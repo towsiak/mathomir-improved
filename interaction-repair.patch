@@ -1,3 +1,45 @@
+diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
+index 944279c..d365781 100644
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -400,11 +400,11 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+ 					if (factorf==0) factorf=0.001;
+ 					double a1=atan2((double)Y-y1,(double)X-x1);
+ 					double a2=atan2((double)y2-Y,(double)x2-X);
+-					if (abs(a1-a2)>abs(a1+6.28318-a2)) a1+=6.28318;
+-					if (abs(a2-a1)>abs(a2+6.28318-a1)) a2+=6.28318;
++					if (fabs(a1-a2)>fabs(a1+6.28318-a2)) a1+=6.28318;
++					if (fabs(a2-a1)>fabs(a2+6.28318-a1)) a2+=6.28318;
+ 				
+-					if ((abs(a1-a2)<0.5/ffactor) || 
+-						((abs(abs(a1-a2)-3.14159)<0.5/ffactor) && (hor_vert_line))) //when drawing horizontal/vertical lines we can 'return' (undraw)
++					if ((fabs(a1-a2)<0.5/ffactor) ||
++						((fabs(fabs(a1-a2)-3.14159)<0.5/ffactor) && (hor_vert_line))) //when drawing horizontal/vertical lines we can 'return' (undraw)
+ 					if (!Drawing_inside_create)
+ 					if (((l2+l3<l1+(double)20.0/factorf/(double)ffactor) && (!hor_vert_line)) || (hor_vert_line) ||
+ 						((l2+l3<l1*1.015) && (hor_vert_line)))
+diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
+index 531282c..dc48354 100644
+--- a/Mathomir/Expression.cpp
++++ b/Mathomir/Expression.cpp
+@@ -16978,7 +16978,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+ 			while (1)
+ 			{
+ 				rr=number_dbl*pow(10.0,-exxp);
+-				if (abs(rr)>=1.0) break; 
++				if (fabs(rr)>=1.0) break;
+ 				exxp--;
+ 				if (exxp<-100) 	{rr=0.0;exxp=0;break;}
+ 			}
+@@ -16988,7 +16988,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+ 			while (1)
+ 			{
+ 				rr=number_dbl/pow(10.0,exxp);
+-				if (abs(rr)<10.0) break;
++				if (fabs(rr)<10.0) break;
+ 				exxp++;
+ 				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
+ 			}
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
 index fc832eb..249ecdd 100644
 --- a/Mathomir/MathomirView.cpp
