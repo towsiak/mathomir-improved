@@ -507,9 +507,47 @@ index f751ecf..a434d1a 100644
  	theMenu->CheckMenuItem(ID_FONTSIZE_NORMAL,(DefaultFontSize==100)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_SMALL,(DefaultFontSize==85)?MF_CHECKED:MF_UNCHECKED);
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..2049c99 100644
+index bdcebb4..bbad3c8 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
+@@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
+ // Dialog
+ //
+ 
+-IDD_ABOUTBOX DIALOGEX 0, 0, 235, 137
+-STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+-CAPTION "About Math-o-mir"
+-FONT 8, "MS Shell Dlg", 0, 0, 0x1
++IDD_ABOUTBOX DIALOGEX 0, 0, 320, 184
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "About Math-o-mir Improved"
++FONT 9, "Segoe UI"
+ BEGIN
+-    ICON            IDR_MAINFRAME,IDC_STATIC,11,14,20,20
+-    LTEXT           "Math-o-mir  2.1 beta5",IDC_STATIC,43,13,125,8,SS_NOPREFIX
+-    LTEXT           "Danijel Gorupec, 2018.",IDC_STATIC,44,42,95,8
+-    DEFPUSHBUTTON   "OK",IDOK,178,6,50,16,WS_GROUP
+-    LTEXT           "E-mail me at: danijel.gorupec@gmail.com",IDC_STATIC,43,100,134,8
+-    LTEXT           "The mathematical notepad.",IDC_STATIC,43,23,88,8
+-    PUSHBUTTON      "Button1",IDC_BUTTON1,198,116,29,14,BS_ICON
+-    PUSHBUTTON      "Button2",IDC_BUTTON2,198,97,29,14,BS_ICON
+-    LTEXT           "Visit the Math-o-mir homepage",IDC_STATIC,43,118,98,8
+-    LTEXT           "This software is free. You are welcome to use,",IDC_STATIC,43,65,185,8
+-    LTEXT           "reuse, copy, modify, distribute, rebrand...",IDC_STATIC,44,74,171,12
++    ICON IDR_MAINFRAME, IDC_STATIC, 12, 12, 20, 20
++    LTEXT "Math-o-mir Improved - v10", IDC_STATIC, 44, 12, 260, 14
++    LTEXT "Windows build: 2026-10-03 | Version 2.1.10.0", IDC_STATIC, 44, 29, 260, 12
++    LTEXT "Based on Math-o-mir 2.1 beta5.", IDC_STATIC, 12, 49, 296, 12
++    LTEXT "Original author: Danijel Gorupec. Original MIT license retained.", IDC_STATIC, 12, 65, 296, 24
++    LTEXT "Improved fork: towsiak / mathomir-improved on GitHub.", IDC_STATIC, 12, 89, 296, 12
++    LTEXT "Source code, Windows builds, updates and issue reports:", IDC_STATIC, 12, 106, 296, 12
++    PUSHBUTTON "Project / updates", IDC_ABOUT_REPOSITORY, 12, 124, 110, 20
++    PUSHBUTTON "Original homepage", IDC_BUTTON1, 128, 124, 104, 20
++    PUSHBUTTON "Original author e-mail", IDC_BUTTON2, 12, 151, 132, 20
++    DEFPUSHBUTTON "OK", IDOK, 244, 151, 64, 20, WS_GROUP
+ END
+ 
+ 
 @@ -218,6 +218,33 @@ END
  // Menu
  //
@@ -637,6 +675,34 @@ index bdcebb4..2049c99 100644
  END
  
  
+@@ -425,8 +487,8 @@ END
+ //
+ 
+ VS_VERSION_INFO VERSIONINFO
+- FILEVERSION 2,1,0,4
+- PRODUCTVERSION 2,1,0,4
++ FILEVERSION 2,1,10,0
++ PRODUCTVERSION 2,1,10,0
+  FILEFLAGSMASK 0x3fL
+ #ifdef _DEBUG
+  FILEFLAGS 0x1L
+@@ -441,12 +503,12 @@ BEGIN
+     BEGIN
+         BLOCK "040904e4"
+         BEGIN
+-            VALUE "FileDescription", "Math-o-mir, the mathematical notepad."
+-            VALUE "FileVersion", "2.1"
++            VALUE "FileDescription", "Math-o-mir Improved v10, the mathematical notepad."
++            VALUE "FileVersion", "2.1.10.0"
+             VALUE "InternalName", "mathomir.exe"
+             VALUE "OriginalFilename", "mathomir.exe"
+-            VALUE "ProductName", "Math-o-mir"
+-            VALUE "ProductVersion", "2.1"
++            VALUE "ProductName", "Math-o-mir Improved"
++            VALUE "ProductVersion", "2.1.10.0"
+         END
+     END
+     BLOCK "VarFileInfo"
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
 index 15ec728..b30baeb 100644
 --- a/Mathomir/MathomirDoc.cpp
@@ -692,7 +758,7 @@ index 15ec728..b30baeb 100644
  					}
  					strcpy(file_pointer,">\r\n");file_pointer+=3;len+=3;
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..d6f5ac6 100644
+index fc832eb..d34f0a0 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -770,13 +836,14 @@ index fc832eb..d6f5ac6 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +260,18 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +260,19 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
 +	ON_COMMAND(ID_TRIG_RADIANS, OnTrigRadians)
 +    ON_COMMAND(ID_TRIG_DEGREES, OnTrigDegrees)
 +	ON_COMMAND(ID_ROTATE_WITH_MOUSE, OnRotateWithMouse)
++	ON_COMMAND(ID_APP_ABOUT, OnImprovedAbout)
 +	ON_COMMAND(ID_FEATURE_SEARCH, OnFeatureSearch)
 +	ON_COMMAND(ID_EDIT_ROTATE_EQUATION, OnRotateEquation)
 +	ON_COMMAND(ID_FONT_ALL_OBJECTS, OnFontAllObjects)
@@ -789,7 +856,7 @@ index fc832eb..d6f5ac6 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -576,17 +635,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +636,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -812,7 +879,7 @@ index fc832eb..d6f5ac6 100644
  				}
  				else
  				{
-@@ -624,13 +684,16 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,13 +685,16 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -830,7 +897,7 @@ index fc832eb..d6f5ac6 100644
  
  		//draw paper sheet area
  		if (!ViewOnlyMode)
-@@ -753,6 +816,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +817,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -840,7 +907,7 @@ index fc832eb..d6f5ac6 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -802,6 +868,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -802,6 +869,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			((CDrawing*)(SpecialDrawingHover->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,SpecialDrawingHover->absolute_X,SpecialDrawingHover->absolute_Y);
  		}
  
@@ -848,7 +915,7 @@ index fc832eb..d6f5ac6 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1293,6 +1360,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1293,6 +1361,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_COPYPEN);
  		}
  		PaintDrawingHotspot(1);
@@ -856,7 +923,7 @@ index fc832eb..d6f5ac6 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1417,53 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1418,53 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -910,7 +977,7 @@ index fc832eb..d6f5ac6 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1555,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1556,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -919,7 +986,7 @@ index fc832eb..d6f5ac6 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +1902,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +1903,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -948,7 +1015,7 @@ index fc832eb..d6f5ac6 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2169,12 +2298,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2299,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -964,7 +1031,7 @@ index fc832eb..d6f5ac6 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2312,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2313,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -976,7 +1043,7 @@ index fc832eb..d6f5ac6 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2326,9 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2327,9 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -987,7 +1054,7 @@ index fc832eb..d6f5ac6 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2812,6 +2944,19 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +2945,19 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -1007,7 +1074,7 @@ index fc832eb..d6f5ac6 100644
  
  	try
  	{
-@@ -3338,6 +3483,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3484,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -1015,7 +1082,7 @@ index fc832eb..d6f5ac6 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +3583,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +3584,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -1028,7 +1095,7 @@ index fc832eb..d6f5ac6 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +3705,10 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +3706,10 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
@@ -1039,7 +1106,7 @@ index fc832eb..d6f5ac6 100644
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +3761,32 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +3762,32 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -1100,7 +1167,7 @@ index fc832eb..d6f5ac6 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4169,31 +4319,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4320,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -1133,7 +1200,7 @@ index fc832eb..d6f5ac6 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4457,6 +4583,13 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +4584,13 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -1147,7 +1214,7 @@ index fc832eb..d6f5ac6 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +4605,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +4606,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -1155,7 +1222,7 @@ index fc832eb..d6f5ac6 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5360,7 +5492,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +5493,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -1164,7 +1231,7 @@ index fc832eb..d6f5ac6 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +5546,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +5547,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -1181,7 +1248,7 @@ index fc832eb..d6f5ac6 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5585,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5586,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -1210,7 +1277,7 @@ index fc832eb..d6f5ac6 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +5676,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +5677,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -1219,7 +1286,7 @@ index fc832eb..d6f5ac6 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +5787,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +5788,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -1271,7 +1338,7 @@ index fc832eb..d6f5ac6 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5836,7 +5948,7 @@ if ((nChar!=6) )
+@@ -5836,7 +5949,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -1280,7 +1347,7 @@ index fc832eb..d6f5ac6 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6230,13 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6231,13 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -1294,7 +1361,7 @@ index fc832eb..d6f5ac6 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -7585,6 +7704,10 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7705,10 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -1305,7 +1372,7 @@ index fc832eb..d6f5ac6 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8235,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8236,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -1333,7 +1400,7 @@ index fc832eb..d6f5ac6 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +8688,8 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +8689,8 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -1343,7 +1410,7 @@ index fc832eb..d6f5ac6 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9534,678 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9535,697 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -1602,6 +1669,22 @@ index fc832eb..d6f5ac6 100644
 +
 +    SetFocus();
 +}
++class CImprovedAboutDialog : public CDialog
++{
++public:
++    CImprovedAboutDialog() : CDialog(IDD_ABOUTBOX) {}
++    afx_msg void OriginalSite() { ShellExecute(m_hWnd,"open","http://gorupec.awardspace.com/mathomir.html",NULL,NULL,SW_SHOWNORMAL); }
++    afx_msg void OriginalAuthor() { ShellExecute(m_hWnd,"open","mailto:danijel.gorupec@gmail.com",NULL,NULL,SW_SHOWNORMAL); }
++    afx_msg void Repository() { ShellExecute(m_hWnd,"open","https://github.com/towsiak/mathomir-improved",NULL,NULL,SW_SHOWNORMAL); }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CImprovedAboutDialog,CDialog)
++    ON_BN_CLICKED(IDC_BUTTON1,OriginalSite)
++    ON_BN_CLICKED(IDC_BUTTON2,OriginalAuthor)
++    ON_BN_CLICKED(IDC_ABOUT_REPOSITORY,Repository)
++END_MESSAGE_MAP()
++void CMathomirView::OnImprovedAbout() { CImprovedAboutDialog dialog; dialog.DoModal(); }
++
 +void CMathomirView::OnFeatureSearch()
 +{
 +    if (FocusQuickActionSearch()) return;
@@ -1652,10 +1735,13 @@ index fc832eb..d6f5ac6 100644
 +        int width=max(0,area.Width()-ToolboxSize);
 +        SetWindowPos(&wndTop,ToolboxSize,top,width,32,SWP_NOACTIVATE);
 +        ShowWindow(ViewOnlyMode ? SW_HIDE : SW_SHOWNOACTIVATE);
-+        int field=max(70,min(320,width-246));
++        int reserved=width>=330 ? 214 : (width>=210 ? 62 : 0);
++        int field=max(50,min(320,width-58-reserved));
 +        label.MoveWindow(6,4,45,24); search.MoveWindow(52,3,field,26);
 +        int x=field+60;
-+        fontButton.MoveWindow(x,3,76,26); rotateButton.MoveWindow(x+82,3,64,26); modeButton.MoveWindow(x+152,3,52,26);
++        fontButton.MoveWindow(x,3,76,26); rotateButton.MoveWindow(x+82,3,64,26);
++        fontButton.ShowWindow(width>=330 ? SW_SHOWNOACTIVATE : SW_HIDE); rotateButton.ShowWindow(width>=330 ? SW_SHOWNOACTIVATE : SW_HIDE);
++        modeButton.MoveWindow(x+(width>=330 ? 152 : 0),3,52,26); modeButton.ShowWindow(width>=210 ? SW_SHOWNOACTIVATE : SW_HIDE);
 +        modeButton.SetWindowText(TrigDegrees ? "DEG" : "RAD");
 +        if (dropdown.GetSafeHwnd() && dropdown.IsWindowVisible()) ShowResults();
 +    }
@@ -1663,7 +1749,7 @@ index fc832eb..d6f5ac6 100644
 +    void ShowResults()
 +    {
 +        if (!view || !GetSafeHwnd()) return;
-+        if (!dropdown.GetSafeHwnd()) { dropdown.inlineView=view; if (!dropdown.Create(IDD_FEATURE_SEARCH,this)) return; }
++        if (!dropdown.GetSafeHwnd()) { dropdown.inlineView=view; if (!dropdown.Create(IDD_FEATURE_SEARCH,this)) return; dropdown.ModifyStyle(WS_CAPTION|WS_SYSMENU,0,SWP_FRAMECHANGED); }
 +        BuildFeatureCatalog(dropdown);
 +        CString query; search.GetWindowText(query); dropdown.SetQuery(query);
 +        CRect field; search.GetWindowRect(&field);
@@ -2022,7 +2108,7 @@ index fc832eb..d6f5ac6 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9438,6 +10234,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10254,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -2031,7 +2117,7 @@ index fc832eb..d6f5ac6 100644
  
  	//first stop the keyboard entry mode if it is active
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..5643f5e 100644
+index 94dd0e4..658bc29 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -76,6 +76,7 @@ public:
@@ -2042,7 +2128,7 @@ index 94dd0e4..5643f5e 100644
  	int PopupCloses(int UserParam, int ExitCode);
  	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
  	afx_msg void OnSelectionsFrame();
-@@ -119,6 +120,23 @@ public:
+@@ -119,6 +120,24 @@ public:
  	afx_msg void OnOutputimageSize80();
  	afx_msg void OnOutputimageForcehighquality();
  	afx_msg void OnOutputimageForcehalftone();
@@ -2055,6 +2141,7 @@ index 94dd0e4..5643f5e 100644
 +	afx_msg void OnTrigDegrees();
 +	void RunFeatureCommand(UINT command, int drawingMode);
 +	afx_msg void OnCaptureChanged(CWnd *window);
++	afx_msg void OnImprovedAbout();
 +	afx_msg void OnFeatureSearch();
 +	afx_msg void OnRotateEquation();
 +	afx_msg void OnFontAllObjects();
@@ -2067,10 +2154,10 @@ index 94dd0e4..5643f5e 100644
  	afx_msg void OnFontsizeLarge();
  	afx_msg void OnFontsizeNormal();
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..346fcaf 100644
+index 05446cf..48d7d1f 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,41 @@
+@@ -174,3 +174,43 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -2112,6 +2199,8 @@ index 05446cf..346fcaf 100644
 +#define ID_DEFAULT_ZOOM_200 33023
 +#define ID_DEFAULT_ZOOM_300 33024
 +#define ID_DEFAULT_ZOOM_400 33025
++
++#define IDC_ABOUT_REPOSITORY 1116
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
 index b9c3f38..b4c998e 100644
 --- a/Mathomir/Toolbox.cpp
