@@ -6,6 +6,15 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- Visible RAD/DEG indicator; Options and Search choose numeric trig angle mode.
+  Mode is saved in .mom files; old files and new documents default to radians.
+  Explicit trailing degree or rad units override mode for numeric arguments.
+  Inverse trig numeric results follow the mode; symbolic pi identities remain
+  radians. Undefined explicit-unit tangent/secant/cotangent/cosecant stay unevaluated.
+- Hover common function names for a transient real-domain/range reference,
+  including trig periods/restrictions and the current numeric angle mode.
+- Avoid scrolling to show an entire equation when its typing cursor is visible.
+  The reported integral lower-limit click jump has not been reproduced here.
 - Search is visible on the menu bar; Ctrl+K opens the feature search box.
   Live, case-insensitive multi-word matching searches menu commands and aliases.
   A single result click or Enter executes the chosen command. Arrow keys change
@@ -67,6 +76,10 @@ Changes:
 - Modern MSVC compatibility fixes for floating-point absolute values.
 
 Test on Windows:
+- Check sin(30) in DEG gives 0.5, sin(pi/6) in RAD gives 0.5, and sin(30deg)
+  gives 0.5 in either mode. Check inverse trig and saved mode after reopening.
+  Hover sin/cos/tan/arcsin/ln/log/exp/abs and move away to dismiss the reference.
+- Click and edit an integral lower limit; check equation position and scrolling.
 - Open Search/Ctrl+K; try font, bigger, rotate, mouse, print preview, letter,
   brace and nonsense. Check single-click, Enter, Up/Down and Escape. Run settings
   and confirm they affect the intended equation after the search closes.
