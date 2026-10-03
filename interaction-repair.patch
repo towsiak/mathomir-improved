@@ -100,8 +100,39 @@ index 531282c..850abf1 100644
  				exxp++;
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
+diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
+index f751ecf..52195ca 100644
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
+ //if yes, convert this into a bitmap so it can be pasted into any other application
+ void CMainFrame::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+ {
++	CFrameWnd::OnActivate(nState,pWndOther,bMinimized);
++	// Opening an in-process dialog is not a copy/paste handoff to another app.
++	// Keep clipboard rendering and document mutation out of nested modal loops.
++	if (nState==WA_INACTIVE)
++	{
++		DWORD otherProcess=0;
++		if (pWndOther && ::IsWindow(pWndOther->GetSafeHwnd()))
++			::GetWindowThreadProcessId(pWndOther->GetSafeHwnd(),&otherProcess);
++		if (!IsWindowEnabled() || otherProcess==::GetCurrentProcessId()) return;
++	}
+ 	dont_empty_clipboard=1;
+ 	if (nState==WA_INACTIVE)	
+ 	{
+@@ -495,7 +505,8 @@ void CMainFrame::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+ 
+ void CMainFrame::OnActivateApp(BOOL bActive,DWORD dwThreadID)
+ {
+-	this->SetActiveWindow();
++	// Let Windows retain the active modal dialog instead of activating its owner.
++	CFrameWnd::OnActivateApp(bActive,dwThreadID);
+ }
+ 
+ //we are going to disable Main Menu activation throught the ALT key
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..2296de5 100644
+index fc832eb..f46f340 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -576,17 +576,18 @@ void CMathomirView::OnDraw(CDC* pDC)
@@ -215,3 +246,17 @@ index fc832eb..2296de5 100644
  			prevTouchedObject=TouchedObject;
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
+@@ -6118,6 +6125,13 @@ unsigned int prevTimerTickTime;
+ unsigned int TimerTickAccumulator;
+ void CMathomirView::OnTimer(UINT nIDEvent)
+ {
++	// Modal dialogs disable the frame. Leave their message loop and focus alone.
++	if (theApp.m_pMainWnd && !theApp.m_pMainWnd->IsWindowEnabled())
++	{
++		prevTimerTickTime=GetTickCount();
++		TimerTickAccumulator=0;
++		return;
++	}
+ 	//faster timing functions here
+ 	unsigned int TimerTickTime=GetTickCount();
+ 	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
