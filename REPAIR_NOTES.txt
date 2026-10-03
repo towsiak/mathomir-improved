@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 6 — 2026-10-03
+Math-o-mir repair candidate 7 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -6,6 +6,18 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- Edit > Font for all objects (Ctrl+Shift+F) opens the Windows font chooser.
+  One choice changes the shared non-symbol font slots and sizes all equations,
+  text and text nested in drawings. Symbol glyphs retain their font.
+  The dialog accepts 6-120 point sizes (40-800% of the normal equation size).
+  Font names are shared application settings, as in the original editor;
+  object-size changes are stored in documents and can be undone.
+- Edit > Font size provides 100%, 200%, 400% and 800% choices. Applies to
+  selected objects, otherwise the active typing object, otherwise new typing.
+  Nested fractions/exponents scale proportionally. Drawing strokes do not scale.
+- Double-click free placement bypasses grid and guideline snapping and automatic
+  append-to-nearby-text behavior. Ordinary new-cursor guideline alignment and
+  append-to-text now require Shift. Ordinary grid snapping remains available.
 - Double-click starts free placement even within expression bounds.
   Double-click and release for a new typing cursor; double-click and hold
   the second press, drag and pause for the existing quick-brace gesture.
@@ -29,6 +41,12 @@ Changes:
 - Modern MSVC compatibility fixes for floating-point absolute values.
 
 Test on Windows:
+- Use Ctrl+Shift+F to change all fonts and sizes. Check ordinary text, equations,
+  Greek/symbol glyphs and labels nested in drawings; save and reopen.
+- Select several objects, use Edit > Font size > 800%, then Undo.
+  Check superscripts/fractions keep proportions and unrelated objects keep sizes.
+- Double-click near another object with coarse grid enabled. The cursor should
+  start at the click without snapping to a guideline or appending to old text.
 - Double-click beneath/above an exponent and type. Double-click and drag
   a thin brace gesture inside the expression footprint; pause then release.
   Check single-click copy and ordinary text/exponent editing too.
