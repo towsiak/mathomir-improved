@@ -348,7 +348,7 @@ $fixture=Join-Path (Split-Path $exe) 'root-annotation-smoke.mom'
 </mathomir>
 '@ | Set-Content -LiteralPath $fixture -Encoding ascii
 $startArgs=@{FilePath=$exe; WorkingDirectory=(Split-Path $exe); PassThru=$true; RedirectStandardError=(Join-Path (Split-Path $exe) 'smoke-stderr.txt')}
-if ($env:MATHOMIR_DIAGNOSTIC_STARTUP) { $startArgs.ArgumentList="`"$fixture`"" }
+
 $appProcess = Start-Process @startArgs
 try {
   $main = [IntPtr]::Zero
@@ -539,6 +539,8 @@ try {
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 } finally {
+  $appProcess.Refresh()
+  if ($appProcess.HasExited) {Write-Output "App exit code: $($appProcess.ExitCode)"}
   if (!$appProcess.HasExited) { Stop-Process -Id $appProcess.Id -Force }
   Get-Content (Join-Path (Split-Path $exe) 'smoke-stderr.txt') -ErrorAction SilentlyContinue
   Get-ChildItem (Split-Path $exe) -Filter 'asan*' | ForEach-Object { Get-Content $_.FullName }
