@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 12 — 2026-10-03
+Math-o-mir repair candidate 13 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -11,6 +11,19 @@ The exact reported crash has not been reproduced. Mouse resizing and printer
 behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
+- Graph Smart fit keeps the horizontal window and fits finite function samples
+  vertically, trimming extreme 5% tails per function and adding readable padding.
+  Fits commit once after sampling, avoiding progressive scale jumps. Constant
+  functions receive useful padding; invalid-only results keep the previous view.
+- The graph toolbar has a labeled Fit button. Search Smart fit, Reset view,
+  Zoom in gently or Zoom out gently. Reset uses -10..10, or -2pi..2pi in pi mode,
+  or 0.1..100 on log axes, and fits the functions. These commands are undoable.
+- Tiny zoom rectangles become gentle pointer-centered zoom, with clamped bounds;
+  axis drag ratios cannot divide near zero or explode. Zoom-out grows spans 25%.
+  Graph ranges are limited to +/-1e12, with minimum linear span 1e-9 (or relative
+  precision at large centers); log limits are 1e-12..1e12. Pi/log modes survive
+  range writes. Incomplete aborted samples are never auto-fitted.
+- Graph sample arrays are released using array delete, matching allocation.
 - Resize updates restore the original root font size before copying and scaling.
   This fixes repeated multiplication of the current size on mouse events, and
   preserves nested font proportions plus Escape restoration at any starting size.
