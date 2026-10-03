@@ -534,9 +534,47 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v13' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v14' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
+  $intervalCounts=@()
+  foreach($command in 33042,33043,33044,33045){
+    [MathomirUiProbe]::Send($main,273,$command)|Out-Null
+    $placeY=210+45*($command-33042)
+    [MathomirUiProbe]::Mouse($view,512,0,100,$placeY)
+    [MathomirUiProbe]::Mouse($view,513,1,100,$placeY)
+    [MathomirUiProbe]::Mouse($view,514,0,100,$placeY)
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$intervalSaved=Get-Content $fixture -Raw
+    $interval=$intervalSaved.SelectSingleNode('/mathomir/*[last()]')
+    $labels=$interval.SelectNodes('./subexp')
+    if($labels.Count -ne 2){throw "Interval $command did not place with two editable endpoint labels."}
+    $segments=0
+    foreach($line in $interval.SelectNodes('./dw')){$segments+=($line.d.Split(';').Count-1)}
+    $intervalCounts+=$segments
+  }
+  if($intervalCounts[1]-$intervalCounts[0] -ne 18 -or $intervalCounts[2]-$intervalCounts[0] -ne 9 -or $intervalCounts[3]-$intervalCounts[0] -ne 9){throw "Endpoint fill choices are inconsistent: $intervalCounts"}
+  $beforeRotation=$interval.OuterXml
+  $intervalX=0;$intervalY=0
+  foreach($obj in $intervalSaved.SelectNodes('/mathomir/*')){if($obj.HasAttribute('X')){$intervalX=[int]$obj.X};if($obj.HasAttribute('Y')){$intervalY=[int]$obj.Y}}
+  $axisData=$interval.SelectSingleNode('./dw').d.Split('|')[1].Split(';')[0].Split(',')
+  $axisY=[int]$axisData[1]/32
+  for($probe=15;$probe -lt 50;$probe+=5){[MathomirUiProbe]::Mouse($view,512,0,($intervalX+$probe),($intervalY+$axisY))}
+  [MathomirUiProbe]::Send($main,273,33011)|Out-Null
+  $handleX=$intervalX+252;$handleY=$intervalY-10
+  [MathomirUiProbe]::Mouse($view,513,1,$handleX,$handleY)
+  [MathomirUiProbe]::Mouse($view,512,1,($intervalX+120),($intervalY+150))
+  [MathomirUiProbe]::Mouse($view,514,0,($intervalX+120),($intervalY+150))
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$rotated=Get-Content $fixture -Raw
+  $rotatedInterval=$rotated.SelectSingleNode('/mathomir/*[last()]')
+  if($rotatedInterval.OuterXml -eq $beforeRotation){throw 'Drawing rotation did not change the interval geometry.'}
+  if($rotatedInterval.SelectNodes('./subexp/*[@rot_mdeg]').Count -ne 2){throw 'Endpoint labels did not rotate with the interval.'}
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$rotationUndo=Get-Content $fixture -Raw
+  if($rotationUndo.SelectSingleNode('/mathomir/*[last()]').OuterXml -ne $beforeRotation){throw 'Undo did not restore interval geometry.'}
+  Write-Output 'Interval and drawing rotation passed: four presets, correct open/closed dots, editable labels rotate with the drawing, Undo restores geometry.'
   Start-Sleep -Milliseconds 300
   $recoveryFolder=Join-Path $env:LOCALAPPDATA 'MathomirImproved/Recovery'
   $before=@(Get-ChildItem $recoveryFolder -Filter 'Recovery-*.mom' -ErrorAction SilentlyContinue).Count
