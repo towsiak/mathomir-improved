@@ -52,11 +52,23 @@ try {
     if ($appProcess.MainWindowHandle -ne 0) { $main=$appProcess.MainWindowHandle; break }
   }
   if ($main -eq [IntPtr]::Zero) { throw 'No main window was created.' }
-  [MathomirUiProbe]::OpenFile($main,$fixture)
+  [MathomirUiProbe]::PostMessage($main,273,[IntPtr]0xE101,[IntPtr]::Zero) | Out-Null
   Start-Sleep -Milliseconds 500
-  $appProcess.Refresh()
-  if ($appProcess.HasExited) { throw "Application exited while opening the root fixture: $($appProcess.ExitCode)" }
-  if ([MathomirUiProbe]::Text($main) -notmatch 'root-annotation-smoke') { throw 'The root fixture did not open.' }
+  $open=[MathomirUiProbe]::Window($appProcess.Id,'Open')
+  if ($open -eq [IntPtr]::Zero) { throw 'The file-open dialog did not appear.' }
+  $fileEdit=[MathomirUiProbe]::Child($open,1148)
+  if ($fileEdit -eq [IntPtr]::Zero) { $fileEdit=[MathomirUiProbe]::Child($open,1001) }
+  if ($fileEdit -eq [IntPtr]::Zero) { $fileEdit=[MathomirUiProbe]::Child($open,1152) }
+  if ($fileEdit -eq [IntPtr]::Zero) { throw ('Filename control not found. '+[MathomirUiProbe]::AllText($open)) }
+  [MathomirUiProbe]::SetText($fileEdit,$fixture)
+  [MathomirUiProbe]::PostMessage($open,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
+  for ($attempt=0; $attempt -lt 30; $attempt++) {
+    Start-Sleep -Milliseconds 100
+    $appProcess.Refresh()
+    if ($appProcess.HasExited) { throw "Application exited while opening the root fixture: $($appProcess.ExitCode)" }
+    if ([MathomirUiProbe]::Text($main) -match 'root-annotation-smoke') { break }
+  }
+  if ([MathomirUiProbe]::Text($main) -notmatch 'root-annotation-smoke') { throw ('The root fixture did not open. '+[MathomirUiProbe]::AllText($open)) }
   $view=[MathomirUiProbe]::Child($main,0xE900)
   if ($view -eq [IntPtr]::Zero) { throw 'The document view is missing.' }
   [MathomirUiProbe]::Send($main,273,32775) | Out-Null
