@@ -1,5 +1,5 @@
 diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
-index 944279c..d365781 100644
+index 944279c..5d53aaf 100644
 --- a/Mathomir/Drawing.cpp
 +++ b/Mathomir/Drawing.cpp
 @@ -400,11 +400,11 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
@@ -18,6 +18,38 @@ index 944279c..d365781 100644
  					if (!Drawing_inside_create)
  					if (((l2+l3<l1+(double)20.0/factorf/(double)ffactor) && (!hor_vert_line)) || (hor_vert_line) ||
  						((l2+l3<l1*1.015) && (hor_vert_line)))
+@@ -2159,6 +2159,8 @@ CObject* CDrawing::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y, in
+ 	{
+ 		sz=MovingDotSize/3+1; 
+ 		if (ViewZoom>100) sz+=sz*(ViewZoom-100)/384;
++		// Ctrl retains larger handles; ordinary hover stays close to the stroke.
++		if (!(GetKeyState(VK_CONTROL)&0xFFFE)) sz=min(sz,2);
+ 	}
+ 	else
+ 		sz=0;
+@@ -2192,13 +2194,15 @@ CObject* CDrawing::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y, in
+ 					break;
+ 				}
+ 			}
+-			double l1=sqrt((double)(((double)x2-x1)*(x2-x1)+((double)y2-y1)*(y2-y1)));
+-			double l2=sqrt((double)(((double)x2-X)*(x2-X)+((double)y2-Y)*(y2-Y)));
+-			double l3=sqrt((double)(((double)X-x1)*(X-x1)+((double)Y-y1)*(Y-y1)));
+-			double factorf=(l2*l3)/(l2+l3);
+-			if (factorf==0) factorf=0.001;
+-			factorf/=((double)max(di->LineWidth*ViewZoom/100,34*DRWZOOM/10))/2.0/(double)DRWZOOM;
+-			if (l2+l3<l1+(double)zoom/100.0/factorf) 
++			// Distance to the finite visible segment, with a small screen-pixel margin.
++			double dx=(double)x2-x1, dy=(double)y2-y1;
++			double lengthSquared=dx*dx+dy*dy;
++			double t=lengthSquared>0 ? (((double)X-x1)*dx+((double)Y-y1)*dy)/lengthSquared : 0;
++			if (t<0) t=0;
++			if (t>1) t=1;
++			double distanceX=X-(x1+t*dx), distanceY=Y-(y1+t*dy);
++			double tolerance=1.0+((double)di->LineWidth*zoom/100/DRWZOOM)/2.0;
++			if (distanceX*distanceX+distanceY*distanceY<=tolerance*tolerance)
+ 			{
+ 				ret=(CObject*)this;
+ 				break;
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
 index 531282c..dc48354 100644
 --- a/Mathomir/Expression.cpp
@@ -41,10 +73,33 @@ index 531282c..dc48354 100644
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..249ecdd 100644
+index fc832eb..11854ab 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -1795,6 +1795,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -576,17 +576,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+ 					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
+ 					((CDrawing*)(ds->Object))->SelectDrawing(0);
+ 				}
+-				tmpbmp.CreateCompatibleBitmap(pDC,l,a+b);
+-				tmpDC.SelectObject(tmpbmp);
+-				tmpDC.FillSolidRect(0,0,ClientArea.right,ClientArea.bottom,RGB(255,255,255));
+ 				PrintRendering=1;
+-				if (PrintTextAsImage)
++				if (PrintTextAsImage && l>0 && a+b>0)
+ 				{
++					if (!tmpbmp.CreateCompatibleBitmap(pDC,l,a+b)) { PrintRendering=0; continue; }
++					CBitmap *previousBitmap=tmpDC.SelectObject(&tmpbmp);
++					tmpDC.FillSolidRect(0,0,l,a+b,RGB(255,255,255));
+ 					if (ds->Type==1)
+ 						((CExpression*)(ds->Object))->PaintExpression(&tmpDC,ViewZoom,0,a);
+ 					else if (ds->Type==2)
+ 						((CDrawing*)(ds->Object))->PaintDrawing(&tmpDC,ViewZoom,0,a,-1,-1);
+ 					pDC->TransparentBlt(RelativeX,RelativeY-a,l,a+b,&tmpDC,0,0,l,a+b,RGB(255,255,255)/*SRCCOPY*/);
++					tmpDC.SelectObject(previousBitmap);
+ 				}
+ 				else
+ 				{
+@@ -1795,6 +1796,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -72,7 +127,7 @@ index fc832eb..249ecdd 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -3610,32 +3631,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3610,32 +3632,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  				
  			RepaintViewTimer=0;
  
