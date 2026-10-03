@@ -1,0 +1,47 @@
+name: Build Windows app
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch original source and apply repair
+        shell: pwsh
+        run: |
+          git clone https://github.com/mathomir/Mathomir_GIT.git source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source checkout 0300c13e5108fb6112403b20f576d977db3309f9
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../interaction-repair.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item Mathomir.vcxproj source/Mathomir/
+      - name: Locate MSBuild and check MFC
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.ATLMFC -property installationPath
+          if (!$vs) { throw 'Visual Studio with MFC is required on the runner.' }
+          "MSBUILD=$vs\MSBuild\Current\Bin\MSBuild.exe" >> $env:GITHUB_ENV
+      - name: Build Release Win32
+        shell: pwsh
+        run: |
+          & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item source/build/Mathomir.exe package/
+          Copy-Item source/ReadMe.txt package/LICENSE.txt
+          Copy-Item REPAIR_NOTES.txt package/
+          Copy-Item source/Mathomir/res/MathomirHandyHelp.chm package/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mathomir-Windows-Repair
+          path: package/
+          if-no-files-found: error
