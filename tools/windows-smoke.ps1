@@ -28,6 +28,9 @@ public static class MathomirUiProbe {
   [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc,int x,int y);
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
+  [DllImport("user32.dll")] static extern IntPtr GetMenu(IntPtr hwnd);
+  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetMenuString(IntPtr menu,uint id,StringBuilder text,int count,uint flags);
+  public static string MenuText(IntPtr hwnd,uint id) {var text=new StringBuilder(256);GetMenuString(GetMenu(hwnd),id,text,256,0);return text.ToString();}
   public static void SetText(IntPtr hwnd,string text) { UIntPtr result; if(SendTextTimeout(hwnd,12,IntPtr.Zero,text,2,3000,out result)==IntPtr.Zero) throw new Exception("Search text did not respond"); }
   public static IntPtr Child(IntPtr parent,int id) { IntPtr found=IntPtr.Zero; EnumChildWindows(parent,(hwnd,p)=>{if(GetDlgCtrlID(hwnd)==id){found=hwnd;return false;} return true;},IntPtr.Zero); return found; }
   public static IntPtr Window(int process,string caption) { IntPtr found=IntPtr.Zero; EnumWindows((hwnd,p)=>{uint pid; GetWindowThreadProcessId(hwnd,out pid); if(pid==process && IsWindowVisible(hwnd) && Text(hwnd)==caption){found=hwnd;return false;}return true;},IntPtr.Zero); return found; }
@@ -93,10 +96,11 @@ try {
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$moved=Get-Content -LiteralPath $fixture -Raw
   if ($moved.mathomir.o.X -ne '130' -or $moved.mathomir.o.Y -ne '170') { throw 'Dragging the move grip did not move the object by the expected distance.' }
+  Write-Output ("Undo menu before command: "+[MathomirUiProbe]::MenuText($main,0xE12B))
   [MathomirUiProbe]::Send($main,273,0xE12B) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$undone=Get-Content -LiteralPath $fixture -Raw
-  if ($undone.mathomir.o.X -ne '100' -or $undone.mathomir.o.Y -ne '150') { throw 'Undo did not restore the grip move.' }
+  if ($undone.mathomir.o.X -ne '100' -or $undone.mathomir.o.Y -ne '150') { throw ("Undo did not restore the grip move. Saved position: $($undone.mathomir.o.X), $($undone.mathomir.o.Y)") }
   Write-Output 'Move grip smoke passed: drag without whole-object selection, save expected position, Undo restores position.'
   [MathomirUiProbe]::Mouse($view,513,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
