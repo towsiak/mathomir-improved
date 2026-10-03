@@ -42,7 +42,12 @@ public static class MathomirUiProbe {
   [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc,int x,int y);
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
-  public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=150;y<240;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
+  public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
+  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint current,uint target,bool attach);
+  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+  [DllImport("user32.dll")] static extern bool GetKeyboardState(byte[] state);
+  [DllImport("user32.dll")] static extern bool SetKeyboardState(byte[] state);
+  public static void ShiftKey(IntPtr hwnd,int key) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share selection key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[16]=128;SetKeyboardState(state);try{Send(hwnd,256,key);}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
   public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   [DllImport("user32.dll")] static extern IntPtr GetMenu(IntPtr hwnd);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetMenuString(IntPtr menu,uint id,StringBuilder text,int count,uint flags);
@@ -175,20 +180,24 @@ try {
   Write-Output 'Move grip smoke passed: drag without whole-object selection, save expected position, Undo restores position.'
   for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
   $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
+  $initialWidth=$sizeGrip[0]-100
+  $initialHeight=$sizeGrip[1]-([MathomirUiProbe]::MoveGripY($view,88)+12)
+  $expectedFont=[Math]::Floor(100*(1+24*($initialWidth+$initialHeight)/($initialWidth*$initialWidth+$initialHeight*$initialHeight))+.5)
   [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
   [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+12),($sizeGrip[1]+12))
   for ($repeat=0; $repeat -lt 30; $repeat++) { [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+24),($sizeGrip[1]+24)) }
-  if (![MathomirUiProbe]::SizeGripAt($view,($sizeGrip[0]+24),($sizeGrip[1]+24))) { throw 'The active resize grip slipped away from the pointer.' }
+  $actualGrip=[MathomirUiProbe]::SizeGrip($view)
+  if ([Math]::Abs($actualGrip[0]-(100+$initialWidth*$expectedFont/100)) -gt 5) { throw 'The active resize grip detached from the object corner.' }
   [MathomirUiProbe]::Mouse($view,514,0,($sizeGrip[0]+24),($sizeGrip[1]+24))
   for ($repeat=0; $repeat -lt 10; $repeat++) { [MathomirUiProbe]::Mouse($view,512,0,($sizeGrip[0]+80),($sizeGrip[1]+80)) }
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$resized=Get-Content -LiteralPath $fixture -Raw
   $resizedExpression=$resized.SelectSingleNode('/mathomir/*[self::o or self::obj][1]/*[self::ex or self::expr]')
   $fontSize=if ($resizedExpression.HasAttribute('fh')) {[int]$resizedExpression.fh} else {[int]$resizedExpression.fnt_h}
-  if ($fontSize -ne 107) { throw "Repeated stationary resize events compounded the font size or release failed: $fontSize, expected 107." }
+  if ([Math]::Abs($fontSize-$expectedFont) -gt 1) { throw "Repeated stationary resize events compounded the font size or release failed: $fontSize, expected $expectedFont." }
   $resizedChild=$resizedExpression.SelectSingleNode('./elm[@tp="8"]/*[self::ex or self::expr]')
   $childSize=if ($resizedChild.HasAttribute('fh')) {[int]$resizedChild.fh} else {[int]$resizedChild.fnt_h}
-  if ($childSize -ne 96) { throw "Nested root contents scaled incorrectly: $childSize, expected 96." }
+  if ([Math]::Abs($childSize-90*$fontSize/100) -gt 1) { throw "Nested root contents scaled incorrectly: $childSize, expected proportional root contents." }
   [MathomirUiProbe]::Send($main,273,0xE12B) | Out-Null
   for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
   $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
@@ -201,12 +210,16 @@ try {
   $cancelledExpression=$cancelled.SelectSingleNode('/mathomir/*[self::o or self::obj][1]/*[self::ex or self::expr]')
   $cancelledSize=if ($cancelledExpression.HasAttribute('fh')) {[int]$cancelledExpression.fh} else {[int]$cancelledExpression.fnt_h}
   if ($cancelledSize -ne 100) { throw "Escape did not restore the original font size: $cancelledSize." }
-  Write-Output 'Resize regression passed: 30 identical drag events produce 107%, nested root stays proportional, release stops growth, Undo and Escape restore size.'
+  Write-Output 'Resize regression passed: 30 identical drag events do not compound size, grip stays at the object corner, nested root stays proportional, release stops growth, Undo and Escape restore size.'
   [MathomirUiProbe]::Mouse($view,513,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
   [MathomirUiProbe]::Mouse($view,515,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
   foreach ($character in 'constant'.ToCharArray()) { [MathomirUiProbe]::Send($view,258,[int]$character) | Out-Null }
+  for ($i=0;$i -lt 8;$i++){[MathomirUiProbe]::ShiftKey($view,37)}
+  [MathomirUiProbe]::Send($view,258,[int][char]'r') | Out-Null
+  [MathomirUiProbe]::Send($view,258,[int][char]'b') | Out-Null
+  [MathomirUiProbe]::Send($main,273,33038) | Out-Null
   [MathomirUiProbe]::Mouse($view,513,1,300,300)
   [MathomirUiProbe]::Mouse($view,514,0,300,300)
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
@@ -217,6 +230,12 @@ try {
   if ($rootTokens -ne '2x4') { throw "The root's variables changed: $rootTokens" }
   $annotationTokens=($savedRoot.SelectNodes('/mathomir/*[self::o or self::obj]/*[self::ex or self::expr]/*[self::var or self::elm[@tp="1"]]') | ForEach-Object {if ($_.HasAttribute('t')) {$_.t} else {$_.tx}}) -join ''
   if ($annotationTokens -notmatch 'constant') { throw "Typing the annotation did not save its text: $annotationTokens" }
+  $coloredConstant=$savedRoot.SelectSingleNode('//var[contains(@t,"constant")] | //elm[@tp="1"][contains(@tx,"constant")]')
+  $colorValue=if($coloredConstant.HasAttribute('clr')){$coloredConstant.clr}else{$coloredConstant.color}
+  if ($colorValue -ne '6') {throw "Highlighted text did not save purple after R/B shortcuts: $colorValue"}
+  $format=if($coloredConstant.HasAttribute('f')){$coloredConstant.f}else{$coloredConstant.fnt}
+  if (([Convert]::ToInt32($format.Substring(0,2),16) -band 1) -ne 0) {throw 'B unexpectedly made the highlighted text bold.'}
+  Write-Output 'Writing color passed: highlight constant, R then B preserve selection, purple saves, B does not apply bold.'
   Write-Output 'Root placement smoke passed: hover inside root, double-click above the 2, type constant, click away to finish, save label and preserve root.'
   [MathomirUiProbe]::Send($main,273,33026) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
@@ -227,6 +246,8 @@ try {
   Start-Sleep -Milliseconds 1800
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$resetGraph=Get-Content -LiteralPath $fixture -Raw
+  $graphSlots=$resetGraph.SelectNodes('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp')
+  if ($graphSlots.Count -lt 12) {throw 'The graph did not create eight function slots.'}
   $resetRange=Get-GraphRange $resetGraph
   if ([Math]::Abs($resetRange[0]+2*[Math]::PI) -gt .001 -or [Math]::Abs($resetRange[1]-2*[Math]::PI) -gt .001) {throw "Graph reset did not restore the pi window: $resetRange"}
   if ($resetRange[2] -lt -5 -or $resetRange[3] -gt 5 -or $resetRange[2] -ge $resetRange[3]) {throw "Graph smart fit did not produce useful finite y limits: $resetRange"}
