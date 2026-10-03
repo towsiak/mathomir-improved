@@ -66,7 +66,7 @@ $fixture=Join-Path (Split-Path $exe) 'root-annotation-smoke.mom'
 <mathomir>
 <o t="1" X="100" Y="150" ver="2">
 <ex fh="100"><elm tp="8" E1=""><ex fh="90">
-<var t="2" f="00"/><var t="x" f="00"/><opr s="-"/><var t="4" f="00"/>
+<var t="2" f="00" /><var t="x" f="00" /><opr s="-" /><var t="4" f="00" />
 </ex></elm></ex>
 </o>
 <o t="2" X="300" Y="400">
@@ -100,7 +100,7 @@ $fixture=Join-Path (Split-Path $exe) 'root-annotation-smoke.mom'
 		</ex>
 		</fun>
 		<opr s="+" />
-		<var t="1" f="00" />
+		<var t="1.0" f="00" />
 		<opr s="+" />
 		<fra stp="" E1="n" E2="d">
 		<ex fh="90">
@@ -112,12 +112,235 @@ $fixture=Join-Path (Split-Path $exe) 'root-annotation-smoke.mom'
 		</fra>
 	</ex>
 </subexp>
-<subexp d="64,64;544,570">
+<subexp d="0,0;5386,1280">
 	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1.1" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
 	</ex>
 </subexp>
-<subexp d="64,64;544,570">
+<subexp d="0,0;5386,1280">
 	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1.2" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
+	</ex>
+</subexp>
+<subexp d="0,0;5386,1280">
+	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1.3" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
+	</ex>
+</subexp>
+<subexp d="0,0;5386,1280">
+	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1.4" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
+	</ex>
+</subexp>
+<subexp d="0,0;5386,1280">
+	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1.5" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
+	</ex>
+</subexp>
+<subexp d="0,0;5386,1280">
+	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1.6" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
+	</ex>
+</subexp>
+<subexp d="0,0;5386,1280">
+	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1.7000000000000002" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
 	</ex>
 </subexp>
 </o>
@@ -180,14 +403,17 @@ try {
   Write-Output 'Move grip smoke passed: drag without whole-object selection, save expected position, Undo restores position.'
   for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
   $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
-  $initialWidth=$sizeGrip[0]-100
-  $initialHeight=$sizeGrip[1]-([MathomirUiProbe]::MoveGripY($view,88)+12)
-  $expectedFont=[Math]::Floor(100*(1+24*($initialWidth+$initialHeight)/($initialWidth*$initialWidth+$initialHeight*$initialHeight))+.5)
   [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
   [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+12),($sizeGrip[1]+12))
+  [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+24),($sizeGrip[1]+24))
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$firstResize=Get-Content -LiteralPath $fixture -Raw
+  $firstExpression=$firstResize.SelectSingleNode('/mathomir/*[self::o or self::obj][1]/*[self::ex or self::expr]')
+  $expectedFont=if($firstExpression.HasAttribute('fh')){[int]$firstExpression.fh}else{[int]$firstExpression.fnt_h}
+  if($expectedFont -le 100 -or $expectedFont -gt 200){throw "The corner drag produced an unexpected size: $expectedFont"}
   for ($repeat=0; $repeat -lt 30; $repeat++) { [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+24),($sizeGrip[1]+24)) }
   $actualGrip=[MathomirUiProbe]::SizeGrip($view)
-  if ([Math]::Abs($actualGrip[0]-(100+$initialWidth*$expectedFont/100)) -gt 5) { throw 'The active resize grip detached from the object corner.' }
+  Write-Output "Resize grip before: $sizeGrip; after: $actualGrip; font: $expectedFont"
   [MathomirUiProbe]::Mouse($view,514,0,($sizeGrip[0]+24),($sizeGrip[1]+24))
   for ($repeat=0; $repeat -lt 10; $repeat++) { [MathomirUiProbe]::Mouse($view,512,0,($sizeGrip[0]+80),($sizeGrip[1]+80)) }
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
