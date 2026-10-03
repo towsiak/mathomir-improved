@@ -132,7 +132,7 @@ index f751ecf..52195ca 100644
  
  //we are going to disable Main Menu activation throught the ALT key
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..e50dc56 100644
+index fc832eb..8932bbb 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -167,6 +167,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
@@ -320,6 +320,14 @@ index fc832eb..e50dc56 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
+@@ -7585,6 +7633,7 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+ #pragma optimize("s",on)
+ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ {
++	if (GetCapture()==this) ReleaseCapture();
+ 	char WasWindowOutOfFocus=IsWindowOutOfFocus;
+ 	IsWindowOutOfFocus=0;
+ 	SteadyCursorTimer=0;
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
 index 94dd0e4..e0aa0e2 100644
 --- a/Mathomir/MathomirView.h
