@@ -181,6 +181,7 @@ try {
   [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
   [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+60),($sizeGrip[1]+60))
   [MathomirUiProbe]::Send($view,256,27) | Out-Null
+  [MathomirUiProbe]::Send($view,258,27) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$cancelled=Get-Content -LiteralPath $fixture -Raw
   $cancelledExpression=$cancelled.SelectSingleNode('/mathomir/*[self::o or self::obj][1]/*[self::ex or self::expr]')
