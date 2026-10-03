@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 7 — 2026-10-03
+Math-o-mir repair candidate 8 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -6,6 +6,17 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- Edit > Rotate text / equation (Ctrl+Shift+R) sets the absolute angle on selected
+  standalone text/equation objects or the active equation. Decimal angles are
+  accepted with 0.001-degree precision; positive is clockwise, negative is
+  counterclockwise. Enter 0 to straighten. Each object rotates about its center.
+  Fractions, exponents, symbols and the typing cursor rotate together.
+  Equations stay editable, with inverse-transformed hit testing and cursor
+  coordinates. Full-object copies and Undo preserve angles.
+- The optional rot_mdeg expression attribute persists rotation in .mom files.
+  Older versions ignore this new attribute and display the object unrotated.
+- Rotated equations render with GDI world transforms; printers without transform
+  support receive a screen-rendered bitmap fallback.
 - Edit > Font for all objects (Ctrl+Shift+F) opens the Windows font chooser.
   One choice changes the shared non-symbol font slots and sizes all equations,
   text and text nested in drawings. Symbol glyphs retain their font.
@@ -42,6 +53,13 @@ Changes:
 - Modern MSVC compatibility fixes for floating-point absolute values.
 
 Test on Windows:
+- Rotate text and a fraction/exponent equation to 17.5, -45, 90 and 180 degrees.
+  Click its strokes to copy; click insertion points and edit. Test Ctrl+Shift+R,
+  multiple selected equations, Undo, 0 degrees, save/reopen, image export and
+  both print modes. Group-embedded labels do not have a direct angle command.
+- 1,296 bounds and inverse-coordinate checks passed against the actual C++
+  geometry methods, including cardinal angles, decimal angles and small objects.
+  Interactive Windows rendering and driver behavior still require manual checks.
 - Use Ctrl+Shift+F to change all fonts and sizes. Check ordinary text, equations,
   Greek/symbol glyphs and labels nested in drawings; save and reopen.
 - Select several objects, use Edit > Font size > 800%, then Undo.
