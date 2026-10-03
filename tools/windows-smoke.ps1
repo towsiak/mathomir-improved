@@ -100,7 +100,8 @@ try {
   [MathomirUiProbe]::Send($main,273,0xE12B) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$undone=Get-Content -LiteralPath $fixture -Raw
-  if ($undone.mathomir.o.X -ne '100' -or $undone.mathomir.o.Y -ne '150') { throw ("Undo did not restore the grip move. Saved position: $($undone.mathomir.o.X), $($undone.mathomir.o.Y)") }
+  $restoredObject=$undone.SelectSingleNode('/mathomir/*[self::o or self::obj]')
+  if ($restoredObject.X -ne '100' -or $restoredObject.Y -ne '150') { throw ("Undo did not restore the grip move. Saved position: $($restoredObject.X), $($restoredObject.Y)") }
   Write-Output 'Move grip smoke passed: drag without whole-object selection, save expected position, Undo restores position.'
   [MathomirUiProbe]::Mouse($view,513,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
@@ -111,11 +112,11 @@ try {
   [MathomirUiProbe]::Mouse($view,514,0,300,300)
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$savedRoot=Get-Content -LiteralPath $fixture -Raw
-  $rootNodes=$savedRoot.SelectNodes('//elm[@tp="8"]/ex')
+  $rootNodes=$savedRoot.SelectNodes('//elm[@tp="8"]/*[self::ex or self::expr]')
   if ($rootNodes.Count -ne 1) { throw 'The root expression was lost when placing an annotation.' }
-  $rootTokens=($rootNodes[0].SelectNodes('./var') | ForEach-Object {$_.t}) -join ''
+  $rootTokens=($rootNodes[0].SelectNodes('./*[self::var or self::elm[@tp="1"]]') | ForEach-Object {if ($_.HasAttribute('t')) {$_.t} else {$_.tx}}) -join ''
   if ($rootTokens -ne '2x4') { throw "The root's variables changed: $rootTokens" }
-  $annotationTokens=($savedRoot.SelectNodes('/mathomir/o/ex/var') | ForEach-Object {$_.t}) -join ''
+  $annotationTokens=($savedRoot.SelectNodes('/mathomir/*[self::o or self::obj]/*[self::ex or self::expr]/*[self::var or self::elm[@tp="1"]]') | ForEach-Object {if ($_.HasAttribute('t')) {$_.t} else {$_.tx}}) -join ''
   if ($annotationTokens -notmatch 'constant') { throw "Typing the annotation did not save its text: $annotationTokens" }
   Write-Output 'Root placement smoke passed: hover inside root, double-click above the 2, type constant, click away to finish, save label and preserve root.'
   $search=[MathomirUiProbe]::Child($main,1112)
@@ -132,6 +133,8 @@ try {
   if ([MathomirUiProbe]::Send($list,395,0) -ne 0) { throw 'Search did not filter an unmatched query.' }
   [MathomirUiProbe]::SetText($search,'smart')
   if ([MathomirUiProbe]::Send($list,395,0) -lt 2) { throw 'Smart sizing commands are missing from search.' }
+  [MathomirUiProbe]::SetText($search,'pi fractions')
+  if ([MathomirUiProbe]::Send($list,395,0) -lt 1) { throw 'Pi graph labels are missing from search.' }
   [MathomirUiProbe]::Send($main,273,33010) | Out-Null
   $mode=[MathomirUiProbe]::Child($main,1115)
   if ([MathomirUiProbe]::Text($mode) -ne 'DEG') { throw 'Angle mode button did not update to DEG.' }
