@@ -4,9 +4,11 @@ Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
 Windows executable built with Visual Studio 2022 via GitHub Actions.
 Windows startup, visible search/filtering, RAD/DEG switching and About were
-verified on the Windows runner for v10. The same checks run for this build.
-Manual dragging, annotation insertion, caret behavior and printing need
-hands-on verification.
+verified on the Windows runner. Root annotation placement was also exercised:
+open sqrt(2x-4), hover inside, double-click above it, type constant, click away
+to finish, save and verify the label plus unchanged root contents.
+The exact reported crash has not been reproduced. Mouse resizing and printer
+behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
 - A four-arrow move grip above-left of the hovered object moves it directly.
