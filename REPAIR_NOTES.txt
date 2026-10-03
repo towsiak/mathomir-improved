@@ -11,6 +11,16 @@ The exact reported crash has not been reproduced. Mouse resizing and printer
 behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
+- Eight writing colors: black, red, green, blue, gray, orange, purple and teal.
+  A Colors button sits beside the permanent Search tools. Colors apply to highlighted
+  text without changing bold or font, selected objects, or the focused object.
+  Search a color name to apply it. Highlighted text uses R red, G green, B blue,
+  K black, H gray, A orange, P purple, T teal. Selection remains for changing colors
+  again; Ctrl+B toggles bold separately, instead of B unexpectedly making bold.
+- Function graphs now offer eight colored function slots; old graphs retain their
+  existing four and gain empty extra slots when opened. Buttons fit the graph height.
+- Resize grip sits on the actual lower-right object corner. Drag scale follows
+  the corner diagonal and retains proportions, with no floating detached grip.
 - Graph Smart fit keeps the horizontal window and fits finite function samples
   vertically, trimming extreme 5% tails per function and adding readable padding.
   Fits commit once after sampling, avoiding progressive scale jumps. Constant
