@@ -51,7 +51,7 @@ index 944279c..5d53aaf 100644
  				ret=(CObject*)this;
  				break;
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..c6c6d1a 100644
+index 531282c..115bc26 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -60,6 +60,7 @@ int KeyboardExponentMode=0;
@@ -419,8 +419,12 @@ index 531282c..c6c6d1a 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -24555,8 +24722,9 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
- 					if (function_type==4) {res=atan(1/N);is_ok=1;} //arccot
+@@ -24552,11 +24719,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+ 					if (function_type==1) {res=asin(N);is_ok=1;} //arcsin
+ 					if (function_type==2) {res=acos(N);is_ok=1;} //arccos
+ 					if (function_type==3) {res=atan(N);is_ok=1;} //arctan
+-					if (function_type==4) {res=atan(1/N);is_ok=1;} //arccot
++					if (function_type==4) {res=atan2(1.0,N);is_ok=1;} //arccot: principal range (0, pi)
  					if (function_type==5) {res=acos(1/N);is_ok=1;} //arcsecant
  					if (function_type==6) {res=asin(1/N);is_ok=1;} //arccsc
 -					if (is_ok)
@@ -758,7 +762,7 @@ index 15ec728..b30baeb 100644
  					}
  					strcpy(file_pointer,">\r\n");file_pointer+=3;len+=3;
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..0f28e99 100644
+index fc832eb..ab4a46e 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -770,7 +774,7 @@ index fc832eb..0f28e99 100644
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -132,6 +134,63 @@ unsigned int LongClickStartTime;
+@@ -132,6 +134,141 @@ unsigned int LongClickStartTime;
  CPoint LongClickPosition;
  CExpression *LongClickObject;
  tDocumentStruct *prevTouchedObject=NULL;
@@ -792,9 +796,87 @@ index fc832eb..0f28e99 100644
 +    else if (n=="exp") result="Domain: all real numbers\nRange: (0, infinity)\nexp(x) = e^x";
 +    else if (n=="root") result="Real domain: even roots require x >= 0; odd roots allow all real x\nRange: even roots [0, infinity); odd roots all real x\nSquare root uses the nonnegative root";
 +    else if (n=="abs") result="Domain: all real numbers\nRange: [0, infinity)\nAbsolute value / distance from zero";
-+    if (result.IsEmpty()) return result;
++    if (n=="arccot" || n=="arcctg") result="Domain: all real numbers\nPrincipal range: (0, 180) deg / (0, pi) rad";
++    else if (n=="arcsec") result="Domain: x <= -1 or x >= 1\nPrincipal range: [0, 180] deg, excluding 90\n(or [0, pi] rad, excluding pi/2)";
++    else if (n=="arccsc") result="Domain: x <= -1 or x >= 1\nPrincipal range: [-90, 90] deg, excluding 0\n(or [-pi/2, pi/2] rad, excluding 0)";
++    else if (n=="sh" || n=="sinh") result="Domain: all real numbers\nRange: all real numbers\nHyperbolic sine; no degree/radian conversion";
++    else if (n=="ch" || n=="cosh") result="Domain: all real numbers\nRange: [1, infinity)\nHyperbolic cosine; no degree/radian conversion";
++    else if (n=="th" || n=="tanh") result="Domain: all real numbers\nRange: (-1, 1)\nHyperbolic tangent; no degree/radian conversion";
++    else if (n=="coth" || n=="cth") result="Domain: x != 0\nRange: (-infinity, -1) or (1, infinity)\nHyperbolic cotangent";
++    else if (n=="sech") result="Domain: all real numbers\nRange: (0, 1]\nHyperbolic secant";
++    else if (n=="csch") result="Domain: x != 0\nRange: all real numbers except 0\nHyperbolic cosecant";
++    else if (n=="arsh" || n=="asinh" || n=="arcsinh") result="Domain: all real numbers\nRange: all real numbers\nInverse hyperbolic sine";
++    else if (n=="arch" || n=="acosh" || n=="arccosh") result="Domain: x >= 1\nRange: [0, infinity)\nInverse hyperbolic cosine";
++    else if (n=="arth" || n=="atanh" || n=="arctanh") result="Domain: (-1, 1)\nRange: all real numbers\nInverse hyperbolic tangent";
++    else if (n=="arcoth" || n=="acoth" || n=="arccoth") result="Domain: x < -1 or x > 1\nRange: all real numbers except 0\nInverse hyperbolic cotangent";
++    else if (n=="arsech" || n=="asech" || n=="arcsech") result="Domain: (0, 1]\nRange: [0, infinity)\nInverse hyperbolic secant";
++    else if (n=="arcsch" || n=="acsch" || n=="arccsch") result="Domain: all real numbers except 0\nRange: all real numbers except 0\nInverse hyperbolic cosecant";
++    else if (n=="Re" || n=="Im") result="Domain: all complex numbers\nRange: all real numbers\nReturns the real / imaginary component";
++    else if (n=="square") { n="x squared"; result="Domain: all real x\nRange: [0, infinity)\nEven function; minimum 0 at x = 0"; }
++    else if (n=="cube") { n="x cubed"; result="Domain: all real x\nRange: all real numbers\nOdd function; increasing everywhere"; }
++    else if (n=="power") result="Domain and range depend on the base and exponent.\nNegative integer powers exclude zero.\nEven roots require a nonnegative real radicand.";
++    else if (n=="fraction") result="Domain: denominator must be nonzero.\nAlso obey restrictions inside numerator/denominator.\nRange depends on the complete expression.";
++    else if (n=="lim") result="Requires an expression and an approach value.\nA two-sided limit exists when both one-sided limits agree.\nDomain/range depend on the underlying function.";
++    else if (n=="d" || n=="partial derivative") result="Requires a differentiable function at the evaluation point.\nDomain: points where that derivative exists.\nRange depends on the derivative function.";
++    else if (n=="integral") result="Requires an integrable expression on the interval.\nCheck discontinuities and convergence for improper integrals.\nDomain/range depend on the integrand and variable limits.";
++    else if (n=="sum" || n=="product") result="Requires an expression and specified index limits.\nDomain/range depend on the terms and index limits.\nInfinite operations also require convergence.";
++    else if (n=="rot" || n=="nabla") result="Requires the relevant differentiable scalar/vector field.\nDomain and output depend on the field and operator.\nCurl, gradient and divergence use different outputs.";
++    else if (n=="Dirac delta") result="A distribution, not an ordinary real-valued function.\nOrdinary domain/range descriptions do not apply.\nIt is defined through its action inside integrals.";
++    if (result.IsEmpty()) result="Domain and range depend on this function's definition.\nCheck its formula, restrictions and any selected branch.\nNo built-in domain/range rule is available.";
 +    extern int TrigDegrees;
 +    return n+" (real-valued basics)\n"+result+"\nNumeric trig mode: "+(TrigDegrees ? "DEG - degrees" : "RAD - radians");
++}
++
++static CString BasicElementHelp(CElement *element)
++{
++    if (!element) return "";
++    if (element->m_Type==6)
++    {
++        if ((unsigned char)element->Data1[0]==0xC2) return BasicFunctionHelp("Re");
++        if ((unsigned char)element->Data1[0]==0xC1) return BasicFunctionHelp("Im");
++        if ((unsigned char)element->Data1[0]==0xB6) return BasicFunctionHelp("partial derivative");
++        if ((unsigned char)element->Data1[0]==0xD1) return BasicFunctionHelp("nabla");
++        if (element->Data1[0]=='d' && (element->Data2[0]&0xE0)==0x60) return BasicFunctionHelp("Dirac delta");
++        return BasicFunctionHelp(element->Data1);
++    }
++    if (element->m_Type==8) return BasicFunctionHelp("root");
++    if (element->m_Type==4) return BasicFunctionHelp("fraction");
++    if (element->m_Type==7) return BasicFunctionHelp(element->Data1[0]=='S' ? "sum" : (element->Data1[0]=='P' ? "product" : "integral"));
++    if (element->m_Type==3)
++    {
++        CExpression *base=(CExpression*)element->Expression1,*exponent=(CExpression*)element->Expression2;
++        if (base && exponent && base->m_NumElements==1 && exponent->m_NumElements==1 &&
++            base->m_pElementList->Type==1 && exponent->m_pElementList->Type==1 &&
++            strcmp(base->m_pElementList->pElementObject->Data1,"x")==0)
++        {
++            const char *power=exponent->m_pElementList->pElementObject->Data1;
++            if (strcmp(power,"2")==0) return BasicFunctionHelp("square");
++            if (strcmp(power,"3")==0) return BasicFunctionHelp("cube");
++        }
++        return BasicFunctionHelp("power");
++    }
++    return "";
++}
++static CString HelpForTouchedExpression(CObject *object,short isExpression)
++{
++    if (!object) return "";
++    CExpression *expression=NULL;
++    if (isExpression==0)
++    {
++        CElement *element=(CElement*)object;
++        CString help=BasicElementHelp(element); if (!help.IsEmpty()) return help;
++        expression=(CExpression*)element->m_pPaternalExpression;
++    }
++    else if (isExpression>0) expression=(CExpression*)object;
++    while (expression)
++    {
++        CString help=BasicElementHelp(expression->m_pPaternalElement);
++        if (!help.IsEmpty()) return help;
++        if (!expression->m_pPaternalElement && expression->m_NumElements==1)
++            return BasicElementHelp(expression->m_pElementList->pElementObject);
++        expression=expression->m_pPaternalExpression;
++    }
++    return "";
 +}
 +
 +CObject *RotationHandleObject=NULL;
@@ -834,7 +916,7 @@ index fc832eb..0f28e99 100644
  char IsWindowOutOfFocus;
  
  #define NUM_SPECIAL_KEYS 21
-@@ -157,6 +216,9 @@ struct
+@@ -157,6 +294,9 @@ struct
  
  
  
@@ -844,7 +926,7 @@ index fc832eb..0f28e99 100644
  CExpression *TheKeyboardClipboard;
  
  IMPLEMENT_DYNCREATE(CMathomirView, CView)
-@@ -167,6 +229,8 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -167,6 +307,8 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -853,7 +935,7 @@ index fc832eb..0f28e99 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +277,19 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +355,19 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
@@ -873,7 +955,7 @@ index fc832eb..0f28e99 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -576,17 +653,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +731,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -896,7 +978,7 @@ index fc832eb..0f28e99 100644
  				}
  				else
  				{
-@@ -624,13 +702,16 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,13 +780,16 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -914,7 +996,7 @@ index fc832eb..0f28e99 100644
  
  		//draw paper sheet area
  		if (!ViewOnlyMode)
-@@ -753,6 +834,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +912,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -924,7 +1006,7 @@ index fc832eb..0f28e99 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -802,6 +886,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -802,6 +964,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			((CDrawing*)(SpecialDrawingHover->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,SpecialDrawingHover->absolute_X,SpecialDrawingHover->absolute_Y);
  		}
  
@@ -932,7 +1014,7 @@ index fc832eb..0f28e99 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1293,6 +1378,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1293,6 +1456,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_COPYPEN);
  		}
  		PaintDrawingHotspot(1);
@@ -940,7 +1022,7 @@ index fc832eb..0f28e99 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1435,54 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1513,54 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -995,7 +1077,7 @@ index fc832eb..0f28e99 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1574,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1652,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -1004,7 +1086,7 @@ index fc832eb..0f28e99 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +1921,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +1999,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -1033,7 +1115,7 @@ index fc832eb..0f28e99 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2169,12 +2317,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2395,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -1049,7 +1131,7 @@ index fc832eb..0f28e99 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2331,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2409,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -1061,7 +1143,7 @@ index fc832eb..0f28e99 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2345,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2423,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -1074,7 +1156,7 @@ index fc832eb..0f28e99 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2812,6 +2965,33 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +3043,33 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -1108,7 +1190,7 @@ index fc832eb..0f28e99 100644
  
  	try
  	{
-@@ -3338,6 +3518,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3596,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -1116,7 +1198,7 @@ index fc832eb..0f28e99 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +3618,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +3696,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -1129,18 +1211,15 @@ index fc832eb..0f28e99 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +3740,10 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +3818,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
-+                            if (TouchedSubelement && IsExpression==0 && ((CElement*)TouchedSubelement)->m_Type==6)
-+                                nextFunctionHelp=BasicFunctionHelp(((CElement*)TouchedSubelement)->Data1);
-+                            if (TouchedSubelement && IsExpression==0 && ((CElement*)TouchedSubelement)->m_Type==8)
-+                                nextFunctionHelp=BasicFunctionHelp("root");
++                            nextFunctionHelp=HelpForTouchedExpression(TouchedSubelement,IsExpression);
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +3796,33 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +3871,33 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -1202,7 +1281,7 @@ index fc832eb..0f28e99 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4169,31 +4355,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4430,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -1235,7 +1314,7 @@ index fc832eb..0f28e99 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4457,6 +4619,14 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +4694,14 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -1250,7 +1329,7 @@ index fc832eb..0f28e99 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +4642,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +4717,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -1258,7 +1337,7 @@ index fc832eb..0f28e99 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5360,7 +5529,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +5604,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -1267,7 +1346,7 @@ index fc832eb..0f28e99 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +5583,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +5658,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -1284,7 +1363,7 @@ index fc832eb..0f28e99 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5622,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5697,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -1313,7 +1392,7 @@ index fc832eb..0f28e99 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +5713,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +5788,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -1322,7 +1401,7 @@ index fc832eb..0f28e99 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +5824,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +5899,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -1374,7 +1453,7 @@ index fc832eb..0f28e99 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5836,7 +5985,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6060,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -1383,7 +1462,7 @@ index fc832eb..0f28e99 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6267,13 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6342,13 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -1397,7 +1476,7 @@ index fc832eb..0f28e99 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -7585,6 +7741,12 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7816,12 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -1410,7 +1489,7 @@ index fc832eb..0f28e99 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8274,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8349,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -1438,7 +1517,7 @@ index fc832eb..0f28e99 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +8727,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +8802,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -1449,7 +1528,7 @@ index fc832eb..0f28e99 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9574,802 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9649,802 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -2252,7 +2331,7 @@ index fc832eb..0f28e99 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9438,6 +10398,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10473,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
