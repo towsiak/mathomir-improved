@@ -1,0 +1,70 @@
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+index fc832eb..249ecdd 100644
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -1795,6 +1795,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ 			}
+ 			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
+ 			{
++				// Verify the current click rather than trusting a previous hover
++				// selection. Preserve group selection, moving dots and placement.
++				if ((ClipboardExpression==NULL) && (ds->Object) &&
++					(ds->MovingDotState==0) && ((nFlags&MK_SHIFT)==0) && (!TouchMouseMode))
++				{
++					CExpression probe(NULL,NULL,((CExpression*)ds->Object)->m_FontSize);
++					probe.CopyExpression((CExpression*)ds->Object,0,1,0);
++					short length,above,below;
++					probe.CalculateSize(DC,ViewZoom,&length,&above,&below);
++					short hitExpression=-1;
++					char hitParenthese=0;
++					int hitX=point.x-(ds->absolute_X-ViewX)*ViewZoom/100;
++					int hitY=point.y-(ds->absolute_Y-ViewY)*ViewZoom/100;
++					CObject *hit=probe.SelectObjectAtPoint(DC,ViewZoom,hitX,hitY,&hitExpression,&hitParenthese);
++					if ((hit==NULL) && (hitExpression==-1))
++					{
++						((CExpression*)ds->Object)->DeselectExpression();
++						if (IsInsertionPointTouched==ds) IsInsertionPointTouched=NULL;
++						continue;
++					}
++				}
+ 				//nothing in the clipboard, then copy into the clipboard
+ 				root_object_flag=0;
+ 				RootObjectCopy=0;
+@@ -3610,32 +3631,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 				
+ 			RepaintViewTimer=0;
+ 
+-			if (ScheduleFullRepaint)
+-				InvalidateRect(NULL,0);
+-			else if ((TouchedObject==prevTouchedObject) && (any_drawing_touched<2) && (prev_any_drawing_touched<2))
+-			{
+-				if (TouchedObject) ((!Tillens.Show)?GentlyPaintObject(TouchedObject,DC):RepaintTheView());
+-			}
+-			else
+-			{
+-				if ((any_drawing_touched<2) && (prev_any_drawing_touched<2))
+-				{
+-					try
+-					{
+-						if (prevTouchedObject)
+-							((!Tillens.Show)?GentlyPaintObject(prevTouchedObject,DC):RepaintTheView());
+-						if (TouchedObject)
+-							((!Tillens.Show)?GentlyPaintObject(TouchedObject,DC):RepaintTheView());
+-						else
+-							RepaintViewTimer=2;
+-					}
+-					catch (...)
+-					{
+-					}
+-				}
+-				else
+-					InvalidateRect(NULL,0);
+-			}
++			// Hover changes must repaint all document layers. GentlyPaintObject
++			// blits an opaque white background for expressions, erasing nearby
++			// braces and annotations that overlap its padded rectangle.
++			InvalidateRect(NULL,0);
++			UpdateWindow();
+ 			prevTouchedObject=TouchedObject;
+ 			prevSelectionChecksum=SelectionChecksum;
+ 			prev_any_drawing_touched=any_drawing_touched;
