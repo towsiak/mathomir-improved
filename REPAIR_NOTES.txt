@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 5 — 2026-10-03
+Math-o-mir repair candidate 6 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -6,6 +6,10 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- Double-click starts free placement even within expression bounds.
+  Double-click and release for a new typing cursor; double-click and hold
+  the second press, drag and pause for the existing quick-brace gesture.
+  Single-click copy remains. Modifier clicks retain existing behavior.
 - Frame activation uses standard MFC handling without forcing focus back
   to the main window. Internal modal dialogs do not trigger clipboard image
   generation/document mutation. Editor timer work pauses while the frame
@@ -25,6 +29,9 @@ Changes:
 - Modern MSVC compatibility fixes for floating-point absolute values.
 
 Test on Windows:
+- Double-click beneath/above an exponent and type. Double-click and drag
+  a thin brace gesture inside the expression footprint; pause then release.
+  Check single-click copy and ordinary text/exponent editing too.
 0. Open Brother printer Document Properties; switch Layout/Paper-Quality,
    open Advanced, and cancel each nested dialog. Check print preview too.
    Check copy/paste into another application and normal focus restoration.
@@ -38,6 +45,7 @@ Test on Windows:
 
 Limits:
 No exact glyph-pixel hit testing for mathematical expressions.
-The reported crashes and five-minute preview stall have not been reproduced.
+The reported crashes have not been reproduced here. The user reported printing
+improved with candidate 5; printer-tab/Cancel behavior still needs confirmation.
 Printer-driver initialization may still cause preview delays.
 Existing document format and upstream MIT license retained.
