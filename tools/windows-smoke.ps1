@@ -1,4 +1,18 @@
 $ErrorActionPreference = 'Stop'
+function Get-GraphRange([xml]$document) {
+  $graph=$document.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]')
+  $numbers=@()
+  foreach ($sub in $graph.SelectNodes('./subexp[position()<=4]')) {
+    $expression=$sub.SelectSingleNode('./*[self::ex or self::expr]')
+    $variable=$expression.SelectSingleNode('./*[self::var or self::elm[@tp="1"]]')
+    $text=if ($variable.HasAttribute('t')) {$variable.t} else {$variable.tx}
+    $number=[double]::Parse($text,[Globalization.CultureInfo]::InvariantCulture)
+    if ($expression.SelectSingleNode('./opr[@s="-"] | ./elm[@tp="2"][@stp="-"]')) {$number=-$number}
+    $numbers+=$number
+  }
+  return $numbers
+}
+
 Add-Type @'
 using System;
 using System.Text;
@@ -209,6 +223,35 @@ try {
   [xml]$piSaved=Get-Content -LiteralPath $fixture -Raw
   $piMinimum=$piSaved.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
   if ($piMinimum.alig -ne '2') { throw 'Pi graph mode did not save its axis setting.' }
+  [MathomirUiProbe]::Send($main,273,33029) | Out-Null
+  Start-Sleep -Milliseconds 1800
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$resetGraph=Get-Content -LiteralPath $fixture -Raw
+  $resetRange=Get-GraphRange $resetGraph
+  if ([Math]::Abs($resetRange[0]+2*[Math]::PI) -gt .001 -or [Math]::Abs($resetRange[1]-2*[Math]::PI) -gt .001) {throw "Graph reset did not restore the pi window: $resetRange"}
+  if ($resetRange[2] -lt -5 -or $resetRange[3] -gt 5 -or $resetRange[2] -ge $resetRange[3]) {throw "Graph smart fit did not produce useful finite y limits: $resetRange"}
+  [MathomirUiProbe]::Send($main,273,33030) | Out-Null
+  Start-Sleep -Milliseconds 500
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$zoomedGraph=Get-Content -LiteralPath $fixture -Raw
+  $zoomedRange=Get-GraphRange $zoomedGraph
+  $ratio=($zoomedRange[1]-$zoomedRange[0])/($resetRange[1]-$resetRange[0])
+  if ([Math]::Abs($ratio-.8) -gt .001) {throw "Graph zoom did not shrink the span gently: $ratio"}
+  $zoomedMode=$zoomedGraph.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
+  if ($zoomedMode.alig -ne '2') {throw 'Graph zoom lost the saved pi label mode.'}
+  [MathomirUiProbe]::Send($main,273,33028) | Out-Null
+  Start-Sleep -Milliseconds 1800
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$fitGraph=Get-Content -LiteralPath $fixture -Raw
+  $fitRange=Get-GraphRange $fitGraph
+  if ([Math]::Abs($fitRange[0]-$zoomedRange[0]) -gt .001 -or [Math]::Abs($fitRange[1]-$zoomedRange[1]) -gt .001) {throw 'Smart fit changed the horizontal viewing window.'}
+  [MathomirUiProbe]::Send($main,273,33031) | Out-Null
+  Start-Sleep -Milliseconds 500
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$widerGraph=Get-Content -LiteralPath $fixture -Raw
+  $widerRange=Get-GraphRange $widerGraph
+  if ([Math]::Abs(($widerRange[1]-$widerRange[0])/($fitRange[1]-$fitRange[0])-1.25) -gt .001) {throw 'Graph zoom out did not expand the span by 25%.'}
+  Write-Output 'Graph smart zoom passed: pi reset window, finite fitted y range, gentle in/out, horizontal window preservation and saved pi labels.'
   [MathomirUiProbe]::Send($main,273,33027) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$decimalSaved=Get-Content -LiteralPath $fixture -Raw
@@ -245,7 +288,7 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v12' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v13' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 } finally {
