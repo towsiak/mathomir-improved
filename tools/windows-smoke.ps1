@@ -560,7 +560,7 @@ try {
   $axisData=$interval.SelectSingleNode('./dw').d.Split('|')[1].Split(';')[0].Split(',')
   $axisY=[int]$axisData[1]/32
   for($probe=15;$probe -lt 50;$probe+=5){[MathomirUiProbe]::Mouse($view,512,0,($intervalX+$probe),($intervalY+$axisY))}
-  [MathomirUiProbe]::Send($main,273,33011)|Out-Null
+  [MathomirUiProbe]::Send($main,273,33008)|Out-Null
   $handleX=$intervalX+252;$handleY=$intervalY-10
   [MathomirUiProbe]::Mouse($view,513,1,$handleX,$handleY)
   [MathomirUiProbe]::Mouse($view,512,1,($intervalX+120),($intervalY+150))
