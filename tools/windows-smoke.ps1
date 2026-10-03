@@ -19,6 +19,10 @@ public static class MathomirUiProbe {
   public static string Text(IntPtr hwnd) { var text=new StringBuilder(512); GetWindowText(hwnd,text,512); return text.ToString(); }
   public static string Class(IntPtr hwnd) { var text=new StringBuilder(128); GetClassName(hwnd,text,128); return text.ToString(); }
   public static long Send(IntPtr hwnd,uint msg,int wparam) { UIntPtr result; if(SendMessageTimeout(hwnd,msg,(IntPtr)wparam,IntPtr.Zero,2,3000,out result)==IntPtr.Zero) throw new Exception("Window did not respond to message "+msg); return (long)result.ToUInt64(); }
+  [DllImport("kernel32.dll")] static extern IntPtr GlobalAlloc(uint flags,UIntPtr bytes);
+  [DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr memory);
+  [DllImport("kernel32.dll")] static extern bool GlobalUnlock(IntPtr memory);
+  public static void OpenFile(IntPtr hwnd,string path) { byte[] file=Encoding.Unicode.GetBytes(path+"\0\0"); IntPtr handle=GlobalAlloc(0x42,(UIntPtr)(20+file.Length)); IntPtr memory=GlobalLock(handle); Marshal.WriteInt32(memory,0,20); Marshal.WriteInt32(memory,16,1); Marshal.Copy(file,0,IntPtr.Add(memory,20),file.Length); GlobalUnlock(handle); PostMessage(hwnd,563,handle,IntPtr.Zero); }
   public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   public static void SetText(IntPtr hwnd,string text) { UIntPtr result; if(SendTextTimeout(hwnd,12,IntPtr.Zero,text,2,3000,out result)==IntPtr.Zero) throw new Exception("Search text did not respond"); }
   public static IntPtr Child(IntPtr parent,int id) { IntPtr found=IntPtr.Zero; EnumChildWindows(parent,(hwnd,p)=>{if(GetDlgCtrlID(hwnd)==id){found=hwnd;return false;} return true;},IntPtr.Zero); return found; }
@@ -38,7 +42,7 @@ $fixture=Join-Path (Split-Path $exe) 'root-annotation-smoke.mom'
 </o>
 </mathomir>
 '@ | Set-Content -LiteralPath $fixture -Encoding ascii
-$appProcess = Start-Process -FilePath $exe -ArgumentList "`"$fixture`"" -WorkingDirectory (Split-Path $exe) -PassThru
+$appProcess = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
 try {
   $main = [IntPtr]::Zero
   for ($attempt=0; $attempt -lt 40; $attempt++) {
@@ -48,11 +52,18 @@ try {
     if ($appProcess.MainWindowHandle -ne 0) { $main=$appProcess.MainWindowHandle; break }
   }
   if ($main -eq [IntPtr]::Zero) { throw 'No main window was created.' }
+  [MathomirUiProbe]::OpenFile($main,$fixture)
+  Start-Sleep -Milliseconds 500
+  $appProcess.Refresh()
+  if ($appProcess.HasExited) { throw "Application exited while opening the root fixture: $($appProcess.ExitCode)" }
+  if ([MathomirUiProbe]::Text($main) -notmatch 'root-annotation-smoke') { throw 'The root fixture did not open.' }
   $view=[MathomirUiProbe]::Child($main,0xE900)
   if ($view -eq [IntPtr]::Zero) { throw 'The document view is missing.' }
   [MathomirUiProbe]::Send($main,273,32775) | Out-Null
   for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
   Start-Sleep -Milliseconds 500
+  [MathomirUiProbe]::Mouse($view,513,1,130,125)
+  [MathomirUiProbe]::Mouse($view,514,0,130,125)
   [MathomirUiProbe]::Mouse($view,515,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
   foreach ($character in 'constant'.ToCharArray()) { [MathomirUiProbe]::Send($view,258,[int]$character) | Out-Null }
