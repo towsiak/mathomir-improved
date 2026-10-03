@@ -537,6 +537,40 @@ try {
   if ($aboutText -notmatch 'Improved - v13' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
+  Start-Sleep -Milliseconds 300
+  $recoveryFolder=Join-Path $env:LOCALAPPDATA 'MathomirImproved/Recovery'
+  $before=@(Get-ChildItem $recoveryFolder -Filter 'Recovery-*.mom' -ErrorAction SilentlyContinue).Count
+  [MathomirUiProbe]::Send($main,273,33010) | Out-Null
+  Start-Sleep -Milliseconds 6000
+  $latest=Join-Path $recoveryFolder 'Latest.mom'
+  if (!(Test-Path $latest)) {throw 'No current recovery snapshot was written.'}
+  [xml]$firstRecovery=Get-Content $latest -Raw
+  if ((($firstRecovery.SelectNodes('//var') | ForEach-Object {$_.t}) -join '') -notmatch 'constant') {throw 'Recovery lost recent annotation text.'}
+  $firstVersions=@(Get-ChildItem $recoveryFolder -Filter 'Recovery-*.mom')
+  if ($firstVersions.Count -le $before) {throw 'First timestamped version missing.'}
+  $previousVersion=$firstVersions | Sort-Object Name -Descending | Select-Object -First 1
+  $previousHash=(Get-FileHash $previousVersion.FullName).Hash
+  [MathomirUiProbe]::Send($main,273,33009) | Out-Null
+  Start-Sleep -Milliseconds 6000
+  if (@(Get-ChildItem $recoveryFolder -Filter 'Recovery-*.mom').Count -le $firstVersions.Count) {throw 'Second timestamped version missing.'}
+  if ((Get-FileHash $previousVersion.FullName).Hash -ne $previousHash) {throw 'Older recovery version was overwritten.'}
+  [xml]$secondRecovery=Get-Content $latest -Raw
+  if ($secondRecovery.SelectSingleNode('/mathomir/*[1]').trig_deg -ne '0') {throw 'Latest recovery does not include the newest angle mode.'}
+  Stop-Process -Id $appProcess.Id -Force
+  $appProcess=Start-Process @startArgs
+  $main=[IntPtr]::Zero
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 250;$appProcess.Refresh();if($appProcess.MainWindowHandle -ne 0){$main=$appProcess.MainWindowHandle;break}}
+  if($main -eq [IntPtr]::Zero){throw 'App did not restart after forced crash.'}
+  [MathomirUiProbe]::PostMessage($main,273,[IntPtr]32854,[IntPtr]::Zero)|Out-Null
+  $recover=[IntPtr]::Zero
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$recover=[MathomirUiProbe]::Window($appProcess.Id,'Recover latest edits or choose an earlier timestamp');if($recover -ne [IntPtr]::Zero){break}}
+  if($recover -eq [IntPtr]::Zero){throw 'Recovery picker did not open.'}
+  [MathomirUiProbe]::PostMessage($recover,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+  Start-Sleep -Milliseconds 1800
+  $appProcess.Refresh()
+  if($appProcess.HasExited){throw 'Opening recovery snapshot crashed.'}
+  if([MathomirUiProbe]::Text($main) -notmatch 'Recovered document'){throw 'Latest recovery was not reopened.'}
+  Write-Output 'Recovery smoke passed: latest edits, two timestamped immutable versions, forced crash, restart and reopen Latest.'
 } finally {
   $appProcess.Refresh()
   if ($appProcess.HasExited) {Write-Output "App exit code: $($appProcess.ExitCode)"}
