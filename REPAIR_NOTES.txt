@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 4 — 2026-10-03
+Math-o-mir repair candidate 5 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -6,6 +6,10 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- Frame activation uses standard MFC handling without forcing focus back
+  to the main window. Internal modal dialogs do not trigger clipboard image
+  generation/document mutation. Editor timer work pauses while the frame
+  is disabled by a modal dialog.
 - Active drawing tools take priority over expression selection, even when
   starting inside an exponent. Ctrl retains object selection in drawing mode.
   Normal click-to-copy remains available when no drawing tool is active.
@@ -21,6 +25,9 @@ Changes:
 - Modern MSVC compatibility fixes for floating-point absolute values.
 
 Test on Windows:
+0. Open Brother printer Document Properties; switch Layout/Paper-Quality,
+   open Advanced, and cancel each nested dialog. Check print preview too.
+   Check copy/paste into another application and normal focus restoration.
 1. Open your original .mom sample; place text directly above/below the brace.
 2. Click actual strokes to copy; check Ctrl node editing at several zooms.
 3. Type +- and -+ repeatedly, after terms and inside fractions and exponents.
