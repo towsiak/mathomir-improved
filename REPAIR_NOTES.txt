@@ -11,6 +11,13 @@ The exact reported crash has not been reproduced. Mouse resizing and printer
 behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
+- Function graphs can label the horizontal axis in real pi fractions such as
+  pi/2, pi, 3*pi/2, using the Unicode pi symbol and reduced fractions.
+  Search pi fractions to enable it; search decimal labels to switch back.
+  A pointed-at/selected graph is updated; otherwise all unlocked graphs update.
+  The graph's LIN/LOG button also cycles through pi mode. This labels radian
+  coordinates; it does not change the separate RAD/DEG computation setting.
+  The choice is saved per graph, and tick spacing adapts to graph width/range.
 - A four-arrow move grip above-left of the hovered object moves it directly.
   Drag without selecting the whole object; Escape cancels, Undo restores position.
 - Resize dragging now uses a consistent screen-distance response: 240 diagonal
