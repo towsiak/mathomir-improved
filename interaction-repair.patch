@@ -63,9 +63,18 @@ index 2f39ec2..a84183c 100644
  	unsigned char show_no_scale;
  	unsigned char calc_y;
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..115bc26 100644
+index 531282c..a3c528b 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
+@@ -46,7 +46,7 @@ void PaintGuidlines(CDC *DC, int AbsoluteY);
+ void CheckForExtendedGuidlines(int AbsoluteY);
+ extern int EasycastListStart;
+ extern char TextControlboxMode;
+-unsigned char is_call_from_ploter;
++thread_local unsigned char is_call_from_ploter=0;
+ 
+ extern int SelectedGuidelineType;
+ extern int GuidlineElement;
 @@ -60,6 +60,7 @@ int KeyboardExponentMode=0;
  CExpression *AutocompleteSource;
  int AutocompletePoints;
@@ -408,7 +417,7 @@ index 531282c..115bc26 100644
  		if (rval)
  		{
  			double N=PF.N1/PF.N2;
-+            if (TrigDegrees) N*=3.14159265358979323846/180.0;
++            if (TrigDegrees && is_call_from_ploter!=2) N*=3.14159265358979323846/180.0;
  			int prec=PF.prec1;
  			{
  				if (fabs(N)<1e-100)
@@ -442,12 +451,39 @@ index 531282c..115bc26 100644
 -					if (is_ok)
 +					if (is_ok && _finite(res))
  					{
-+                        if (TrigDegrees) res*=180.0/3.14159265358979323846;
++                        if (TrigDegrees && is_call_from_ploter!=2) res*=180.0/3.14159265358979323846;
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
+@@ -25178,7 +25346,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
+ 	return 1;
+ }
+ //int sshit=0;
+-double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
++double CExpression::PlotterCalculateFunctionValue(double X,void *VP,bool radians)
+ {
+ 	if (wwwwxxxx==0) {InitializeCriticalSection(&section3);wwwwxxxx=1;}
+ 	int cntrr=0;
+@@ -25191,7 +25359,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+ 
+ 	//first replace all variables with the given value
+ 
+-	is_call_from_ploter=1;
++	is_call_from_ploter=radians?2:1;
+ 
+ 	try
+ 	{
+@@ -25295,7 +25463,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+ 		LeaveCriticalSection(&section3);
+ 		return retval;
+ 	}
+-	if (_isnan(retval)) {is_call_from_ploter=0;return retval;}
++	if (_isnan(retval)) {is_call_from_ploter=0;LeaveCriticalSection(&section3);return retval;}
+ 	//infinite numbers
+ 	if (PF.N1*PF.N2<0)
+ 	{is_call_from_ploter=0;LeaveCriticalSection(&section3);return -1e+48;}
 diff --git a/Mathomir/Expression.h b/Mathomir/Expression.h
-index 36238b0..1358cfd 100644
+index 36238b0..3746c64 100644
 --- a/Mathomir/Expression.h
 +++ b/Mathomir/Expression.h
 @@ -139,6 +139,7 @@ public:
@@ -469,11 +505,28 @@ index 36238b0..1358cfd 100644
  	short GetActualFontSize(short zoom);
  	int InsertEmptyElement(short position,short Type,char Operator, int color=-1);
  	void SelectExpression(char Select);
+@@ -266,7 +271,7 @@ public:
+ 	int Derivate(CExpression * variable,int internall_call=0);
+ 
+ 	void *PlotterPrepareVariablePositions(void *VarPos=NULL);
+-	double PlotterCalculateFunctionValue(double X,void *VarPos);
++	double PlotterCalculateFunctionValue(double X,void *VarPos,bool radians=false);
+ 	int PlotterReleaseVariablePositions(void *VarPos);
+ 	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
+ 	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..00df84c 100644
+index 1ef18dd..b70efad 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
-@@ -113,7 +113,7 @@ CFunctionPlotter::CFunctionPlotter(CDrawing *BaseItem)
+@@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ 
+ *********************************************************************************************************/
+ #include "StdAfx.h"
++#include "PiAxis.h"
+ #include ".\drawing.h"
+ #include "Mathomir.h"
+ #include "mainfrm.h"
+@@ -113,7 +114,7 @@ CFunctionPlotter::CFunctionPlotter(CDrawing *BaseItem)
  {
  	Base=BaseItem;
  	Plot=NULL;
@@ -482,7 +535,7 @@ index 1ef18dd..00df84c 100644
  	abort_request=0;
  	show_no_scale=0;
  	calc_y=0;
-@@ -145,6 +145,7 @@ int CFunctionPlotter::CopyFrom(CDrawing *Original)
+@@ -145,6 +146,7 @@ int CFunctionPlotter::CopyFrom(CDrawing *Original)
  
  	is_y_log=org->is_y_log;
  	is_x_log=org->is_x_log;
@@ -490,7 +543,7 @@ index 1ef18dd..00df84c 100644
  	show_no_scale=org->show_no_scale;
  	analyze=org->analyze;
  	any_function_defined=org->any_function_defined;
-@@ -235,7 +236,8 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -235,7 +237,8 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  			CExpression *y0=(CExpression*)((Base->Items+6)->pSubdrawing);
  			CExpression *x0=(CExpression*)((Base->Items+4)->pSubdrawing);
  			if (y0->m_Alignment) is_y_log=1; else is_y_log=0;
@@ -500,7 +553,7 @@ index 1ef18dd..00df84c 100644
  
  			//start the plotting thread and create the bitmap
  			if (GetCurrentThreadId()!=ThreadID)
-@@ -390,7 +392,8 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -390,7 +393,8 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  					DC->SetBkMode(TRANSPARENT);
  					DC->SetTextColor(0);
  					DC->TextOut(X+hh+2*zz,Y+Ylen-2*zz-hh-3,(is_y_log)?"LOG":"LIN",3);
@@ -510,7 +563,7 @@ index 1ef18dd..00df84c 100644
  				}
  			}
  
-@@ -623,7 +626,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -623,7 +627,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  			}
  			if (xstep<1e-48) xstep=1e-48;
  
@@ -522,7 +575,7 @@ index 1ef18dd..00df84c 100644
  			int last_x=-1000;
  			while (first<Xmx)
  			{
-@@ -654,11 +660,19 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -654,11 +661,19 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  						fsize=fsize*MX*zoom/5000;
  						DC->SelectObject(GetFontFromPool(0,0,0,fsize));
  						DC->SetTextAlign(TA_CENTER);
@@ -545,7 +598,7 @@ index 1ef18dd..00df84c 100644
  							cs=DC->GetTextExtent(number,(int)strlen(number));
  						last_x=x+cs.cx+LeftMargin/10;
  					}
-@@ -1185,8 +1199,8 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1185,8 +1200,8 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  		{
  			//lin/log adjustments
  
@@ -556,7 +609,7 @@ index 1ef18dd..00df84c 100644
  			else if ((is_x_log==0) && (is_y_log))
  				is_x_log=1;
  			else if ((is_x_log) && (is_y_log))
-@@ -1197,7 +1211,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1197,7 +1212,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  			//nasty trick - the lin/log configuration is stored into m_Alignment
  			CExpression *y0=(CExpression*)((Base->Items+6)->pSubdrawing);
  			CExpression *x0=(CExpression*)((Base->Items+4)->pSubdrawing);
@@ -565,6 +618,15 @@ index 1ef18dd..00df84c 100644
  			if (is_y_log) y0->m_Alignment=1;else y0->m_Alignment=0;//x0->m_FontSize-1; else y0->m_FontSizeHQ=y0->m_FontSize;
  
  			TheState=0;
+@@ -1828,7 +1843,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+ 					X=((double)i+0)*f1+Xmin;
+ 				else
+ 					X=Xmin*pow(10.0,i*f2);
+-				*(YY[kk]+i)=Func[kk]->PlotterCalculateFunctionValue(X,VarPos[kk]);
++				*(YY[kk]+i)=Func[kk]->PlotterCalculateFunctionValue(X,VarPos[kk],is_x_pi!=0);
+ 			}
+ 		}
+ 
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
 index f751ecf..f451196 100644
 --- a/Mathomir/MainFrm.cpp
