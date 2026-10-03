@@ -1976,7 +1976,7 @@ index 0000000..46781e8
 +}
 +}
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
-index f751ecf..6c48e90 100644
+index f751ecf..4352081 100644
 --- a/Mathomir/MainFrm.cpp
 +++ b/Mathomir/MainFrm.cpp
 @@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
@@ -2045,6 +2045,14 @@ index f751ecf..6c48e90 100644
  
  	if (pMainViewBase)
  	{
+@@ -1471,6 +1491,7 @@ int CMainFrame::UndoRestore()
+ 		pDoc->SetModifiedFlag(1);
+ 	}
+ 
++    RecoveryGeneration++; RecoveryLastEdit=GetTickCount();
+ 	//first check what object do we need to delete
+ 	//only objects that were modified are deleted and (latter) recreated,
+ 	//objects that were not modified are not touched by undo restore.
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
 index bdcebb4..943f025 100644
 --- a/Mathomir/Mathomir.rc
@@ -2244,7 +2252,7 @@ index bdcebb4..943f025 100644
      END
      BLOCK "VarFileInfo"
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
-index 15ec728..01bf981 100644
+index 15ec728..b9e7329 100644
 --- a/Mathomir/MathomirDoc.cpp
 +++ b/Mathomir/MathomirDoc.cpp
 @@ -29,6 +29,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -2382,8 +2390,12 @@ index 15ec728..01bf981 100644
  	}
  	else
  	{
-@@ -1236,4 +1249,49 @@ void FatalErrorHandling()
- 		MessageBox(theApp.m_pMainWnd->m_hWnd,"FATAL ERROR!\r\nYou can try to save your work now, then restart the software.\r\nUpon restart, you can also check the 'Autosave.mom' file.","Math-o-mir",MB_ICONSTOP|MB_OK);
+@@ -1233,7 +1246,52 @@ void FatalErrorHandling()
+ 		FatalErrorActivated=1;
+ 		if (AutosaveOption==0)	pMainView->GetDocument()->SaveMOMFile("Autosave.mom",TheFileType);
+ 
+-		MessageBox(theApp.m_pMainWnd->m_hWnd,"FATAL ERROR!\r\nYou can try to save your work now, then restart the software.\r\nUpon restart, you can also check the 'Autosave.mom' file.","Math-o-mir",MB_ICONSTOP|MB_OK);
++		MessageBox(theApp.m_pMainWnd->m_hWnd,"FATAL ERROR!\r\nYou can try to save your work now, then restart the software.\r\nUpon restart, search for recover to open Latest.mom or an earlier recovery version. You can also check Autosave.mom.","Math-o-mir",MB_ICONSTOP|MB_OK);
  	}
  }
 -#pragma optimize("",on)
@@ -2426,7 +2438,7 @@ index 15ec728..01bf981 100644
 +    temporary.ReleaseBuffer(); XMLFileVersion=oldXML;
 +    if (!saved) { DeleteFileA(temporary); return false; }
 +    if (!MoveFileExA(temporary,version,MOVEFILE_WRITE_THROUGH)) { DeleteFileA(temporary); return false; }
-+    CString latest=folder+"\\Latest.mom", pending=folder+"\\Latest.tmp";
++    CString latest=folder+"\\Latest.mom", pending=version+".latest.tmp";
 +    if (!CopyFileA(version,pending,FALSE)) return false;
 +    HANDLE file=CreateFileA(pending,GENERIC_WRITE,0,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
 +    if (file==INVALID_HANDLE_VALUE) return false;
