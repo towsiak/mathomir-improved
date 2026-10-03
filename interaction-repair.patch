@@ -427,7 +427,7 @@ index bdcebb4..3819118 100644
          MENUITEM "Access &Locked Objects",      ID_EDIT_ACCESSLOCKEDOBJECTS
          MENUITEM SEPARATOR
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..3d767a1 100644
+index fc832eb..72a3715 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -693,7 +693,7 @@ index fc832eb..3d767a1 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -9410,6 +9472,170 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9472,172 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -756,7 +756,8 @@ index fc832eb..3d767a1 100644
 +void CMathomirView::OnRotateEquation()
 +{
 +    if (ViewOnlyMode) return;
-+    tDocumentStruct *active=KeyboardEntryBaseObject ? KeyboardEntryBaseObject : SelectedDocumentObject;
++    tDocumentStruct *active=prevTouchedObject ? prevTouchedObject :
++        (KeyboardEntryBaseObject ? KeyboardEntryBaseObject : SelectedDocumentObject);
 +    CExpression *first=NULL;
 +    for (int i=0;i<NumDocumentElements;i++)
 +    {
@@ -809,7 +810,8 @@ index fc832eb..3d767a1 100644
 +    {
 +        tDocumentStruct *object=TheDocument+i;
 +        if (object->MovingDotState==3 || (NumSelectedObjects==0 &&
-+            (object==(KeyboardEntryBaseObject ? KeyboardEntryBaseObject : SelectedDocumentObject))))
++            (object==(prevTouchedObject ? prevTouchedObject :
++                (KeyboardEntryBaseObject ? KeyboardEntryBaseObject : SelectedDocumentObject)))))
 +        {
 +            ResizeObjectFonts(object->Object,object->Type,size);
 +            changed=true;
