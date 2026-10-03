@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 3 — 2026-10-03
+Math-o-mir repair candidate 4 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -6,6 +6,9 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- Active drawing tools take priority over expression selection, even when
+  starting inside an exponent. Ctrl retains object selection in drawing mode.
+  Normal click-to-copy remains available when no drawing tool is active.
 - Full redraw on hover selection changes to preserve overlapping annotations.
 - Recheck expression copy clicks at the actual cursor position.
 - Drawing selection uses distance to visible line segments with a small
