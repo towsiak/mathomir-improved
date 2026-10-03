@@ -1,11 +1,22 @@
-Math-o-mir repair candidate 10 — 2026-10-03
+Math-o-mir repair candidate 11 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
 Windows executable built with Visual Studio 2022 via GitHub Actions.
-Interactive behavior has not been verified on Windows.
+Windows startup, visible search/filtering, RAD/DEG switching and About were
+verified on the Windows runner for v10. The same checks run for this build.
+Manual dragging, annotation insertion, caret behavior and printing need
+hands-on verification.
 
 Changes:
+- A four-arrow move grip above-left of the hovered object moves it directly.
+  Drag without selecting the whole object; Escape cancels, Undo restores position.
+- Resize dragging now uses a consistent screen-distance response: 240 diagonal
+  pixels doubles the size. Hold Shift for four-times finer control. Small objects
+  no longer amplify a tiny drag based on their initial dimensions.
+- Hover references resolve the touched item from the live expression tree,
+  avoiding upward parent-link traversal while nested annotations change.
+  This is a defensive change; the reported annotated-root crash is not reproduced.
 - A permanent Search field is visible directly below the toolbar. Type there
   for live clickable results; Ctrl+K focuses it and selects the old query.
   Up/Down select results, Enter runs a command, Escape closes the dropdown.
