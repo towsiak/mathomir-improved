@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 11 — 2026-10-03
+Math-o-mir repair candidate 12 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -11,6 +11,11 @@ The exact reported crash has not been reproduced. Mouse resizing and printer
 behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
+- Resize updates restore the original root font size before copying and scaling.
+  This fixes repeated multiplication of the current size on mouse events, and
+  preserves nested font proportions plus Escape restoration at any starting size.
+- The resize grip follows the pointer throughout dragging, including movements
+  too small to change the rounded font size. Release ends the drag.
 - Function graphs can label the horizontal axis in real pi fractions such as
   pi/2, pi, 3*pi/2, using the Unicode pi symbol and reduced fractions.
   Search pi fractions to enable it; search decimal labels to switch back.
