@@ -454,7 +454,7 @@ index 36238b0..1358cfd 100644
  	int InsertEmptyElement(short position,short Type,char Operator, int color=-1);
  	void SelectExpression(char Select);
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
-index f751ecf..e9fbe0d 100644
+index f751ecf..a434d1a 100644
 --- a/Mathomir/MainFrm.cpp
 +++ b/Mathomir/MainFrm.cpp
 @@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
@@ -492,8 +492,22 @@ index f751ecf..e9fbe0d 100644
  	NumDocumentElementsReserved=10;
  	TheDocument=(tDocumentStruct*)malloc(10*sizeof(tDocumentStruct));
  	ViewX=ViewY=0;
+@@ -1188,7 +1200,12 @@ int CMainFrame::AdjustMenu(int adjust_undo_only)
+ 	theMenu->CheckMenuItem(ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS120,(DefaultZoom==120)?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS100,(DefaultZoom==100)?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS80,(DefaultZoom==80)?MF_CHECKED:MF_UNCHECKED);
+-	theMenu->CheckMenuItem(ID_FONTSIZE_VERYLARGE,(DefaultFontSize>=150)?MF_CHECKED:MF_UNCHECKED);
++	theMenu->CheckMenuItem(ID_FONTSIZE_VERYLARGE,(DefaultFontSize==150)?MF_CHECKED:MF_UNCHECKED);
++    const UINT sizes[]={ID_DEFAULT_FONT_300,ID_DEFAULT_FONT_400,ID_DEFAULT_FONT_600,ID_DEFAULT_FONT_800};
++    const int values[]={300,400,600,800};
++    for (int s=0;s<4;s++) theMenu->CheckMenuItem(sizes[s],DefaultFontSize==values[s] ? MF_CHECKED : MF_UNCHECKED);
++    const UINT zooms[]={ID_DEFAULT_ZOOM_200,ID_DEFAULT_ZOOM_300,ID_DEFAULT_ZOOM_400};
++    for (int z=0;z<3;z++) theMenu->CheckMenuItem(zooms[z],DefaultZoom==200+100*z ? MF_CHECKED : MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_FONTSIZE_LARGE,(DefaultFontSize==120)?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_FONTSIZE_NORMAL,(DefaultFontSize==100)?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_FONTSIZE_SMALL,(DefaultFontSize==85)?MF_CHECKED:MF_UNCHECKED);
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..80430aa 100644
+index bdcebb4..2049c99 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -218,6 +218,33 @@ END
@@ -539,7 +553,7 @@ index bdcebb4..80430aa 100644
          MENUITEM "&Undo\tCtrl+Z",               ID_EDIT_UNDO
          MENUITEM SEPARATOR
          MENUITEM "Cu&t\tCtrl+X",                ID_EDIT_CUT
-@@ -254,6 +283,17 @@ BEGIN
+@@ -254,6 +283,22 @@ BEGIN
          MENUITEM SEPARATOR
          MENUITEM "&Delete\tDel",                ID_EDIT_DELETE
          MENUITEM SEPARATOR
@@ -552,12 +566,28 @@ index bdcebb4..80430aa 100644
 +            MENUITEM "Extra large (200%)", ID_FONT_SIZE_200
 +            MENUITEM "Huge (400%)", ID_FONT_SIZE_400
 +            MENUITEM "Maximum (800%)", ID_FONT_SIZE_800
++            MENUITEM "300%", ID_FONT_SIZE_300
++            MENUITEM "600%", ID_FONT_SIZE_600
++            MENUITEM SEPARATOR
++            MENUITEM "Smart size: fit to page width", ID_FONT_FIT_PAGE
++            MENUITEM "Smart size: fit to window width", ID_FONT_FIT_WINDOW
 +        END
 +        MENUITEM SEPARATOR
          MENUITEM "Find text...",                ID_Menu32880
          MENUITEM "Access &Locked Objects",      ID_EDIT_ACCESSLOCKEDOBJECTS
          MENUITEM SEPARATOR
-@@ -314,6 +354,9 @@ BEGIN
+@@ -265,6 +310,10 @@ BEGIN
+     BEGIN
+         POPUP "&Zoom"
+         BEGIN
++            MENUITEM "Zoom 480%", ID_ZOOM_480_EXPLICIT
++            MENUITEM "Zoom 400%", ID_ZOOM_400_EXPLICIT
++            MENUITEM "Zoom 300%", ID_ZOOM_300_EXPLICIT
++            MENUITEM "Zoom 200%", ID_ZOOM_200_EXPLICIT
+             MENUITEM "zoom &240%",                  ID_ZOOM_400
+             MENUITEM "zoom 1&50%",                  ID_ZOOM_300
+             MENUITEM "zoom &100%",                  ID_ZOOM_100
+@@ -314,6 +363,9 @@ BEGIN
      END
      POPUP "Options"
      BEGIN
@@ -567,7 +597,39 @@ index bdcebb4..80430aa 100644
          POPUP "&Selections"
          BEGIN
              MENUITEM "Use &intelligent framing",    ID_SELECTIONS_INTELLIGENTFRAMING
-@@ -416,6 +459,7 @@ BEGIN
+@@ -333,7 +385,6 @@ BEGIN
+             MENUITEM "Mouse-wheel function: Zoom in/out", ID_MOUSE_MOUSE
+             MENUITEM "Hold right-button to toggle the mouse-wheel function", ID_MOUSE_RIGHTMOUSEBUTTONTOTOGGLEMOUSE
+             MENUITEM SEPARATOR
+-            MENUITEM "Zooming with mouse wheel adjusts pointer", ID_ZOOM_WHEELZOOMADJUSTSPOINTER
+             MENUITEM "Reverse direction for mouse wheel scrolling", ID_MOUSE_REVERSEMOUSEWHEELSCROLLINGDIRECTION
+             MENUITEM "Slow-speed mouse wheel scrolling", ID_MOUSE_SLOW
+         END
+@@ -363,12 +414,22 @@ BEGIN
+         END
+         POPUP "&Font size && Zoom"
+         BEGIN
++            MENUITEM "Default zoom: 400%", ID_DEFAULT_ZOOM_400
++            MENUITEM "Default zoom: 300%", ID_DEFAULT_ZOOM_300
++            MENUITEM "Default zoom: 200%", ID_DEFAULT_ZOOM_200
+             MENUITEM "Default zoom is 150%",        ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS150
+             MENUITEM "Default zoom is 120%",        ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS120
+             MENUITEM "Default zoom is 100%",        ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS100
+             MENUITEM "Default zoom is 80%",         ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS80
+             MENUITEM SEPARATOR
+-            MENUITEM "Default font size is &Very large", ID_FONTSIZE_VERYLARGE
++            MENUITEM "Smart size: fit selected equation to page width", ID_FONT_FIT_PAGE
++            MENUITEM "Smart size: fit selected equation to window width", ID_FONT_FIT_WINDOW
++            MENUITEM SEPARATOR
++            MENUITEM "Default font size: 800%", ID_DEFAULT_FONT_800
++            MENUITEM "Default font size: 600%", ID_DEFAULT_FONT_600
++            MENUITEM "Default font size: 400%", ID_DEFAULT_FONT_400
++            MENUITEM "Default font size: 300%", ID_DEFAULT_FONT_300
++            MENUITEM "Default font size: Very large (150%)", ID_FONTSIZE_VERYLARGE
+             MENUITEM "Default font size is &Large", ID_FONTSIZE_LARGE
+             MENUITEM "Default font size is &Medium", ID_FONTSIZE_NORMAL
+             MENUITEM "Default Font size is &Small", ID_FONTSIZE_SMALL
+@@ -416,6 +477,7 @@ BEGIN
          MENUITEM SEPARATOR
          MENUITEM "&About Math-o-mir...",        ID_APP_ABOUT
      END
@@ -630,7 +692,7 @@ index 15ec728..b30baeb 100644
  					}
  					strcpy(file_pointer,">\r\n");file_pointer+=3;len+=3;
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..e6e7ef3 100644
+index fc832eb..d6f5ac6 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -708,7 +770,7 @@ index fc832eb..e6e7ef3 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +260,13 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +260,18 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
@@ -719,10 +781,15 @@ index fc832eb..e6e7ef3 100644
 +	ON_COMMAND(ID_EDIT_ROTATE_EQUATION, OnRotateEquation)
 +	ON_COMMAND(ID_FONT_ALL_OBJECTS, OnFontAllObjects)
 +	ON_COMMAND_RANGE(ID_FONT_SIZE_200, ID_FONT_SIZE_100, OnQuickFontSize)
++    ON_COMMAND_RANGE(ID_FONT_SIZE_300, ID_FONT_SIZE_600, OnQuickFontSize)
++    ON_COMMAND_RANGE(ID_FONT_FIT_PAGE, ID_FONT_FIT_WINDOW, OnFitFontSize)
++    ON_COMMAND_RANGE(ID_DEFAULT_FONT_300, ID_DEFAULT_FONT_800, OnLargeDefaultFont)
++    ON_COMMAND_RANGE(ID_ZOOM_200_EXPLICIT, ID_ZOOM_480_EXPLICIT, OnLargeZoom)
++    ON_COMMAND_RANGE(ID_DEFAULT_ZOOM_200, ID_DEFAULT_ZOOM_400, OnLargeDefaultZoom)
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -576,17 +630,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +635,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -745,7 +812,7 @@ index fc832eb..e6e7ef3 100644
  				}
  				else
  				{
-@@ -624,13 +679,16 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,13 +684,16 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -763,7 +830,7 @@ index fc832eb..e6e7ef3 100644
  
  		//draw paper sheet area
  		if (!ViewOnlyMode)
-@@ -753,6 +811,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +816,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -773,7 +840,7 @@ index fc832eb..e6e7ef3 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -802,6 +863,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -802,6 +868,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			((CDrawing*)(SpecialDrawingHover->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,SpecialDrawingHover->absolute_X,SpecialDrawingHover->absolute_Y);
  		}
  
@@ -781,7 +848,7 @@ index fc832eb..e6e7ef3 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1293,6 +1355,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1293,6 +1360,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_COPYPEN);
  		}
  		PaintDrawingHotspot(1);
@@ -789,7 +856,7 @@ index fc832eb..e6e7ef3 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1412,53 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1417,53 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -843,7 +910,7 @@ index fc832eb..e6e7ef3 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1550,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1555,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -852,7 +919,7 @@ index fc832eb..e6e7ef3 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +1897,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +1902,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -881,7 +948,7 @@ index fc832eb..e6e7ef3 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2169,12 +2293,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2298,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -897,7 +964,7 @@ index fc832eb..e6e7ef3 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2307,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2312,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -909,7 +976,7 @@ index fc832eb..e6e7ef3 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2321,9 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2326,9 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -920,7 +987,7 @@ index fc832eb..e6e7ef3 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2812,6 +2939,19 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +2944,19 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -940,7 +1007,7 @@ index fc832eb..e6e7ef3 100644
  
  	try
  	{
-@@ -3338,6 +3478,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3483,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -948,7 +1015,7 @@ index fc832eb..e6e7ef3 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +3578,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +3583,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -961,7 +1028,7 @@ index fc832eb..e6e7ef3 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +3700,10 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +3705,10 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
@@ -972,7 +1039,7 @@ index fc832eb..e6e7ef3 100644
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +3756,32 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +3761,32 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -1033,7 +1100,7 @@ index fc832eb..e6e7ef3 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4169,31 +4314,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4319,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -1066,7 +1133,7 @@ index fc832eb..e6e7ef3 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4457,6 +4578,13 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +4583,13 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -1080,7 +1147,7 @@ index fc832eb..e6e7ef3 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +4600,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +4605,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -1088,7 +1155,7 @@ index fc832eb..e6e7ef3 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5360,7 +5487,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +5492,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -1097,7 +1164,7 @@ index fc832eb..e6e7ef3 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +5541,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +5546,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -1114,7 +1181,7 @@ index fc832eb..e6e7ef3 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5580,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5585,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -1143,7 +1210,7 @@ index fc832eb..e6e7ef3 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +5671,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +5676,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -1152,7 +1219,7 @@ index fc832eb..e6e7ef3 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +5782,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +5787,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -1204,7 +1271,7 @@ index fc832eb..e6e7ef3 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5836,7 +5943,7 @@ if ((nChar!=6) )
+@@ -5836,7 +5948,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -1213,7 +1280,7 @@ index fc832eb..e6e7ef3 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6225,13 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6230,13 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -1227,7 +1294,7 @@ index fc832eb..e6e7ef3 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -7585,6 +7699,10 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7704,10 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -1238,7 +1305,7 @@ index fc832eb..e6e7ef3 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8230,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8235,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -1266,7 +1333,7 @@ index fc832eb..e6e7ef3 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +8683,8 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +8688,8 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -1276,7 +1343,7 @@ index fc832eb..e6e7ef3 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9529,634 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9534,678 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -1497,6 +1564,8 @@ index fc832eb..e6e7ef3 100644
 +    dialog.Add(ID_ROTATE_WITH_MOUSE,"Rotate > Drag text / equation with mouse","angle turn tilt orientation rotate rotation handle mouse");
 +    dialog.Add(ID_FONT_ALL_OBJECTS,"Font > Change font and size for all objects",dialog.Aliases(ID_FONT_ALL_OBJECTS));
 +    dialog.Add(ID_EDIT_ROTATE_EQUATION,"Rotate > Set text / equation angle",dialog.Aliases(ID_EDIT_ROTATE_EQUATION));
++    dialog.Add(ID_FONT_FIT_PAGE,"Smart font size > Fit equation to page width","large bigger smart intelligent auto automatic fit page width");
++    dialog.Add(ID_FONT_FIT_WINDOW,"Smart font size > Fit equation to window width","large bigger smart intelligent auto automatic fit screen window width");
 +    dialog.Add(ID_FONT_SIZE_800,"Font size > Maximum (800%)",dialog.Aliases(ID_FONT_SIZE_800));
 +    dialog.Add(ID_FONT_SIZE_400,"Font size > Huge (400%)",dialog.Aliases(ID_FONT_SIZE_400));
 +    dialog.Add(ID_FONT_SIZE_200,"Font size > Extra large (200%)",dialog.Aliases(ID_FONT_SIZE_200));
@@ -1847,6 +1916,8 @@ index fc832eb..e6e7ef3 100644
 +    if (ViewOnlyMode) return;
 +    int size=100;
 +    if (command==ID_FONT_SIZE_200) size=200;
++    if (command==ID_FONT_SIZE_300) size=300;
++    if (command==ID_FONT_SIZE_600) size=600;
 +    if (command==ID_FONT_SIZE_400) size=400;
 +    if (command==ID_FONT_SIZE_800) size=800;
 +    UndoSave("font size",20501);
@@ -1866,6 +1937,46 @@ index fc832eb..e6e7ef3 100644
 +    RepaintTheView(1);
 +    if (KeyboardEntryObject) SendKeyStroke(-1,0,0);
 +    ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();
++}
++
++void CMathomirView::OnLargeDefaultFont(UINT command)
++{
++    const int sizes[]={300,400,600,800}; DefaultFontSize=sizes[command-ID_DEFAULT_FONT_300];
++    ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();
++}
++void CMathomirView::OnLargeZoom(UINT command)
++{
++    const int zooms[]={200,300,400,480}; ViewZoom=zooms[command-ID_ZOOM_200_EXPLICIT];
++    RepaintTheView(1);
++}
++void CMathomirView::OnLargeDefaultZoom(UINT command)
++{
++    DefaultZoom=200+100*(command-ID_DEFAULT_ZOOM_200); ViewZoom=DefaultZoom;
++    ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu(); RepaintTheView(1);
++}
++void CMathomirView::OnFitFontSize(UINT command)
++{
++    if (ViewOnlyMode) return;
++    tDocumentStruct *target=KeyboardEntryBaseObject ? KeyboardEntryBaseObject : (prevTouchedObject ? prevTouchedObject : RotationHandleDocument());
++    bool changed=false; CClientDC dc(this);
++    for (int i=0;i<NumDocumentElements;i++)
++    {
++        tDocumentStruct *object=TheDocument+i;
++        if (object->Type!=1 || !object->Object || object->MovingDotState==5) continue;
++        if (NumSelectedObjects ? object->MovingDotState!=3 : object!=target) continue;
++        CExpression *expression=(CExpression*)object->Object;
++        short length,above,below; expression->CalculateSize(&dc,ViewZoom,&length,&above,&below);
++        if (length<=0) continue;
++        int width=PaperWidth-max(0,object->absolute_X-15)-30;
++        if (command==ID_FONT_FIT_WINDOW) width=min(width,ViewX+TheClientRect.right*100/ViewZoom-object->absolute_X-30);
++        if (width<=0) continue;
++        int size=max(40,min(800,(int)floor(expression->m_FontSize*(width*ViewZoom/100.0)/length)));
++        if (size==expression->m_FontSize) continue;
++        if (!changed) UndoSave("smart font size",20505);
++        ResizeObjectFonts(object->Object,1,size); changed=true;
++    }
++    if (!changed && !target && !NumSelectedObjects) AfxMessageBox("Point at or select an equation, then choose a smart font size.");
++    if (changed) { GetDocument()->SetModifiedFlag(); RepaintTheView(1); }
 +}
 +
 +void CMathomirView::OnFontAllObjects()
@@ -1911,7 +2022,7 @@ index fc832eb..e6e7ef3 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9438,6 +10185,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10234,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -1920,7 +2031,7 @@ index fc832eb..e6e7ef3 100644
  
  	//first stop the keyboard entry mode if it is active
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..463c82c 100644
+index 94dd0e4..5643f5e 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -76,6 +76,7 @@ public:
@@ -1931,7 +2042,7 @@ index 94dd0e4..463c82c 100644
  	int PopupCloses(int UserParam, int ExitCode);
  	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
  	afx_msg void OnSelectionsFrame();
-@@ -119,6 +120,19 @@ public:
+@@ -119,6 +120,23 @@ public:
  	afx_msg void OnOutputimageSize80();
  	afx_msg void OnOutputimageForcehighquality();
  	afx_msg void OnOutputimageForcehalftone();
@@ -1948,14 +2059,18 @@ index 94dd0e4..463c82c 100644
 +	afx_msg void OnRotateEquation();
 +	afx_msg void OnFontAllObjects();
 +	afx_msg void OnQuickFontSize(UINT command);
++	afx_msg void OnFitFontSize(UINT command);
++	afx_msg void OnLargeDefaultFont(UINT command);
++	afx_msg void OnLargeZoom(UINT command);
++	afx_msg void OnLargeDefaultZoom(UINT command);
  	afx_msg void OnFontsizeVerylarge();
  	afx_msg void OnFontsizeLarge();
  	afx_msg void OnFontsizeNormal();
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..9fddd42 100644
+index 05446cf..346fcaf 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,25 @@
+@@ -174,3 +174,41 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -1981,6 +2096,22 @@ index 05446cf..9fddd42 100644
 +
 +#define ID_TRIG_RADIANS 33009
 +#define ID_TRIG_DEGREES 33010
++
++#define ID_FONT_FIT_PAGE 33011
++#define ID_FONT_FIT_WINDOW 33012
++#define ID_FONT_SIZE_300 33013
++#define ID_FONT_SIZE_600 33014
++#define ID_DEFAULT_FONT_300 33015
++#define ID_DEFAULT_FONT_400 33016
++#define ID_DEFAULT_FONT_600 33017
++#define ID_DEFAULT_FONT_800 33018
++#define ID_ZOOM_200_EXPLICIT 33019
++#define ID_ZOOM_300_EXPLICIT 33020
++#define ID_ZOOM_400_EXPLICIT 33021
++#define ID_ZOOM_480_EXPLICIT 33022
++#define ID_DEFAULT_ZOOM_200 33023
++#define ID_DEFAULT_ZOOM_300 33024
++#define ID_DEFAULT_ZOOM_400 33025
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
 index b9c3f38..b4c998e 100644
 --- a/Mathomir/Toolbox.cpp
