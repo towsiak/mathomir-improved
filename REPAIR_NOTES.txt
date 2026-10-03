@@ -15,9 +15,11 @@ Changes:
   pi/2, pi, 3*pi/2, using the Unicode pi symbol and reduced fractions.
   Search pi fractions to enable it; search decimal labels to switch back.
   A pointed-at/selected graph is updated; otherwise all unlocked graphs update.
-  The graph's LIN/LOG button also cycles through pi mode. This labels radian
-  coordinates; it does not change the separate RAD/DEG computation setting.
+  The graph's LIN/LOG button also cycles through pi mode. In pi mode, graph
+  trig calculations use radians without changing the document's RAD/DEG setting.
   The choice is saved per graph, and tick spacing adapts to graph width/range.
+- Invalid graph results release the calculation lock before returning, preventing
+  that path from blocking later graph calculations.
 - A four-arrow move grip above-left of the hovered object moves it directly.
   Drag without selecting the whole object; Escape cancels, Undo restores position.
 - Resize dragging now uses a consistent screen-distance response: 240 diagonal
@@ -34,7 +36,7 @@ Changes:
 - Hover equations/text/ordinary drawings for a lower-right size grip. Drag to
   resize proportionally without selecting a bounding rectangle. Equation sizes
   stay within 40-800%. Drawing scales are 5-800% of their starting dimensions.
-  Shift snaps scale in 10% steps; Escape or lost capture restores the snapshot.
+  Shift gives finer control; Escape or lost capture restores the snapshot.
   One Undo reverses the resize. Specialized plot/image boxes retain their tools.
 - Font size includes 300%, 400%, 600% and 800% presets for selection and defaults.
   Smart size fits selected/focused equations to remaining page or window width,
