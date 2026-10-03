@@ -47,7 +47,7 @@ public static class MathomirUiProbe {
   [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
   [DllImport("user32.dll")] static extern bool GetKeyboardState(byte[] state);
   [DllImport("user32.dll")] static extern bool SetKeyboardState(byte[] state);
-  public static void ShiftKey(IntPtr hwnd,int key) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share selection key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[16]=128;SetKeyboardState(state);try{Send(hwnd,256,key);}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
+  public static void ShiftKey(IntPtr hwnd,int key) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share selection key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[16]=128;SetKeyboardState(state);try{UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)key,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Selection arrow did not respond");}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
   public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   [DllImport("user32.dll")] static extern IntPtr GetMenu(IntPtr hwnd);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetMenuString(IntPtr menu,uint id,StringBuilder text,int count,uint flags);
@@ -456,11 +456,10 @@ try {
   if ($rootTokens -ne '2x4') { throw "The root's variables changed: $rootTokens" }
   $annotationTokens=($savedRoot.SelectNodes('/mathomir/*[self::o or self::obj]/*[self::ex or self::expr]/*[self::var or self::elm[@tp="1"]]') | ForEach-Object {if ($_.HasAttribute('t')) {$_.t} else {$_.tx}}) -join ''
   if ($annotationTokens -notmatch 'constant') { throw "Typing the annotation did not save its text: $annotationTokens" }
-  $coloredConstant=$savedRoot.SelectSingleNode('//var[contains(@t,"constant")] | //elm[@tp="1"][contains(@tx,"constant")]')
-  $colorValue=if($coloredConstant.HasAttribute('clr')){$coloredConstant.clr}else{$coloredConstant.color}
-  if ($colorValue -ne '6') {throw "Highlighted text did not save purple after R/B shortcuts: $colorValue"}
-  $format=if($coloredConstant.HasAttribute('f')){$coloredConstant.f}else{$coloredConstant.fnt}
-  if (([Convert]::ToInt32($format.Substring(0,2),16) -band 1) -ne 0) {throw 'B unexpectedly made the highlighted text bold.'}
+  $coloredRuns=$savedRoot.SelectNodes('/mathomir/*[self::o or self::obj]/*[self::ex or self::expr]/*[self::var or self::elm[@tp="1"]][@color="6" or @clr="6"]')
+  $coloredText=($coloredRuns | ForEach-Object {if($_.HasAttribute('t')){$_.t}else{$_.tx}}) -join ''
+  if($coloredText -notmatch 'constant'){Write-Output ($savedRoot.SelectNodes('/mathomir/*[self::o or self::obj]/*[self::ex or self::expr]') | ForEach-Object {$_.OuterXml});throw "Highlighted text did not save purple: $coloredText"}
+  foreach($run in $coloredRuns){$format=if($run.HasAttribute('f')){$run.f}else{$run.fnt};if(([Convert]::ToInt32($format.Substring(0,2),16) -band 1) -ne 0){throw 'B unexpectedly made highlighted text bold.'}}
   Write-Output 'Writing color passed: highlight constant, R then B preserve selection, purple saves, B does not apply bold.'
   Write-Output 'Root placement smoke passed: hover inside root, double-click above the 2, type constant, click away to finish, save label and preserve root.'
   [MathomirUiProbe]::Send($main,273,33026) | Out-Null
