@@ -17,7 +17,8 @@ Changes:
   Nested fractions/exponents scale proportionally. Drawing strokes do not scale.
 - Double-click free placement bypasses grid and guideline snapping and automatic
   append-to-nearby-text behavior. Ordinary new-cursor guideline alignment and
-  append-to-text now require Shift. Ordinary grid snapping remains available.
+  append-to-text and new-cursor grid snapping now require Shift.
+  Saved default font sizes retain the new 40-800% range.
 - Double-click starts free placement even within expression bounds.
   Double-click and release for a new typing cursor; double-click and hold
   the second press, drag and pause for the existing quick-brace gesture.
