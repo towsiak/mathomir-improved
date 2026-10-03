@@ -51,10 +51,18 @@ index 944279c..5d53aaf 100644
  				ret=(CObject*)this;
  				break;
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..af28ec9 100644
+index 531282c..316752f 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
-@@ -453,7 +453,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
+@@ -60,6 +60,7 @@ int KeyboardExponentMode=0;
+ CExpression *AutocompleteSource;
+ int AutocompletePoints;
+ int AutocompleteTriggered;
++int TrigDegrees=0; // document numeric angle mode; symbolic pi stays radians
+ extern char TouchMouseMode;
+ extern char DisableMultitouch;
+ int CalcStructuralChecksumOnly; //for speed - as global variable (should be used with care in single thread)
+@@ -453,7 +454,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
  //for displaying
  //this function should be relatively fast.
  
@@ -144,7 +152,7 @@ index 531282c..af28ec9 100644
  {
  	
  	try
-@@ -1320,7 +1401,7 @@ void CExpression::CalculateSizeReadjust(short zoom, short *length, short *above,
+@@ -1320,7 +1402,7 @@ void CExpression::CalculateSizeReadjust(short zoom, short *length, short *above,
  CBitmap *cursor_bitmap;
  //paints the expression - the expression must be already prepared for displaying (by call to CalculateSize)
  //this function must be fast!!
@@ -153,7 +161,7 @@ index 531282c..af28ec9 100644
  {
  	try
  	{
-@@ -2407,6 +2488,15 @@ void CExpression::DeselectExpression()
+@@ -2407,6 +2489,15 @@ void CExpression::DeselectExpression()
  //it work recursively (can return its subelements)
  CObject* CExpression::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y,short *IsExpression, char *IsParenthese,char ForceInsertionPoints)
  {
@@ -169,7 +177,7 @@ index 531282c..af28ec9 100644
  	int i;
  	if ((DC==NULL) || (X<-5000) || (X>30000) || (Y<-5000) || (Y>15000) || (IsExpression==NULL)) return NULL;
  
-@@ -3053,6 +3143,7 @@ int CExpression::CopyExpression(const CExpression* Original,const char OnlySelec
+@@ -3053,6 +3144,7 @@ int CExpression::CopyExpression(const CExpression* Original,const char OnlySelec
  	m_ParentheseShape=Original->m_ParentheseShape;
  	m_ParenthesesFlags=Original->m_ParenthesesFlags;
  	if (m_pPaternalExpression) m_IsVertical=0; else m_IsVertical=Original->m_IsVertical;
@@ -177,7 +185,7 @@ index 531282c..af28ec9 100644
  
  	if (OnlySelected==1)
  	{
-@@ -3135,6 +3226,7 @@ void CExpression::Delete(void)
+@@ -3135,6 +3227,7 @@ void CExpression::Delete(void)
  	m_MaxNumColumns=1;
  	m_IsComputed=0;
  	m_IsVertical=0;
@@ -185,7 +193,7 @@ index 531282c..af28ec9 100644
  	m_Color=-1;
  	m_IsHeadline=0;
  	m_DrawParentheses=0;
-@@ -4383,7 +4475,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
+@@ -4383,7 +4476,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
  		this->m_KeyboardCursorPos=0;
  		CExpression *parent=this;
  		while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
@@ -194,7 +202,7 @@ index 531282c..af28ec9 100644
  		return 2;
  	}
  	/*if ((strnicmp(theElement->pElementObject->Data1,"\\text",5)==0)
-@@ -6352,7 +6444,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6352,7 +6445,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  			while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
  			if (parent)
  			{
@@ -203,7 +211,7 @@ index 531282c..af28ec9 100644
  			}
  			if ((UseToolbar)  && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
  			return 1;
-@@ -8778,6 +8870,27 @@ keyboardkeyhit_addtoexponent:
+@@ -8778,6 +8871,27 @@ keyboardkeyhit_addtoexponent:
  			theElement=KeyboardSplitVariable();
  			if (m_KeyboardCursorPos==0) IsEditedVariableEmpty=1;
  
@@ -231,7 +239,7 @@ index 531282c..af28ec9 100644
  			if (IsEditedVariableEmpty) 
  				DeleteElement(m_IsKeyboardEntry-1);
  			else
-@@ -11644,7 +11757,7 @@ autowraptext_start:
+@@ -11644,7 +11758,7 @@ autowraptext_start:
  int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  {
  	int len=0;
@@ -240,7 +248,7 @@ index 531282c..af28ec9 100644
  	static char tabs[17];
  
  	if (num_tabs>16) num_tabs=16;
-@@ -11694,6 +11807,13 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
+@@ -11694,6 +11808,13 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  		itoa(m_IsHeadline,tmp,10);
  		strcat(tmpstr,tmp);
  	}
@@ -254,7 +262,7 @@ index 531282c..af28ec9 100644
  	if (m_IsVertical)
  	{
  		strcat(tmpstr,"\" vert=\"");
-@@ -11852,6 +11972,7 @@ char * CExpression::XML_input(char * file)
+@@ -11852,6 +11973,7 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"txt")==0) {m_StartAsText=1;old_version_text_decode=1;}
  		if (strcmp(attribute,"hed")==0) m_IsHeadline=atoi(value);
  		if (strcmp(attribute,"vert")==0) m_IsVertical=atoi(value);
@@ -262,7 +270,7 @@ index 531282c..af28ec9 100644
  		if ((strcmp(attribute,"color")==0) || (strcmp(attribute,"clr")==0)) m_Color=atoi(value);
  		if (strcmp(attribute,"alig")==0) m_Alignment=atoi(value);
  		if ((strcmp(attribute,"brack")==0) || (strcmp(attribute,"br")==0)) m_ParenthesesFlags=atoi(value);
-@@ -11862,6 +11983,7 @@ char * CExpression::XML_input(char * file)
+@@ -11862,6 +11984,7 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"b_data")==0) m_ParenthesesFlags|=(atoi(value)<<2);
  
  	} while (attribute[0]);
@@ -270,7 +278,7 @@ index 531282c..af28ec9 100644
  
  	int found_anything=0;
  	int is_matrix=0;
-@@ -12021,7 +12143,7 @@ char * CExpression::XML_input(char * file)
+@@ -12021,7 +12144,7 @@ char * CExpression::XML_input(char * file)
  int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,char output_type)
  {
  	int len=0;
@@ -279,7 +287,7 @@ index 531282c..af28ec9 100644
  	static char tabs[17];
  	if (num_tabs>16) num_tabs=16;
  
-@@ -12272,7 +12394,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12272,7 +12395,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  int CExpression::LaTeX_output(char * output, char only_calculate)
  {
  	int len=0;
@@ -288,7 +296,7 @@ index 531282c..af28ec9 100644
  	char *tabs="";
  	char output_type=3;
  	int num_tabs=0;
-@@ -12567,7 +12689,7 @@ int IsCharacterLow(char ch,char font)
+@@ -12567,7 +12690,7 @@ int IsCharacterLow(char ch,char font)
  
  int CExpression::CalcChecksum()
  {
@@ -297,7 +305,7 @@ index 531282c..af28ec9 100644
  		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
  		
  	int c=m_NumElements;
-@@ -12581,6 +12703,7 @@ int CExpression::CalcChecksum()
+@@ -12581,6 +12704,7 @@ int CExpression::CalcChecksum()
  		//c+=128*m_ParentheseHeightFactor;
  		c+=256*(m_Color+4*m_StartAsText+8*m_IsVertical);
  		c+=768*m_Alignment;
@@ -305,7 +313,7 @@ index 531282c..af28ec9 100644
  		if (m_pPaternalExpression) c+=500;
  		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
  		c+=m_InternalInsertionPoint;
-@@ -14353,6 +14476,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
+@@ -14353,6 +14477,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
  	}
  	return 0;
  getkeyboardcursorpos_finish:
@@ -313,7 +321,7 @@ index 531282c..af28ec9 100644
  
  	if ((m_IsVertical) && (m_pPaternalExpression==NULL))
  	{
-@@ -16978,7 +17102,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16978,7 +17103,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl*pow(10.0,-exxp);
@@ -322,7 +330,7 @@ index 531282c..af28ec9 100644
  				exxp--;
  				if (exxp<-100) 	{rr=0.0;exxp=0;break;}
  			}
-@@ -16988,7 +17112,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16988,7 +17113,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl/pow(10.0,exxp);
@@ -331,6 +339,75 @@ index 531282c..af28ec9 100644
  				exxp++;
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
+@@ -24194,6 +24319,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
+ 
+ 	CExpression *arg=(CExpression*)((m_pElementList+Position)->pElementObject->Expression1);
+ 	if (!arg) return 0;
++    // Explicit trailing degree / radian units override the document mode.
++    if (function_type && arg->m_NumElements>1)
++    {
++        tElementStruct *last=arg->m_pElementList+arg->m_NumElements-1;
++        const char *unit=last->pElementObject ? last->pElementObject->Data1 : "";
++        int degrees=(unit[0]==(char)0xB0 && unit[1]==0) || strcmp(unit,"deg")==0;
++        int radians=strcmp(unit,"rad")==0;
++        if (last->Type==1 && (degrees || radians))
++        {
++            CExpression numeric(NULL,NULL,arg->m_FontSize);
++            numeric.CopyExpression(arg,0,1,0);
++            numeric.DeleteElement(numeric.m_NumElements-1);
++            int count=0; while (count++<50 && numeric.Compute(0,numeric.m_NumElements-1,0)) {}
++            tPureFactors factors; memset(&factors,0,sizeof(factors)); factors.N1=factors.N2=1.0;
++            if (!numeric.StrikeoutCommonFactors(0,numeric.m_NumElements-1,1,NULL,0,0,1,&factors) || factors.N2==0) return retval;
++            double angle=factors.N1/factors.N2;
++            if (degrees) angle*=3.14159265358979323846/180.0;
++            double result=0;
++            if (function_type==1) result=sin(angle);
++            if (function_type==2) result=cos(angle);
++            if (function_type==3) { if (fabs(cos(angle))<1e-14) return retval; result=tan(angle); }
++            if (function_type==4) { if (fabs(sin(angle))<1e-14) return retval; result=cos(angle)/sin(angle); }
++            if (function_type==5) { if (fabs(cos(angle))<1e-14) return retval; result=1.0/cos(angle); }
++            if (function_type==6) { if (fabs(sin(angle))<1e-14) return retval; result=1.0/sin(angle); }
++            if (!_finite(result) || fabs(result)>9e18) return retval;
++            if (fabs(result)<1e-14) result=0;
++            DeleteElement(Position);
++            GenerateASCIINumber(result,(long long)result,(result==(long long)result)?1:0,15,Position);
++            return 1;
++        }
++    }
++
+ 
+ 	{
+ 		int cnt=0;
+@@ -24454,6 +24611,7 @@ computesincos_end:
+ 		if (rval)
+ 		{
+ 			double N=PF.N1/PF.N2;
++            if (TrigDegrees) N*=3.14159265358979323846/180.0;
+ 			int prec=PF.prec1;
+ 			{
+ 				if (fabs(N)<1e-100)
+@@ -24484,8 +24642,9 @@ computesincos_end:
+ 					if (function_type==5) {res=1.0/cos(N);is_ok=1;} //secant
+ 					if (function_type==6) {res=1.0/sin(N);is_ok=1;} //cosecant
+ 
+-					if (is_ok)
++					if (is_ok && _finite(res) && fabs(res)<9e18)
+ 					{
++                        if (fabs(res)<1e-14) res=0;
+ 						if (prec<2) prec=2;
+ 						DeleteElement(Position);
+ 						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
+@@ -24555,8 +24714,9 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+ 					if (function_type==4) {res=atan(1/N);is_ok=1;} //arccot
+ 					if (function_type==5) {res=acos(1/N);is_ok=1;} //arcsecant
+ 					if (function_type==6) {res=asin(1/N);is_ok=1;} //arccsc
+-					if (is_ok)
++					if (is_ok && _finite(res))
+ 					{
++                        if (TrigDegrees) res*=180.0/3.14159265358979323846;
+ 						if (prec<2) prec=2;
+ 						DeleteElement(Position);
+ 						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
 diff --git a/Mathomir/Expression.h b/Mathomir/Expression.h
 index 36238b0..1358cfd 100644
 --- a/Mathomir/Expression.h
@@ -394,7 +471,7 @@ index f751ecf..e9fbe0d 100644
  	TheDocument=(tDocumentStruct*)malloc(10*sizeof(tDocumentStruct));
  	ViewX=ViewY=0;
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..400dbc3 100644
+index bdcebb4..80430aa 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -218,6 +218,33 @@ END
@@ -458,7 +535,17 @@ index bdcebb4..400dbc3 100644
          MENUITEM "Find text...",                ID_Menu32880
          MENUITEM "Access &Locked Objects",      ID_EDIT_ACCESSLOCKEDOBJECTS
          MENUITEM SEPARATOR
-@@ -416,6 +456,7 @@ BEGIN
+@@ -314,6 +354,9 @@ BEGIN
+     END
+     POPUP "Options"
+     BEGIN
++        MENUITEM "Trig angles: Radians (RAD)", ID_TRIG_RADIANS
++        MENUITEM "Trig angles: Degrees (DEG)", ID_TRIG_DEGREES
++        MENUITEM SEPARATOR
+         POPUP "&Selections"
+         BEGIN
+             MENUITEM "Use &intelligent framing",    ID_SELECTIONS_INTELLIGENTFRAMING
+@@ -416,6 +459,7 @@ BEGIN
          MENUITEM SEPARATOR
          MENUITEM "&About Math-o-mir...",        ID_APP_ABOUT
      END
@@ -467,27 +554,61 @@ index bdcebb4..400dbc3 100644
  
  
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
-index 15ec728..f51db2f 100644
+index 15ec728..b30baeb 100644
 --- a/Mathomir/MathomirDoc.cpp
 +++ b/Mathomir/MathomirDoc.cpp
-@@ -64,6 +64,7 @@ CMathomirDoc::CMathomirDoc()
+@@ -62,8 +62,10 @@ CMathomirDoc::CMathomirDoc()
+ }
  
+ 
++extern int TrigDegrees;
  BOOL CMathomirDoc::OnNewDocument()
  {
-+	PaperWidth=1200; PaperHeight=1553; // US Letter portrait
++	TrigDegrees=0; PaperWidth=1200; PaperHeight=1553; // US Letter portrait
  	AutosavePoints=AutosaveTime=0;
  	if (!CDocument::OnNewDocument())
  		return FALSE;
-@@ -154,6 +155,7 @@ void CMathomirDoc::OnFileNew()
+@@ -151,9 +153,11 @@ void CMathomirDoc::OnFileNew()
+ 	if (!SaveModified()) return;
+ 	AutosavePoints=AutosaveTime=0;
+ 	((CMainFrame*)(theApp.m_pMainWnd))->ClearDocument();
++        TrigDegrees=0;
  	SetPathName("\\Untitled",0); //ClearPathName does not exist??
  	SetModifiedFlag(0);
  	Toolbox->LoadSettings(NULL);
-+	PaperWidth=1200; PaperHeight=1553; // New documents start on US Letter
++	TrigDegrees=0; PaperWidth=1200; PaperHeight=1553; // New documents start on US Letter
  	ViewOnlyMode=0;
  	IsDrawingMode=0;
  	ToolboxSize=(BaseToolboxSize)?BaseToolboxSize:60;
+@@ -326,6 +330,7 @@ int CMathomirDoc::OpenMOMFile(char * filename)
+ 	{
+ 		//clear the entire documment
+ 		((CMainFrame*)(theApp.m_pMainWnd))->ClearDocument();
++        TrigDegrees=0;
+ 
+ 		//get data from file
+ 		fread(file_buffer,len,1,fil);
+@@ -403,7 +408,8 @@ int CMathomirDoc::OpenMOMFile(char * filename)
+ 						if (strcmp(attribute,"X")==0) x=atoi(value);
+ 						if (strcmp(attribute,"Y")==0) y=atoi(value);
+ 						if (strcmp(attribute,"lock")==0) lock=atoi(value);
+-						if ((filename) && (strcmp(attribute,"page_w")==0)) PaperWidth=atoi(value);
++						if ((filename) && (strcmp(attribute,"trig_deg")==0)) TrigDegrees=atoi(value)!=0;
++                        if ((filename) && (strcmp(attribute,"page_w")==0)) PaperWidth=atoi(value);
+ 						if ((filename) && (strcmp(attribute,"page_h")==0)) PaperHeight=atoi(value);
+ 						if ((filename) && (strcmp(attribute,"numbering")==0)) PageNumeration=atoi(value);
+ 					} while (attribute[0]);
+@@ -693,7 +699,7 @@ int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
+ 					if (i==0) 
+ 					{
+ 						//only the first object has some global attributs
+-						sprintf(dummy," page_w=\"%d\" page_h=\"%d\" numbering=\"%d\" ver=\"%d\"",PaperWidth,PaperHeight,PageNumeration,XMLFileVersion);
++						sprintf(dummy," page_w=\"%d\" page_h=\"%d\" numbering=\"%d\" ver=\"%d\" trig_deg=\"%d\"",PaperWidth,PaperHeight,PageNumeration,XMLFileVersion,TrigDegrees);
+ 						int ll=(int)strlen(dummy);memcpy(file_pointer,dummy,ll+1);file_pointer+=ll;len+=ll;
+ 					}
+ 					strcpy(file_pointer,">\r\n");file_pointer+=3;len+=3;
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..e75f9e4 100644
+index fc832eb..c32bb0c 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -499,10 +620,32 @@ index fc832eb..e75f9e4 100644
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -132,6 +134,23 @@ unsigned int LongClickStartTime;
+@@ -132,6 +134,45 @@ unsigned int LongClickStartTime;
  CPoint LongClickPosition;
  CExpression *LongClickObject;
  tDocumentStruct *prevTouchedObject=NULL;
++static CString FunctionHelpText;
++static CPoint FunctionHelpPoint;
++static CString BasicFunctionHelp(const char *name)
++{
++    CString n(name), result;
++    if (n=="sin" || n=="cos") result="Domain: all real angles\nRange: [-1, 1]\nPeriod: 360 deg / 2*pi rad";
++    else if (n=="tan" || n=="tg") result="Domain: excludes 90 + 180*k deg\n(or pi/2 + k*pi rad), integer k\nRange: all real numbers; period: 180 deg / pi rad";
++    else if (n=="cot" || n=="ctg") result="Domain: excludes 180*k deg / k*pi rad\nRange: all real numbers; period: 180 deg / pi rad";
++    else if (n=="sec") result="Domain: excludes 90 + 180*k deg / pi/2 + k*pi rad\nRange: (-infinity, -1] or [1, infinity)";
++    else if (n=="csc" || n=="cosec") result="Domain: excludes 180*k deg / k*pi rad\nRange: (-infinity, -1] or [1, infinity)";
++    else if (n=="arcsin") result="Domain: [-1, 1]\nRange: [-90, 90] deg / [-pi/2, pi/2] rad";
++    else if (n=="arccos") result="Domain: [-1, 1]\nRange: [0, 180] deg / [0, pi] rad";
++    else if (n=="arctan" || n=="arctg") result="Domain: all real numbers\nRange: (-90, 90) deg / (-pi/2, pi/2) rad";
++    else if (n=="ln") result="Real domain: x > 0\nRange: all real numbers\nNatural logarithm (base e)";
++    else if (n=="log") result="Real domain: x > 0; base b > 0, b != 1\nRange: all real numbers\nCheck the logarithm base before evaluating";
++    else if (n=="exp") result="Domain: all real numbers\nRange: (0, infinity)\nexp(x) = e^x";
++    else if (n=="abs") result="Domain: all real numbers\nRange: [0, infinity)\nAbsolute value / distance from zero";
++    if (result.IsEmpty()) return result;
++    extern int TrigDegrees;
++    return n+" (real-valued basics)\n"+result+"\nNumeric trig mode: "+(TrigDegrees ? "DEG - degrees" : "RAD - radians");
++}
++
 +CObject *RotationHandleObject=NULL;
 +static bool MouseRotationActive=false;
 +static double MouseRotationStartDirection,MouseRotationCenterX,MouseRotationCenterY;
@@ -523,7 +666,7 @@ index fc832eb..e75f9e4 100644
  char IsWindowOutOfFocus;
  
  #define NUM_SPECIAL_KEYS 21
-@@ -167,6 +186,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -167,6 +208,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -531,10 +674,12 @@ index fc832eb..e75f9e4 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +233,11 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +255,13 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
++	ON_COMMAND(ID_TRIG_RADIANS, OnTrigRadians)
++    ON_COMMAND(ID_TRIG_DEGREES, OnTrigDegrees)
 +	ON_COMMAND(ID_ROTATE_WITH_MOUSE, OnRotateWithMouse)
 +	ON_COMMAND(ID_FEATURE_SEARCH, OnFeatureSearch)
 +	ON_COMMAND(ID_EDIT_ROTATE_EQUATION, OnRotateEquation)
@@ -543,7 +688,7 @@ index fc832eb..e75f9e4 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -576,17 +601,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +625,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -566,7 +711,7 @@ index fc832eb..e75f9e4 100644
  				}
  				else
  				{
-@@ -802,6 +828,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -802,6 +852,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			((CDrawing*)(SpecialDrawingHover->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,SpecialDrawingHover->absolute_X,SpecialDrawingHover->absolute_Y);
  		}
  
@@ -574,7 +719,7 @@ index fc832eb..e75f9e4 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1349,14 +1376,52 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1400,52 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -627,7 +772,7 @@ index fc832eb..e75f9e4 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1513,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1537,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -636,7 +781,7 @@ index fc832eb..e75f9e4 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +1860,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +1884,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -665,7 +810,7 @@ index fc832eb..e75f9e4 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2182,9 +2269,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2293,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -677,17 +822,18 @@ index fc832eb..e75f9e4 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2283,8 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2307,9 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
 -		/*	if (prevTouchedObject==object) prevTouchedObject=NULL;
 +		/*	if (RotationHandleObject==object->Object) RotationHandleObject=NULL;
-+			if (prevTouchedObject==object) prevTouchedObject=NULL;
++			if (RotationHandleObject==object->Object) RotationHandleObject=NULL;
++            if (prevTouchedObject==object) prevTouchedObject=NULL;
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2812,6 +2900,19 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +2925,19 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -707,7 +853,15 @@ index fc832eb..e75f9e4 100644
  
  	try
  	{
-@@ -3437,6 +3538,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3464,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 		}
+ 
+ 		CObject *TouchedSubelement=NULL;
++        CString nextFunctionHelp;
+ 		tDocumentStruct *TouchedObject=NULL;
+ 		tDocumentStruct *TouchedExpression=NULL;
+ 		char IsTouchedExpressionFullyInside=0;
+@@ -3437,6 +3564,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -720,7 +874,23 @@ index fc832eb..e75f9e4 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3610,33 +3717,13 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +3686,8 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 								}
+ 							}
+ 							TouchedObject=ds;
++                            if (TouchedSubelement && IsExpression==0 && ((CElement*)TouchedSubelement)->m_Type==6)
++                                nextFunctionHelp=BasicFunctionHelp(((CElement*)TouchedSubelement)->Data1);
+ 							TouchedExpression=ds;
+ 							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
+ 								IsInsertionPointTouched=ds;
+@@ -3605,38 +3740,19 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 			ScheduleFullRepaint=1;
+ 		}
+ 		
+-		if ((prevSelectionChecksum!=SelectionChecksum) || (ScheduleFullRepaint))
++		if (nextFunctionHelp!=FunctionHelpText) { FunctionHelpText=nextFunctionHelp; FunctionHelpPoint=point; ScheduleFullRepaint=1; }
++        if ((prevSelectionChecksum!=SelectionChecksum) || (ScheduleFullRepaint))
+ 		{
  				
  			RepaintViewTimer=0;
  
@@ -760,7 +930,7 @@ index fc832eb..e75f9e4 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4457,6 +4544,13 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +4573,13 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -774,7 +944,16 @@ index fc832eb..e75f9e4 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -5634,49 +5728,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5360,7 +5483,7 @@ int CMathomirView::ScrollCursorIntoView()
+ 
+ 			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
+ 			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
+-			if (bottom>ViewY+(TheClientRect.bottom)*100/ViewZoom-tmp/2) //we want to show the entire object that is edited
++			if (Y>ViewY+TheClientRect.bottom*100/ViewZoom-tmp && bottom>ViewY+(TheClientRect.bottom)*100/ViewZoom-tmp/2) //we want to show the entire object that is edited
+ 			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
+ 
+ 	
+@@ -5634,49 +5757,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -826,7 +1005,7 @@ index fc832eb..e75f9e4 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -6118,6 +6171,13 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6200,13 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -840,7 +1019,7 @@ index fc832eb..e75f9e4 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -7585,6 +7645,10 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7674,10 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -851,7 +1030,7 @@ index fc832eb..e75f9e4 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8176,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8205,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -879,7 +1058,17 @@ index fc832eb..e75f9e4 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -9410,6 +9474,489 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -8565,7 +8658,8 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+ 				KeyboardEntryBaseObject--;
+ 			}
+ 
+-			if (prevTouchedObject==object) prevTouchedObject=NULL;
++			if (RotationHandleObject==object->Object) RotationHandleObject=NULL;
++            if (prevTouchedObject==object) prevTouchedObject=NULL;
+ 			if (prevTouchedObject>object) prevTouchedObject--;
+ 			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
+ 			if (SelectedDocumentObject>object) SelectedDocumentObject--;
+@@ -9410,6 +9504,511 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -1074,9 +1263,14 @@ index fc832eb..e75f9e4 100644
 +    ON_LBN_DBLCLK(IDC_FEATURE_RESULTS,OnOK)
 +END_MESSAGE_MAP()
 +
++extern int TrigDegrees;
++void CMathomirView::OnTrigRadians() { TrigDegrees=0; GetDocument()->SetModifiedFlag(); RepaintTheView(); }
++void CMathomirView::OnTrigDegrees() { TrigDegrees=1; GetDocument()->SetModifiedFlag(); RepaintTheView(); }
 +void CMathomirView::OnFeatureSearch()
 +{
 +    CFeatureSearchDialog dialog;
++    dialog.Add(ID_TRIG_RADIANS,"Trig angles > Use radians (RAD)","sin cos tan angle mode radian");
++    dialog.Add(ID_TRIG_DEGREES,"Trig angles > Use degrees (DEG)","sin cos tan angle mode degree");
 +    dialog.Add(ID_ROTATE_WITH_MOUSE,"Rotate > Drag text / equation with mouse","angle turn tilt orientation rotate rotation handle mouse");
 +    dialog.Add(ID_FONT_ALL_OBJECTS,"Font > Change font and size for all objects",dialog.Aliases(ID_FONT_ALL_OBJECTS));
 +    dialog.Add(ID_EDIT_ROTATE_EQUATION,"Rotate > Set text / equation angle",dialog.Aliases(ID_EDIT_ROTATE_EQUATION));
@@ -1116,6 +1310,23 @@ index fc832eb..e75f9e4 100644
 +
 +void CMathomirView::PaintRotationHandle(CDC *dc)
 +{
++    int modeSaved=dc->SaveDC();
++    dc->SelectObject(GetStockObject(DEFAULT_GUI_FONT)); dc->SetTextAlign(TA_LEFT|TA_TOP);
++    dc->SetBkMode(OPAQUE); dc->SetBkColor(RGB(255,255,255)); dc->SetTextColor(RGB(30,70,120));
++    dc->TextOut(8,8,TrigDegrees ? "Trig: DEG (degrees) - change in Options / Search" : "Trig: RAD (radians) - change in Options / Search");
++    dc->RestoreDC(modeSaved);
++    if (!FunctionHelpText.IsEmpty() && MouseMode==0 && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing)
++    {
++        int saved=dc->SaveDC(); dc->SelectObject(GetStockObject(DEFAULT_GUI_FONT));
++        dc->SetTextAlign(TA_LEFT|TA_TOP); dc->SetTextColor(RGB(30,30,30)); dc->SetBkMode(TRANSPARENT);
++        CRect box(0,0,390,0); dc->DrawText(FunctionHelpText,&box,DT_CALCRECT|DT_WORDBREAK|DT_NOPREFIX);
++        int w=box.Width()+16, h=box.Height()+16;
++        int x=max(0,min(FunctionHelpPoint.x+18,TheClientRect.right-w));
++        int y=max(0,min(FunctionHelpPoint.y+24,TheClientRect.bottom-h));
++        box.SetRect(x,y,x+w,y+h); dc->FillSolidRect(box,RGB(255,255,225)); dc->Draw3dRect(box,RGB(110,110,110),RGB(110,110,110));
++        box.DeflateRect(8,8); dc->DrawText(FunctionHelpText,&box,DT_WORDBREAK|DT_NOPREFIX); dc->RestoreDC(saved);
++    }
++
 +    if (ViewOnlyMode || IsDrawingMode || FreePlacementGesture) return;
 +    tDocumentStruct *object=RotationHandleDocument();
 +    if (!object || object->MovingDotState==5) return;
@@ -1369,8 +1580,16 @@ index fc832eb..e75f9e4 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
+@@ -9438,6 +10037,7 @@ void CMathomirView::OnFontsizeSmall()
+ 
+ void CMathomirView::OnEditUndo()
+ {
++    RotationHandleObject=NULL; FunctionHelpText.Empty();
+ 	if (UndoNumLevels==0) return; //nothing to restore
+ 
+ 	//first stop the keyboard entry mode if it is active
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..d05d9ea 100644
+index 94dd0e4..b758950 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -76,6 +76,7 @@ public:
@@ -1381,7 +1600,7 @@ index 94dd0e4..d05d9ea 100644
  	int PopupCloses(int UserParam, int ExitCode);
  	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
  	afx_msg void OnSelectionsFrame();
-@@ -119,6 +120,15 @@ public:
+@@ -119,6 +120,17 @@ public:
  	afx_msg void OnOutputimageSize80();
  	afx_msg void OnOutputimageForcehighquality();
  	afx_msg void OnOutputimageForcehalftone();
@@ -1390,6 +1609,8 @@ index 94dd0e4..d05d9ea 100644
 +	bool BeginMouseRotation(CPoint point);
 +	void UpdateMouseRotation(CPoint point, UINT flags);
 +	void EndMouseRotation(bool cancel);
++	afx_msg void OnTrigRadians();
++	afx_msg void OnTrigDegrees();
 +	afx_msg void OnFeatureSearch();
 +	afx_msg void OnRotateEquation();
 +	afx_msg void OnFontAllObjects();
@@ -1398,10 +1619,10 @@ index 94dd0e4..d05d9ea 100644
  	afx_msg void OnFontsizeLarge();
  	afx_msg void OnFontsizeNormal();
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..5384c77 100644
+index 05446cf..9fddd42 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,22 @@
+@@ -174,3 +174,25 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -1424,6 +1645,9 @@ index 05446cf..5384c77 100644
 +
 +#define ID_ROTATE_WITH_MOUSE 33008
 +#define IDC_ROTATION_MOUSE 1104
++
++#define ID_TRIG_RADIANS 33009
++#define ID_TRIG_DEGREES 33010
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
 index b9c3f38..109f589 100644
 --- a/Mathomir/Toolbox.cpp
