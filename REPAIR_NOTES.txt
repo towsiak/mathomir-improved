@@ -1,40 +1,33 @@
-Math-o-mir interaction repair candidate — 2026-10-03
-Base repository: https://github.com/mathomir/Mathomir_GIT
+Math-o-mir repair candidate 3 — 2026-10-03
+Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
-STATUS: Source changes only. Not compiled or run on Windows.
+Windows executable built with Visual Studio 2022 via GitHub Actions.
+Interactive behavior has not been verified on Windows.
 
-Changes
-1. Hover selection changes now request a full document redraw rather than
-   opaque single-object repainting. This should prevent overlapping braces
-   and annotations from being erased by the equation background. Full redraw
-   may cost performance in large documents; measure on Windows.
-2. Ordinary expression copy clicks recheck the current position using a
-   temporary expression and the existing hit tester before accepting the
-   previous hover selection. Group selection, moving-dot actions and placement
-   are excluded. Click-to-copy remains enabled.
+Changes:
+- Full redraw on hover selection changes to preserve overlapping annotations.
+- Recheck expression copy clicks at the actual cursor position.
+- Drawing selection uses distance to visible line segments with a small
+  screen-pixel margin. Ordinary node hover is capped at 2 pixels.
+  Ctrl retains larger node handles.
+- Printing creates object bitmaps only when image printing is enabled, fills
+  only their bounds, and restores the selected bitmap before deleting it.
+- Typing +- and -+ combines the operator in place while retaining the live
+  empty cursor element, avoiding its deletion and reconstruction.
+- Modern MSVC compatibility fixes for floating-point absolute values.
 
-Limits
-The hit tester still uses mathematical element geometry, not exact glyph pixels.
-This candidate does not comprehensively tighten every symbol's clickable area.
-No crash cause has been reproduced or repaired. Existing document format retained.
+Test on Windows:
+1. Open your original .mom sample; place text directly above/below the brace.
+2. Click actual strokes to copy; check Ctrl node editing at several zooms.
+3. Type +- and -+ repeatedly, after terms and inside fractions and exponents.
+   Check subsequent typing, backspace, undo/redo, save and reopen.
+4. Open print preview with image printing enabled and disabled.
+5. Confirm nearby objects remain visible when hovering.
+6. Confirm insertion, matrices, group movement and clipboard placement.
 
-Build on Windows
-Install Visual Studio with Desktop development with C++ and MFC support.
-Open Mathomir.sln, accept project conversion, retarget available toolset/SDK,
-and select Win32. The original project predates modern Visual Studio; additional
-compiler migration work may be needed. Build Debug first and run under debugger.
-Do not replace your working executable until the checks below pass.
-
-Manual verification
-- Create 2x, a brace and nearby explanatory text; hover repeatedly over each.
-  All objects must stay visible, including overlapping or closely spaced items.
-- Click directly on 2x; copying must still work. Place the copy and press Esc.
-- Hover 2x then move into whitespace and click: no stale copy should begin.
-- Verify insertion before/after/between terms, fractions, powers and matrices.
-- Verify Shift groups, moving dots, drawing copy and clipboard placement.
-- Repeat at multiple zoom levels and Windows display scaling settings.
-- Type, undo/redo, save and reopen; compare against the original app.
-- Try a large document to assess hover redraw performance.
-
-License: original MIT license remains in ReadMe.txt and source headers.
+Limits:
+No exact glyph-pixel hit testing for mathematical expressions.
+The reported crashes and five-minute preview stall have not been reproduced.
+Printer-driver initialization may still cause preview delays.
+Existing document format and upstream MIT license retained.
