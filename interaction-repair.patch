@@ -131,8 +131,28 @@ index f751ecf..52195ca 100644
  }
  
  //we are going to disable Main Menu activation throught the ALT key
+diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
+index bdcebb4..6baea0a 100644
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -254,6 +254,15 @@ BEGIN
+         MENUITEM SEPARATOR
+         MENUITEM "&Delete\tDel",                ID_EDIT_DELETE
+         MENUITEM SEPARATOR
++        MENUITEM "Font for &all objects...\tCtrl+Shift+F", ID_FONT_ALL_OBJECTS
++        POPUP "Font si&ze (selection / new typing)"
++        BEGIN
++            MENUITEM "Normal (100%)", ID_FONT_SIZE_100
++            MENUITEM "Extra large (200%)", ID_FONT_SIZE_200
++            MENUITEM "Huge (400%)", ID_FONT_SIZE_400
++            MENUITEM "Maximum (800%)", ID_FONT_SIZE_800
++        END
++        MENUITEM SEPARATOR
+         MENUITEM "Find text...",                ID_Menu32880
+         MENUITEM "Access &Locked Objects",      ID_EDIT_ACCESSLOCKEDOBJECTS
+         MENUITEM SEPARATOR
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..8932bbb 100644
+index fc832eb..ba7cbe9 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -167,6 +167,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
@@ -143,7 +163,16 @@ index fc832eb..8932bbb 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -576,17 +577,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -213,6 +214,8 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+ 	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
+ 	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
+ 	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
++	ON_COMMAND(ID_FONT_ALL_OBJECTS, OnFontAllObjects)
++	ON_COMMAND_RANGE(ID_FONT_SIZE_200, ID_FONT_SIZE_100, OnQuickFontSize)
+ 	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
+ 	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
+ 	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
+@@ -576,17 +579,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -166,7 +195,14 @@ index fc832eb..8932bbb 100644
  				}
  				else
  				{
-@@ -1355,6 +1357,39 @@ int LockDrawingBox=0;
+@@ -1349,14 +1353,50 @@ CBitmap *NewlineBitmap=NULL;
+ 
+ 
+ int MultipleModeWasAccepted=0;
++static bool FreePlacementGesture=false;
+ int MovingFirstMove=0;
+ int ResizingFirstPass;
+ int LockDrawingBox=0;
  int root_object_flag;
  
  #pragma optimize("s",on)
@@ -191,6 +227,7 @@ index fc832eb..8932bbb 100644
 +	SpecialDrawingHover=NULL;
 +	GuidlineElement=-2;
 +	NewlineAddObject=-1;
++	FreePlacementGesture=true;
 +	// Reuse free-space placement and quick-brace dragging without object hit tests.
 +	MouseMode=5;
 +	MultipleX=MultipleStartX=ViewX+point.x*100/ViewZoom;
@@ -205,8 +242,11 @@ index fc832eb..8932bbb 100644
 +
  void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  {
++	FreePlacementGesture=false;
  	SteadyCursorTimer=0;
-@@ -1448,7 +1483,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ 	SpacebarPressedRecently=0;
+ 	LeftClickTimer=0;
+@@ -1448,7 +1488,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -215,7 +255,7 @@ index fc832eb..8932bbb 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +1830,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +1835,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -243,7 +283,7 @@ index fc832eb..8932bbb 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2182,9 +2238,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2243,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -255,7 +295,7 @@ index fc832eb..8932bbb 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -3437,6 +3493,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +3498,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -268,7 +308,7 @@ index fc832eb..8932bbb 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3610,32 +3672,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3610,32 +3677,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  				
  			RepaintViewTimer=0;
  
@@ -306,7 +346,16 @@ index fc832eb..8932bbb 100644
  			prevTouchedObject=TouchedObject;
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
-@@ -6118,6 +6159,13 @@ unsigned int prevTimerTickTime;
+@@ -4457,6 +4503,8 @@ char RepaintedOnCtrlWhileDrawing=0;
+ #pragma optimize("s",on)
+ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+ {
++	if (nChar=='F' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))
++	{ SurpressCharMessage=1; OnFontAllObjects(); return; }
+ 
+ 	if ((ListPopup) && (ListPopup->IsWindowVisible()))
+ 	{
+@@ -6118,6 +6166,13 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -320,16 +369,136 @@ index fc832eb..8932bbb 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -7585,6 +7633,7 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7640,9 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
++	const bool exactPlacement=FreePlacementGesture;
++	FreePlacementGesture=false;
 +	if (GetCapture()==this) ReleaseCapture();
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
+@@ -8116,19 +8174,19 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ 		{
+ 			//clicked on empty screen, we are adding new empty expression (or from clipboard)
+ 			int make_text=0;
+-			if (GuidlineElement>=0)
++			if (!exactPlacement && (nFlags&MK_SHIFT) && GuidlineElement>=0)
+ 			{
+ 				AbsoluteX=prevGuidlineX;
+ 				make_text=SelectedGuidelineType;
+ 			}
+-			else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++			else if (!exactPlacement && (IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 			{
+ 				AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID-3;
+ 				AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
+ 			}			
+ 			if (!IsDrawingMode)
+ 			{
+-				if ((NewlineAddObject>=0) && ((NewlineAddObject&0x3FFFFFFF)<NumDocumentElements) && (TheDocument[NewlineAddObject&0x3FFFFFFF].Type==1))
++				if (!exactPlacement && (nFlags&MK_SHIFT) && (NewlineAddObject>=0) && ((NewlineAddObject&0x3FFFFFFF)<NumDocumentElements) && (TheDocument[NewlineAddObject&0x3FFFFFFF].Type==1))
+ 				{
+ 					int mark_for_redraw=0;
+ 					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
+@@ -9410,6 +9468,94 @@ void CMathomirView::OnOutputimageForcehalftone()
+ 	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
+ }
+ 
++
++// Font sizes are percentages of the normal equation size. Scale nested parts
++// together so superscripts and fractions retain their proportions.
++static void ResizeObjectFonts(CObject *object, int type, int size)
++{
++    if (!object) return;
++    if (type==1)
++    {
++        CExpression *expression=(CExpression*)object;
++        expression->ChangeFontSize((float)size/max(10,(int)expression->m_FontSize));
++    }
++    else if (type==2)
++    {
++        CDrawing *drawing=(CDrawing*)object;
++        for (int i=0;i<drawing->NumItems;i++)
++        {
++            tDrawingItem *item=drawing->Items+i;
++            if (item->Type==0) ResizeObjectFonts((CObject*)item->pSubdrawing,2,size);
++            if (item->Type==2) ResizeObjectFonts((CObject*)item->pSubdrawing,1,size);
++        }
++    }
++}
++
++void CMathomirView::OnQuickFontSize(UINT command)
++{
++    if (ViewOnlyMode) return;
++    int size=100;
++    if (command==ID_FONT_SIZE_200) size=200;
++    if (command==ID_FONT_SIZE_400) size=400;
++    if (command==ID_FONT_SIZE_800) size=800;
++    UndoSave("font size",20501);
++    bool changed=false;
++    for (int i=0;i<NumDocumentElements;i++)
++    {
++        tDocumentStruct *object=TheDocument+i;
++        if (object->MovingDotState==3 || (NumSelectedObjects==0 &&
++            (object==(KeyboardEntryBaseObject ? KeyboardEntryBaseObject : SelectedDocumentObject))))
++        {
++            ResizeObjectFonts(object->Object,object->Type,size);
++            changed=true;
++        }
++    }
++    if (!changed) DefaultFontSize=size;
++    RepaintTheView(1);
++    if (KeyboardEntryObject) SendKeyStroke(-1,0,0);
++    ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();
++}
++
++void CMathomirView::OnFontAllObjects()
++{
++    if (ViewOnlyMode) return;
++    CDC *dc=GetDC();
++    LOGFONT font;
++    ((CMainFrame*)theApp.m_pMainWnd)->GetLogicalFont(0,&font,dc);
++    font.lfHeight=-MulDiv(15,dc->GetDeviceCaps(LOGPIXELSY),72);
++    CHOOSEFONT choice;
++    ZeroMemory(&choice,sizeof(choice));
++    choice.lStructSize=sizeof(choice);
++    choice.hwndOwner=theApp.m_pMainWnd->m_hWnd;
++    choice.lpLogFont=&font;
++    choice.Flags=CF_SCREENFONTS|CF_INITTOLOGFONTSTRUCT|CF_SCALABLEONLY|CF_LIMITSIZE|CF_NOSTYLESEL;
++    choice.nSizeMin=6;
++    choice.nSizeMax=120;
++    if (ChooseFont(&choice))
++    {
++        UndoSave("font for all objects",20502);
++        int size=max(50,min(800,MulDiv(choice.iPointSize,100,150)));
++        // The application stores named font slots globally. Keep Symbol intact.
++        // Keep their original size calibration; size is stored in each equation.
++        for (int slot=0;slot<3;slot++)
++        {
++            LOGFONT original;
++            ((CMainFrame*)theApp.m_pMainWnd)->GetLogicalFont(slot,&original,dc);
++            lstrcpyn(original.lfFaceName,font.lfFaceName,LF_FACESIZE);
++            original.lfCharSet=font.lfCharSet;
++            ((CMainFrame*)theApp.m_pMainWnd)->SetLogicalFont(slot,&original,dc);
++        }
++        for (int i=0;i<NumDocumentElements;i++)
++            ResizeObjectFonts(TheDocument[i].Object,TheDocument[i].Type,size);
++        DefaultFontSize=size;
++        RepaintTheView(1);
++        if (KeyboardEntryObject) SendKeyStroke(-1,0,0);
++        Toolbox->InvalidateRect(NULL,1);
++        ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();
++    }
++    ReleaseDC(dc);
++}
++
+ void CMathomirView::OnFontsizeVerylarge()
+ {
+ 	DefaultFontSize=150; //bilo 185
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..e0aa0e2 100644
+index 94dd0e4..7b1e19f 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -76,6 +76,7 @@ public:
@@ -340,3 +509,26 @@ index 94dd0e4..e0aa0e2 100644
  	int PopupCloses(int UserParam, int ExitCode);
  	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
  	afx_msg void OnSelectionsFrame();
+@@ -119,6 +120,8 @@ public:
+ 	afx_msg void OnOutputimageSize80();
+ 	afx_msg void OnOutputimageForcehighquality();
+ 	afx_msg void OnOutputimageForcehalftone();
++	afx_msg void OnFontAllObjects();
++	afx_msg void OnQuickFontSize(UINT command);
+ 	afx_msg void OnFontsizeVerylarge();
+ 	afx_msg void OnFontsizeLarge();
+ 	afx_msg void OnFontsizeNormal();
+diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
+index 05446cf..df8891f 100644
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -174,3 +174,9 @@
+ #define _APS_NEXT_SYMED_VALUE           101
+ #endif
+ #endif
++
++#define ID_FONT_ALL_OBJECTS 33001
++#define ID_FONT_SIZE_200 33002
++#define ID_FONT_SIZE_400 33003
++#define ID_FONT_SIZE_800 33004
++#define ID_FONT_SIZE_100 33005
