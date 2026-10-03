@@ -51,10 +51,38 @@ index 944279c..5d53aaf 100644
  				ret=(CObject*)this;
  				break;
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..dc48354 100644
+index 531282c..850abf1 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
-@@ -16978,7 +16978,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -8778,6 +8778,27 @@ keyboardkeyhit_addtoexponent:
+ 			theElement=KeyboardSplitVariable();
+ 			if (m_KeyboardCursorPos==0) IsEditedVariableEmpty=1;
+ 
++			// Combine +/- in place while retaining the live empty cursor element.
++			// Avoid deleting and rebuilding that element during a two-key conversion.
++			if (IsEditedVariableEmpty && m_IsKeyboardEntry>1 && m_IsKeyboardEntry<=m_NumElements &&
++				theElement && theElement->Type==1 && theElement->pElementObject &&
++				theElement->pElementObject->Data1[0]==0)
++			{
++				tElementStruct *previous=m_pElementList+m_IsKeyboardEntry-2;
++				if (previous->Type==2 && previous->pElementObject)
++				{
++					char previousOperator=previous->pElementObject->Data1[0];
++					if (previousOperator==lastkeystrokes[1] &&
++						((previousOperator=='+' && ch=='-') || (previousOperator=='-' && ch=='+')))
++					{
++						previous->pElementObject->Data1[0]=(previousOperator=='+') ? (char)0xB1 : (char)0xB2;
++						for (CExpression *parent=this; parent; parent=parent->m_pPaternalExpression) parent->m_IsComputed=0;
++						m_KeyboardCursorPos=0;
++						return 1;
++					}
++				}
++			}
++
+ 			if (IsEditedVariableEmpty) 
+ 				DeleteElement(m_IsKeyboardEntry-1);
+ 			else
+@@ -16978,7 +16999,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl*pow(10.0,-exxp);
@@ -63,7 +91,7 @@ index 531282c..dc48354 100644
  				exxp--;
  				if (exxp<-100) 	{rr=0.0;exxp=0;break;}
  			}
-@@ -16988,7 +16988,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16988,7 +17009,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl/pow(10.0,exxp);
