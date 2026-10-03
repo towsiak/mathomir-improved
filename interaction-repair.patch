@@ -51,7 +51,7 @@ index 944279c..5d53aaf 100644
  				ret=(CObject*)this;
  				break;
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..faf76f1 100644
+index 531282c..af28ec9 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -453,7 +453,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
@@ -293,7 +293,7 @@ index 531282c..faf76f1 100644
  int CExpression::CalcChecksum()
  {
 -	if ((m_NumElements==1) && (m_pElementList->Type==5)) //special () =()	
-+	if ((m_NumElements==1) && (m_pElementList->Type==5) && (!m_RotationMilliDegrees || CalcStructuralChecksumOnly)) //special () =()	
++	if ((m_NumElements==1) && (m_pElementList->Type==5) && (!m_RotationMilliDegrees || CalcStructuralChecksumOnly)) //special () =()
  		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
  		
  	int c=m_NumElements;
@@ -427,7 +427,7 @@ index bdcebb4..3819118 100644
          MENUITEM "Access &Locked Objects",      ID_EDIT_ACCESSLOCKEDOBJECTS
          MENUITEM SEPARATOR
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..8df734b 100644
+index fc832eb..3d767a1 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -693,7 +693,7 @@ index fc832eb..8df734b 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -9410,6 +9472,169 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9472,170 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -741,8 +741,9 @@ index fc832eb..8df734b 100644
 +        CString value; GetDlgItemText(IDC_ROTATION_ANGLE,value);
 +        const char *text=value; char *end=NULL;
 +        double entered=strtod(text,&end);
++        const bool hasNumber=(end!=text);
 +        while (end && (*end==' ' || *end=='\t')) end++;
-+        if (end==text || !end || *end || !_finite(entered))
++        if (!hasNumber || !end || *end || !_finite(entered))
 +        {
 +            AfxMessageBox("Enter an angle in degrees, for example 17.5 or -45.");
 +            GetDlgItem(IDC_ROTATION_ANGLE)->SetFocus(); return;
