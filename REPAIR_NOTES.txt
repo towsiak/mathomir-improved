@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 8 — 2026-10-03
+Math-o-mir repair candidate 9 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -6,6 +6,20 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- Search is visible on the menu bar; Ctrl+K opens the feature search box.
+  Live, case-insensitive multi-word matching searches menu commands and aliases.
+  A single result click or Enter executes the chosen command. Arrow keys change
+  the choice; Escape closes without executing. Common font/rotation actions are
+  prioritized, and menu commands are collected dynamically to include new ones.
+  Drawing tools include brace, line, arrow, rectangle, ellipse and freehand.
+- A round rotation handle appears beside the focused/hovered text or equation.
+  Drag it to rotate in place with a live angle readout. Shift snaps to 15-degree
+  steps, Escape cancels, and one Undo restores the original angle/position.
+  Edit > Rotate with mouse and the numeric dialog's Use mouse button expose it.
+- New documents and blank startup pages default to US Letter portrait. Page
+  dimensions loaded from nonempty saved documents retain the existing override.
+- Removed the typing-time overlap-avoidance code that automatically shifted an
+  edited equation up/down by up to 24 document units. Typing now keeps its position.
 - Edit > Rotate text / equation (Ctrl+Shift+R) sets the absolute angle on selected
   standalone text/equation objects or the active equation. Decimal angles are
   accepted with 0.001-degree precision; positive is clockwise, negative is
@@ -53,6 +67,15 @@ Changes:
 - Modern MSVC compatibility fixes for floating-point absolute values.
 
 Test on Windows:
+- Open Search/Ctrl+K; try font, bigger, rotate, mouse, print preview, letter,
+  brace and nonsense. Check single-click, Enter, Up/Down and Escape. Run settings
+  and confirm they affect the intended equation after the search closes.
+- Drag the rotation handle at several zooms; test a full turn, Shift snapping,
+  Escape, release outside the window, Undo, copying and save/reopen.
+- Start with no settings and with saved A4 defaults: new pages should be Letter.
+  Open an existing A4 document: its page dimensions should stay as saved.
+- Put text close above/below another equation and type fractions and exponents.
+  The existing object must retain its absolute position while growing.
 - Rotate text and a fraction/exponent equation to 17.5, -45, 90 and 180 degrees.
   Click its strokes to copy; click insertion points and edit. Test Ctrl+Shift+R,
   multiple selected equations, Undo, 0 degrees, save/reopen, image export and
