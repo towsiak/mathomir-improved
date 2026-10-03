@@ -162,6 +162,7 @@ try {
   for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
   $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
   [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
+  [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+12),($sizeGrip[1]+12))
   for ($repeat=0; $repeat -lt 30; $repeat++) { [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+24),($sizeGrip[1]+24)) }
   if (![MathomirUiProbe]::SizeGripAt($view,($sizeGrip[0]+24),($sizeGrip[1]+24))) { throw 'The active resize grip slipped away from the pointer.' }
   [MathomirUiProbe]::Mouse($view,514,0,($sizeGrip[0]+24),($sizeGrip[1]+24))
