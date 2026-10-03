@@ -27,6 +27,7 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd,IntPtr dc);
   [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc,int x,int y);
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
+  public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=150;y<240;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
   public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   [DllImport("user32.dll")] static extern IntPtr GetMenu(IntPtr hwnd);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetMenuString(IntPtr menu,uint id,StringBuilder text,int count,uint flags);
@@ -157,6 +158,32 @@ try {
   $restoredObject=$undone.SelectSingleNode('/mathomir/*[self::o or self::obj]')
   if ($restoredObject.X -ne '100' -or $restoredObject.Y -ne '150') { throw ("Undo did not restore the grip move. Saved position: $($restoredObject.X), $($restoredObject.Y)") }
   Write-Output 'Move grip smoke passed: drag without whole-object selection, save expected position, Undo restores position.'
+  for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
+  $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
+  [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
+  for ($repeat=0; $repeat -lt 30; $repeat++) { [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+24),($sizeGrip[1]+24)) }
+  [MathomirUiProbe]::Mouse($view,514,0,($sizeGrip[0]+24),($sizeGrip[1]+24))
+  for ($repeat=0; $repeat -lt 10; $repeat++) { [MathomirUiProbe]::Mouse($view,512,0,($sizeGrip[0]+80),($sizeGrip[1]+80)) }
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$resized=Get-Content -LiteralPath $fixture -Raw
+  $resizedExpression=$resized.SelectSingleNode('/mathomir/*[self::o or self::obj][1]/*[self::ex or self::expr]')
+  $fontSize=if ($resizedExpression.HasAttribute('fh')) {[int]$resizedExpression.fh} else {[int]$resizedExpression.fnt_h}
+  if ($fontSize -ne 107) { throw "Repeated stationary resize events compounded the font size or release failed: $fontSize, expected 107." }
+  $resizedChild=$resizedExpression.SelectSingleNode('./elm[@tp="8"]/*[self::ex or self::expr]')
+  $childSize=if ($resizedChild.HasAttribute('fh')) {[int]$resizedChild.fh} else {[int]$resizedChild.fnt_h}
+  if ($childSize -ne 96) { throw "Nested root contents scaled incorrectly: $childSize, expected 96." }
+  [MathomirUiProbe]::Send($main,273,0xE12B) | Out-Null
+  for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
+  $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
+  [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
+  [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+60),($sizeGrip[1]+60))
+  [MathomirUiProbe]::Send($view,256,27) | Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$cancelled=Get-Content -LiteralPath $fixture -Raw
+  $cancelledExpression=$cancelled.SelectSingleNode('/mathomir/*[self::o or self::obj][1]/*[self::ex or self::expr]')
+  $cancelledSize=if ($cancelledExpression.HasAttribute('fh')) {[int]$cancelledExpression.fh} else {[int]$cancelledExpression.fnt_h}
+  if ($cancelledSize -ne 100) { throw "Escape did not restore the original font size: $cancelledSize." }
+  Write-Output 'Resize regression passed: 30 identical drag events produce 107%, nested root stays proportional, release stops growth, Undo and Escape restore size.'
   [MathomirUiProbe]::Mouse($view,513,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
   [MathomirUiProbe]::Mouse($view,515,1,130,125)
@@ -214,7 +241,7 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v11' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v12' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 } finally {
