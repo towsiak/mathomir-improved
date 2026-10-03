@@ -217,7 +217,7 @@ improved with candidate 5; printer-tab/Cancel behavior still needs confirmation.
 Printer-driver initialization may still cause preview delays.
 Existing document format and upstream MIT license retained.
 
-VERSIONED CRASH RECOVERY (v13)
+VERSIONED CRASH RECOVERY (v14)
 Recovery runs automatically, independent of the old Never/Low/Medium/High setting.
 Normally writes about one second after edits stop, or every five seconds during
 continuous editing. Active move/resize/rotate gestures and running graph workers
@@ -231,3 +231,17 @@ older Recovery-YYYYMMDD-HHMMSS-milliseconds-process.mom for an earlier version.
 Recovery opens as a modified document so Save As lets you choose its new name.
 Recovery files are retained; remove unwanted older versions from that folder.
 Recent keystrokes before a snapshot can still be lost in a sudden crash.
+
+V14 DRAWING ROTATION AND INTERVAL PRESETS
+Point at an ordinary drawing, brace, arrow, shape or interval diagram and drag
+its round rotation grip. Rotate button also enables that grip. Shift snaps to
+15-degree increments. Escape cancels; Undo restores. Rotation always uses a
+snapshot of the original geometry so repeated mouse events do not compound.
+Nested ordinary drawings and text labels rotate together.
+Special drawing objects (live graphs, bitmap images, drawing containers) are
+not handled by this geometry rotation and do not show its grip.
+Search 'number line' or 'interval' for four presets: (a,b), [a,b], (a,b], [a,b).
+Choose one, then click in the document to place it. Open endpoints have hollow
+circles; included endpoints have filled dots. The interval is a heavier line,
+with thin number-line extensions and arrows. Labels a and b are editable text.
+Move, resize, rotate, save and reopen these as ordinary drawing objects.
