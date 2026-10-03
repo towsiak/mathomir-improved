@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 9 — 2026-10-03
+Math-o-mir repair candidate 10 — 2026-10-03
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -6,6 +6,36 @@ Windows executable built with Visual Studio 2022 via GitHub Actions.
 Interactive behavior has not been verified on Windows.
 
 Changes:
+- A permanent Search field is visible directly below the toolbar. Type there
+  for live clickable results; Ctrl+K focuses it and selects the old query.
+  Up/Down select results, Enter runs a command, Escape closes the dropdown.
+  All fonts, Rotate and RAD/DEG buttons are alongside it; the header is outside
+  document coordinates and adapts to narrower windows.
+- Hover equations/text/ordinary drawings for a lower-right size grip. Drag to
+  resize proportionally without selecting a bounding rectangle. Equation sizes
+  stay within 40-800%. Drawing scales are 5-800% of their starting dimensions.
+  Shift snaps scale in 10% steps; Escape or lost capture restores the snapshot.
+  One Undo reverses the resize. Specialized plot/image boxes retain their tools.
+- Font size includes 300%, 400%, 600% and 800% presets for selection and defaults.
+  Smart size fits selected/focused equations to remaining page or window width,
+  bounded by 40-800%. It keeps the equation's position and is undoable.
+  View zoom supports explicit 200%, 300%, 400% and 480%; default zoom adds 200-400%.
+- Wheel zoom retains pointer anchoring without warping or auto-centering the mouse.
+- Hover repaints use the dirty area and coalesce queued mouse events, while painting
+  all intersecting layers. Resize deletes the bitmap DC before deleting its bitmap;
+  direct toolbox hover drawing uses one automatically released DC.
+- Normal text insertion in the same text run is guarded to advance the caret once.
+  Text mode skips equation autocomplete searches. Fixed the key-history int-array
+  shift that incorrectly advanced four elements and read beyond its array.
+  The reported green-caret jump still requires an interactive Windows check.
+- Function references cover circular/inverse/hyperbolic/inverse-hyperbolic trig,
+  logs, roots, absolute value, common powers, fractions and calculus operators.
+  Custom functions describe the need for their definition instead of inventing
+  domain/range. Hovering the argument also finds its enclosing function.
+  Popups wait 450 ms of steady hover and move away with normal interaction.
+  Inverse cotangent uses the standard principal branch (0, pi).
+- About displays Improved v10, the date, Windows version 2.1.10.0, original author
+  Danijel Gorupec, retained MIT license and a clickable fork/project link.
 - Visible RAD/DEG indicator; Options and Search choose numeric trig angle mode.
   Mode is saved in .mom files; old files and new documents default to radians.
   Explicit trailing degree or rad units override mode for numeric arguments.
@@ -15,7 +45,7 @@ Changes:
   including trig periods/restrictions and the current numeric angle mode.
 - Avoid scrolling to show an entire equation when its typing cursor is visible.
   The reported integral lower-limit click jump has not been reproduced here.
-- Search is visible on the menu bar; Ctrl+K opens the feature search box.
+- Search is visible on the menu bar; Ctrl+K focuses the persistent feature field.
   Live, case-insensitive multi-word matching searches menu commands and aliases.
   A single result click or Enter executes the chosen command. Arrow keys change
   the choice; Escape closes without executing. Common font/rotation actions are
@@ -76,6 +106,17 @@ Changes:
 - Modern MSVC compatibility fixes for floating-point absolute values.
 
 Test on Windows:
+- Click the persistent Search field, type font/rotate/print/brace/smart, and check
+  keyboard navigation, single-click results, Escape, focus back to the canvas,
+  narrow resizing and toolbar on/off. Check the RAD/DEG button after opening files.
+- Hover an equation, text and brace/drawing; drag the size grip, test Shift, Escape,
+  loss of capture, Undo and save/reopen. Check rotated equations and drawing labels.
+- Check the larger defaults and selected sizes, page/window fitting and zoom presets.
+- Type normal text, including repeated letters and >16 characters, then insert
+  in the middle, backspace and use arrows. Check the green caret stays at the edit.
+- Move across overlapping objects and zoom/resize repeatedly. Annotations must
+  remain visible; hover rendering must not leave stale pixels.
+- Open About and check original author, MIT notice, version and project button.
 - Check sin(30) in DEG gives 0.5, sin(pi/6) in RAD gives 0.5, and sin(30deg)
   gives 0.5 in either mode. Check inverse trig and saved mode after reopening.
   Hover sin/cos/tan/arcsin/ln/log/exp/abs and move away to dismiss the reference.
