@@ -21,3 +21,9 @@ Writing has eight colors, including orange, purple and teal, through the **Color
 For graph labels, search **pi fractions** or **decimal labels**. π mode uses radians for that graph and saves the choice. Drag the four-arrow grip to move an object; use the lower-right grip to resize, holding Shift for finer control.
 
 Download the latest successful **Mathomir-Windows-Repair** artifact under [Actions](https://github.com/towsiak/mathomir-improved/actions), extract the ZIP, and run `Mathomir.exe`.
+
+## Crash recovery
+
+Recovery saves automatically about one second after edits stop, or every five seconds while editing continues. A running graph calculation or active drag must finish first. Each snapshot is an independent timestamped `.mom` file, and `Latest.mom` is replaced only after a complete, flushed snapshot is available. Earlier versions are retained.
+
+To reopen work after a crash, launch the app and type **recover** in the visible Search box. Choose `Latest.mom` or an earlier timestamp. Files are stored in `%LOCALAPPDATA%\MathomirImproved\Recovery`; unwanted old versions can be deleted there. This recovery works independently of the legacy autosave-frequency setting. A few recent unsnapshotted edits can still be lost in a sudden crash.
