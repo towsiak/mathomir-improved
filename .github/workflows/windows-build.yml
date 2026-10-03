@@ -32,6 +32,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Windows UI smoke checks
+        shell: pwsh
+        run: ./tools/windows-smoke.ps1
       - name: Package
         shell: pwsh
         run: |
