@@ -152,7 +152,7 @@ index bdcebb4..6baea0a 100644
          MENUITEM "Access &Locked Objects",      ID_EDIT_ACCESSLOCKEDOBJECTS
          MENUITEM SEPARATOR
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..ba7cbe9 100644
+index fc832eb..f163f35 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -167,6 +167,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
@@ -379,7 +379,12 @@ index fc832eb..ba7cbe9 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8116,19 +8174,19 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8170,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ 					MultipleModeWasAccepted=0;
+ 				}
+ 		}
+-		if ((MultipleModeWasAccepted==1) && (SpecialDrawingHover==NULL) && (LeftClickTimer<4))
++		if ((MultipleModeWasAccepted==1) && (exactPlacement || SpecialDrawingHover==NULL) && (LeftClickTimer<4))
  		{
  			//clicked on empty screen, we are adding new empty expression (or from clipboard)
  			int make_text=0;
@@ -390,7 +395,7 @@ index fc832eb..ba7cbe9 100644
  				make_text=SelectedGuidelineType;
  			}
 -			else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
-+			else if (!exactPlacement && (IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++			else if (!exactPlacement && (nFlags&MK_SHIFT) && (IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
  			{
  				AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID-3;
  				AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
@@ -472,7 +477,7 @@ index fc832eb..ba7cbe9 100644
 +    if (ChooseFont(&choice))
 +    {
 +        UndoSave("font for all objects",20502);
-+        int size=max(50,min(800,MulDiv(choice.iPointSize,100,150)));
++        int size=max(40,min(800,MulDiv(choice.iPointSize,100,150)));
 +        // The application stores named font slots globally. Keep Symbol intact.
 +        // Keep their original size calibration; size is stored in each equation.
 +        for (int slot=0;slot<3;slot++)
@@ -532,3 +537,18 @@ index 05446cf..df8891f 100644
 +#define ID_FONT_SIZE_400 33003
 +#define ID_FONT_SIZE_800 33004
 +#define ID_FONT_SIZE_100 33005
+diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
+index b9c3f38..67da348 100644
+--- a/Mathomir/Toolbox.cpp
++++ b/Mathomir/Toolbox.cpp
+@@ -5658,8 +5658,8 @@ int CToolbox::LoadSettings(char * filename)
+ 		fread(&ForceHighQualityImage,sizeof(int),1,fil);
+ 		fread(&ForceHalftoneImage,sizeof(int),1,fil);
+ 		fread(&DefaultFontSize,sizeof(int),1,fil);
+-			if (DefaultFontSize>150) DefaultFontSize=150;
+-			if (DefaultFontSize<85) DefaultFontSize=80;
++			if (DefaultFontSize>800) DefaultFontSize=800;
++			if (DefaultFontSize<40) DefaultFontSize=40;
+ 		fread(&MovingDotSize,sizeof(int),1,fil);
+ 		fread(&MovingDotPermanent,sizeof(int),1,fil);
+ 		fread(&GRID,sizeof(int),1,fil);
