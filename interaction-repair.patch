@@ -4351,7 +4351,7 @@ index 05446cf..4c435c1 100644
 +#define ID_WRITING_COLORS 33040
 +#define ID_WRITING_BOLD 33041
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..e0f23cb 100644
+index b9c3f38..feb74a1 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4362,6 +4362,15 @@ index b9c3f38..e0f23cb 100644
  #include "Mathomir.h"
  #include "Toolbox.h"
  #include ".\toolbox.h"
+@@ -331,7 +332,7 @@ const struct
+ 	{72,"Left","Left align",25},//25
+ 	{73,"Center","Center align",25},//26
+ 	{74,"Right","Right align",25},//27
+-	{15,"Bold","Bold (b)",25},//28
++	{15,"Bold","Bold (Ctrl+B)",25},//28
+ 	{14,"Italic","Italic (i)",25},//29
+ 	{6,"U.line","Underline (u)",25},//30
+ 	{130,"U.brace","Under brace",25},//31
 @@ -753,6 +754,7 @@ CToolbox::CToolbox(int IsSubtoolbox)
  	if (IsSubtoolbox==0)
  	{
