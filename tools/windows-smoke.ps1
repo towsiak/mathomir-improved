@@ -27,6 +27,7 @@ public static class MathomirUiProbe {
   public static void SetText(IntPtr hwnd,string text) { UIntPtr result; if(SendTextTimeout(hwnd,12,IntPtr.Zero,text,2,3000,out result)==IntPtr.Zero) throw new Exception("Search text did not respond"); }
   public static IntPtr Child(IntPtr parent,int id) { IntPtr found=IntPtr.Zero; EnumChildWindows(parent,(hwnd,p)=>{if(GetDlgCtrlID(hwnd)==id){found=hwnd;return false;} return true;},IntPtr.Zero); return found; }
   public static IntPtr Window(int process,string caption) { IntPtr found=IntPtr.Zero; EnumWindows((hwnd,p)=>{uint pid; GetWindowThreadProcessId(hwnd,out pid); if(pid==process && IsWindowVisible(hwnd) && Text(hwnd)==caption){found=hwnd;return false;}return true;},IntPtr.Zero); return found; }
+  public static IntPtr Dialog(int process) { IntPtr found=IntPtr.Zero; EnumWindows((hwnd,p)=>{uint pid; GetWindowThreadProcessId(hwnd,out pid); if(pid==process && IsWindowVisible(hwnd) && Class(hwnd)=="#32770"){found=hwnd;return false;}return true;},IntPtr.Zero); return found; }
   public static string AllText(IntPtr parent) { var lines=new List<string>(); EnumChildWindows(parent,(hwnd,p)=>{lines.Add(Text(hwnd));return true;},IntPtr.Zero);return String.Join("\n",lines); }
 }
 '@
@@ -42,7 +43,9 @@ $fixture=Join-Path (Split-Path $exe) 'root-annotation-smoke.mom'
 </o>
 </mathomir>
 '@ | Set-Content -LiteralPath $fixture -Encoding ascii
-$appProcess = Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -PassThru
+$startArgs=@{FilePath=$exe; WorkingDirectory=(Split-Path $exe); PassThru=$true; RedirectStandardError=(Join-Path (Split-Path $exe) 'smoke-stderr.txt')}
+if ($env:MATHOMIR_DIAGNOSTIC_STARTUP) { $startArgs.ArgumentList="`"$fixture`"" }
+$appProcess = Start-Process @startArgs
 try {
   $main = [IntPtr]::Zero
   for ($attempt=0; $attempt -lt 40; $attempt++) {
@@ -53,8 +56,12 @@ try {
   }
   if ($main -eq [IntPtr]::Zero) { throw 'No main window was created.' }
   [MathomirUiProbe]::PostMessage($main,273,[IntPtr]0xE101,[IntPtr]::Zero) | Out-Null
-  Start-Sleep -Milliseconds 500
-  $open=[MathomirUiProbe]::Window($appProcess.Id,'Open')
+  $open=[IntPtr]::Zero
+  for ($attempt=0; $attempt -lt 80; $attempt++) {
+    Start-Sleep -Milliseconds 100
+    $open=[MathomirUiProbe]::Dialog($appProcess.Id)
+    if ($open -ne [IntPtr]::Zero) { break }
+  }
   if ($open -eq [IntPtr]::Zero) { throw 'The file-open dialog did not appear.' }
   $fileEdit=[MathomirUiProbe]::Child($open,1148)
   if ($fileEdit -eq [IntPtr]::Zero) { $fileEdit=[MathomirUiProbe]::Child($open,1001) }
@@ -121,4 +128,6 @@ try {
   Write-Output "Windows UI smoke passed: visible Search, $matches font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 } finally {
   if (!$appProcess.HasExited) { Stop-Process -Id $appProcess.Id -Force }
+  Get-Content (Join-Path (Split-Path $exe) 'smoke-stderr.txt') -ErrorAction SilentlyContinue
+  Get-ChildItem (Split-Path $exe) -Filter 'asan*' | ForEach-Object { Get-Content $_.FullName }
 }
