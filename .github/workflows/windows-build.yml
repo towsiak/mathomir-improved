@@ -45,7 +45,7 @@ jobs:
           $vs = & $vswhere -latest -products '*' -property installationPath
           $compiler = Get-ChildItem "$vs\VC\Tools\MSVC" -Directory | Sort-Object Name -Descending | Select-Object -First 1
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
-          $env:ASAN_OPTIONS = "log_path=$((Resolve-Path source/build).Path)\asan"
+          $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/windows-smoke.ps1
       - name: Package
