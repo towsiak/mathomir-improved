@@ -541,6 +541,7 @@ try {
 } finally {
   $appProcess.Refresh()
   if ($appProcess.HasExited) {Write-Output "App exit code: $($appProcess.ExitCode)"}
+  if ($env:MATHOMIR_DIAGNOSTIC_STARTUP -and !$appProcess.HasExited) {for($wait=0;$wait -lt 20 -and !$appProcess.HasExited;$wait++){Start-Sleep -Milliseconds 250;$appProcess.Refresh()}}
   if (!$appProcess.HasExited) { Stop-Process -Id $appProcess.Id -Force }
   Get-Content (Join-Path (Split-Path $exe) 'smoke-stderr.txt') -ErrorAction SilentlyContinue
   Get-ChildItem (Split-Path $exe) -Filter 'asan*' | ForEach-Object { Get-Content $_.FullName }
