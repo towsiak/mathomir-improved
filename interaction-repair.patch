@@ -681,7 +681,7 @@ index f751ecf..f451196 100644
  	theMenu->CheckMenuItem(ID_FONTSIZE_NORMAL,(DefaultFontSize==100)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_SMALL,(DefaultFontSize==85)?MF_CHECKED:MF_UNCHECKED);
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..ae5c7a2 100644
+index bdcebb4..ff6a5f7 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -709,8 +709,8 @@ index bdcebb4..ae5c7a2 100644
 -    LTEXT           "This software is free. You are welcome to use,",IDC_STATIC,43,65,185,8
 -    LTEXT           "reuse, copy, modify, distribute, rebrand...",IDC_STATIC,44,74,171,12
 +    ICON IDR_MAINFRAME, IDC_STATIC, 12, 12, 20, 20
-+    LTEXT "Math-o-mir Improved - v11", IDC_STATIC, 44, 12, 260, 14
-+    LTEXT "Windows build: 2026-10-03 | Version 2.1.11.0", IDC_STATIC, 44, 29, 260, 12
++    LTEXT "Math-o-mir Improved - v12", IDC_STATIC, 44, 12, 260, 14
++    LTEXT "Windows build: 2026-10-03 | Version 2.1.12.0", IDC_STATIC, 44, 29, 260, 12
 +    LTEXT "Based on Math-o-mir 2.1 beta5.", IDC_STATIC, 12, 49, 296, 12
 +    LTEXT "Original author: Danijel Gorupec. Original MIT license retained.", IDC_STATIC, 12, 65, 296, 24
 +    LTEXT "Improved fork: towsiak / mathomir-improved on GitHub.", IDC_STATIC, 12, 89, 296, 12
@@ -856,8 +856,8 @@ index bdcebb4..ae5c7a2 100644
  VS_VERSION_INFO VERSIONINFO
 - FILEVERSION 2,1,0,4
 - PRODUCTVERSION 2,1,0,4
-+ FILEVERSION 2,1,11,0
-+ PRODUCTVERSION 2,1,11,0
++ FILEVERSION 2,1,12,0
++ PRODUCTVERSION 2,1,12,0
   FILEFLAGSMASK 0x3fL
  #ifdef _DEBUG
   FILEFLAGS 0x1L
@@ -867,14 +867,14 @@ index bdcebb4..ae5c7a2 100644
          BEGIN
 -            VALUE "FileDescription", "Math-o-mir, the mathematical notepad."
 -            VALUE "FileVersion", "2.1"
-+            VALUE "FileDescription", "Math-o-mir Improved v11, the mathematical notepad."
-+            VALUE "FileVersion", "2.1.11.0"
++            VALUE "FileDescription", "Math-o-mir Improved v12, the mathematical notepad."
++            VALUE "FileVersion", "2.1.12.0"
              VALUE "InternalName", "mathomir.exe"
              VALUE "OriginalFilename", "mathomir.exe"
 -            VALUE "ProductName", "Math-o-mir"
 -            VALUE "ProductVersion", "2.1"
 +            VALUE "ProductName", "Math-o-mir Improved"
-+            VALUE "ProductVersion", "2.1.11.0"
++            VALUE "ProductVersion", "2.1.12.0"
          END
      END
      BLOCK "VarFileInfo"
@@ -933,7 +933,7 @@ index 15ec728..b30baeb 100644
  					}
  					strcpy(file_pointer,">\r\n");file_pointer+=3;len+=3;
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..c37c3d2 100644
+index fc832eb..b7e010e 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -1066,7 +1066,7 @@ index fc832eb..c37c3d2 100644
 +CObject *ResizeHandleObject=NULL;
 +static bool MouseSizingActive=false;
 +static bool MouseMovingActive=false;
-+static CPoint MoveStartPoint,SizingStartPoint;
++static CPoint MoveStartPoint,SizingStartPoint,SizingCurrentPoint;
 +static int MoveStartX,MoveStartY;
 +static CObject *MoveGripObject=NULL;
 +static CExpression *SizingExpressionSnapshot=NULL;
@@ -1815,7 +1815,7 @@ index fc832eb..c37c3d2 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9712,874 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9712,884 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -2283,7 +2283,7 @@ index fc832eb..c37c3d2 100644
 +{
 +    tDocumentStruct *object=ResizeHandleDocument();
 +    if (!object || object->MovingDotState==5 || (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing)) return;
-+    CPoint point=ResizeHandlePoint(object);
++    CPoint point=MouseSizingActive ? SizingCurrentPoint : ResizeHandlePoint(object);
 +    CPen pen(PS_SOLID,1,RGB(45,95,155)); CBrush brush(RGB(255,255,255));
 +    CPen *oldPen=dc->SelectObject(&pen); CBrush *oldBrush=dc->SelectObject(&brush);
 +    dc->MoveTo(point.x-8,point.y-8); dc->LineTo(point.x-3,point.y-3);
@@ -2317,13 +2317,14 @@ index fc832eb..c37c3d2 100644
 +    SizingAnchorX=object->absolute_X; SizingAnchorY=object->absolute_Y-object->Above;
 +    SizingVectorX=ViewX+point.x*100.0/ViewZoom-SizingAnchorX;
 +    SizingVectorY=ViewY+point.y*100.0/ViewZoom-SizingAnchorY;
-+    SizingScale=1.0; SizingStartPoint=point;
++    SizingScale=1.0; SizingStartPoint=SizingCurrentPoint=point;
 +    if (object->Type==1)
 +    {
 +        CExpression *expression=(CExpression*)object->Object;
 +        SizingFontSize=expression->m_FontSize;
-+        SizingExpressionSnapshot=new CExpression(NULL,NULL,100);
++        SizingExpressionSnapshot=new CExpression(NULL,NULL,SizingFontSize);
 +        SizingExpressionSnapshot->CopyExpression(expression,0,1,0);
++        SizingExpressionSnapshot->m_FontSize=SizingFontSize;
 +    }
 +    else { SizingDrawingSnapshot=new CDrawing(); SizingDrawingSnapshot->CopyDrawing((CDrawing*)object->Object); }
 +    UndoSave("resize with grip",20506);
@@ -2333,6 +2334,7 @@ index fc832eb..c37c3d2 100644
 +}
 +void CMathomirView::UpdateMouseSizing(CPoint point,UINT flags)
 +{
++    bool gripMoved=point!=SizingCurrentPoint; SizingCurrentPoint=point;
 +    tDocumentStruct *object=ResizeHandleDocument();
 +    if (!object) { EndMouseSizing(true); return; }
 +    // Screen-distance scaling keeps small objects as controllable as large ones.
@@ -2345,7 +2347,10 @@ index fc832eb..c37c3d2 100644
 +    {
 +        int size=max(40,min(800,(int)floor(SizingFontSize*scale+0.5)));
 +        CExpression *expression=(CExpression*)object->Object;
-+        if (size==expression->m_FontSize) return;
++        if (size==expression->m_FontSize) { if (gripMoved) { InvalidateRect(NULL,FALSE); UpdateWindow(); } return; }
++        // CopyExpression preserves root size and scales children relative to it.
++        // Restore the original root size before copying, then apply drag once.
++        expression->m_FontSize=SizingFontSize;
 +        expression->CopyExpression(SizingExpressionSnapshot,0,1,0);
 +        expression->ChangeFontSize((float)size/max(10,SizingFontSize));
 +        expression->CalculateSize(&dc,ViewZoom,&length,&above,&below);
@@ -2353,7 +2358,7 @@ index fc832eb..c37c3d2 100644
 +    }
 +    else if (object->Type==2 && SizingDrawingSnapshot)
 +    {
-+        if (fabs(scale-SizingScale)<0.002) return;
++        if (fabs(scale-SizingScale)<0.002) { if (gripMoved) { InvalidateRect(NULL,FALSE); UpdateWindow(); } return; }
 +        CDrawing *drawing=(CDrawing*)object->Object;
 +        drawing->CopyDrawing(SizingDrawingSnapshot); drawing->ScaleForFactor((float)scale,(float)scale);
 +        drawing->CalculateSize(&dc,ViewZoom,&length,&below);
@@ -2368,7 +2373,12 @@ index fc832eb..c37c3d2 100644
 +    tDocumentStruct *object=ResizeHandleDocument();
 +    if (cancel && object)
 +    {
-+        if (object->Type==1 && SizingExpressionSnapshot) ((CExpression*)object->Object)->CopyExpression(SizingExpressionSnapshot,0,1,0);
++        if (object->Type==1 && SizingExpressionSnapshot)
++        {
++            CExpression *expression=(CExpression*)object->Object;
++            expression->m_FontSize=SizingFontSize;
++            expression->CopyExpression(SizingExpressionSnapshot,0,1,0);
++        }
 +        if (object->Type==2 && SizingDrawingSnapshot) ((CDrawing*)object->Object)->CopyDrawing(SizingDrawingSnapshot);
 +        object->absolute_X=SizingStartX; object->absolute_Y=SizingStartY;
 +    }
@@ -2690,7 +2700,7 @@ index fc832eb..c37c3d2 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10592,35 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10602,35 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -2726,7 +2736,7 @@ index fc832eb..c37c3d2 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10637,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10647,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
