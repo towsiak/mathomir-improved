@@ -176,12 +176,12 @@ try {
   [MathomirUiProbe]::Send($main,273,33026) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$piSaved=Get-Content -LiteralPath $fixture -Raw
-  $piMinimum=$piSaved.SelectSingleNode('/mathomir/*[dw[@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
+  $piMinimum=$piSaved.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
   if ($piMinimum.alig -ne '2') { throw 'Pi graph mode did not save its axis setting.' }
   [MathomirUiProbe]::Send($main,273,33027) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$decimalSaved=Get-Content -LiteralPath $fixture -Raw
-  $decimalMinimum=$decimalSaved.SelectSingleNode('/mathomir/*[dw[@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
+  $decimalMinimum=$decimalSaved.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
   if ($decimalMinimum.alig -eq '2' -or $decimalMinimum.alig -eq '1') { throw 'Decimal graph mode did not restore linear labels.' }
   Write-Output 'Graph axis smoke passed: pi fraction mode and decimal mode both save correctly.'
   $search=[MathomirUiProbe]::Child($main,1112)
