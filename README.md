@@ -12,4 +12,8 @@ This repository contains modifications to his application; it does not claim aut
 
 ## Repair status
 
-Windows builds are produced through GitHub Actions. Changes address hover repainting, click placement, drawing-tool selection, operator conversion, print rendering, and modal-dialog handling. Compilation has passed; reported Windows interaction problems still require hands-on verification.
+Windows builds are produced through GitHub Actions. v11 includes a permanent feature search, move/resize/rotate grips, larger font choices and smart fitting, RAD/DEG controls, expanded function reference cards, US Letter defaults, and interaction/printing repairs.
+
+The Windows runner verifies startup, search filtering, angle-mode controls, and the About box. Annotation insertion, dragging, caret behavior and printer dialogs still need hands-on verification. The reported annotated-root crash has not been reproduced; this build includes a defensive change to hover-reference traversal.
+
+Download the latest successful **Mathomir-Windows-Repair** artifact under [Actions](https://github.com/towsiak/mathomir-improved/actions), extract the ZIP, and run `Mathomir.exe`.
