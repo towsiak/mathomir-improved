@@ -64,7 +64,7 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v10' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v11' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $matches font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 } finally {
