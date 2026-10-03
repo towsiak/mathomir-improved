@@ -216,3 +216,18 @@ The reported crashes have not been reproduced here. The user reported printing
 improved with candidate 5; printer-tab/Cancel behavior still needs confirmation.
 Printer-driver initialization may still cause preview delays.
 Existing document format and upstream MIT license retained.
+
+VERSIONED CRASH RECOVERY (v13)
+Recovery runs automatically, independent of the old Never/Low/Medium/High setting.
+Normally writes about one second after edits stop, or every five seconds during
+continuous editing. Active move/resize/rotate gestures and running graph workers
+must finish before a consistent snapshot is saved. Disk errors are retried.
+Every successful snapshot has a timestamp and process ID; older versions stay.
+Completed bytes are flushed before publishing a version, and Latest.mom is
+replaced safely. A failed write leaves existing recovery files intact.
+Files: %LOCALAPPDATA%\MathomirImproved\Recovery
+Use the visible Search box: recover. Choose Latest.mom for recent edits or an
+older Recovery-YYYYMMDD-HHMMSS-milliseconds-process.mom for an earlier version.
+Recovery opens as a modified document so Save As lets you choose its new name.
+Recovery files are retained; remove unwanted older versions from that folder.
+Recent keystrokes before a snapshot can still be lost in a sudden crash.
