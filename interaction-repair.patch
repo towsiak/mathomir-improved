@@ -132,10 +132,18 @@ index f751ecf..52195ca 100644
  
  //we are going to disable Main Menu activation throught the ALT key
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..f46f340 100644
+index fc832eb..e50dc56 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -576,17 +576,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -167,6 +167,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+ 	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
+ 	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
+ 	ON_WM_LBUTTONDOWN()
++	ON_WM_LBUTTONDBLCLK()
+ 	ON_WM_SIZE()
+ 	ON_WM_HSCROLL()
+ 	ON_WM_VSCROLL()
+@@ -576,17 +577,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -158,7 +166,47 @@ index fc832eb..f46f340 100644
  				}
  				else
  				{
-@@ -1448,7 +1449,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1355,6 +1357,39 @@ int LockDrawingBox=0;
+ int root_object_flag;
+ 
+ #pragma optimize("s",on)
++void CMathomirView::OnLButtonDblClk(UINT nFlags, CPoint point)
++{
++	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
++	if (nFlags & (MK_CONTROL|MK_SHIFT)) { OnLButtonDown(nFlags,point); return; }
++	RestoreClipboardBackground();
++	if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
++	if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
++	for (int i=0;i<NumDocumentElements;i++)
++	{
++		tDocumentStruct *object=TheDocument+i;
++		if (object->MovingDotState!=5) object->MovingDotState=0;
++		if (object->Object && object->Type==1) ((CExpression*)object->Object)->DeselectExpression();
++		if (object->Object && object->Type==2) ((CDrawing*)object->Object)->SelectDrawing(0);
++	}
++	NumSelectedObjects=0;
++	SelectedDocumentObject=SelectedDocumentObject2=NULL;
++	IsInsertionPointTouched=NULL;
++	MouseTouchingSelection=0;
++	SpecialDrawingHover=NULL;
++	GuidlineElement=-2;
++	NewlineAddObject=-1;
++	// Reuse free-space placement and quick-brace dragging without object hit tests.
++	MouseMode=5;
++	MultipleX=MultipleStartX=ViewX+point.x*100/ViewZoom;
++	MultipleY=MultipleStartY=ViewY+point.y*100/ViewZoom;
++	MultipleModeWasAccepted=1;
++	LeftClickTimer=0;
++	QuickDrawingDisable=0;
++	MakeQuickDrawing=0;
++	SetCapture();
++	RepaintTheView();
++}
++
+ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ {
+ 	SteadyCursorTimer=0;
+@@ -1448,7 +1483,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -167,7 +215,7 @@ index fc832eb..f46f340 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +1796,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +1830,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -195,7 +243,19 @@ index fc832eb..f46f340 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -3437,6 +3459,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -2182,9 +2238,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+ 	
+ 	if (Tillens.Show) Tillens.Show=0;
+ 
+-	//quick fix: we are going to disable reception of double-click messages
++	// Double-click permits placement within an existing expression footprint.
+ 	DWORD style=GetClassLong(this->m_hWnd,GCL_STYLE);
+-	style&=(~CS_DBLCLKS);
++	style|=CS_DBLCLKS;
+ 	SetClassLong(this->m_hWnd,GCL_STYLE,style);
+ 
+ 	if (theApp.m_pMainWnd) AdjustPosition();
+@@ -3437,6 +3493,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -208,7 +268,7 @@ index fc832eb..f46f340 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3610,32 +3638,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3610,32 +3672,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  				
  			RepaintViewTimer=0;
  
@@ -246,7 +306,7 @@ index fc832eb..f46f340 100644
  			prevTouchedObject=TouchedObject;
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
-@@ -6118,6 +6125,13 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6159,13 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -260,3 +320,15 @@ index fc832eb..f46f340 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
+diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
+index 94dd0e4..e0aa0e2 100644
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -76,6 +76,7 @@ public:
+ 	int GentlyPaintObject(tDocumentStruct * ds, CDC * DC);
+ 	afx_msg void OnRButtonUp(UINT nFlags, CPoint point);
+ 	afx_msg void OnLButtonUp(UINT nFlags, CPoint point);
++	afx_msg void OnLButtonDblClk(UINT nFlags, CPoint point);
+ 	int PopupCloses(int UserParam, int ExitCode);
+ 	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
+ 	afx_msg void OnSelectionsFrame();
