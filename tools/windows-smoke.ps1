@@ -48,6 +48,59 @@ $fixture=Join-Path (Split-Path $exe) 'root-annotation-smoke.mom'
 <var t="2" f="00"/><var t="x" f="00"/><opr s="-"/><var t="4" f="00"/>
 </ex></elm></ex>
 </o>
+<o t="2" X="300" Y="400">
+<dw spec="51" d="32|32,32;13600,32;:,9056;32,:;:,32" />
+<subexp d="64,64;2544,704">
+	<ex fh="100"><opr s="-" /><var t="6.283185307179586" f="00" /></ex></subexp>
+<subexp d="64,64;2464,704">
+	<ex fh="100"><var t="6.283185307179586" f="00" /></ex></subexp>
+<subexp d="64,64;2837,704">
+	<ex fh="100"><opr s="-" /><var t="2" f="00" /></ex></subexp>
+<subexp d="64,64;2464,704">
+	<ex fh="100"><var t="2" f="00" /></ex></subexp>
+<subexp d="0,0;5386,1280">
+	<ex fh="100">
+		<fun t="f" f="20" E1="">
+		<ex fh="100" br="3">
+			<var t="t" f="00" />
+		</ex>
+		</fun>
+		<opr s="=" />
+		<fun t="sin" f="20" E1="">
+		<ex fh="100" br="2">
+			<fra stp="" E1="n" E2="d">
+			<ex fh="90">
+				<var t="t" f="00" />
+			</ex>
+			<ex fh="90">
+				<var t="10" f="00" />
+			</ex>
+			</fra>
+		</ex>
+		</fun>
+		<opr s="+" />
+		<var t="1" f="00" />
+		<opr s="+" />
+		<fra stp="" E1="n" E2="d">
+		<ex fh="90">
+			<var t="t" f="00" />
+		</ex>
+		<ex fh="90">
+			<var t="10" f="00" />
+		</ex>
+		</fra>
+	</ex>
+</subexp>
+<subexp d="64,64;544,570">
+	<ex fh="100">
+	</ex>
+</subexp>
+<subexp d="64,64;544,570">
+	<ex fh="100">
+	</ex>
+</subexp>
+</o>
+
 </mathomir>
 '@ | Set-Content -LiteralPath $fixture -Encoding ascii
 $startArgs=@{FilePath=$exe; WorkingDirectory=(Split-Path $exe); PassThru=$true; RedirectStandardError=(Join-Path (Split-Path $exe) 'smoke-stderr.txt')}
@@ -95,7 +148,8 @@ try {
   [MathomirUiProbe]::Mouse($view,514,0,118,($gripY+20))
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$moved=Get-Content -LiteralPath $fixture -Raw
-  if ($moved.mathomir.o.X -ne '130' -or $moved.mathomir.o.Y -ne '170') { throw 'Dragging the move grip did not move the object by the expected distance.' }
+  $movedRoot=$moved.SelectSingleNode('/mathomir/o[1]')
+  if ($movedRoot.X -ne '130' -or $movedRoot.Y -ne '170') { throw 'Dragging the move grip did not move the object by the expected distance.' }
   Write-Output ("Undo menu before command: "+[MathomirUiProbe]::MenuText($main,0xE12B))
   [MathomirUiProbe]::Send($main,273,0xE12B) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
@@ -119,6 +173,17 @@ try {
   $annotationTokens=($savedRoot.SelectNodes('/mathomir/*[self::o or self::obj]/*[self::ex or self::expr]/*[self::var or self::elm[@tp="1"]]') | ForEach-Object {if ($_.HasAttribute('t')) {$_.t} else {$_.tx}}) -join ''
   if ($annotationTokens -notmatch 'constant') { throw "Typing the annotation did not save its text: $annotationTokens" }
   Write-Output 'Root placement smoke passed: hover inside root, double-click above the 2, type constant, click away to finish, save label and preserve root.'
+  [MathomirUiProbe]::Send($main,273,33026) | Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$piSaved=Get-Content -LiteralPath $fixture -Raw
+  $piMinimum=$piSaved.SelectSingleNode('/mathomir/*[dw[@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
+  if ($piMinimum.alig -ne '2') { throw 'Pi graph mode did not save its axis setting.' }
+  [MathomirUiProbe]::Send($main,273,33027) | Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$decimalSaved=Get-Content -LiteralPath $fixture -Raw
+  $decimalMinimum=$decimalSaved.SelectSingleNode('/mathomir/*[dw[@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
+  if ($decimalMinimum.alig -eq '2' -or $decimalMinimum.alig -eq '1') { throw 'Decimal graph mode did not restore linear labels.' }
+  Write-Output 'Graph axis smoke passed: pi fraction mode and decimal mode both save correctly.'
   $search=[MathomirUiProbe]::Child($main,1112)
   if ($search -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($search)) { throw 'The permanent Search field is missing or hidden.' }
   [MathomirUiProbe]::Send($main,273,33007) | Out-Null
