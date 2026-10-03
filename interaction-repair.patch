@@ -355,7 +355,7 @@ index 36238b0..1358cfd 100644
  	int InsertEmptyElement(short position,short Type,char Operator, int color=-1);
  	void SelectExpression(char Select);
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
-index f751ecf..52195ca 100644
+index f751ecf..e9fbe0d 100644
 --- a/Mathomir/MainFrm.cpp
 +++ b/Mathomir/MainFrm.cpp
 @@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
@@ -385,11 +385,19 @@ index f751ecf..52195ca 100644
  }
  
  //we are going to disable Main Menu activation throught the ALT key
+@@ -890,6 +901,7 @@ int CMainFrame::ClearDocument(void)
+ 		free(TheDocument);
+ 	}
+ 	NumDocumentElements=0;
++	extern CObject *RotationHandleObject; RotationHandleObject=NULL;
+ 	NumDocumentElementsReserved=10;
+ 	TheDocument=(tDocumentStruct*)malloc(10*sizeof(tDocumentStruct));
+ 	ViewX=ViewY=0;
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..3819118 100644
+index bdcebb4..400dbc3 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
-@@ -218,6 +218,19 @@ END
+@@ -218,6 +218,33 @@ END
  // Menu
  //
  
@@ -402,17 +410,41 @@ index bdcebb4..3819118 100644
 +    EDITTEXT IDC_ROTATION_ANGLE, 112, 10, 104, 16, ES_AUTOHSCROLL | WS_TABSTOP
 +    LTEXT "Positive = clockwise. Negative = counterclockwise.", IDC_STATIC, 10, 34, 210, 12
 +    LTEXT "Use 0 to straighten. Decimals are allowed.", IDC_STATIC, 10, 48, 210, 12
++    PUSHBUTTON "Use mouse", IDC_ROTATION_MOUSE, 10, 70, 82, 16
 +    DEFPUSHBUTTON "Rotate", IDOK, 106, 70, 52, 16
 +    PUSHBUTTON "Cancel", IDCANCEL, 164, 70, 52, 16
++END
++
++IDD_FEATURE_SEARCH DIALOGEX 0, 0, 390, 247
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Search features"
++FONT 9, "Segoe UI"
++BEGIN
++    LTEXT "Find a feature:", IDC_STATIC, 10, 10, 100, 12
++    EDITTEXT IDC_FEATURE_QUERY, 10, 25, 370, 19, ES_AUTOHSCROLL | WS_TABSTOP
++    LISTBOX IDC_FEATURE_RESULTS, 10, 51, 370, 148, LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
++    LTEXT "Type a name, then click a result or press Enter.", IDC_FEATURE_STATUS, 10, 205, 370, 12
++    DEFPUSHBUTTON "Use feature", IDOK, 254, 223, 66, 16
++    PUSHBUTTON "Close", IDCANCEL, 326, 223, 54, 16
 +END
 +
  IDR_MAINFRAME MENU 
  BEGIN
      POPUP "&File"
-@@ -254,6 +267,16 @@ BEGIN
+@@ -246,6 +273,8 @@ BEGIN
+     END
+     POPUP "&Edit"
+     BEGIN
++        MENUITEM "&Search features...\tCtrl+K", ID_FEATURE_SEARCH
++        MENUITEM SEPARATOR
+         MENUITEM "&Undo\tCtrl+Z",               ID_EDIT_UNDO
+         MENUITEM SEPARATOR
+         MENUITEM "Cu&t\tCtrl+X",                ID_EDIT_CUT
+@@ -254,6 +283,17 @@ BEGIN
          MENUITEM SEPARATOR
          MENUITEM "&Delete\tDel",                ID_EDIT_DELETE
          MENUITEM SEPARATOR
++        MENUITEM "Rotate with &mouse", ID_ROTATE_WITH_MOUSE
 +        MENUITEM "&Rotate text / equation...\tCtrl+Shift+R", ID_EDIT_ROTATE_EQUATION
 +        MENUITEM "Font for &all objects...\tCtrl+Shift+F", ID_FONT_ALL_OBJECTS
 +        POPUP "Font si&ze (selection / new typing)"
@@ -426,19 +458,72 @@ index bdcebb4..3819118 100644
          MENUITEM "Find text...",                ID_Menu32880
          MENUITEM "Access &Locked Objects",      ID_EDIT_ACCESSLOCKEDOBJECTS
          MENUITEM SEPARATOR
+@@ -416,6 +456,7 @@ BEGIN
+         MENUITEM SEPARATOR
+         MENUITEM "&About Math-o-mir...",        ID_APP_ABOUT
+     END
++    MENUITEM "&Search", ID_FEATURE_SEARCH
+ END
+ 
+ 
+diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
+index 15ec728..f51db2f 100644
+--- a/Mathomir/MathomirDoc.cpp
++++ b/Mathomir/MathomirDoc.cpp
+@@ -64,6 +64,7 @@ CMathomirDoc::CMathomirDoc()
+ 
+ BOOL CMathomirDoc::OnNewDocument()
+ {
++	PaperWidth=1200; PaperHeight=1553; // US Letter portrait
+ 	AutosavePoints=AutosaveTime=0;
+ 	if (!CDocument::OnNewDocument())
+ 		return FALSE;
+@@ -154,6 +155,7 @@ void CMathomirDoc::OnFileNew()
+ 	SetPathName("\\Untitled",0); //ClearPathName does not exist??
+ 	SetModifiedFlag(0);
+ 	Toolbox->LoadSettings(NULL);
++	PaperWidth=1200; PaperHeight=1553; // New documents start on US Letter
+ 	ViewOnlyMode=0;
+ 	IsDrawingMode=0;
+ 	ToolboxSize=(BaseToolboxSize)?BaseToolboxSize:60;
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..72a3715 100644
+index fc832eb..e75f9e4 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -30,6 +30,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -30,6 +30,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  #include "popupmenu.h"
  #include "mainfrm.h"
  #include "math.h"
 +#include <float.h>
++#include <vector>
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -167,6 +168,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -132,6 +134,23 @@ unsigned int LongClickStartTime;
+ CPoint LongClickPosition;
+ CExpression *LongClickObject;
+ tDocumentStruct *prevTouchedObject=NULL;
++CObject *RotationHandleObject=NULL;
++static bool MouseRotationActive=false;
++static double MouseRotationStartDirection,MouseRotationCenterX,MouseRotationCenterY;
++static int MouseRotationStartAngle,MouseRotationStartX,MouseRotationStartY;
++static char MouseRotationStartVertical;
++static tDocumentStruct *RotationHandleDocument()
++{
++    for (int i=0;i<NumDocumentElements;i++)
++        if (TheDocument[i].Object==RotationHandleObject && TheDocument[i].Type==1) return TheDocument+i;
++    return NULL;
++}
++static CPoint RotationHandlePoint(tDocumentStruct *object)
++{
++    return CPoint((object->absolute_X+object->Length-ViewX)*ViewZoom/100+10,
++        (object->absolute_Y-object->Above-ViewY)*ViewZoom/100-10);
++}
++
+ char IsWindowOutOfFocus;
+ 
+ #define NUM_SPECIAL_KEYS 21
+@@ -167,6 +186,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -446,17 +531,19 @@ index fc832eb..72a3715 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +215,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +233,11 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
++	ON_COMMAND(ID_ROTATE_WITH_MOUSE, OnRotateWithMouse)
++	ON_COMMAND(ID_FEATURE_SEARCH, OnFeatureSearch)
 +	ON_COMMAND(ID_EDIT_ROTATE_EQUATION, OnRotateEquation)
 +	ON_COMMAND(ID_FONT_ALL_OBJECTS, OnFontAllObjects)
 +	ON_COMMAND_RANGE(ID_FONT_SIZE_200, ID_FONT_SIZE_100, OnQuickFontSize)
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -576,17 +581,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +601,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -479,7 +566,15 @@ index fc832eb..72a3715 100644
  				}
  				else
  				{
-@@ -1349,14 +1355,50 @@ CBitmap *NewlineBitmap=NULL;
+@@ -802,6 +828,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+ 			((CDrawing*)(SpecialDrawingHover->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,SpecialDrawingHover->absolute_X,SpecialDrawingHover->absolute_Y);
+ 		}
+ 
++		PaintRotationHandle(&bitmapDC);
+ 		//painting multiple selection box
+ 		if (MultipleStartX!=-1)
+ 		{
+@@ -1349,14 +1376,52 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -526,11 +621,13 @@ index fc832eb..72a3715 100644
 +
  void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  {
++	if (BeginMouseRotation(point)) return;
++	RotationHandleObject=NULL;
 +	FreePlacementGesture=false;
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1490,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1513,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -539,7 +636,7 @@ index fc832eb..72a3715 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +1837,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +1860,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -564,10 +661,11 @@ index fc832eb..72a3715 100644
 +						continue;
 +					}
 +				}
++				RotationHandleObject=ds->Object;
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2182,9 +2245,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2269,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -579,7 +677,37 @@ index fc832eb..72a3715 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -3437,6 +3500,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -2196,7 +2283,8 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+ {
+ 	tDocumentStruct tmp;
+ 	
+-		/*	if (prevTouchedObject==object) prevTouchedObject=NULL;
++		/*	if (RotationHandleObject==object->Object) RotationHandleObject=NULL;
++			if (prevTouchedObject==object) prevTouchedObject=NULL;
+ 			if (prevTouchedObject>object) prevTouchedObject--;
+ 			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
+ 			if (SelectedDocumentObject>object) SelectedDocumentObject--;
+@@ -2812,6 +2900,19 @@ int SelectedTabObjectIndex;
+ 
+ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ {
++	if (MouseRotationActive)
++	{
++		if (GetCapture()!=this) { EndMouseRotation(true); return; }
++		if (!(nFlags&MK_LBUTTON)) { EndMouseRotation(false); return; }
++		UpdateMouseRotation(point,nFlags); return;
++	}
++	tDocumentStruct *rotationObject=RotationHandleDocument();
++	if (rotationObject && !IsDrawingMode)
++	{
++		CPoint handle=RotationHandlePoint(rotationObject);
++		int dx=point.x-handle.x,dy=point.y-handle.y;
++		if (dx*dx+dy*dy<=121) { SetCursor(::LoadCursor(NULL,IDC_HAND)); return; }
++	}
+ 
+ 	try
+ 	{
+@@ -3437,6 +3538,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -592,7 +720,7 @@ index fc832eb..72a3715 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3610,32 +3679,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3610,33 +3717,13 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  				
  			RepaintViewTimer=0;
  
@@ -628,12 +756,17 @@ index fc832eb..72a3715 100644
 +			InvalidateRect(NULL,0);
 +			UpdateWindow();
  			prevTouchedObject=TouchedObject;
++			if (TouchedObject && TouchedObject->Type==1 && !IsDrawingMode) RotationHandleObject=TouchedObject->Object;
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
-@@ -4457,6 +4505,10 @@ char RepaintedOnCtrlWhileDrawing=0;
+ 		}		
+@@ -4457,6 +4544,13 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
++	if (MouseRotationActive && nChar==VK_ESCAPE) { EndMouseRotation(true); SurpressCharMessage=1; return; }
++	if (nChar=='K' && (GetKeyState(VK_CONTROL)&0x8000))
++	{ SurpressCharMessage=1; OnFeatureSearch(); return; }
 +	if (nChar=='R' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))
 +	{ SurpressCharMessage=1; OnRotateEquation(); return; }
 +	if (nChar=='F' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))
@@ -641,7 +774,59 @@ index fc832eb..72a3715 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -6118,6 +6170,13 @@ unsigned int prevTimerTickTime;
+@@ -5634,49 +5728,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+ 					GentlyPaintObject(KeyboardEntryBaseObject,DC);
+ 				}
+ 
+-				if (nChar>6)
+-				{
+-					//we will move the equation that is edited a bit down or up if
+-					//it grows over the equation near it. This is only done if there is space to move.
+-					int dmax=0;
+-					int disallow=0;
+-					tDocumentStruct *ds=TheDocument;
+-					for (int ii=0;ii<NumDocumentElements;ii++,ds++)
+-					{
+-						if (ds->Type==1)
+-							if ((((CExpression*)KeyboardEntryBaseObject->Object)->m_NumElements>1) || (((CExpression*)KeyboardEntryBaseObject->Object)->m_pElementList->Type!=1))
+-							{
+-								if ((ds->absolute_Y+ds->Below<KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below) &&
+-									(ds->absolute_Y-ds->Above>KeyboardEntryBaseObject->absolute_Y-KeyboardEntryBaseObject->Above))
+-									{disallow=1;break;}
+-								if ((KeyboardEntryBaseObject->absolute_Y-KeyboardEntryBaseObject->Above<ds->absolute_Y+ds->Below+5) &&
+-									(KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below>ds->absolute_Y-ds->Above-5))
+-								if ((KeyboardEntryBaseObject->absolute_X<ds->absolute_X+ds->Length) &&
+-									(KeyboardEntryBaseObject->absolute_X+KeyboardEntryBaseObject->Length>ds->absolute_X))
+-								if (ds!=KeyboardEntryBaseObject)
+-								{
+-									if ((ds->absolute_Y<KeyboardEntryBaseObject->absolute_Y) && (dmax>=0))
+-									{
+-										int d=3+ds->absolute_Y+ds->Below-KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Above;
+-										if (dmax<d) dmax=d;
+-									}
+-									else if ((ds->absolute_Y>KeyboardEntryBaseObject->absolute_Y) && (dmax<=0))
+-									{
+-										int d=-3+ds->absolute_Y-ds->Above-KeyboardEntryBaseObject->absolute_Y-KeyboardEntryBaseObject->Below;
+-										if (d<dmax) dmax=d;
+-									}
+-									else
+-										{disallow=1;break;} //we will not change y position if there is no room below
+-								}
+-							}
+-					}
+-					if ((dmax) && (abs(dmax)<25) && (!disallow))
+-					{
+-						KeyboardEntryBaseObject->absolute_Y+=dmax;
+-						InvalidateRect(NULL,0);
+-						UpdateWindow();
+-					}
+-				}
++				// Keep the user-chosen position while typing, even near another equation.
++
+ 			}
+ 			else if (KeyboardEntryBaseObject->Type==2)
+ 			{
+@@ -6118,6 +6171,13 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -655,17 +840,18 @@ index fc832eb..72a3715 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -7585,6 +7644,9 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7645,10 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
++	if (MouseRotationActive) { UpdateMouseRotation(point,nFlags); EndMouseRotation(false); return; }
 +	const bool exactPlacement=FreePlacementGesture;
 +	FreePlacementGesture=false;
 +	if (GetCapture()==this) ReleaseCapture();
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8174,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8176,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -693,7 +879,7 @@ index fc832eb..72a3715 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -9410,6 +9472,172 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9474,489 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -721,11 +907,326 @@ index fc832eb..72a3715 100644
 +}
 +
 +
++
++struct CFeatureSearchEntry
++{
++    UINT command;
++    int drawingMode;
++    CString label,keywords;
++};
++
++// One mouse click runs a result, including the initially selected first row.
++class CFeatureResultList : public CListBox
++{
++protected:
++    afx_msg void OnLButtonUp(UINT flags,CPoint point)
++    {
++        CListBox::OnLButtonUp(flags,point);
++        BOOL outside=FALSE;
++        UINT item=ItemFromPoint(point,outside);
++        CRect rectangle;
++        if (!outside && item<(UINT)GetCount() && GetItemRect(item,&rectangle)!=LB_ERR && rectangle.PtInRect(point))
++        {
++            SetCurSel(item);
++            GetParent()->SendMessage(WM_COMMAND,MAKEWPARAM(IDC_FEATURE_RESULTS,LBN_DBLCLK),(LPARAM)m_hWnd);
++        }
++    }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CFeatureResultList,CListBox)
++    ON_WM_LBUTTONUP()
++END_MESSAGE_MAP()
++
++class CFeatureSearchDialog : public CDialog
++{
++public:
++    std::vector<CFeatureSearchEntry> entries;
++    UINT command;
++    int drawingMode;
++    CFeatureSearchDialog() : CDialog(IDD_FEATURE_SEARCH,theApp.m_pMainWnd),command(0),drawingMode(-1) {}
++    void Add(UINT id,const char *label,const char *aliases="",int tool=-1)
++    {
++        if (id==ID_FEATURE_SEARCH) return;
++        for (size_t i=0;id && i<entries.size();i++) if (entries[i].command==id) return;
++        CFeatureSearchEntry entry;
++        entry.command=id; entry.drawingMode=tool; entry.label=label;
++        entry.keywords=entry.label+" "+aliases; entry.keywords.MakeLower();
++        entries.push_back(entry);
++    }
++    CString Aliases(UINT id)
++    {
++        switch (id)
++        {
++        case ID_FONT_ALL_OBJECTS: return "typeface family change all global text equations font size";
++        case ID_EDIT_ROTATE_EQUATION: return "angle turn tilt degrees orientation text equation";
++        case ID_FONT_SIZE_800: return "font size maximum biggest huge larger enlarge text equation";
++        case ID_FONT_SIZE_400: return "font size bigger huge larger enlarge text equation";
++        case ID_FONT_SIZE_200: return "font size bigger large larger enlarge text equation";
++        case ID_FONT_SIZE_100: return "font size normal smaller reset medium text equation";
++        case ID_FILE_PRINT: return "printer paper output document";
++        case ID_FILE_PRINT_PREVIEW: return "printer page preview before printing";
++        case ID_FILE_PRINT_SETUP: return "printer settings properties paper quality layout dialog";
++        case ID_VIEW_SHOWGRID: return "snap snapping spacing placement grid";
++        case ID_EDIT_DELETE: return "remove erase selected objects";
++        case ID_EDIT_UNDO: return "revert reverse change";
++        case ID_EDIT_COPYLATEXCODE: return "export equation latex code";
++        case ID_EDIT_IMAGE: return "export copy equation picture image";
++        case ID_EDIT_SAVEEQUATIONIMAGE: return "export save equation picture image file";
++        case ID_SAVEOPTIONS_SAVEASDEFAULT: return "remember preferences settings fonts default";
++        }
++        return "";
++    }
++    void Collect(CMenu *menu,const CString &prefix)
++    {
++        if (!menu) return;
++        for (int i=0;i<menu->GetMenuItemCount();i++)
++        {
++            UINT state=menu->GetMenuState(i,MF_BYPOSITION);
++            if (state & MF_SEPARATOR) continue;
++            CString name;
++            menu->GetMenuString(i,name,MF_BYPOSITION);
++            name.Remove('&');
++            int tab=name.Find('\t'); if (tab>=0) name=name.Left(tab);
++            name.TrimLeft(); name.TrimRight();
++            if (name.IsEmpty()) continue;
++            CString path=prefix.IsEmpty() ? name : prefix+" > "+name;
++            CMenu *child=menu->GetSubMenu(i);
++            if (child) { Collect(child,path); continue; }
++            UINT id=menu->GetMenuItemID(i);
++            if (id==0 || id==(UINT)-1 || (state&(MF_DISABLED|MF_GRAYED))) continue;
++            CString aliases=Aliases(id);
++            if (state & MF_CHECKED) path+=" [on]";
++            Add(id,path,aliases);
++        }
++    }
++protected:
++    CFeatureResultList results;
++    virtual BOOL OnInitDialog()
++    {
++        CDialog::OnInitDialog();
++        results.SubclassDlgItem(IDC_FEATURE_RESULTS,this);
++        ((CEdit*)GetDlgItem(IDC_FEATURE_QUERY))->LimitText(128);
++        Filter();
++        GetDlgItem(IDC_FEATURE_QUERY)->SetFocus();
++        return FALSE;
++    }
++    afx_msg void Filter()
++    {
++        if (!results.GetSafeHwnd()) return;
++        CString query; GetDlgItemText(IDC_FEATURE_QUERY,query);
++        query.MakeLower(); query.TrimLeft(); query.TrimRight();
++        std::vector<CString> words;
++        int position=0;
++        while (position<query.GetLength())
++        {
++            while (position<query.GetLength() && (query[position]==' ' || query[position]=='\t')) position++;
++            int start=position;
++            while (position<query.GetLength() && query[position]!=' ' && query[position]!='\t') position++;
++            if (position>start) words.push_back(query.Mid(start,position-start));
++        }
++        results.SetRedraw(FALSE); results.ResetContent();
++        // Name matches appear ahead of matches found only through synonyms.
++        for (int pass=0;pass<2;pass++)
++        for (size_t i=0;i<entries.size();i++)
++        {
++            bool matches=true;
++            for (size_t w=0;w<words.size();w++)
++                if (entries[i].keywords.Find(words[w])<0) { matches=false; break; }
++            if (!matches) continue;
++            CString label=entries[i].label; label.MakeLower();
++            bool nameMatch=query.IsEmpty() || label.Find(query)>=0;
++            if ((pass==0)!=nameMatch) continue;
++            int row=results.AddString(entries[i].label);
++            if (row>=0) results.SetItemData(row,(DWORD_PTR)i);
++        }
++        if (results.GetCount()>0) results.SetCurSel(0);
++        results.SetRedraw(TRUE); results.Invalidate();
++        GetDlgItem(IDOK)->EnableWindow(results.GetCount()>0);
++        SetDlgItemText(IDC_FEATURE_STATUS,results.GetCount() ?
++            "Click a result or press Enter. Arrow keys choose a result." :
++            "No matching feature. Try a shorter word, such as font or print.");
++    }
++    virtual BOOL PreTranslateMessage(MSG *message)
++    {
++        if (message->message==WM_KEYDOWN && (message->wParam==VK_DOWN || message->wParam==VK_UP) &&
++            message->hwnd==GetDlgItem(IDC_FEATURE_QUERY)->GetSafeHwnd())
++        {
++            int row=results.GetCurSel();
++            row+=(message->wParam==VK_DOWN ? 1 : -1);
++            if (results.GetCount()) results.SetCurSel(max(0,min(results.GetCount()-1,row)));
++            return TRUE;
++        }
++        return CDialog::PreTranslateMessage(message);
++    }
++    virtual void OnOK()
++    {
++        int row=results.GetCurSel();
++        if (row<0) return;
++        DWORD_PTR index=results.GetItemData(row);
++        if (index>=entries.size()) return;
++        command=entries[index].command; drawingMode=entries[index].drawingMode;
++        CDialog::OnOK();
++    }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CFeatureSearchDialog,CDialog)
++    ON_EN_CHANGE(IDC_FEATURE_QUERY,Filter)
++    ON_LBN_DBLCLK(IDC_FEATURE_RESULTS,OnOK)
++END_MESSAGE_MAP()
++
++void CMathomirView::OnFeatureSearch()
++{
++    CFeatureSearchDialog dialog;
++    dialog.Add(ID_ROTATE_WITH_MOUSE,"Rotate > Drag text / equation with mouse","angle turn tilt orientation rotate rotation handle mouse");
++    dialog.Add(ID_FONT_ALL_OBJECTS,"Font > Change font and size for all objects",dialog.Aliases(ID_FONT_ALL_OBJECTS));
++    dialog.Add(ID_EDIT_ROTATE_EQUATION,"Rotate > Set text / equation angle",dialog.Aliases(ID_EDIT_ROTATE_EQUATION));
++    dialog.Add(ID_FONT_SIZE_800,"Font size > Maximum (800%)",dialog.Aliases(ID_FONT_SIZE_800));
++    dialog.Add(ID_FONT_SIZE_400,"Font size > Huge (400%)",dialog.Aliases(ID_FONT_SIZE_400));
++    dialog.Add(ID_FONT_SIZE_200,"Font size > Extra large (200%)",dialog.Aliases(ID_FONT_SIZE_200));
++    dialog.Add(ID_FONT_SIZE_100,"Font size > Normal (100%)",dialog.Aliases(ID_FONT_SIZE_100));
++    ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();
++    dialog.Collect(theApp.m_pMainWnd->GetMenu(),"");
++    dialog.Add(0,"Draw > Brace (drag to set its size)","bracket curly brace overbrace underbrace annotation",19);
++    dialog.Add(0,"Draw > Line","straight stroke segment",2);
++    dialog.Add(0,"Draw > Arrow","direction pointer vector",5);
++    dialog.Add(0,"Draw > Rectangle","box square shape",1);
++    dialog.Add(0,"Draw > Ellipse / circle","oval round shape",4);
++    dialog.Add(0,"Draw > Freehand","pen handwriting sketch",3);
++    dialog.Add(0,"Draw > Stop drawing / return to typing","cancel tool text equation",0);
++    if (dialog.DoModal()!=IDOK) return;
++    if (dialog.drawingMode>=0)
++    {
++        if (ViewOnlyMode) return;
++        RestoreClipboardBackground();
++        if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
++        if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
++        IsDrawingMode=dialog.drawingMode;
++        SetMousePointer();
++        if (UseToolbar && Toolbox->Toolbar) Toolbox->Toolbar->ConfigureToolbar();
++        RepaintTheView();
++        SetFocus();
++    }
++    else if (dialog.command)
++    {
++        if (RotationHandleDocument()) prevTouchedObject=RotationHandleDocument();
++        theApp.m_pMainWnd->SendMessage(WM_COMMAND,MAKEWPARAM(dialog.command,0),0);
++    }
++}
++
++
++void CMathomirView::PaintRotationHandle(CDC *dc)
++{
++    if (ViewOnlyMode || IsDrawingMode || FreePlacementGesture) return;
++    tDocumentStruct *object=RotationHandleDocument();
++    if (!object || object->MovingDotState==5) return;
++    CPoint point=RotationHandlePoint(object);
++    CPen pen(PS_SOLID,1,RGB(45,95,155));
++    CBrush brush(RGB(255,255,255));
++    CPen *oldPen=dc->SelectObject(&pen); CBrush *oldBrush=dc->SelectObject(&brush);
++    dc->MoveTo(point.x-8,point.y+8); dc->LineTo(point.x-3,point.y+3);
++    dc->Ellipse(point.x-8,point.y-8,point.x+9,point.y+9);
++    dc->Arc(point.x-5,point.y-5,point.x+6,point.y+6,point.x+5,point.y,point.x,point.y-5);
++    dc->MoveTo(point.x,point.y-5); dc->LineTo(point.x+4,point.y-5); dc->LineTo(point.x+3,point.y-1);
++    dc->SelectObject(oldBrush); dc->SelectObject(oldPen);
++    if (MouseRotationActive)
++    {
++        CString angle; angle.Format("%.1f degrees",((CExpression*)object->Object)->m_RotationMilliDegrees/1000.0);
++        int saved=dc->SaveDC(); dc->SelectObject(GetStockObject(DEFAULT_GUI_FONT)); dc->SetTextAlign(TA_LEFT|TA_TOP);
++        dc->SetBkMode(OPAQUE); dc->SetBkColor(RGB(255,255,255)); dc->SetTextColor(RGB(0,0,0));
++        dc->TextOut(point.x+13,point.y-7,angle); dc->RestoreDC(saved);
++    }
++}
++
++void CMathomirView::OnRotateWithMouse()
++{
++    if (ViewOnlyMode) return;
++    tDocumentStruct *object=prevTouchedObject ? prevTouchedObject : RotationHandleDocument();
++    if (!object) object=KeyboardEntryBaseObject ? KeyboardEntryBaseObject : SelectedDocumentObject;
++    if (NumSelectedObjects)
++        for (int i=0;i<NumDocumentElements;i++)
++            if (TheDocument[i].Type==1 && TheDocument[i].MovingDotState==3) { object=TheDocument+i; break; }
++    if (!object || object->Type!=1 || !object->Object || object->MovingDotState==5)
++    { AfxMessageBox("Point at or select a text / equation object, then choose Rotate with mouse."); return; }
++    RestoreClipboardBackground();
++    if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
++    if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
++    IsDrawingMode=0;
++    RotationHandleObject=object->Object;
++    RepaintTheView();
++    SetFocus();
++}
++
++bool CMathomirView::BeginMouseRotation(CPoint point)
++{
++    tDocumentStruct *object=RotationHandleDocument();
++    if (ViewOnlyMode || IsDrawingMode || !object || object->MovingDotState==5) return false;
++    CPoint handle=RotationHandlePoint(object);
++    int dx=point.x-handle.x,dy=point.y-handle.y;
++    if (dx*dx+dy*dy>121) return false;
++    RestoreClipboardBackground();
++    if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
++    if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
++    CExpression *expression=(CExpression*)object->Object;
++    MouseRotationStartAngle=expression->m_RotationMilliDegrees;
++    MouseRotationStartVertical=expression->m_IsVertical;
++    MouseRotationStartX=object->absolute_X; MouseRotationStartY=object->absolute_Y;
++    MouseRotationCenterX=object->absolute_X+object->Length/2.0;
++    MouseRotationCenterY=object->absolute_Y+(object->Below-object->Above)/2.0;
++    double x=ViewX+point.x*100.0/ViewZoom,y=ViewY+point.y*100.0/ViewZoom;
++    MouseRotationStartDirection=atan2(y-MouseRotationCenterY,x-MouseRotationCenterX);
++    UndoSave("rotate equation with mouse",20504);
++    MouseRotationActive=true; MouseMode=103;
++    SetCapture(); SetCursor(::LoadCursor(NULL,IDC_CROSS));
++    return true;
++}
++
++void CMathomirView::UpdateMouseRotation(CPoint point,UINT flags)
++{
++    tDocumentStruct *object=RotationHandleDocument();
++    if (!object) { EndMouseRotation(true); return; }
++    double x=ViewX+point.x*100.0/ViewZoom,y=ViewY+point.y*100.0/ViewZoom;
++    double dx=x-MouseRotationCenterX,dy=y-MouseRotationCenterY;
++    if (dx*dx+dy*dy<1) return;
++    double delta=atan2(dy,dx)-MouseRotationStartDirection;
++    double angle=(MouseRotationStartVertical ? -90.0 : MouseRotationStartAngle/1000.0)+delta*180.0/3.14159265358979323846;
++    if (flags&MK_SHIFT) angle=floor(angle/15.0+0.5)*15.0;
++    angle=fmod(angle,360.0);
++    CExpression *expression=(CExpression*)object->Object;
++    expression->m_IsVertical=0;
++    expression->m_RotationMilliDegrees=(int)(angle*1000.0+(angle<0 ? -0.5 : 0.5));
++    short length,above,below; CDC *dc=GetDC();
++    expression->CalculateSize(dc,ViewZoom,&length,&above,&below); ReleaseDC(dc);
++    object->absolute_X=(int)floor(MouseRotationCenterX-length*50.0/ViewZoom+0.5);
++    object->absolute_Y=(int)floor(MouseRotationCenterY-(below-above)*50.0/ViewZoom+0.5);
++    object->Length=length*100/ViewZoom; object->Above=above*100/ViewZoom; object->Below=below*100/ViewZoom;
++    InvalidateRect(NULL,FALSE); UpdateWindow();
++}
++
++void CMathomirView::EndMouseRotation(bool cancel)
++{
++    tDocumentStruct *object=RotationHandleDocument();
++    if (cancel && object)
++    {
++        CExpression *expression=(CExpression*)object->Object;
++        expression->m_RotationMilliDegrees=MouseRotationStartAngle;
++        expression->m_IsVertical=MouseRotationStartVertical;
++        object->absolute_X=MouseRotationStartX; object->absolute_Y=MouseRotationStartY;
++    }
++    MouseRotationActive=false; MouseMode=0;
++    if (GetCapture()==this) ReleaseCapture();
++    RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
++}
++
 +class CEquationRotationDialog : public CDialog
 +{
 +public:
 +    double angle;
 +    CEquationRotationDialog(double initial) : CDialog(IDD_ROTATE_EQUATION,theApp.m_pMainWnd),angle(initial) {}
++    virtual BOOL OnCommand(WPARAM wParam,LPARAM lParam)
++    {
++        if (LOWORD(wParam)==IDC_ROTATION_MOUSE) { EndDialog(IDC_ROTATION_MOUSE); return TRUE; }
++        return CDialog::OnCommand(wParam,lParam);
++    }
 +protected:
 +    virtual BOOL OnInitDialog()
 +    {
@@ -769,7 +1270,9 @@ index fc832eb..72a3715 100644
 +    if (!first)
 +    { AfxMessageBox("Select a text or equation object, or click inside it to edit, then choose Rotate."); return; }
 +    CEquationRotationDialog dialog(first->m_RotationMilliDegrees/1000.0);
-+    if (dialog.DoModal()!=IDOK) return;
++    INT_PTR result=dialog.DoModal();
++    if (result==IDC_ROTATION_MOUSE) { OnRotateWithMouse(); return; }
++    if (result!=IDOK) return;
 +    int angle=(int)(dialog.angle*1000.0+(dialog.angle<0 ? -0.5 : 0.5));
 +    angle%=360000;
 +    RestoreClipboardBackground();
@@ -867,7 +1370,7 @@ index fc832eb..72a3715 100644
  {
  	DefaultFontSize=150; //bilo 185
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..c56d0c6 100644
+index 94dd0e4..d05d9ea 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -76,6 +76,7 @@ public:
@@ -878,10 +1381,16 @@ index 94dd0e4..c56d0c6 100644
  	int PopupCloses(int UserParam, int ExitCode);
  	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
  	afx_msg void OnSelectionsFrame();
-@@ -119,6 +120,9 @@ public:
+@@ -119,6 +120,15 @@ public:
  	afx_msg void OnOutputimageSize80();
  	afx_msg void OnOutputimageForcehighquality();
  	afx_msg void OnOutputimageForcehalftone();
++	afx_msg void OnRotateWithMouse();
++	void PaintRotationHandle(CDC *dc);
++	bool BeginMouseRotation(CPoint point);
++	void UpdateMouseRotation(CPoint point, UINT flags);
++	void EndMouseRotation(bool cancel);
++	afx_msg void OnFeatureSearch();
 +	afx_msg void OnRotateEquation();
 +	afx_msg void OnFontAllObjects();
 +	afx_msg void OnQuickFontSize(UINT command);
@@ -889,10 +1398,10 @@ index 94dd0e4..c56d0c6 100644
  	afx_msg void OnFontsizeLarge();
  	afx_msg void OnFontsizeNormal();
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..51564af 100644
+index 05446cf..5384c77 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,13 @@
+@@ -174,3 +174,22 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -906,11 +1415,28 @@ index 05446cf..51564af 100644
 +#define ID_EDIT_ROTATE_EQUATION 33006
 +#define IDD_ROTATE_EQUATION 180
 +#define IDC_ROTATION_ANGLE 1100
++
++#define ID_FEATURE_SEARCH 33007
++#define IDD_FEATURE_SEARCH 181
++#define IDC_FEATURE_QUERY 1101
++#define IDC_FEATURE_RESULTS 1102
++#define IDC_FEATURE_STATUS 1103
++
++#define ID_ROTATE_WITH_MOUSE 33008
++#define IDC_ROTATION_MOUSE 1104
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..d15d02c 100644
+index b9c3f38..109f589 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
-@@ -1948,6 +1948,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -753,6 +753,7 @@ CToolbox::CToolbox(int IsSubtoolbox)
+ 	if (IsSubtoolbox==0)
+ 	{
+ 		LoadSettings(NULL);
++		PaperWidth=1200; PaperHeight=1553; // Startup default: US Letter portrait
+ 		//init symbolic calculator (to be called only once)
+ 		ToolboxMembers[0].Submembers[0]->InitCalculator();
+ 
+@@ -1948,6 +1949,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
  					{
  						yes=1;
  						if (parent->m_IsVertical) parent->m_IsVertical=0; else parent->m_IsVertical=1;
@@ -918,7 +1444,7 @@ index b9c3f38..d15d02c 100644
  					}
  					if (icon==19)
  					{
-@@ -5658,8 +5659,8 @@ int CToolbox::LoadSettings(char * filename)
+@@ -5658,8 +5660,8 @@ int CToolbox::LoadSettings(char * filename)
  		fread(&ForceHighQualityImage,sizeof(int),1,fil);
  		fread(&ForceHalftoneImage,sizeof(int),1,fil);
  		fread(&DefaultFontSize,sizeof(int),1,fil);
