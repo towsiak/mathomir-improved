@@ -11,6 +11,9 @@ The exact reported crash has not been reproduced. Mouse resizing and printer
 behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
+- Element allocation type and parent are thread-local. The eight-curve regression
+  exposed heap corruption when UI editing and background graph calculation shared
+  these temporary allocation settings; independent thread context fixes the race.
 - Eight writing colors: black, red, green, blue, gray, orange, purple and teal.
   A Colors button sits beside the permanent Search tools. Colors apply to highlighted
   text without changing bold or font, selected objects, or the focused object.
