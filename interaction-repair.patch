@@ -103,7 +103,7 @@ index 2f39ec2..bf37826 100644
  	int ShowNumberWithPrecision(double number, double precision,char *string);
  };
 diff --git a/Mathomir/Element.cpp b/Mathomir/Element.cpp
-index 209a634..f14aded 100644
+index 209a634..099b0f6 100644
 --- a/Mathomir/Element.cpp
 +++ b/Mathomir/Element.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -114,6 +114,17 @@ index 209a634..f14aded 100644
  #include ".\element.h"
  #include "expression.h"
  #include "Mathomir.h"
+@@ -74,8 +75,8 @@ const struct
+ 
+ //constructor of the CElement class
+ //the 'CElement' represents an element of expression (in expression 'A+B' elemens are: 'A', '+', and 'B')
+-short CElementInitType;
+-CObject *CElementInitPaternalExpression;
++thread_local short CElementInitType=0;
++thread_local CObject *CElementInitPaternalExpression=NULL;
+ CElement::CElement()
+ {
+ 	//most of initialization is already done in the overloaded 'new' operator
 @@ -1794,7 +1795,7 @@ void CElement::PaintExpression(CDC * DC, short zoom, short X, short Y,char IsBlu
  	CMainFrame *mf;
  	HFONT hfont;
@@ -124,7 +135,7 @@ index 209a634..f14aded 100644
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..799c007 100644
+index 531282c..523be84 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -152,6 +163,17 @@ index 531282c..799c007 100644
  extern char TouchMouseMode;
  extern char DisableMultitouch;
  int CalcStructuralChecksumOnly; //for speed - as global variable (should be used with care in single thread)
+@@ -328,8 +330,8 @@ extern CExpression *TheKeyboardClipboard;
+ #define xreturn(x) return x
+ #endif
+ 
+-extern short CElementInitType; //passed through global variable for speed
+-extern CObject *CElementInitPaternalExpression; //passed through global variable for speed
++extern thread_local short CElementInitType; //passed through global variable for speed
++extern thread_local CObject *CElementInitPaternalExpression; //passed through global variable for speed
+ 
+ extern CExpression* ClipboardExpression;
+ extern CExpression* prevClipboardExpression;
 @@ -453,7 +455,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
  //for displaying
  //this function should be relatively fast.
@@ -4269,7 +4291,7 @@ index 0000000..3bd012b
 +}
 +}
 diff --git a/Mathomir/PopupMenu.cpp b/Mathomir/PopupMenu.cpp
-index 7166815..a47c806 100644
+index 7166815..1a552c8 100644
 --- a/Mathomir/PopupMenu.cpp
 +++ b/Mathomir/PopupMenu.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4280,6 +4302,17 @@ index 7166815..a47c806 100644
  #include "Mathomir.h"
  #include "MathomirDoc.h"
  #include "MathomirView.h"
+@@ -31,8 +32,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ #include "math.h"
+ 
+ 
+-extern short CElementInitType; //passed through global variable for speed
+-extern CObject *CElementInitPaternalExpression; //passed through global variable for speed
++extern thread_local short CElementInitType; //passed through global variable for speed
++extern thread_local CObject *CElementInitPaternalExpression; //passed through global variable for speed
+ extern RECT TheClientRect;
+ extern CExpression* ClipboardExpression;
+ extern CMathomirView *pMainView;
 @@ -1729,7 +1730,7 @@ int PopupMenu::PaintThePopupMenu(void)
  					int lrg=0;
  					clr=Options[i].Data-81;
