@@ -23,6 +23,10 @@ public static class MathomirUiProbe {
   [DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr memory);
   [DllImport("kernel32.dll")] static extern bool GlobalUnlock(IntPtr memory);
   public static void OpenFile(IntPtr hwnd,string path) { byte[] file=Encoding.Unicode.GetBytes(path+"\0\0"); IntPtr handle=GlobalAlloc(0x42,(UIntPtr)(20+file.Length)); IntPtr memory=GlobalLock(handle); Marshal.WriteInt32(memory,0,20); Marshal.WriteInt32(memory,16,1); Marshal.Copy(file,0,IntPtr.Add(memory,20),file.Length); GlobalUnlock(handle); PostMessage(hwnd,563,handle,IntPtr.Zero); }
+  [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr hwnd);
+  [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd,IntPtr dc);
+  [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc,int x,int y);
+  public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   public static void SetText(IntPtr hwnd,string text) { UIntPtr result; if(SendTextTimeout(hwnd,12,IntPtr.Zero,text,2,3000,out result)==IntPtr.Zero) throw new Exception("Search text did not respond"); }
   public static IntPtr Child(IntPtr parent,int id) { IntPtr found=IntPtr.Zero; EnumChildWindows(parent,(hwnd,p)=>{if(GetDlgCtrlID(hwnd)==id){found=hwnd;return false;} return true;},IntPtr.Zero); return found; }
@@ -81,6 +85,19 @@ try {
   [MathomirUiProbe]::Send($main,273,32775) | Out-Null
   for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
   Start-Sleep -Milliseconds 500
+  $gripY=[MathomirUiProbe]::MoveGripY($view,88)
+  [MathomirUiProbe]::Mouse($view,512,0,88,$gripY)
+  [MathomirUiProbe]::Mouse($view,513,1,88,$gripY)
+  [MathomirUiProbe]::Mouse($view,512,1,118,($gripY+20))
+  [MathomirUiProbe]::Mouse($view,514,0,118,($gripY+20))
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$moved=Get-Content -LiteralPath $fixture -Raw
+  if ($moved.mathomir.o.X -ne '130' -or $moved.mathomir.o.Y -ne '170') { throw 'Dragging the move grip did not move the object by the expected distance.' }
+  [MathomirUiProbe]::Send($main,273,0xE12B) | Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
+  [xml]$undone=Get-Content -LiteralPath $fixture -Raw
+  if ($undone.mathomir.o.X -ne '100' -or $undone.mathomir.o.Y -ne '150') { throw 'Undo did not restore the grip move.' }
+  Write-Output 'Move grip smoke passed: drag without whole-object selection, save expected position, Undo restores position.'
   [MathomirUiProbe]::Mouse($view,513,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
   [MathomirUiProbe]::Mouse($view,515,1,130,125)
@@ -105,8 +122,8 @@ try {
   $popup=[MathomirUiProbe]::Window($appProcess.Id,'Search features')
   if ($popup -eq [IntPtr]::Zero) { throw 'The search dropdown did not open.' }
   $list=[MathomirUiProbe]::Child($popup,1102)
-  $matches=[MathomirUiProbe]::Send($list,395,0)
-  if ($matches -le 0) { throw 'Search found no font commands.' }
+  $fontMatchCount=[MathomirUiProbe]::Send($list,395,0)
+  if ($fontMatchCount -le 0) { throw 'Search found no font commands.' }
   [MathomirUiProbe]::SetText($search,'zzzznonexistentfeaturezzzz')
   if ([MathomirUiProbe]::Send($list,395,0) -ne 0) { throw 'Search did not filter an unmatched query.' }
   [MathomirUiProbe]::SetText($search,'smart')
@@ -127,7 +144,7 @@ try {
   $aboutText=[MathomirUiProbe]::AllText($about)
   if ($aboutText -notmatch 'Improved - v11' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
-  Write-Output "Windows UI smoke passed: visible Search, $matches font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
+  Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 } finally {
   if (!$appProcess.HasExited) { Stop-Process -Id $appProcess.Id -Force }
   Get-Content (Join-Path (Split-Path $exe) 'smoke-stderr.txt') -ErrorAction SilentlyContinue
