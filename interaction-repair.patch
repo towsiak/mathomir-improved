@@ -78,7 +78,7 @@ index 944279c..0926c2b 100644
  				ret=(CObject*)this;
  				break;
 diff --git a/Mathomir/Drawing.h b/Mathomir/Drawing.h
-index 2f39ec2..fb47998 100644
+index 2f39ec2..bf37826 100644
 --- a/Mathomir/Drawing.h
 +++ b/Mathomir/Drawing.h
 @@ -115,6 +115,7 @@ public:
@@ -89,12 +89,13 @@ index 2f39ec2..fb47998 100644
  	unsigned char abort_request;
  	unsigned char show_no_scale;
  	unsigned char calc_y;
-@@ -137,6 +138,11 @@ public:
+@@ -137,6 +138,12 @@ public:
  	char *XML_input(char * file);
  
  	int PlotFunction(int reset_plot, CDC *PrintDC=NULL,short zoom=0);
 +	bool StopForZoom();
 +    void EnsureFunctionSlots();
++    int CurveControlStep(int zoom);
 +    void SetBounds(double Xmin,double Xmax,double Ymin,double Ymax);
 +    bool SmartFit(bool resetX=false);
 +    bool StepZoom(double factor);
@@ -123,7 +124,7 @@ index 209a634..f14aded 100644
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..38c5282 100644
+index 531282c..799c007 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -429,7 +430,7 @@ index 531282c..38c5282 100644
  
  	int found_anything=0;
  	int is_matrix=0;
-@@ -12021,7 +12158,7 @@ char * CExpression::XML_input(char * file)
+@@ -12021,18 +12158,18 @@ char * CExpression::XML_input(char * file)
  int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,char output_type)
  {
  	int len=0;
@@ -438,6 +439,28 @@ index 531282c..38c5282 100644
  	static char tabs[17];
  	if (num_tabs>16) num_tabs=16;
  
+ 	memset(tabs,9,num_tabs);tabs[num_tabs]=0; //generating the tablist string
+ 
+-	if ((m_Color>-1) && (m_Color<=4))
++	if ((m_Color>-1) && (m_Color<=7))
+ 	{
+ 		//color of the expression - if m_Color==-1, then the color is inherited or default
+ 		strcpy(tmpstr,tabs);
+ 		strcat(tmpstr,"<mstyle mathcolor=\"");
+-		strcat(tmpstr,(m_Color==1)?"red":(m_Color==2)?"green":(m_Color==3)?"blue":(m_Color==4)?"gray":"black");
++		strcat(tmpstr,ImprovedColorNames[m_Color]);
+ 		strcat(tmpstr,"\">\r\n");
+ 		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
+ 	}
+@@ -12257,7 +12394,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+ 		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
+ 	}
+ 
+-	if ((m_Color>-1) && (m_Color<=4))
++	if ((m_Color>-1) && (m_Color<=7))
+ 	{
+ 		strcpy(tmpstr,tabs);
+ 		strcat(tmpstr,"</mstyle>\r\n");
 @@ -12272,7 +12409,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  int CExpression::LaTeX_output(char * output, char only_calculate)
  {
@@ -447,6 +470,24 @@ index 531282c..38c5282 100644
  	char *tabs="";
  	char output_type=3;
  	int num_tabs=0;
+@@ -12281,7 +12418,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+ 
+ 	//memset(tabs,9,num_tabs);tabs[num_tabs]=0; //generating the tablist string
+ 
+-	/*if ((m_Color>-1) && (m_Color<=4))
++	/*if ((m_Color>-1) && (m_Color<=7))
+ 	{
+ 		//color of the expression - if m_Color==-1, then the color is inherited or default
+ 	}*/
+@@ -12486,7 +12623,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+ 		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
+ 	}
+ 
+-	/*if ((m_Color>-1) && (m_Color<=4))
++	/*if ((m_Color>-1) && (m_Color<=7))
+ 	{
+ 		strcpy(tmpstr,tabs);
+ 		strcat(tmpstr,"</mstyle>\r\n");
 @@ -12567,7 +12704,7 @@ int IsCharacterLow(char ch,char font)
  
  int CExpression::CalcChecksum()
@@ -631,7 +672,7 @@ index 36238b0..3746c64 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..06c8a41 100644
+index 1ef18dd..35c5d46 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -861,7 +902,7 @@ index 1ef18dd..06c8a41 100644
 +        if(Ylen>ToolboxSize)
 +        {
 +            const int colors[8]={0,2,1,3,5,6,7,4};
-+            for(int k=0;k<8;k++){int size=TheState==8+k?zz:zz/2;DC->FillSolidRect(X+Xlen-ToolboxSize/6-2*size,Y+(k*ToolboxSize/3)+ToolboxSize/6-2*size,4*size,4*size,ImprovedColor(colors[k]));}
++            for(int k=0;k<8;k++){int size=TheState==8+k?zz:zz/2;DC->FillSolidRect(X+Xlen-ToolboxSize/6-2*size,Y+k*CurveControlStep(zoom)+CurveControlStep(zoom)/2-2*size,4*size,4*size,ImprovedColor(colors[k]));}
 +        }
  
 -			}
@@ -967,7 +1008,7 @@ index 1ef18dd..06c8a41 100644
  			if (Base->NumItems>8+kk)
  			{
  				CExpression *func=(CExpression*)((Base->Items+8+kk)->pSubdrawing);
-@@ -856,12 +853,9 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -856,14 +853,11 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  				pp[5].x=x0-20;pp[5].y=pp[0].y-10;
  				pp[6].x=pp[0].x;pp[6].y=pp[0].y;
  			}
@@ -980,8 +1021,11 @@ index 1ef18dd..06c8a41 100644
 -				
 +
  				x0=X+Xlen-l-20-ToolboxSize/6;
- 				y0=Y+10+ToolboxSize/6+(TheState-108)*ToolboxSize/3;
+-				y0=Y+10+ToolboxSize/6+(TheState-108)*ToolboxSize/3;
++				y0=Y+10+CurveControlStep(ViewZoom)/2+(TheState-108)*CurveControlStep(ViewZoom);
  				pp[0].x=x0-3;pp[0].y=y0;
+ 				pp[1].x=pp[0].x+l-2+6;pp[1].y=pp[0].y;
+ 				pp[2].x=pp[1].x+20;pp[2].y=pp[1].y-10;
 @@ -897,6 +891,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  #pragma optimize("s",on)
  int CFunctionPlotter::MouseClick(int X, int Y)
@@ -1185,7 +1229,7 @@ index 1ef18dd..06c8a41 100644
  
  			int x0;
  			int y0;
-@@ -1143,10 +1066,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1143,13 +1066,10 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  				x0=LeftMargin+10;
  				y0=10;
  			}
@@ -1196,7 +1240,11 @@ index 1ef18dd..06c8a41 100644
 +			if (TheState>=108 && TheState<=115)
  			{
  				x0=Xlen-l-20-ToolboxSize/6;
- 				y0=10+ToolboxSize/6+(TheState-108)*ToolboxSize/3;
+-				y0=10+ToolboxSize/6+(TheState-108)*ToolboxSize/3;
++				y0=10+CurveControlStep(ViewZoom)/2+(TheState-108)*CurveControlStep(ViewZoom);
+ 			}
+ 			short isexpression;
+ 			char isparenthese;
 @@ -1185,8 +1105,8 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  		{
  			//lin/log adjustments
@@ -1264,9 +1312,7 @@ index 1ef18dd..06c8a41 100644
 -				Xmin/=10.0;
 -				Xmax*=10.0;
 -			}
-+        if ((edit_at_position==1) && (Base->NumItems>=8))
-+        { StepZoom(1.25); return 0; }
- 
+-
 -			if (is_y_log==0)
 -			{
 -				double dy=Ymax-Ymin;
@@ -1286,7 +1332,9 @@ index 1ef18dd..06c8a41 100644
 -			((CExpression*)((Base->Items+4)->pSubdrawing))->GenerateASCIINumber(Xmin,(long long)Xmin,0,5,0);
 -			((CExpression*)((Base->Items+5)->pSubdrawing))->Delete();
 -			((CExpression*)((Base->Items+5)->pSubdrawing))->GenerateASCIINumber(Xmax,(long long)Xmax,0,5,0);
--
++        if ((edit_at_position==1) && (Base->NumItems>=8))
++        { StepZoom(1.25); return 0; }
+ 
 -			PlotFunction(1);
 -			return 0;
 -		}
@@ -1409,8 +1457,8 @@ index 1ef18dd..06c8a41 100644
 -			new_mode=10;
 -		if ((X>SpecialDrawingHover->Length-ToolboxSize*30/ViewZoom) && (Y>ToolboxSize*100/ViewZoom) && (Y<ToolboxSize*133/ViewZoom))
 -			new_mode=11;
-+        if(X>SpecialDrawingHover->Length-ToolboxSize*30/ViewZoom && Y>=0 && Y<ToolboxSize*266/ViewZoom)
-+            new_mode=8+min(7,Y*ViewZoom/(ToolboxSize*33));
++        if(X>SpecialDrawingHover->Length-ToolboxSize*30/ViewZoom && Y>=0 && Y*ViewZoom/100<CurveControlStep(ViewZoom)*8)
++            new_mode=8+min(7,Y*ViewZoom/100/CurveControlStep(ViewZoom));
 +
  		if (TheState!=new_mode) {TheState=new_mode;return 1;}
  		return 0;
@@ -1763,10 +1811,13 @@ index 1ef18dd..06c8a41 100644
  			Func[kk]->PlotterReleaseVariablePositions(VarPos[kk]);
  			delete Func[kk];
  		}
-@@ -2107,12 +1935,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2107,12 +1935,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	return 0;
  }
  
++int CFunctionPlotter::CurveControlStep(int zoom)
++{int height=abs((Base->Items+1)->Y2-(Base->Items+1)->Y1)/DRWZOOM*zoom/100-MY*zoom/100;return max(6,min(ToolboxSize/3,height/8));}
++
 +void CFunctionPlotter::EnsureFunctionSlots()
 +{
 +    if(Base->NumItems<8 || Base->NumItems>=16)return;
@@ -1814,7 +1865,7 @@ index 1ef18dd..06c8a41 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+5)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2129,7 +1994,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2129,7 +1997,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=5)
@@ -1823,7 +1874,7 @@ index 1ef18dd..06c8a41 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+4)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2146,7 +2011,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2146,7 +2014,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=8)
@@ -1832,7 +1883,7 @@ index 1ef18dd..06c8a41 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+7)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2163,7 +2028,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2163,7 +2031,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=7)
@@ -1841,7 +1892,7 @@ index 1ef18dd..06c8a41 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+6)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2193,6 +2058,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2193,6 +2061,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		if (*Ymax<=1e-100) *Ymax=1;
  		if (*Ymin<=1e-100) *Ymin=*Ymax/1e+10;
  	}
@@ -1849,7 +1900,7 @@ index 1ef18dd..06c8a41 100644
  	return 1;
  }
  
-@@ -2246,7 +2112,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
+@@ -2246,7 +2115,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
  	if (t[0]=='-') {isminus=1;memmove(t,t+1,strlen(t));}
  
  	//leading zeros
