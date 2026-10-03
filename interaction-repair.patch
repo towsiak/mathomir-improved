@@ -2252,7 +2252,7 @@ index bdcebb4..943f025 100644
      END
      BLOCK "VarFileInfo"
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
-index 15ec728..b9e7329 100644
+index 15ec728..c0ba4b7 100644
 --- a/Mathomir/MathomirDoc.cpp
 +++ b/Mathomir/MathomirDoc.cpp
 @@ -29,6 +29,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -2390,7 +2390,7 @@ index 15ec728..b9e7329 100644
  	}
  	else
  	{
-@@ -1233,7 +1246,52 @@ void FatalErrorHandling()
+@@ -1233,7 +1246,62 @@ void FatalErrorHandling()
  		FatalErrorActivated=1;
  		if (AutosaveOption==0)	pMainView->GetDocument()->SaveMOMFile("Autosave.mom",TheFileType);
  
@@ -2446,16 +2446,27 @@ index 15ec728..b9e7329 100644
 +    if (!flushed) return false;
 +    return MoveFileExA(pending,latest,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
 +}
++
++void CMathomirDoc::SetModifiedFlag(BOOL modified)
++{
++    if (modified)
++    {
++        extern DWORD RecoveryGeneration, RecoveryLastEdit;
++        RecoveryGeneration++; RecoveryLastEdit=GetTickCount();
++    }
++    CDocument::SetModifiedFlag(modified);
++}
 diff --git a/Mathomir/MathomirDoc.h b/Mathomir/MathomirDoc.h
-index 381b4e2..adf7478 100644
+index 381b4e2..cb07877 100644
 --- a/Mathomir/MathomirDoc.h
 +++ b/Mathomir/MathomirDoc.h
-@@ -43,7 +43,9 @@ public:
+@@ -43,7 +43,10 @@ public:
  	afx_msg BOOL SaveModified();
  	virtual BOOL OnOpenDocument(LPCTSTR lpszPathName);
  	int OpenMOMFile(char * filename);
 -	int SaveMOMFile(char * filename,char filetype);
 +	int SaveMOMFile(char * filename,char filetype,bool recovery=false);
++	void SetModifiedFlag(BOOL modified=TRUE);
 +	static CString RecoveryFolder();
 +	bool SaveRecovery();
  	int ScrambleMOMFile(char ** bufer, int len,char type);
