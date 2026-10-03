@@ -27,6 +27,7 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd,IntPtr dc);
   [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc,int x,int y);
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
+  public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=150;y<240;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
   public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   [DllImport("user32.dll")] static extern IntPtr GetMenu(IntPtr hwnd);
@@ -162,6 +163,7 @@ try {
   $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
   [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
   for ($repeat=0; $repeat -lt 30; $repeat++) { [MathomirUiProbe]::Mouse($view,512,1,($sizeGrip[0]+24),($sizeGrip[1]+24)) }
+  if (![MathomirUiProbe]::SizeGripAt($view,($sizeGrip[0]+24),($sizeGrip[1]+24))) { throw 'The active resize grip slipped away from the pointer.' }
   [MathomirUiProbe]::Mouse($view,514,0,($sizeGrip[0]+24),($sizeGrip[1]+24))
   for ($repeat=0; $repeat -lt 10; $repeat++) { [MathomirUiProbe]::Mouse($view,512,0,($sizeGrip[0]+80),($sizeGrip[1]+80)) }
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
