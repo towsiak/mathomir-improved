@@ -101,7 +101,7 @@ index 531282c..850abf1 100644
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..11854ab 100644
+index fc832eb..2296de5 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -576,17 +576,18 @@ void CMathomirView::OnDraw(CDC* pDC)
@@ -127,6 +127,15 @@ index fc832eb..11854ab 100644
  				}
  				else
  				{
+@@ -1448,7 +1449,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ 	//if drawing mode is on - start drawing
+ 	if (ShowRullerCounter) //rullers not displayed
+ 	if (!ViewOnlyMode)
+-	if ((IsDrawingMode) && (!MouseTouchingSelection) && (!(GetKeyState(VK_CONTROL)&0xFFFE)) && 
++	if ((IsDrawingMode) && (!(GetKeyState(VK_CONTROL)&0xFFFE)) &&
+ 		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
+ 	{
+ 		if (NumSelectedObjects)
 @@ -1795,6 +1796,27 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
@@ -155,7 +164,20 @@ index fc832eb..11854ab 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -3610,32 +3632,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +3459,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 			}
+ 
+ 
++			if (ds->Type==1 && IsDrawingMode && !isCTRL)
++			{
++				((CExpression*)ds->Object)->DeselectExpression();
++				continue;
++			}
++
+ 			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
+ 				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
+ 				((ds->MovingDotState!=5) || (AccessLockedObjects)))
+@@ -3610,32 +3638,11 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  				
  			RepaintViewTimer=0;
  
