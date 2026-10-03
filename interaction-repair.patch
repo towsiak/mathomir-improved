@@ -526,7 +526,7 @@ index 36238b0..3746c64 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..ea6ca53 100644
+index 1ef18dd..8c5ed51 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -596,8 +596,12 @@ index 1ef18dd..ea6ca53 100644
  	show_no_scale=org->show_no_scale;
  	analyze=org->analyze;
  	any_function_defined=org->any_function_defined;
-@@ -208,7 +211,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
- 				int Ylen=(Base->Items+1)->Y2/DRWZOOM-MY;
+@@ -205,20 +208,20 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+ 
+ 			if ((is_y_log==0) && (TheState==96))
+ 			{
+-				int Ylen=(Base->Items+1)->Y2/DRWZOOM-MY;
++				int Ylen=max(1,(Base->Items+1)->Y2/DRWZOOM-MY);
  				double Ys=Ymax-(Ymax-Ymin)*(double)m_Y1/(double)Ylen;
  				double Ye=Ymax-(Ymax-Ymin)*(double)m_Y2/(double)Ylen;
 -				double f=(Ye-Ymin)/(Ys-Ymin);
@@ -605,8 +609,11 @@ index 1ef18dd..ea6ca53 100644
  				double Ymax2=Ymin+(Ymax-Ymin)/f;
  				int ysize=(int)((sz.cy-1)*((Ymax2-Ymin)/(Ymax-Ymin)));
  				DC->StretchBlt(X+LeftMargin,Y,sz.cx-2,sz.cy-1,&mDC,0,sz.cy-1-ysize,sz.cx-2,ysize,SRCCOPY);
-@@ -218,7 +221,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
- 				int Xlen=(Base->Items)->X2/DRWZOOM-MX;
+ 			}
+ 			else if ((is_x_log==0) && (TheState==94))
+ 			{
+-				int Xlen=(Base->Items)->X2/DRWZOOM-MX;
++				int Xlen=max(1,(Base->Items)->X2/DRWZOOM-MX);
  				double Xs=Xmin+(Xmax-Xmin)*((double)m_X1-MX)/(double)Xlen;
  				double Xe=Xmin+(Xmax-Xmin)*((double)m_X2-MX)/(double)Xlen;
 -				double f=(Xe-Xmin)/(Xs-Xmin);
@@ -826,7 +833,13 @@ index 1ef18dd..ea6ca53 100644
  	if (GetKeyState(VK_LBUTTON)&0x8000)
  	{
  		abort_request=1;
-@@ -926,7 +924,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -921,12 +919,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+ 			//Y ranging
+ 			double Xmax,Ymax,Xmin,Ymin;
+ 			this->PlotFunctionGetBondaries(&Xmin,&Xmax,&Ymin,&Ymax);
+-			int Ylen=(Base->Items+1)->Y2/DRWZOOM-MY;
++			int Ylen=max(1,(Base->Items+1)->Y2/DRWZOOM-MY);
+ 			if (is_y_log==0)
  			{
  				double Ys=Ymax-(Ymax-Ymin)*(double)m_Y1/(double)Ylen;
  				double Ye=Ymax-(Ymax-Ymin)*(double)m_Y2/(double)Ylen;
@@ -852,7 +865,13 @@ index 1ef18dd..ea6ca53 100644
  			return 0;
  
  		}
-@@ -954,7 +951,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -949,12 +946,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+ 			//X ranging
+ 			double Xmax,Ymax,Xmin,Ymin;
+ 			this->PlotFunctionGetBondaries(&Xmin,&Xmax,&Ymin,&Ymax);
+-			int Xlen=(Base->Items)->X2/DRWZOOM-MX;
++			int Xlen=max(1,(Base->Items)->X2/DRWZOOM-MX);
+ 			if (is_x_log==0)
  			{
  				double Xs=Xmin+(Xmax-Xmin)*((double)m_X1-MX)/(double)Xlen;
  				double Xe=Xmin+(Xmax-Xmin)*((double)m_X2-MX)/(double)Xlen;
@@ -861,7 +880,7 @@ index 1ef18dd..ea6ca53 100644
  				Xmax=Xmin+(Xmax-Xmin)/f;
  			}
  			else
-@@ -962,91 +959,27 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -962,96 +959,32 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  				double Xs=m_X1-MX;
  				Xs=Xmin*pow(10.0,log10(Xmax/Xmin)*Xs/Xlen);
  				double Xe=m_X2-MX;
@@ -968,6 +987,13 @@ index 1ef18dd..ea6ca53 100644
  		if (TheState==3) //moving the plot with mouse finished
  		{
  			TheState=0;
+-			int Xlen=(Base->Items)->X2/DRWZOOM-MX;
+-			int Ylen=(Base->Items+1)->Y2/DRWZOOM-MY;
++			int Xlen=max(1,(Base->Items)->X2/DRWZOOM-MX);
++			int Ylen=max(1,(Base->Items+1)->Y2/DRWZOOM-MY);
+ 			double Xmax,Ymax,Xmin,Ymin;
+ 			this->PlotFunctionGetBondaries(&Xmin,&Xmax,&Ymin,&Ymax);
+ 
 @@ -1085,14 +1018,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  				Ymin*=fy;
  			}
@@ -1928,7 +1954,7 @@ index 15ec728..b30baeb 100644
  					}
  					strcpy(file_pointer,">\r\n");file_pointer+=3;len+=3;
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..55fb8d0 100644
+index fc832eb..d19d2c6 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -30,6 +30,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3718,7 +3744,7 @@ index fc832eb..55fb8d0 100644
 +        if(drawing->IsSpecialDrawing!=51 || !drawing->SpecialData || drawing->NumItems<8)continue;
 +        if(NumSelectedObjects && object->MovingDotState!=3)continue;
 +        if(!NumSelectedObjects && focused && object!=focus)continue;
-+        if(!changed)UndoSave("graph smart zoom",20510);
++        if(!changed)UndoSave("graph smart zoom");
 +        CFunctionPlotter *p=(CFunctionPlotter*)drawing->SpecialData;
 +        p->is_x_pi=((CExpression*)(drawing->Items+4)->pSubdrawing)->m_Alignment==2;
 +        p->is_x_log=((CExpression*)(drawing->Items+4)->pSubdrawing)->m_Alignment==1;
