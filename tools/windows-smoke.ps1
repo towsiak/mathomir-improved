@@ -86,6 +86,8 @@ try {
   [MathomirUiProbe]::Mouse($view,515,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
   foreach ($character in 'constant'.ToCharArray()) { [MathomirUiProbe]::Send($view,258,[int]$character) | Out-Null }
+  [MathomirUiProbe]::Mouse($view,513,1,300,300)
+  [MathomirUiProbe]::Mouse($view,514,0,300,300)
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$savedRoot=Get-Content -LiteralPath $fixture -Raw
   $rootNodes=$savedRoot.SelectNodes('//elm[@tp="8"]/ex')
@@ -94,7 +96,7 @@ try {
   if ($rootTokens -ne '2x4') { throw "The root's variables changed: $rootTokens" }
   $annotationTokens=($savedRoot.SelectNodes('/mathomir/o/ex/var') | ForEach-Object {$_.t}) -join ''
   if ($annotationTokens -notmatch 'constant') { throw "Typing the annotation did not save its text: $annotationTokens" }
-  Write-Output 'Root placement smoke passed: hover inside root, double-click above the 2, type constant, save label and preserve root.'
+  Write-Output 'Root placement smoke passed: hover inside root, double-click above the 2, type constant, click away to finish, save label and preserve root.'
   $search=[MathomirUiProbe]::Child($main,1112)
   if ($search -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($search)) { throw 'The permanent Search field is missing or hidden.' }
   [MathomirUiProbe]::Send($main,273,33007) | Out-Null
