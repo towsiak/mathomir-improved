@@ -1976,7 +1976,7 @@ index 0000000..46781e8
 +}
 +}
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
-index f751ecf..f451196 100644
+index f751ecf..6c48e90 100644
 --- a/Mathomir/MainFrm.cpp
 +++ b/Mathomir/MainFrm.cpp
 @@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
@@ -2028,6 +2028,23 @@ index f751ecf..f451196 100644
  	theMenu->CheckMenuItem(ID_FONTSIZE_LARGE,(DefaultFontSize==120)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_NORMAL,(DefaultFontSize==100)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_SMALL,(DefaultFontSize==85)?MF_CHECKED:MF_UNCHECKED);
+@@ -1305,6 +1322,8 @@ int CMainFrame::UndoEnableSaving()
+ }
+ 
+ extern DWORD AutosavePoints;
++DWORD RecoveryGeneration=0;
++DWORD RecoveryLastEdit=0;
+ 
+ 
+ //saves undo information (saves the current sate of documment)
+@@ -1322,6 +1341,7 @@ int CMainFrame::UndoSave(char * text,int unique_ID)
+ 
+ 	int i;
+ 	AutosavePoints++;  //for the autosave function
++    RecoveryGeneration++; RecoveryLastEdit=GetTickCount();
+ 
+ 	if (pMainViewBase)
+ 	{
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
 index bdcebb4..943f025 100644
 --- a/Mathomir/Mathomir.rc
@@ -2227,10 +2244,18 @@ index bdcebb4..943f025 100644
      END
      BLOCK "VarFileInfo"
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
-index 15ec728..b30baeb 100644
+index 15ec728..01bf981 100644
 --- a/Mathomir/MathomirDoc.cpp
 +++ b/Mathomir/MathomirDoc.cpp
-@@ -62,8 +62,10 @@ CMathomirDoc::CMathomirDoc()
+@@ -29,6 +29,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ #include "drawing.h"
+ #include "diffiehellman.h"
+ #include "passworddlg.h"
++#include <io.h>
+ 
+ #ifdef _DEBUG
+ #define new DEBUG_NEW
+@@ -62,8 +63,10 @@ CMathomirDoc::CMathomirDoc()
  }
  
  
@@ -2241,7 +2266,7 @@ index 15ec728..b30baeb 100644
  	AutosavePoints=AutosaveTime=0;
  	if (!CDocument::OnNewDocument())
  		return FALSE;
-@@ -151,9 +153,11 @@ void CMathomirDoc::OnFileNew()
+@@ -151,9 +154,11 @@ void CMathomirDoc::OnFileNew()
  	if (!SaveModified()) return;
  	AutosavePoints=AutosaveTime=0;
  	((CMainFrame*)(theApp.m_pMainWnd))->ClearDocument();
@@ -2253,7 +2278,7 @@ index 15ec728..b30baeb 100644
  	ViewOnlyMode=0;
  	IsDrawingMode=0;
  	ToolboxSize=(BaseToolboxSize)?BaseToolboxSize:60;
-@@ -326,6 +330,7 @@ int CMathomirDoc::OpenMOMFile(char * filename)
+@@ -326,6 +331,7 @@ int CMathomirDoc::OpenMOMFile(char * filename)
  	{
  		//clear the entire documment
  		((CMainFrame*)(theApp.m_pMainWnd))->ClearDocument();
@@ -2261,7 +2286,7 @@ index 15ec728..b30baeb 100644
  
  		//get data from file
  		fread(file_buffer,len,1,fil);
-@@ -403,7 +408,8 @@ int CMathomirDoc::OpenMOMFile(char * filename)
+@@ -403,7 +409,8 @@ int CMathomirDoc::OpenMOMFile(char * filename)
  						if (strcmp(attribute,"X")==0) x=atoi(value);
  						if (strcmp(attribute,"Y")==0) y=atoi(value);
  						if (strcmp(attribute,"lock")==0) lock=atoi(value);
@@ -2271,7 +2296,34 @@ index 15ec728..b30baeb 100644
  						if ((filename) && (strcmp(attribute,"page_h")==0)) PaperHeight=atoi(value);
  						if ((filename) && (strcmp(attribute,"numbering")==0)) PageNumeration=atoi(value);
  					} while (attribute[0]);
-@@ -693,7 +699,7 @@ int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
+@@ -557,7 +564,7 @@ openMOMfile_end:
+ // saves into MOM file or clipboard
+ // (if filename==NULL the saves into clipboard)
+ #pragma optimize("s",on)
+-int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
++int CMathomirDoc::SaveMOMFile(char * filename,char filetype,bool recovery)
+ {
+ 	if ((filetype=='2') || (filename==NULL)) XMLFileVersion=2; else XMLFileVersion=1;
+ 	char dummy[128];
+@@ -623,7 +630,7 @@ int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
+ 			}
+ 			catch(...)
+ 			{
+-
++                if (recovery) return 0;
+ 			}
+ 		}
+ 	}
+@@ -636,7 +643,7 @@ int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
+ 	file_buffer=(char*)malloc(alloc_len);
+ 	if (file_buffer==0)
+ 	{
+-		if (filename) AfxMessageBox("Cannot reserve memory for file saving!",MB_OK|MB_ICONWARNING,NULL);
++		if (filename && !recovery) AfxMessageBox("Cannot reserve memory for file saving!",MB_OK|MB_ICONWARNING,NULL);
+ 		return 0;
+ 	}
+ 	file_pointer=file_buffer;
+@@ -693,7 +700,7 @@ int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
  					if (i==0) 
  					{
  						//only the first object has some global attributs
@@ -2280,8 +2332,125 @@ index 15ec728..b30baeb 100644
  						int ll=(int)strlen(dummy);memcpy(file_pointer,dummy,ll+1);file_pointer+=ll;len+=ll;
  					}
  					strcpy(file_pointer,">\r\n");file_pointer+=3;len+=3;
+@@ -718,6 +725,7 @@ int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
+ 			}
+ 			catch(...)
+ 			{
++                if (recovery) { free(file_buffer); return 0; }
+ 			}
+ 		}
+ 	}
+@@ -739,21 +747,26 @@ int CMathomirDoc::SaveMOMFile(char * filename,char filetype)
+ 		len=ScrambleMOMFile(&file_buffer,len,filetype);
+ 		if (len==0) {free(file_buffer); return 0;}
+ 		//save to file
+-		FILE *fil;
+-		fil=fopen(filename,"w+b");
+-		if (fil)
+-		{
+-			fwrite(file_buffer,len,1,fil);
+-			fclose(fil);
+-			if (strcmp(filename,"autosave.mom")!=0) SetModifiedFlag(0);
+-			AutosavePoints=AutosaveTime=0;
+-		}
+-		else
+-		{
+-			char str[80];
+-			CopyTranslatedString(str,"Cannot create file!",5031,79);
+-			AfxMessageBox(str,MB_OK|MB_ICONWARNING,NULL);
+-		}
++        FILE *fil=fopen(filename,"w+b");
++        bool saved=false;
++        if (fil)
++        {
++            saved=(fwrite(file_buffer,1,len,fil)==(size_t)len);
++            if (fflush(fil)!=0) saved=false;
++            if (_commit(_fileno(fil))!=0) saved=false;
++            if (fclose(fil)!=0) saved=false;
++        }
++        if (!saved)
++        {
++            free(file_buffer);
++            if (!recovery) AfxMessageBox("Cannot save file. Your document is still modified.",MB_OK|MB_ICONWARNING);
++            return 0;
++        }
++        if (!recovery)
++        {
++            if (_stricmp(filename,"autosave.mom")!=0) SetModifiedFlag(0);
++            AutosavePoints=AutosaveTime=0;
++        }
+ 	}
+ 	else
+ 	{
+@@ -1236,4 +1249,49 @@ void FatalErrorHandling()
+ 		MessageBox(theApp.m_pMainWnd->m_hWnd,"FATAL ERROR!\r\nYou can try to save your work now, then restart the software.\r\nUpon restart, you can also check the 'Autosave.mom' file.","Math-o-mir",MB_ICONSTOP|MB_OK);
+ 	}
+ }
+-#pragma optimize("",on)
+\ No newline at end of file
++#pragma optimize("",on)
++// Recovery files are independent of the document path and the legacy autosave setting.
++CString CMathomirDoc::RecoveryFolder()
++{
++    char path[MAX_PATH];
++    DWORD size=GetEnvironmentVariableA("LOCALAPPDATA",path,MAX_PATH);
++    if (!size || size>=MAX_PATH-70) { if (!GetTempPathA(MAX_PATH,path)) return CString(); }
++    CString folder(path);
++    folder+="\\MathomirImproved";
++    if (!CreateDirectoryA(folder,NULL) && GetLastError()!=ERROR_ALREADY_EXISTS) return CString();
++    folder+="\\Recovery";
++    if (!CreateDirectoryA(folder,NULL) && GetLastError()!=ERROR_ALREADY_EXISTS) return CString();
++    return folder;
++}
++bool CMathomirDoc::SaveRecovery()
++{
++    // A graph can update its bounds on its worker thread. Retry after it finishes.
++    for (int i=0;i<NumDocumentElements;i++)
++        if (TheDocument[i].Type==2)
++        {
++            CDrawing *drawing=(CDrawing*)TheDocument[i].Object;
++            if (drawing->IsSpecialDrawing==51 && drawing->SpecialData)
++            {
++                CFunctionPlotter *plot=(CFunctionPlotter*)drawing->SpecialData;
++                if (plot->ThreadHandle && WaitForSingleObject(plot->ThreadHandle,0)==WAIT_TIMEOUT) return false;
++            }
++        }
++    CString folder=RecoveryFolder();
++    if (folder.IsEmpty()) return false;
++    SYSTEMTIME time; GetLocalTime(&time);
++    char name[128];
++    sprintf(name,"\\Recovery-%04d%02d%02d-%02d%02d%02d-%03d-%lu.mom",time.wYear,time.wMonth,time.wDay,time.wHour,time.wMinute,time.wSecond,time.wMilliseconds,GetCurrentProcessId());
++    CString version=folder+name, temporary=version+".tmp";
++    char oldXML=XMLFileVersion;
++    bool saved=SaveMOMFile(temporary.GetBuffer(), '2',true)!=0;
++    temporary.ReleaseBuffer(); XMLFileVersion=oldXML;
++    if (!saved) { DeleteFileA(temporary); return false; }
++    if (!MoveFileExA(temporary,version,MOVEFILE_WRITE_THROUGH)) { DeleteFileA(temporary); return false; }
++    CString latest=folder+"\\Latest.mom", pending=folder+"\\Latest.tmp";
++    if (!CopyFileA(version,pending,FALSE)) return false;
++    HANDLE file=CreateFileA(pending,GENERIC_WRITE,0,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
++    if (file==INVALID_HANDLE_VALUE) return false;
++    bool flushed=FlushFileBuffers(file)!=0; CloseHandle(file);
++    if (!flushed) return false;
++    return MoveFileExA(pending,latest,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
++}
+diff --git a/Mathomir/MathomirDoc.h b/Mathomir/MathomirDoc.h
+index 381b4e2..adf7478 100644
+--- a/Mathomir/MathomirDoc.h
++++ b/Mathomir/MathomirDoc.h
+@@ -43,7 +43,9 @@ public:
+ 	afx_msg BOOL SaveModified();
+ 	virtual BOOL OnOpenDocument(LPCTSTR lpszPathName);
+ 	int OpenMOMFile(char * filename);
+-	int SaveMOMFile(char * filename,char filetype);
++	int SaveMOMFile(char * filename,char filetype,bool recovery=false);
++	static CString RecoveryFolder();
++	bool SaveRecovery();
+ 	int ScrambleMOMFile(char ** bufer, int len,char type);
+ 	int UnscrambleMOMFile(char ** bufer, int len);
+ };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..fce7460 100644
+index fc832eb..5dd6429 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3133,7 +3302,42 @@ index fc832eb..fce7460 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -7585,6 +7885,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -6558,23 +6858,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+ 	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
+ 		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
+ 	
+-	if (!ViewOnlyMode)
+-	if (AutosaveOption)
+-	{
+-		AutosaveFreetime++;
+-		if ((AutosaveTime==0) || (AutosaveTime>GetTickCount()) || (AutosavePoints==0)) AutosaveTime=GetTickCount();
+-		DWORD timedelta=GetTickCount()-AutosaveTime;
+-		if ((timedelta*AutosavePoints>(DWORD)((AutosaveOption==3)?3500000:((AutosaveOption==2)?8000000:18000000))) && (AutosaveFreetime>=(5+9/AutosaveOption)))
+-		{
+-			if (TheFileType!='s')
+-			{
+-				DisplayShortText("Autosaving...",10,10,7006);
+-				this->GetDocument()->SaveMOMFile("autosave.mom",TheFileType);
+-				AutosaveTime=GetTickCount();
+-				AutosavePoints=0;
+-			}
+-		}
+-	}
++    extern DWORD RecoveryGeneration, RecoveryLastEdit;
++    static DWORD recoverySaved=0, recoveryAttempt=0;
++    DWORD recoveryNow=GetTickCount();
++    if (!ViewOnlyMode && RecoveryGeneration!=recoverySaved &&
++        recoveryNow-recoveryAttempt>=1000 &&
++        (recoveryNow-RecoveryLastEdit>=1000 || recoveryNow-recoveryAttempt>=5000) &&
++        !MouseSizingActive && !MouseMovingActive && !MouseRotationActive)
++    {
++        recoveryAttempt=recoveryNow;
++        if (GetDocument()->SaveRecovery()) recoverySaved=RecoveryGeneration;
++    }
+ 
+ 	if (GetForegroundWindow()==theApp.m_pMainWnd)
+ 	{
+@@ -7585,6 +7879,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -3147,7 +3351,7 @@ index fc832eb..fce7460 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8419,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8413,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -3175,7 +3379,7 @@ index fc832eb..fce7460 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +8872,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +8866,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -3186,7 +3390,7 @@ index fc832eb..fce7460 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9719,895 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9713,896 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -3418,6 +3622,7 @@ index fc832eb..fce7460 100644
 +    dialog.Add(ID_WRITING_COLORS,"Writing > Colors...","color palette highlighted text orange purple teal");
 +    dialog.Add(ID_WRITING_BOLD,"Writing > Bold (Ctrl+B)","bold selected text formatting");
 +    for(int i=0;i<8;i++){CString label="Writing > Color: ";label+=ImprovedColorNames[i];dialog.Add(ID_WRITING_COLOR_BLACK+i,label,"color colour highlighted text writing palette");}
++    dialog.Add(ID_AUTOSAVE_LOADTHEAUTOSAVE,"Recovery > Recover latest edits or older version","autosave recover crash backup history versions");
 +    dialog.Add(ID_GRAPH_SMART_FIT,"Graph > Smart fit","grapher smart zoom auto fit visible function range recover");
 +    dialog.Add(ID_GRAPH_RESET_VIEW,"Graph > Reset view","grapher reset zoom recover default window sane range");
 +    dialog.Add(ID_GRAPH_ZOOM_IN,"Graph > Zoom in gently","grapher zoom in closer smaller range");
@@ -4082,7 +4287,7 @@ index fc832eb..fce7460 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10620,108 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10615,108 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4191,7 +4396,7 @@ index fc832eb..fce7460 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10738,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10733,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -4199,6 +4404,42 @@ index fc832eb..fce7460 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
+@@ -10115,19 +11411,22 @@ void CMathomirView::OnAutosaveHigh()
+ 
+ void CMathomirView::OnAutosaveLoadtheautosave()
+ {
+-	this->GetDocument()->OnFileNew();
+-	if (this->GetDocument()->IsModified()==0)
+-	{
+-		if (this->GetDocument()->OpenMOMFile("autosave.mom"))
+-		{
+-			AutosavePoints=AutosaveTime=0;
+-			this->GetDocument()->SetPathName("Untitled",0);
+-			this->GetDocument()->SetModifiedFlag(0);
+-			((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
+-			RepaintTheView();
+-			InvalidateRect(NULL,1);
+-		}
+-	}
++    CString folder=CMathomirDoc::RecoveryFolder();
++    CString latest=folder+"\\Latest.mom";
++    CFileDialog dialog(TRUE,"mom",latest,OFN_FILEMUSTEXIST|OFN_HIDEREADONLY,"Math-o-mir recovery (*.mom)|*.mom||",this);
++    dialog.m_ofn.lpstrInitialDir=folder;
++    dialog.m_ofn.lpstrTitle="Recover latest edits or choose an earlier timestamp";
++    if (dialog.DoModal()!=IDOK) return;
++    CString chosen=dialog.GetPathName();
++    if (!GetDocument()->SaveModified()) return;
++    GetDocument()->OnFileNew();
++    if (GetDocument()->OpenMOMFile(chosen.GetBuffer()))
++    {
++        GetDocument()->SetPathName("Recovered document",FALSE);
++        GetDocument()->SetModifiedFlag(TRUE);
++        RepaintTheView(); InvalidateRect(NULL,TRUE);
++    }
++    chosen.ReleaseBuffer();
+ }
+ 
+ void CMathomirView::OnZoomWheelzoomadjustspointer()
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
 index 94dd0e4..388a80a 100644
 --- a/Mathomir/MathomirView.h
