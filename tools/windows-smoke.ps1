@@ -561,7 +561,7 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v15' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v16' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 
@@ -627,6 +627,25 @@ try {
   [xml]$rotationUndo=Get-Content $fixture -Raw
   if($rotationUndo.SelectSingleNode('/mathomir/*[last()]').OuterXml -ne $beforeRotation){throw 'Undo did not restore interval geometry.'}
   Write-Output 'Interval and drawing rotation passed: four presets, correct open/closed dots, editable labels rotate with the drawing, Undo restores geometry.'
+  $castY=110
+  foreach($code in @('inf','frac','int','lim','vec','eq','sqrt','pm','pi','sin','subseteq')) {
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Mouse($view,512,0,650,$castY)
+    [MathomirUiProbe]::Mouse($view,513,1,650,$castY)
+    [MathomirUiProbe]::Mouse($view,514,0,650,$castY)
+    foreach($character in ($code+' 1').ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$character)|Out-Null}
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$castSaved=Get-Content $fixture -Raw
+    $cast=$castSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
+    if(!$cast){throw "Shortcut $code did not create a math expression."}
+    $letters=($cast.SelectNodes('.//var')|ForEach-Object {$_.t}) -join ''
+    if($letters.Contains($code)){Write-Output $cast.OuterXml;throw "Shortcut $code was left as letters."}
+    if($code -eq 'frac' -and !$cast.SelectSingleNode('./fra | ./elm[@tp="4"]')){Write-Output $cast.OuterXml;throw 'Fraction shortcut lost its structure.'}
+    if($code -eq 'vec' -and !$cast.SelectSingleNode('./bra | ./elm[@tp="5"]')){throw 'Vector shortcut lost its editable cells.'}
+    $castY+=35
+  }
+  Write-Output 'Default casts passed: infinity, fraction, integral, limit, vector, equals, root, plus/minus, pi, sine and subseteq expand with Space.'
   Start-Sleep -Milliseconds 300
   $recoveryFolder=Join-Path $env:LOCALAPPDATA 'MathomirImproved/Recovery'
   $before=@(Get-ChildItem $recoveryFolder -Filter 'Recovery-*.mom' -ErrorAction SilentlyContinue).Count
