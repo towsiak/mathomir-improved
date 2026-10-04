@@ -268,3 +268,6 @@ V18: Fit width rounds down to keep both paper edges visible and disables horizon
 
 - A pi/Decimal toggle sits next to the graph zoom and Fit controls. It changes x-axis labels without cycling logarithmic modes and remains usable during plotting.
 - Background plot updates invalidate the document region instead of painting over text and other objects above the graph.
+
+- Very faint dotted bounds appear around the hovered grip target and disappear with its grips.
+- A visible Select all button beside Fit width selects every page object for Delete. Edit > Select all page objects and Ctrl+Shift+A provide the same command; Ctrl+A keeps its existing approximate-equals meaning. Deletion remains undoable.
