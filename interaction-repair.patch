@@ -867,7 +867,7 @@ index 36238b0..cbff598 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..3e39ee3 100644
+index 1ef18dd..3555935 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -1618,9 +1618,7 @@ index 1ef18dd..3e39ee3 100644
 -				Xmin/=10.0;
 -				Xmax*=10.0;
 -			}
-+        if ((edit_at_position==1) && (Base->NumItems>=8))
-+        { StepZoom(1.25); return 0; }
- 
+-
 -			if (is_y_log==0)
 -			{
 -				double dy=Ymax-Ymin;
@@ -1640,12 +1638,14 @@ index 1ef18dd..3e39ee3 100644
 -			((CExpression*)((Base->Items+4)->pSubdrawing))->GenerateASCIINumber(Xmin,(long long)Xmin,0,5,0);
 -			((CExpression*)((Base->Items+5)->pSubdrawing))->Delete();
 -			((CExpression*)((Base->Items+5)->pSubdrawing))->GenerateASCIINumber(Xmax,(long long)Xmax,0,5,0);
-+        EnsureFunctionSlots();
++        if ((edit_at_position==1) && (Base->NumItems>=8))
++        { StepZoom(1.25); return 0; }
  
 -			PlotFunction(1);
 -			return 0;
 -		}
--
++        EnsureFunctionSlots();
+ 
 -		if (Base->NumItems==11)
 -		{
 -			//special handling for compatibility - if there is no fourth function expression, make it now
@@ -1825,7 +1825,7 @@ index 1ef18dd..3e39ee3 100644
  			return 1;
  		}
  
-@@ -1625,9 +1567,68 @@ char *CFunctionPlotter::XML_input(char * file)
+@@ -1625,9 +1567,85 @@ char *CFunctionPlotter::XML_input(char * file)
  //this function plots the mathematical function
  //first four items are the frame
  //inputs: reset_plot-(0-plot the funciton, 1 - prepare no Y ranging, 2-prepare with Y ranging);  PrintDC - when printing the device context, or NULL
@@ -1888,6 +1888,23 @@ index 1ef18dd..3e39ee3 100644
 +    }
 +}
 +
++// Recognize x = constant before the ordinary y=f(x) evaluator strips its left side.
++static bool GraphXEquation(CExpression *expression)
++{
++    if(expression->m_NumElements<3)return false;
++    tElementStruct *e=expression->m_pElementList;
++    return e[0].Type==1 && e[0].pElementObject && strcmp(e[0].pElementObject->Data1,"x")==0 &&
++        (e[0].pElementObject->Data2[0]&0xE0)!=0x60 && e[1].Type==2 && e[1].pElementObject && e[1].pElementObject->Data1[0]=='=';
++}
++static bool GraphVerticalValue(CExpression *expression,bool radians,double &value)
++{
++    CExpression rhs(NULL,NULL,100);rhs.CopyExpression(expression,0);rhs.DeleteElement(0);rhs.DeleteElement(0);
++    CExpression *variable=NULL;int position=0;
++    if(!rhs.IsSuitableForComputation() || rhs.PlotterGetEquationInfo(&variable,&position,NULL,NULL))return false;
++    void *variables=rhs.PlotterPrepareVariablePositions();if(!variables)return false;
++    value=rhs.PlotterCalculateFunctionValue(0,variables,radians);rhs.PlotterReleaseVariablePositions(variables);
++    return GraphDiscontinuities::Finite(value);
++}
  int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  {
 -	if (ViewZoom==0) 
@@ -1895,7 +1912,7 @@ index 1ef18dd..3e39ee3 100644
  		ViewZoom=::ViewZoom;
  	int Xlen;
  	int Ylen;
-@@ -1641,7 +1642,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1641,7 +1659,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		{
  			abort_request=1;
  			Sleep(10);
@@ -1904,7 +1921,7 @@ index 1ef18dd..3e39ee3 100644
  			{
  				TerminateThread(ThreadHandle,0);
  				if (DrawingThreadUsed>0) DrawingThreadUsed--;
-@@ -1660,6 +1661,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1660,6 +1678,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		//reduce for size of 'borders' (coordinate system)
  		Xlen-=MX*ViewZoom/100;
  		Ylen-=MY*ViewZoom/100;
@@ -1912,7 +1929,7 @@ index 1ef18dd..3e39ee3 100644
  
  		//delete the previous bitmap, if dimensions are different
  		if (Plot)
-@@ -1723,24 +1725,28 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1723,24 +1742,35 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	//getting bittmap dimensions
  	CSize cs=Plot->GetBitmapDimension();
  	Xlen=cs.cx;
@@ -1925,6 +1942,7 @@ index 1ef18dd..3e39ee3 100644
 -	
 -	CExpression *Func[4];
 +	CExpression *Func[8];
++    bool vertical[8]={false};double verticalX[8]={0};
 +    std::vector<CExpression*> divisors[8];
 +    std::vector<GraphDomainPoint> domainPoints[8];
  	tDrawingItem *pItem=Base->Items+8;
@@ -1943,11 +1961,17 @@ index 1ef18dd..3e39ee3 100644
  			{
  				Func[kk]=new CExpression(NULL,NULL,100);
  				Func[kk]->CopyExpression((CExpression*)(pItem->pSubdrawing),0);
++                if(GraphXEquation(Func[kk]))
++                {
++                    vertical[kk]=GraphVerticalValue(Func[kk],is_x_pi!=0,verticalX[kk]);
++                    if(vertical[kk])any_found=1;
++                    delete Func[kk];Func[kk]=NULL;continue;
++                }
 +                CollectGraphDivisors(Func[kk],divisors[kk]);
  				any_found=1;
  			}
  		}
-@@ -1748,30 +1754,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1748,30 +1778,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	if (!any_found) return 0;
  
  	any_function_defined=1;
@@ -1987,7 +2011,7 @@ index 1ef18dd..3e39ee3 100644
  				delete Func[kk];
  				Func[kk]=NULL;
  			}
-@@ -1780,32 +1788,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1780,32 +1812,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  
  	//create an arrays that will hold Y calculated values
@@ -2033,7 +2057,7 @@ index 1ef18dd..3e39ee3 100644
  		  (GetKeyState(33)&0x8000) ||
  		  (GetKeyState(34)&0x8000) ||
  		  (GetKeyState(VK_LEFT)&0x8000) ||
-@@ -1818,7 +1825,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1818,7 +1849,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		}
  
  		//compute 'y' value in this point 'x'
@@ -2042,7 +2066,7 @@ index 1ef18dd..3e39ee3 100644
  		{
  			if (abort_request) break;
  			if (Func[kk])
-@@ -1828,72 +1835,45 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1828,72 +1859,45 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  					X=((double)i+0)*f1+Xmin;
  				else
  					X=Xmin*pow(10.0,i*f2);
@@ -2140,7 +2164,7 @@ index 1ef18dd..3e39ee3 100644
  
  			//compute scaling factors
  			double F1=(is_y_log==0)?((double)Ylen/(double)(Ymax-Ymin)):((double)Ylen/log10(Ymax/Ymin));
-@@ -1901,8 +1881,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1901,8 +1905,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  			//now we start drawing pre-calculated points into the plotter bitmap
  			if (!abort_request)
@@ -2151,7 +2175,7 @@ index 1ef18dd..3e39ee3 100644
  					if (Func[kk])
  					{
  						double Y=(is_y_log==0)?((double)(*(YY[kk]+j)-Ymin)):(log10(*(YY[kk]+j))-log10(Ymin));
-@@ -1913,7 +1893,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1913,7 +1917,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  						double Y2=Y;
  						if (analyze)
  						{
@@ -2160,7 +2184,7 @@ index 1ef18dd..3e39ee3 100644
  							if ((j>1) && (j<i-1))
  							{
  								double n,a,b,c,d;
-@@ -1924,14 +1904,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1924,14 +1928,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								d=*(YY[kk]+j+2);
  								if ((b>a) && (b>c)) special_point=1; //maximum
  								if ((b<a) && (b<c)) special_point=2; //minimum
@@ -2178,7 +2202,7 @@ index 1ef18dd..3e39ee3 100644
  								if (Func[zz])
  								{
  									double a2,b2,c2;
-@@ -1970,11 +1950,38 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1970,11 +1974,38 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  						if (Y>16000) Y=16000;
  						if (Y<-16000) Y=-16000;
@@ -2219,7 +2243,7 @@ index 1ef18dd..3e39ee3 100644
  							mDC.MoveTo(Xp,Ylen-(int)prevy[kk]);
  							mDC.LineTo(X,Ylen-(int)Y);
  
-@@ -1990,13 +1997,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1990,13 +2021,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								}
  								else //paint colored point
  									mDC.FillSolidRect(X-2,zed-2,4,4,RGB(255,0,(special_point==3)?255:0));
@@ -2235,7 +2259,7 @@ index 1ef18dd..3e39ee3 100644
  								double Xd;
  								if (is_x_log==0)
  								{
-@@ -2015,7 +2022,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2015,7 +2046,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  								double Yd=*(YY[kk]+j);
  								double Ydd=fabs(*(YY[kk]+j-1)-Yd);
@@ -2244,7 +2268,7 @@ index 1ef18dd..3e39ee3 100644
  								{
  									if (is_y_log==0)
  										ShowNumberWithPrecision(Yd,max(Ydd,1/F1/density),txt2);
-@@ -2049,8 +2056,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2049,8 +2080,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  						}
  						prevy[kk]=Y;
  					}
@@ -2255,10 +2279,15 @@ index 1ef18dd..3e39ee3 100644
  
  			if ((analyze) && (i==density*Xlen-1) && (!abort_request) && (PrintDC==NULL) && (Func[0]) && (is_x_log==0))
  			{
-@@ -2080,23 +2087,40 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2080,23 +2111,45 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  				}
  			}
  
++            if(!abort_request)for(int k=0;k<8;k++)if(vertical[k] && verticalX[k]>=Xmin && verticalX[k]<=Xmax && (!is_x_log || verticalX[k]>0))
++            {
++                double pixel=is_x_log?log10(verticalX[k]/Xmin)/log10(Xmax/Xmin)*(Xlen-1):(verticalX[k]-Xmin)/(Xmax-Xmin)*(Xlen-1);
++                if(GraphDiscontinuities::Finite(pixel)){mDC.SelectObject(&curvePens[k]);mDC.MoveTo((int)pixel,0);mDC.LineTo((int)pixel,Ylen);}
++            }
 +            // Paint open circles last so the interpolated curve cannot fill their centers.
 +            if(i==density*Xlen-1 && !abort_request)
 +                for(int k=0;k<8;k++)for(size_t n=0;n<domainPoints[k].size();n++)
@@ -2303,7 +2332,7 @@ index 1ef18dd..3e39ee3 100644
  			Func[kk]->PlotterReleaseVariablePositions(VarPos[kk]);
  			delete Func[kk];
  		}
-@@ -2107,12 +2131,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2107,12 +2160,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	return 0;
  }
  
@@ -2357,7 +2386,7 @@ index 1ef18dd..3e39ee3 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+5)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2129,7 +2193,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2129,7 +2222,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=5)
@@ -2366,7 +2395,7 @@ index 1ef18dd..3e39ee3 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+4)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2146,7 +2210,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2146,7 +2239,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=8)
@@ -2375,7 +2404,7 @@ index 1ef18dd..3e39ee3 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+7)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2163,7 +2227,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2163,7 +2256,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=7)
@@ -2384,7 +2413,7 @@ index 1ef18dd..3e39ee3 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+6)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2193,6 +2257,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2193,6 +2286,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		if (*Ymax<=1e-100) *Ymax=1;
  		if (*Ymin<=1e-100) *Ymin=*Ymax/1e+10;
  	}
@@ -2392,7 +2421,7 @@ index 1ef18dd..3e39ee3 100644
  	return 1;
  }
  
-@@ -2246,7 +2311,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
+@@ -2246,7 +2340,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
  	if (t[0]=='-') {isminus=1;memmove(t,t+1,strlen(t));}
  
  	//leading zeros
@@ -2589,7 +2618,7 @@ index f751ecf..4352081 100644
  	//only objects that were modified are deleted and (latter) recreated,
  	//objects that were not modified are not touched by undo restore.
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..f76cfec 100644
+index bdcebb4..17e7db3 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -2791,7 +2820,7 @@ index bdcebb4..f76cfec 100644
          END
      END
      BLOCK "VarFileInfo"
-@@ -607,3 +671,50 @@ LANGUAGE 9, 1
+@@ -607,3 +671,53 @@ LANGUAGE 9, 1
  /////////////////////////////////////////////////////////////////////////////
  #endif    // not APSTUDIO_INVOKED
  
@@ -2817,7 +2846,7 @@ index bdcebb4..f76cfec 100644
 +END
 +
 +
-+IDD_UNIT_CIRCLE DIALOGEX 0,0,310,216
++IDD_UNIT_CIRCLE DIALOGEX 0,0,310,266
 +STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 +CAPTION "Unit circle maker"
 +FONT 9,"Segoe UI"
@@ -2835,12 +2864,15 @@ index bdcebb4..f76cfec 100644
 +    EDITTEXT IDC_UNIT_RADIUS,80,102,55,14,ES_NUMBER
 +    LTEXT "60-600 (resize later with the corner grip)",-1,143,105,155,16
 +    CONTROL "Angle labels",IDC_UNIT_LABELS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,128,130,12
-+    CONTROL "Exact endpoint coordinates",IDC_UNIT_COORDINATES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,155,128,145,12
-+    CONTROL "Common angle ticks and labels",IDC_UNIT_COMMON,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,149,145,12
++    CONTROL "Point coordinates",IDC_UNIT_COORDINATES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,155,128,145,12
++    CONTROL "Common angles and points",IDC_UNIT_COMMON,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,149,145,12
 +    CONTROL "End-angle right triangle",IDC_UNIT_TRIANGLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,155,149,145,12
-+    LTEXT "Radians accept pi/6, -pi/2, 2*pi/3 or decimals. Negative angles are allowed.",-1,10,169,287,18
-+    DEFPUSHBUTTON "OK",IDOK,192,194,50,14
-+    PUSHBUTTON "Cancel",IDCANCEL,247,194,50,14
++    CONTROL "Mark start/end and common points",IDC_UNIT_POINTS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,169,287,12
++    LTEXT "Extra points",-1,10,192,65,12
++    EDITTEXT IDC_UNIT_POINT_ANGLES,80,189,217,14,ES_AUTOHSCROLL
++    LTEXT "Optional comma-separated angles in selected units: 30, 45, 120 or pi/6, pi/4. Up to 32 points.",-1,10,209,287,24
++    DEFPUSHBUTTON "OK",IDOK,192,244,50,14
++    PUSHBUTTON "Cancel",IDCANCEL,247,244,50,14
 +END
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
 index 15ec728..c0ba4b7 100644
@@ -3064,7 +3096,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..381001f 100644
+index fc832eb..fffd96e 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -5471,7 +5503,7 @@ index fc832eb..381001f 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12494,320 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12494,346 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -5546,14 +5578,14 @@ index fc832eb..381001f 100644
 +class CUnitCircleDialog:public CDialog
 +{
 +public:
-+    double start,end;int radius;bool radians,clockwise,labels,coordinates,common,triangle;
-+    CUnitCircleDialog():CDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),radians(false),clockwise(false),labels(true),coordinates(true),common(false),triangle(true){}
++    double start,end;int radius;bool radians,clockwise,labels,coordinates,common,triangle,points;std::vector<double> pointAngles;
++    CUnitCircleDialog():CDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),radians(false),clockwise(false),labels(true),coordinates(true),common(false),triangle(true),points(true){}
 +    virtual BOOL OnInitDialog()
 +    {
 +        CDialog::OnInitDialog();SetDlgItemText(IDC_UNIT_START,"0");SetDlgItemText(IDC_UNIT_END,"90");SetDlgItemInt(IDC_UNIT_RADIUS,radius);
 +        CComboBox *unit=(CComboBox*)GetDlgItem(IDC_UNIT_MODE);unit->AddString("Degrees");unit->AddString("Radians (pi/3, 2*pi/3, or decimal)");unit->SetCurSel(0);
 +        CComboBox *direction=(CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION);direction->AddString("Counterclockwise");direction->AddString("Clockwise");direction->SetCurSel(0);
-+        CheckDlgButton(IDC_UNIT_LABELS,BST_CHECKED);CheckDlgButton(IDC_UNIT_COORDINATES,BST_CHECKED);CheckDlgButton(IDC_UNIT_TRIANGLE,BST_CHECKED);return TRUE;
++        CheckDlgButton(IDC_UNIT_POINTS,BST_CHECKED);CheckDlgButton(IDC_UNIT_LABELS,BST_CHECKED);CheckDlgButton(IDC_UNIT_COORDINATES,BST_CHECKED);CheckDlgButton(IDC_UNIT_TRIANGLE,BST_CHECKED);return TRUE;
 +    }
 +    virtual void OnOK()
 +    {
@@ -5562,6 +5594,19 @@ index fc832eb..381001f 100644
 +        BOOL valid;radius=GetDlgItemInt(IDC_UNIT_RADIUS,&valid,FALSE);
 +        if(!ReadUnitAngle(a,radians,start)||!ReadUnitAngle(b,radians,end)||!valid||radius<60||radius>600)
 +        {AfxMessageBox("Enter valid angles (degrees, or radians such as pi/6). Use a radius from 60 to 600. Angles may be negative, up to ten turns.");return;}
++        CString extra;GetDlgItemText(IDC_UNIT_POINT_ANGLES,extra);pointAngles.clear();extra.Trim();
++        if(!extra.IsEmpty())
++        {
++            int begin=0;
++            while(begin<=extra.GetLength())
++            {
++                int comma=extra.Find(',',begin);CString token=comma<0?extra.Mid(begin):extra.Mid(begin,comma-begin);double angle;
++                if(!ReadUnitAngle(token,radians,angle) || pointAngles.size()>=32)
++                {AfxMessageBox("Enter up to 32 point angles separated by commas, using the selected angle units.");return;}
++                pointAngles.push_back(angle);if(comma<0)break;begin=comma+1;
++            }
++        }
++        points=IsDlgButtonChecked(IDC_UNIT_POINTS)==BST_CHECKED;
 +        clockwise=((CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION))->GetCurSel()==1;
 +        labels=IsDlgButtonChecked(IDC_UNIT_LABELS)==BST_CHECKED;coordinates=IsDlgButtonChecked(IDC_UNIT_COORDINATES)==BST_CHECKED;
 +        common=IsDlgButtonChecked(IDC_UNIT_COMMON)==BST_CHECKED;triangle=IsDlgButtonChecked(IDC_UNIT_TRIANGLE)==BST_CHECKED;CDialog::OnOK();
@@ -5611,6 +5656,10 @@ index fc832eb..381001f 100644
 +    if(numerator!=1)UnitNumber(n,numerator);
 +    int p=n->m_NumElements;p=UnitAppend(n,1,'p');n->m_pElementList[p].pElementObject->Data2[0]=0x60;
 +}
++static void UnitPoint(CDrawing *drawing,double x,double y)
++{
++    for(int row=-4;row<=4;row++){double half=sqrt(16.-row*row);IntervalLine(drawing,x-half,y+row,x+half,y+row);}
++}
 +void CMathomirView::OnUnitCircle()
 +{
 +    if(ViewOnlyMode)return;OnChar(27,1,0);CUnitCircleDialog setup;if(setup.DoModal()!=IDOK)return;
@@ -5630,7 +5679,7 @@ index fc832eb..381001f 100644
 +    IntervalLine(drawing,tipX,tipY,tipX-tx*10+ty*5,tipY-ty*10-tx*5,2);IntervalLine(drawing,tipX,tipY,tipX-tx*10-ty*5,tipY-ty*10+tx*5,2);
 +    for(int endpoint=0;endpoint<2;endpoint++)
 +    {
-+        double angle=endpoint?setup.end:setup.start,a=angle*pi/180,x=c+r*cos(a),y=c-r*sin(a);IntervalLine(drawing,c,c,x,y,2);
++        double angle=endpoint?setup.end:setup.start,a=angle*pi/180,x=c+r*cos(a),y=c-r*sin(a);IntervalLine(drawing,c,c,x,y,2);if(setup.points)UnitPoint(drawing,x,y);
 +        CExpression label(NULL,NULL,80);
 +        if(setup.labels){UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a),0,0);}
 +        if(setup.coordinates)
@@ -5643,9 +5692,18 @@ index fc832eb..381001f 100644
 +    if(setup.common)
 +    {
 +        const int angles[]={0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330};
-+        for(int i=0;i<16;i++){double a=angles[i]*pi/180;IntervalLine(drawing,c+(r-4)*cos(a),c-(r-4)*sin(a),c+(r+4)*cos(a),c-(r+4)*sin(a));
++        for(int i=0;i<16;i++){double a=angles[i]*pi/180;if(setup.points)UnitPoint(drawing,c+r*cos(a),c-r*sin(a));IntervalLine(drawing,c+(r-4)*cos(a),c-(r-4)*sin(a),c+(r+4)*cos(a),c-(r+4)*sin(a));
 +            if(fabs(remainder(setup.start-angles[i],360.))<1e-8 || fabs(remainder(setup.end-angles[i],360.))<1e-8)continue;
 +            CExpression label(NULL,NULL,65);UnitAngleLabel(&label,angles[i],setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+20)*cos(a)-12,c-(r+20)*sin(a),0,0);}
++    }
++    for(size_t i=0;i<setup.pointAngles.size();i++)
++    {
++        double angle=setup.pointAngles[i],a=angle*pi/180;UnitPoint(drawing,c+r*cos(a),c-r*sin(a));
++        bool duplicate=fabs(remainder(angle-setup.start,360.))<1e-8 || fabs(remainder(angle-setup.end,360.))<1e-8;
++        for(size_t j=0;j<i;j++)if(fabs(remainder(angle-setup.pointAngles[j],360.))<1e-8)duplicate=true;
++        if(duplicate)continue;
++        if(setup.labels){CExpression label(NULL,NULL,65);UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a),0,0);}
++        if(setup.coordinates){CExpression label(NULL,NULL,70);label.InsertEmptyElement(0,2,'(');UnitValue(&label,cos(a));label.InsertEmptyElement(label.m_NumElements,2,',');UnitValue(&label,sin(a));label.InsertEmptyElement(label.m_NumElements,2,')');drawing->CopyExpressionIntoSubgroup(&label,c+(r+65)*cos(a)-25,c-(r+65)*sin(a)+10,0,0);}
 +    }
 +    ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;
 +    IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
@@ -5934,10 +5992,10 @@ index 7166815..1a552c8 100644
  					dc->FillSolidRect(Options[i].X+TSize/8+1-lrg,Options[i].Y+1+TSize_1p20-lrg,TSize/8+2*lrg,TSize/8+2*lrg,clr);
  					if (Options[i].IsChecked&0x01) 
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..3cdc0ab 100644
+index 05446cf..ae2cccd 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,96 @@
+@@ -174,3 +174,98 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -6026,6 +6084,8 @@ index 05446cf..3cdc0ab 100644
 +#define IDC_UNIT_COORDINATES 1136
 +#define IDC_UNIT_COMMON 1137
 +#define IDC_UNIT_TRIANGLE 1138
++#define IDC_UNIT_POINTS 1139
++#define IDC_UNIT_POINT_ANGLES 1140
 +
 +#define ID_TRIANGLE_45 33053
 +#define ID_TRIANGLE_30 33054

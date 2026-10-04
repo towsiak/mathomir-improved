@@ -50,3 +50,6 @@ V18: Fit width rounds down to keep both paper edges visible and disables horizon
 
 Print guide: a faint dashed quarter-inch safety inset on every page, enlarged to printer hardware margins measured from a print/preview DC when available. A warning pulses for three seconds when page content crosses the inset and clears when safe. The guide and warning never print.
 Unit circle maker: drawing palette circle icon or Search 'unit circle'; configure start/end angles in degrees or radians (pi/6 etc.), arc direction, radius, angle labels, exact endpoint coordinates, common angle ticks, and an end-angle right triangle. Click OK then click to place; native grips move, scale and rotate the grouped drawing.
+
+Unit-circle points: filled start/end markers are enabled by default; common angles can also be marked. Enter optional extra point angles separated by commas (up to 32) in degrees or radians; angle and coordinate labels follow the existing switches. Extra points are marked even when automatic endpoint markers are off.
+Vertical lines: enter x=3, x=-2, x=0, or x=1/2 in any colored graph slot. Constant expressions are evaluated with the usual math engine, and the line spans the visible height alongside ordinary functions. Saving, zooming and printing retain the equation. Variable-dependent x= equations are not supported.

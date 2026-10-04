@@ -800,6 +800,11 @@ try {
   Write-Output 'Default casts passed: infinity, fraction, integral, limit, vector, equals, root, plus/minus, pi, sine and subseteq expand with Space.'
   $domainFixture=Join-Path (Split-Path $exe) 'graph-domain-smoke.mom'
   $cases=@(
+    @{name='vertical-positive';xmin=-5;xmax=5;ymin=-4;ymax=4;formula='<var t="x" f="00" /><opr s="=" /><var t="3" f="00" />';cx=3;cy=2;vertical=$true},
+    @{name='vertical-negative';xmin=-5;xmax=5;ymin=-4;ymax=4;formula='<var t="x" f="00" /><opr s="=" /><opr s="-" /><var t="2" f="00" />';cx=-2;cy=2;vertical=$true},
+    @{name='vertical-zero';xmin=-5;xmax=5;ymin=-4;ymax=4;formula='<var t="x" f="00" /><opr s="=" /><var t="0" f="00" />';cx=0;cy=2;vertical=$true},
+    @{name='vertical-fraction';xmin=-5;xmax=5;ymin=-4;ymax=4;formula='<var t="x" f="00" /><opr s="=" /><fra E1="n" E2="d"><ex><var t="1" f="00" /></ex><ex><var t="2" f="00" /></ex></fra>';cx=.5;cy=2;vertical=$true},
+    @{name='horizontal-equation';xmin=-5;xmax=5;ymin=-4;ymax=4;formula='<var t="y" f="00" /><opr s="=" /><var t="2" f="00" />';cx=3;cy=2},
     @{name='sinc';xmin=-2.7;xmax=3.3;ymin=-.2;ymax=1.4;formula='<fra E1="n" E2="d"><ex><fun t="sin" f="20" E1=""><ex br="2"><var t="x" f="00" /></ex></fun></ex><ex><var t="x" f="00" /></ex></fra>';hx=0;hy=1},
     @{name='rational';xmin=-3.13;xmax=6.07;ymin=-2;ymax=2;formula='<fra E1="n" E2="d"><ex><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="+" /><var t="2" f="00" /></ex></elm><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="-" /><var t="1" f="00" /></ex></elm></ex><ex><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="+" /><var t="2" f="00" /></ex></elm><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="-" /><var t="5" f="00" /></ex></elm></ex></fra>';hx=-2;hy=(3/7)},
     @{name='power';xmin=-2.7;xmax=3.3;ymin=-.2;ymax=3;formula='<elm tp="3" E1="b" E2="p"><ex><var t="x" f="00" /></ex><ex><fra E1="n" E2="d"><ex><var t="2" f="00" /></ex><ex><var t="3" f="00" /></ex></fra></ex></elm>';cx=-1;cy=1},
@@ -811,6 +816,7 @@ try {
     $domainFixture=Join-Path (Split-Path $exe) ('graph-domain-'+$case.name+'-smoke.mom')
     $axis=@($case.xmin,$case.xmax,$case.ymin,$case.ymax)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
     $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o><o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o></mathomir>'
+    if($case.ContainsKey('vertical')){$xml=$xml.Replace('</subexp></o><o t="1"','</subexp><subexp d="0,0;4000,1000"><ex fh="100"><var t="y" f="00" /><opr s="=" /><var t="1" f="00" /></ex></subexp></o><o t="1"')}
     $label='<o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o>'
     $frame='<o t="2" X="190" Y="185"><dw d="32|0,0;3840,0;:,1920;0,:;:,0" /></o>'
     if($case.name -eq 'rational' -or $case.name -eq 'semicircle'){
@@ -829,6 +835,15 @@ try {
     $area=[MathomirUiProbe]::PlotArea($view)
     if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
     else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
+    if($case.ContainsKey('vertical')){
+      foreach($height in @(-3,0,3)){
+        $px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]))
+        $py=[int]($area[3]-($height-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]))
+        if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Vertical line did not span the plot in $($case.name) at y=$height."}
+      }
+      $px=[int]($area[0]+.8*($area[2]-$area[0]));$py=[int]($area[3]-(1-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]))
+      if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw 'An ordinary horizontal function disappeared beside a vertical line.'}
+    }
     if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw 'Graph repaint covered text placed above the graph.'}
     foreach($position in @(@(350,300),@(465,390),@(850,50))){
       [MathomirUiProbe]::Mouse($view,512,0,$position[0],$position[1])
@@ -876,6 +891,8 @@ try {
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1130),$(if($radian){'pi/6'}else{'30'}))
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1131),$(if($radian){'5*pi/6'}else{'150'}))
     [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1134),334,[int]$radian)|Out-Null
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1140),$(if($radian){'pi/4, -pi/2'}else{'45, -90'}))
+    if([MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1139),240,0) -ne 1){throw 'Unit circle point markers were not enabled by default.'}
     [MathomirUiProbe]::PostMessage($unitDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
     for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($unitDialog)){break}}
     if([MathomirUiProbe]::IsWindowVisible($unitDialog)){throw 'Valid unit circle angles were rejected.'}
@@ -887,10 +904,10 @@ try {
     [xml]$unitSaved=Get-Content $marginFixture -Raw
     $unitObject=$unitSaved.SelectSingleNode('/mathomir/*[last()]')
     if($unitObject.GetAttribute('t') -ne '2' -and $unitObject.GetAttribute('type') -ne '2'){throw 'Unit circle was not placed as a drawing.'}
-    if($unitObject.SelectNodes('.//subexp').Count -lt 4){Write-Output $unitObject.OuterXml;throw 'Unit circle labels and exact coordinates were missing.'}
+    if($unitObject.SelectNodes('.//subexp').Count -lt 8){Write-Output $unitObject.OuterXml;throw 'Unit circle labels and exact coordinates were missing.'}
     if($unitObject.SelectNodes('.//fra | .//elm[@tp="4"]').Count -lt 2){Write-Output $unitObject.OuterXml;throw 'Exact coordinate fractions were not retained.'}
   }
-  Write-Output 'Unit circle maker passed: degree and pi-fraction input, clockwise/counterclockwise choices, native drawing and exact editable coordinate labels.'
+  Write-Output 'Unit circle maker passed: extra point angles, default point markers, degree and pi-fraction input, clockwise/counterclockwise choices, native drawing and exact editable coordinate labels.'
   foreach($preset in @(33053,33054)){
     [MathomirUiProbe]::Send($view,273,$preset)|Out-Null
     [MathomirUiProbe]::Mouse($view,512,0,200,180)
