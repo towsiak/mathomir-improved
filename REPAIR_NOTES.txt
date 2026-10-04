@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 18 — 2026-10-04
+Math-o-mir repair candidate 19 — 2026-10-04
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -271,3 +271,5 @@ V18: Fit width rounds down to keep both paper edges visible and disables horizon
 
 - Very faint dotted bounds appear around the hovered grip target and disappear with its grips.
 - A visible Select all button beside Fit width selects every page object for Delete. Edit > Select all page objects and Ctrl+Shift+A provide the same command; Ctrl+A keeps its existing approximate-equals meaning. Deletion remains undoable.
+
+- Graphs render below page labels and boxes regardless of creation order, including graph hover. Hover range handles request document repaint instead of painting over labels. Windows checks exercise boxed labels before and after graphs and entering/leaving the graph.
