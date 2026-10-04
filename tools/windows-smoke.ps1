@@ -55,6 +55,7 @@ public static class MathomirUiProbe {
   public static bool PageEdgeMarks(IntPtr hwnd){Rect r;GetClientRect(hwnd,out r);IntPtr dc=GetDC(hwnd);try{int left=0,right=0;for(int y=20;y<Math.Min(r.Bottom,350);y++){for(int x=0;x<5;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){left++;break;}}for(int x=Math.Max(0,r.Right-20);x<r.Right;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){right++;break;}}}return left>10 && right>10;}finally{ReleaseDC(hwnd,dc);}}
   public static int[] PlotArea(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int left=102;while(left<250 && GetPixel(dc,left,170)==0xE0E0E0)left++;int bottom=418;while(bottom>300 && GetPixel(dc,170,bottom)==0xE0E0E0)bottom--;return new int[]{left,102,498,bottom};}finally{ReleaseDC(hwnd,dc);}}
   public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
+  public static void DumpRegion(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{StringBuilder text=new StringBuilder();text.Append("GRAPHPIXELS:");for(int j=-10;j<=10;j++)for(int i=-10;i<=10;i++){text.Append(GetPixel(dc,x+i,y+j).ToString("X6"));text.Append(',');}Console.WriteLine(text.ToString());}finally{ReleaseDC(hwnd,dc);}}
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;if(GetPixel(dc,cx,cy)!=0xFFFFFF)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=7;r++){left|=GetPixel(dc,cx-r,cy)==0;right|=GetPixel(dc,cx+r,cy)==0;top|=GetPixel(dc,cx,cy-r)==0;bottom|=GetPixel(dc,cx,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
@@ -814,12 +815,24 @@ try {
     [MathomirUiProbe]::Mouse($view,512,0,850,50)
     Write-Output ('Domain test window: '+[MathomirUiProbe]::Text($main))
     $area=[MathomirUiProbe]::PlotArea($view)
-    if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
+    if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
     else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
     if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw 'Graph repaint covered text placed above the graph.'}
     Write-Output "Native graph domain passed: $($case.name)"
   }
 
+  $selectButton=[MathomirUiProbe]::Child($main,1118)
+  if($selectButton -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($selectButton)){throw 'Visible Select all button is missing.'}
+  [MathomirUiProbe]::Send($selectButton,245,0)|Out-Null
+  [MathomirUiProbe]::Send($view,256,46)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$cleared=Get-Content $domainFixture -Raw
+  if($cleared.SelectNodes('/mathomir/o | /mathomir/obj').Count -ne 0){throw 'Select all followed by Delete left page objects behind.'}
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$restored=Get-Content $domainFixture -Raw
+  if($restored.SelectNodes('/mathomir/o | /mathomir/obj').Count -lt 2){throw 'Undo did not restore objects deleted through Select all.'}
+  Write-Output 'Select all passed: visible button, Delete clears all page objects, Undo restores them.'
   [MathomirUiProbe]::OpenFile($main,$fixture)
   Start-Sleep -Milliseconds 300
   $recoveryFolder=Join-Path $env:LOCALAPPDATA 'MathomirImproved/Recovery'
