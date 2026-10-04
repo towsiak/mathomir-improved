@@ -659,8 +659,33 @@ try {
     if(!$cast){throw "Shortcut $code did not create a math expression."}
     $letters=($cast.SelectNodes('.//var')|ForEach-Object {if($_.HasAttribute("t")){$_.t}else{$_.tx}}) -join ''
     if($letters.Contains($code)){Write-Output $cast.OuterXml;throw "Shortcut $code was left as letters."}
+    $expectedTypes=@{int=7;lim=6;eq=2;sqrt=8;pm=2;sin=6;subseteq=2}
+    if($expectedTypes.ContainsKey($code)) {
+      $type=$expectedTypes[$code];$tag=@{2='opr';6='fun'}[$type]
+      $found=$cast.SelectSingleNode("./elm[@tp='$type']")
+      if(!$found -and $tag){$found=$cast.SelectSingleNode("./$tag")}
+      if(!$found){Write-Output $cast.OuterXml;throw "Shortcut $code lost its native structure."}
+    }
+    if($code -eq 'inf') {
+      $symbol=$cast.SelectSingleNode('./var | ./elm[@tp="1"]')
+      $font=if($symbol.HasAttribute('f')){$symbol.f}else{$symbol.fnt}
+      if($font -ne '60'){Write-Output $cast.OuterXml;throw 'Infinity is not using the native math symbol font.'}
+    }
     if($code -eq 'frac' -and !$cast.SelectSingleNode('./fra | ./elm[@tp="4"]')){Write-Output $cast.OuterXml;throw 'Fraction shortcut lost its structure.'}
     if($code -eq 'vec' -and !$cast.SelectSingleNode('./bra | ./elm[@tp="5"]')){throw 'Vector shortcut lost its editable cells.'}
+    $castY+=35
+  }
+  foreach($word in @('limit','infinite','fraction')) {
+    [MathomirUiProbe]::Mouse($view,512,0,680,$castY)
+    [MathomirUiProbe]::Mouse($view,513,1,680,$castY)
+    [MathomirUiProbe]::Mouse($view,514,0,680,$castY)
+    foreach($character in ($word+' ').ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$character)|Out-Null}
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$wordSaved=Get-Content $fixture -Raw
+    $lastExpression=$wordSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
+    $letters=($lastExpression.SelectNodes('.//var | .//elm[@tp="1"]')|ForEach-Object {if($_.HasAttribute('t')){$_.t}else{$_.tx}}) -join ''
+    if($letters -ne $word){Write-Output $lastExpression.OuterXml;throw "Ordinary name $word was changed by a default cast."}
     $castY+=35
   }
   Write-Output 'Default casts passed: infinity, fraction, integral, limit, vector, equals, root, plus/minus, pi, sine and subseteq expand with Space.'
