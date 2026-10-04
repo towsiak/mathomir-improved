@@ -1,4 +1,4 @@
-Math-o-mir repair candidate 19 — 2026-10-04
+Math-o-mir repair candidate 20 — 2026-10-04
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
 
@@ -273,3 +273,6 @@ V18: Fit width rounds down to keep both paper edges visible and disables horizon
 - A visible Select all button beside Fit width selects every page object for Delete. Edit > Select all page objects and Ctrl+Shift+A provide the same command; Ctrl+A keeps its existing approximate-equals meaning. Deletion remains undoable.
 
 - Graphs render below page labels and boxes regardless of creation order, including graph hover. Hover range handles request document repaint instead of painting over labels. Windows checks exercise boxed labels before and after graphs and entering/leaving the graph.
+
+Print guide: a faint dashed quarter-inch safety inset on every page, enlarged to printer hardware margins measured from a print/preview DC when available. A warning pulses for three seconds when page content crosses the inset and clears when safe. The guide and warning never print.
+Unit circle maker: drawing palette circle icon or Search 'unit circle'; configure start/end angles in degrees or radians (pi/6 etc.), arc direction, radius, angle labels, exact endpoint coordinates, common angle ticks, and an end-angle right triangle. Click OK then click to place; native grips move, scale and rotate the grouped drawing.
