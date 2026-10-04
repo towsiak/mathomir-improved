@@ -657,7 +657,7 @@ try {
     [xml]$castSaved=Get-Content $fixture -Raw
     $cast=$castSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
     if(!$cast){throw "Shortcut $code did not create a math expression."}
-    $letters=($cast.SelectNodes('.//var')|ForEach-Object {$_.t}) -join ''
+    $letters=($cast.SelectNodes('.//var')|ForEach-Object {if($_.HasAttribute("t")){$_.t}else{$_.tx}}) -join ''
     if($letters.Contains($code)){Write-Output $cast.OuterXml;throw "Shortcut $code was left as letters."}
     if($code -eq 'frac' -and !$cast.SelectSingleNode('./fra | ./elm[@tp="4"]')){Write-Output $cast.OuterXml;throw 'Fraction shortcut lost its structure.'}
     if($code -eq 'vec' -and !$cast.SelectSingleNode('./bra | ./elm[@tp="5"]')){throw 'Vector shortcut lost its editable cells.'}
