@@ -191,7 +191,7 @@ index 209a634..099b0f6 100644
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..b564441 100644
+index 531282c..bafe2a4 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -425,7 +425,7 @@ index 531282c..b564441 100644
  	if (m_KeyboardCursorPos>23) m_KeyboardCursorPos=23;
  	
  
-+    if(nChar==' ' && ExpandDefaultMathCast(DC,zoom,fcolor))return 1;
++    if(nChar==' ' && is_external!=0 && ExpandDefaultMathCast(DC,zoom,fcolor))return 1;
 +
  	//m_IsKeyboardEntry contains ordinal number (with offset +1) of the element that 
  	//is being edited. The edited element can only be variable (type==1)
