@@ -3023,7 +3023,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..0a3f7ca 100644
+index fc832eb..ec166ae 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -5527,7 +5527,7 @@ index fc832eb..0a3f7ca 100644
 +    int root=fabs(value-.5)<1e-8?0:fabs(value-sqrt(.5))<1e-8?2:fabs(value-sqrt(3.)/2)<1e-8?3:-1;
 +    if(root>=0)
 +    {
-+        label->InsertEmptyElement(p,4,0);CExpression *n=(CExpression*)label->m_pElementList[p].pElementObject->Expression1,*d=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;
++        p=label->InsertEmptyElement(p,4,0);CExpression *n=(CExpression*)label->m_pElementList[p].pElementObject->Expression1,*d=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;
 +        n->DeleteElement(0);d->DeleteElement(0);
 +        if(root){n->InsertEmptyElement(0,8,1);CExpression *r=(CExpression*)n->m_pElementList[0].pElementObject->Expression1;r->DeleteElement(0);r->InsertEmptyElement(0,1,'0'+root);}else n->InsertEmptyElement(0,1,'1');
 +        d->InsertEmptyElement(0,1,'2');
@@ -5544,9 +5544,9 @@ index fc832eb..0a3f7ca 100644
 +    if(!numerator){label->InsertEmptyElement(0,1,'0');return;}
 +    if(numerator<0){label->InsertEmptyElement(0,2,'-');numerator=-numerator;}
 +    CExpression *n=label;
-+    if(denominator>1){int p=label->m_NumElements;label->InsertEmptyElement(p,4,0);n=(CExpression*)label->m_pElementList[p].pElementObject->Expression1;CExpression *d=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;n->DeleteElement(0);d->DeleteElement(0);d->GenerateASCIINumber(denominator,denominator,0,0,0);}
++    if(denominator>1){int p=label->m_NumElements;p=label->InsertEmptyElement(p,4,0);n=(CExpression*)label->m_pElementList[p].pElementObject->Expression1;CExpression *d=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;n->DeleteElement(0);d->DeleteElement(0);d->GenerateASCIINumber(denominator,denominator,0,0,0);}
 +    if(numerator!=1)n->GenerateASCIINumber(numerator,numerator,0,0,n->m_NumElements);
-+    int p=n->m_NumElements;n->InsertEmptyElement(p,1,'p');n->m_pElementList[p].pElementObject->Data2[0]=0x60;
++    int p=n->m_NumElements;p=n->InsertEmptyElement(p,1,'p');n->m_pElementList[p].pElementObject->Data2[0]=0x60;
 +}
 +void CMathomirView::OnUnitCircle()
 +{
