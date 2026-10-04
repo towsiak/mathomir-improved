@@ -2542,7 +2542,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..70e09c0 100644
+index fc832eb..b2b3cef 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3098,6 +3098,18 @@ index fc832eb..70e09c0 100644
 +        if (!(nFlags&MK_LBUTTON)) EndGripMove(false);
 +        return;
 +    }
++    if (MouseSizingActive)
++    {
++        if (GetCapture()!=this) { EndMouseSizing(true); return; }
++        if (!(nFlags&MK_LBUTTON)) { EndMouseSizing(false); return; }
++        UpdateMouseSizing(point,nFlags); return;
++    }
++	if (MouseRotationActive)
++	{
++		if (GetCapture()!=this) { EndMouseRotation(true); return; }
++		if (!(nFlags&MK_LBUTTON)) { EndMouseRotation(false); return; }
++		UpdateMouseRotation(point,nFlags); return;
++	}
 +    tDocumentStruct *moveHover=ResizeHandleDocument();
 +    if (moveHover && !IsDrawingMode && !ViewOnlyMode)
 +    {
@@ -3105,12 +3117,6 @@ index fc832eb..70e09c0 100644
 +        CPoint lower=LowerMoveGripPoint(moveHover);
 +        if ((abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9) || (abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9))
 +        { SetCursor(::LoadCursor(NULL,IDC_SIZEALL)); return; }
-+    }
-+    if (MouseSizingActive)
-+    {
-+        if (GetCapture()!=this) { EndMouseSizing(true); return; }
-+        if (!(nFlags&MK_LBUTTON)) { EndMouseSizing(false); return; }
-+        UpdateMouseSizing(point,nFlags); return;
 +    }
 +    tDocumentStruct *sizingObject=ResizeHandleDocument();
 +    if (sizingObject && !IsDrawingMode && !ViewOnlyMode)
@@ -3120,12 +3126,6 @@ index fc832eb..70e09c0 100644
 +        { SetCursor(::LoadCursor(NULL,IDC_SIZENWSE)); return; }
 +    }
 +
-+	if (MouseRotationActive)
-+	{
-+		if (GetCapture()!=this) { EndMouseRotation(true); return; }
-+		if (!(nFlags&MK_LBUTTON)) { EndMouseRotation(false); return; }
-+		UpdateMouseRotation(point,nFlags); return;
-+	}
 +	tDocumentStruct *rotationObject=RotationHandleDocument();
 +	if (rotationObject && !IsDrawingMode)
 +	{
