@@ -5055,7 +5055,7 @@ index 05446cf..f4cfcd9 100644
 +#define ID_DRAW_RECTANGLE 33049
 +#define ID_DRAW_ELLIPSE 33050
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..b28edaa 100644
+index b9c3f38..169f9ce 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -5493,8 +5493,8 @@ index b9c3f38..b28edaa 100644
 +            {"mat",5,145,false},
 +            {"mat3",5,162,false},
 +            {"eq",2,61,false},
-+            {"inf",1,165,false},
-+            {"infty",1,165,false},
++            {"inf",1,165,true},
++            {"infty",1,165,true},
 +            {"pi",1,112,true},
 +            {"pm",2,177,false},
 +            {"mp",2,178,false},
