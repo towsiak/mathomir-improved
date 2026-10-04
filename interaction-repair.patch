@@ -2544,7 +2544,7 @@ index 0000000..6965d76
 +}
 +}
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
-index f751ecf..4352081 100644
+index f751ecf..d8a8535 100644
 --- a/Mathomir/MainFrm.cpp
 +++ b/Mathomir/MainFrm.cpp
 @@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
@@ -2574,7 +2574,16 @@ index f751ecf..4352081 100644
  }
  
  //we are going to disable Main Menu activation throught the ALT key
-@@ -890,6 +901,7 @@ int CMainFrame::ClearDocument(void)
+@@ -870,6 +881,8 @@ int CMainFrame::MyBitBlt(CDC * DC, int X, int Y, int width, int height, int Xsrc
+ //clears the entire document (like File->New)
+ int CMainFrame::ClearDocument(void)
+ {
++    // Hover entries point into TheDocument: clear them before freeing its storage.
++    SpecialDrawingHover=prevSpecialDrawingHover=NULL;
+ 	int i;
+ 	if (TheDocument)
+ 	{
+@@ -890,6 +903,7 @@ int CMainFrame::ClearDocument(void)
  		free(TheDocument);
  	}
  	NumDocumentElements=0;
@@ -2582,7 +2591,7 @@ index f751ecf..4352081 100644
  	NumDocumentElementsReserved=10;
  	TheDocument=(tDocumentStruct*)malloc(10*sizeof(tDocumentStruct));
  	ViewX=ViewY=0;
-@@ -1188,7 +1200,12 @@ int CMainFrame::AdjustMenu(int adjust_undo_only)
+@@ -1188,7 +1202,12 @@ int CMainFrame::AdjustMenu(int adjust_undo_only)
  	theMenu->CheckMenuItem(ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS120,(DefaultZoom==120)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS100,(DefaultZoom==100)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZEANDDEFAULTZOOM_DEFAULTZOOMIS80,(DefaultZoom==80)?MF_CHECKED:MF_UNCHECKED);
@@ -2596,7 +2605,7 @@ index f751ecf..4352081 100644
  	theMenu->CheckMenuItem(ID_FONTSIZE_LARGE,(DefaultFontSize==120)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_NORMAL,(DefaultFontSize==100)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_SMALL,(DefaultFontSize==85)?MF_CHECKED:MF_UNCHECKED);
-@@ -1305,6 +1322,8 @@ int CMainFrame::UndoEnableSaving()
+@@ -1305,6 +1324,8 @@ int CMainFrame::UndoEnableSaving()
  }
  
  extern DWORD AutosavePoints;
@@ -2605,7 +2614,7 @@ index f751ecf..4352081 100644
  
  
  //saves undo information (saves the current sate of documment)
-@@ -1322,6 +1341,7 @@ int CMainFrame::UndoSave(char * text,int unique_ID)
+@@ -1322,6 +1343,7 @@ int CMainFrame::UndoSave(char * text,int unique_ID)
  
  	int i;
  	AutosavePoints++;  //for the autosave function
@@ -2613,7 +2622,7 @@ index f751ecf..4352081 100644
  
  	if (pMainViewBase)
  	{
-@@ -1471,6 +1491,7 @@ int CMainFrame::UndoRestore()
+@@ -1471,6 +1493,7 @@ int CMainFrame::UndoRestore()
  		pDoc->SetModifiedFlag(1);
  	}
  
