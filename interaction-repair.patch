@@ -2553,7 +2553,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..1d60dcd 100644
+index fc832eb..d7262d7 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3024,6 +3024,15 @@ index fc832eb..1d60dcd 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
+@@ -2051,7 +2335,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ 		//ds->absolute_Y=AbsoluteY;
+ 		//ds->Type=1; //expression
+ 		ds->Object=(CObject*)new CExpression(NULL,NULL,DefaultFontSize);
+-		if (RootObjectCopy==ClipboardExpression->CalcChecksum())
++		if ((RootObjectCopy==-1 || RootObjectCopy==ClipboardExpression->CalcChecksum()))
+ 		{
+ 			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
+ 			//((CExpression*)(ds->Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
 @@ -2169,12 +2453,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
@@ -3308,6 +3317,15 @@ index fc832eb..1d60dcd 100644
  			this->SetFocus();
  			return;
  		}
+@@ -5168,7 +5523,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+ 						short l,a=0,b;
+ 						//TheDocument[NumDocumentElements-1].Type=1;
+ 						TheDocument[NumDocumentElements-1].Object=(CObject*)(new CExpression(NULL,NULL,DefaultFontSize));
+-						if (RootObjectCopy==ClipboardExpression->CalcChecksum())
++						if ((RootObjectCopy==-1 || RootObjectCopy==ClipboardExpression->CalcChecksum()))
+ 						{
+ 							((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSize=RootObjectFontSize;
+ 							//((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
 @@ -5360,7 +5715,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
@@ -4747,7 +4765,7 @@ index fc832eb..1d60dcd 100644
 +    if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}
 +    if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
 +    CDC *dc=GetDC();short length,above,below;table->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
-+    ClipboardExpression=table;RootObjectCopy=table->CalcChecksum();RootObjectFontSize=dialog.font;
++    ClipboardExpression=table;RootObjectCopy=-1;RootObjectFontSize=dialog.font; // configured font must survive preview layout changes
 +    IsDrawingMode=0;MouseMode=0;
 +    SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
 +}
