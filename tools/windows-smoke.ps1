@@ -48,7 +48,10 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern bool GetKeyboardState(byte[] state);
   [DllImport("user32.dll")] static extern bool SetKeyboardState(byte[] state);
   public static void ShiftKey(IntPtr hwnd,int key) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share selection key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[16]=128;SetKeyboardState(state);try{UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)key,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Selection arrow did not respond");}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
-  public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
+  [StructLayout(LayoutKind.Sequential)] struct Point {public int X,Y;}
+  [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr hwnd,ref Point point);
+  [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
+  public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { if(msg==512 && flags==0){Point point=new Point{X=x,Y=y};ClientToScreen(hwnd,ref point);SetCursorPos(point.X,point.Y);} UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   [DllImport("user32.dll")] static extern IntPtr GetMenu(IntPtr hwnd);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetMenuString(IntPtr menu,uint id,StringBuilder text,int count,uint flags);
   public static string MenuText(IntPtr hwnd,uint id) {var text=new StringBuilder(256);GetMenuString(GetMenu(hwnd),id,text,256,0);return text.ToString();}
