@@ -217,7 +217,7 @@ improved with candidate 5; printer-tab/Cancel behavior still needs confirmation.
 Printer-driver initialization may still cause preview delays.
 Existing document format and upstream MIT license retained.
 
-VERSIONED CRASH RECOVERY (v14)
+VERSIONED CRASH RECOVERY (v15)
 Recovery runs automatically, independent of the old Never/Low/Medium/High setting.
 Normally writes about one second after edits stop, or every five seconds during
 continuous editing. Active move/resize/rotate gestures and running graph workers
@@ -245,3 +245,15 @@ Choose one, then click in the document to place it. Open endpoints have hollow
 circles; included endpoints have filled dots. The interval is a heavier line,
 with thin number-line extensions and arrows. Labels a and b are editable text.
 Move, resize, rotate, save and reopen these as ordinary drawing objects.
+
+V15 TABLE AND PALETTE TOOLS
+The brace/arrow drawing palette now includes a table-grid icon and four
+interval icons. Table opens setup first: 1-20 rows, 1-12 columns (at least
+two cells), 40-800% font size, alignment, and all/outer/header/no borders.
+Choose Place table, then click in the document. Cells use the native table
+editor for text and equations, and expand with their contents. Search 'table'
+also opens setup. The four interval icons use the same templates as Search.
+A second move grip is 22 screen pixels right and 12 pixels below the resize
+corner. Both move grips take priority over ordinary object clicks.
+Grips disappear when the pointer leaves the object/grip area or document view,
+except during an active move, resize or rotate drag.
