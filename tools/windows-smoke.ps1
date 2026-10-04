@@ -591,16 +591,16 @@ try {
   [xml]$decimalSaved=Get-Content -LiteralPath $fixture -Raw
   $decimalMinimum=$decimalSaved.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
   if ($decimalMinimum.alig -eq '2' -or $decimalMinimum.alig -eq '1') { throw 'Decimal graph mode did not restore linear labels.' }
-  [MathomirUiProbe]::Mouse($view,512,0,480,410)
-  [MathomirUiProbe]::Mouse($view,513,1,480,410)
-  [MathomirUiProbe]::Mouse($view,514,0,480,410)
+  [MathomirUiProbe]::Mouse($view,512,0,450,410)
+  [MathomirUiProbe]::Mouse($view,513,1,450,410)
+  [MathomirUiProbe]::Mouse($view,514,0,450,410)
   Start-Sleep -Milliseconds 500
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$buttonPi=Get-Content -LiteralPath $fixture -Raw
   if($buttonPi.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]').alig -ne '2'){throw 'The graph pi/decimal button did not enable pi fractions.'}
-  [MathomirUiProbe]::Mouse($view,512,0,480,410)
-  [MathomirUiProbe]::Mouse($view,513,1,480,410)
-  [MathomirUiProbe]::Mouse($view,514,0,480,410)
+  [MathomirUiProbe]::Mouse($view,512,0,450,410)
+  [MathomirUiProbe]::Mouse($view,513,1,450,410)
+  [MathomirUiProbe]::Mouse($view,514,0,450,410)
   Start-Sleep -Milliseconds 500
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$buttonDecimal=Get-Content -LiteralPath $fixture -Raw
