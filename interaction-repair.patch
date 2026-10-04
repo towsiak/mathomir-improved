@@ -2518,7 +2518,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..3cec3de 100644
+index fc832eb..cff9300 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4550,7 +4550,7 @@ index fc832eb..3cec3de 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10965,3 +12306,45 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12306,47 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -4593,7 +4593,9 @@ index fc832eb..3cec3de 100644
 +        CExpression label(NULL,NULL,100); label.InsertEmptyElement(0,1,end?'b':'a');
 +        drawing->CopyExpressionIntoSubgroup(&label,x-4,y+12,0,0);
 +    }
-+    ClipboardDrawing=drawing; IsDrawingMode=0; MouseMode=0; MovingStartX=MovingStartY=-1;
++    ClipboardDrawing=new CDrawing();
++    ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0); delete drawing;
++    IsDrawingMode=0; MouseMode=0; MovingStartX=MovingStartY=0;
 +    SetFocus(); RepaintTheView(); SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
 +}
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
