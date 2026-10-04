@@ -50,6 +50,8 @@ public static class MathomirUiProbe {
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
+  [DllImport("user32.dll")] static extern IntPtr GetFocus();
+  public static IntPtr Focus(IntPtr hwnd){uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not inspect keyboard focus");try{return GetFocus();}finally{AttachThreadInput(current,target,false);}}
   [DllImport("user32.dll")] static extern bool AttachThreadInput(uint current,uint target,bool attach);
   [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
   [DllImport("user32.dll")] static extern bool GetKeyboardState(byte[] state);
@@ -576,6 +578,26 @@ try {
   if ([MathomirUiProbe]::Send($list,395,0) -lt 2) { throw 'Smart sizing commands are missing from search.' }
   [MathomirUiProbe]::SetText($search,'pi fractions')
   if ([MathomirUiProbe]::Send($list,395,0) -lt 1) { throw 'Pi graph labels are missing from search.' }
+  [MathomirUiProbe]::SetText($search,'use degrees')
+  [MathomirUiProbe]::Mouse($list,513,1,20,8)
+  [MathomirUiProbe]::Mouse($list,514,0,20,8)
+  Start-Sleep -Milliseconds 800
+  if([MathomirUiProbe]::IsWindowVisible($popup)){throw 'Search dropdown reopened after choosing a result.'}
+  if([MathomirUiProbe]::Focus($main) -ne $view){throw 'Search result did not leave keyboard focus on the page.'}
+  [MathomirUiProbe]::Mouse($view,512,0,650,450)
+  Start-Sleep -Milliseconds 500
+  if([MathomirUiProbe]::Focus($main) -ne $view){throw 'Keyboard focus jumped back into Search after moving across the page.'}
+  [MathomirUiProbe]::Send($main,273,33007)|Out-Null
+  [MathomirUiProbe]::SetText($search,'about')
+  [MathomirUiProbe]::Mouse($list,513,1,20,8)
+  [MathomirUiProbe]::Mouse($list,514,0,20,8)
+  $searchAbout=[IntPtr]::Zero
+  for($attempt=0;$attempt -lt 30;$attempt++){Start-Sleep -Milliseconds 100;$searchAbout=[MathomirUiProbe]::Window($appProcess.Id,'About Math-o-mir Improved');if($searchAbout -ne [IntPtr]::Zero){break}}
+  if($searchAbout -eq [IntPtr]::Zero){throw 'Search could not open the About dialog.'}
+  [MathomirUiProbe]::PostMessage($searchAbout,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+  Start-Sleep -Milliseconds 800
+  if([MathomirUiProbe]::IsWindowVisible($popup) -or [MathomirUiProbe]::Focus($main) -ne $view){throw 'Closing a searched dialog returned focus to Search.'}
+  Write-Output 'Search focus passed: mouse choice returns to page, remains there after pointer movement, and stays there after closing a searched dialog.'
   [MathomirUiProbe]::Send($main,273,33010) | Out-Null
   $mode=[MathomirUiProbe]::Child($main,1115)
   if ([MathomirUiProbe]::Text($mode) -ne 'DEG') { throw 'Angle mode button did not update to DEG.' }
