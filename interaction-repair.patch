@@ -2553,7 +2553,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..545c70d 100644
+index fc832eb..1d60dcd 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4649,7 +4649,7 @@ index fc832eb..545c70d 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10965,3 +12370,111 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12370,113 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -4726,6 +4726,7 @@ index fc832eb..545c70d 100644
 +void CMathomirView::OnInsertTable()
 +{
 +    if(ViewOnlyMode)return;
++    OnChar(27,1,0);
 +    CTableSetupDialog dialog;
 +    if(dialog.DoModal()!=IDOK)return;
 +    CExpression *table=new CExpression(NULL,NULL,dialog.font);
@@ -4745,6 +4746,7 @@ index fc832eb..545c70d 100644
 +    RestoreClipboardBackground();
 +    if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}
 +    if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
++    CDC *dc=GetDC();short length,above,below;table->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
 +    ClipboardExpression=table;RootObjectCopy=table->CalcChecksum();RootObjectFontSize=dialog.font;
 +    IsDrawingMode=0;MouseMode=0;
 +    SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
