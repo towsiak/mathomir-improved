@@ -191,7 +191,7 @@ index 209a634..099b0f6 100644
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..6752a27 100644
+index 531282c..1da5931 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -675,24 +675,32 @@ index 531282c..6752a27 100644
  				exxp++;
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
-@@ -17204,6 +17388,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17177,6 +17361,15 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  
- 	double ArgVal;
- 	double ExpVal;
+ 	CExpression *exp=(CExpression*)(ts->pElementObject->Expression2);
+ 	CExpression *arg=(CExpression*)(ts->pElementObject->Expression1);
++    // Keep the exact fraction before Compute turns it into a floating value.
 +    double rationalNumerator=0,rationalDenominator=0;
- 	int is_argument_pure=0;
- 	int is_exponent_pure=0;
- 	int arg_prec;
-@@ -17223,7 +17408,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
++    if(is_call_from_ploter)
++    {
++        CExpression exact(NULL,NULL,100);exact.CopyExpression(exp,0);
++        tPureFactors factors;factors.N1=factors.N2=1;factors.is_frac1=0;factors.prec1=0;
++        if(exact.StrikeoutCommonFactors(0,exact.m_NumElements-1,1,NULL,0,0,1,&factors))
++        {rationalNumerator=factors.N1;rationalDenominator=factors.N2;ReduceTwoNumbers(&rationalNumerator,&rationalDenominator);}
++    }
+ 
+ 	//take care about exponent
+ 
+@@ -17223,7 +17416,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  		PF.prec1=0;
  		ret=exp->StrikeoutCommonFactors(0,exp->m_NumElements-1,1,NULL,0,0,1,&PF);
  		exp->StrikeoutRemove(0,exp->m_NumElements-1);
 -		if (ret) {is_exponent_pure=1;ExpVal=PF.N1/PF.N2;exp_prec=PF.prec1;}
-+		if (ret) {is_exponent_pure=1;ExpVal=PF.N1/PF.N2;exp_prec=PF.prec1;rationalNumerator=PF.N1;rationalDenominator=PF.N2;ReduceTwoNumbers(&rationalNumerator,&rationalDenominator);}
++		if (ret) {is_exponent_pure=1;ExpVal=PF.N1/PF.N2;exp_prec=PF.prec1;if(rationalDenominator==0){rationalNumerator=PF.N1;rationalDenominator=PF.N2;ReduceTwoNumbers(&rationalNumerator,&rationalDenominator);}}
  	}
  	else
  	{
-@@ -17335,7 +17520,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17335,7 +17528,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  				}
  
  				double Re,Im=0;
@@ -710,7 +718,7 @@ index 531282c..6752a27 100644
  				{
  					//result might be imaginary number
  					precision2++;
-@@ -24194,6 +24388,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
+@@ -24194,6 +24396,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
  
  	CExpression *arg=(CExpression*)((m_pElementList+Position)->pElementObject->Expression1);
  	if (!arg) return 0;
@@ -749,7 +757,7 @@ index 531282c..6752a27 100644
  
  	{
  		int cnt=0;
-@@ -24454,6 +24680,7 @@ computesincos_end:
+@@ -24454,6 +24688,7 @@ computesincos_end:
  		if (rval)
  		{
  			double N=PF.N1/PF.N2;
@@ -757,7 +765,7 @@ index 531282c..6752a27 100644
  			int prec=PF.prec1;
  			{
  				if (fabs(N)<1e-100)
-@@ -24477,6 +24704,7 @@ computesincos_end:
+@@ -24477,6 +24712,7 @@ computesincos_end:
  				if (function_type)
  				{
  					int is_ok=0;
@@ -765,7 +773,7 @@ index 531282c..6752a27 100644
  					if (function_type==1) {res=sin(N);is_ok=1;}
  					if (function_type==2) {res=cos(N);is_ok=1;}
  					if (function_type==3) {res=tan(N);is_ok=1;}
-@@ -24484,8 +24712,9 @@ computesincos_end:
+@@ -24484,8 +24720,9 @@ computesincos_end:
  					if (function_type==5) {res=1.0/cos(N);is_ok=1;} //secant
  					if (function_type==6) {res=1.0/sin(N);is_ok=1;} //cosecant
  
@@ -776,7 +784,7 @@ index 531282c..6752a27 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -24552,11 +24781,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+@@ -24552,11 +24789,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
  					if (function_type==1) {res=asin(N);is_ok=1;} //arcsin
  					if (function_type==2) {res=acos(N);is_ok=1;} //arccos
  					if (function_type==3) {res=atan(N);is_ok=1;} //arctan
@@ -791,7 +799,7 @@ index 531282c..6752a27 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -25178,7 +25408,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
+@@ -25178,7 +25416,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
  	return 1;
  }
  //int sshit=0;
@@ -800,7 +808,7 @@ index 531282c..6752a27 100644
  {
  	if (wwwwxxxx==0) {InitializeCriticalSection(&section3);wwwwxxxx=1;}
  	int cntrr=0;
-@@ -25191,7 +25421,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25191,7 +25429,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  
  	//first replace all variables with the given value
  
@@ -809,7 +817,7 @@ index 531282c..6752a27 100644
  
  	try
  	{
-@@ -25295,7 +25525,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25295,7 +25533,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  		LeaveCriticalSection(&section3);
  		return retval;
  	}
