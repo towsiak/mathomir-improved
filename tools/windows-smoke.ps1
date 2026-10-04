@@ -48,6 +48,10 @@ public static class MathomirUiProbe {
   public static Rect WindowRect(IntPtr hwnd){Rect rect;GetWindowRect(hwnd,out rect);return rect;}
   public static void Resize(IntPtr hwnd,Rect rect,int delta){int width=Math.Min(GetSystemMetrics(0),rect.Right-rect.Left+delta);int left=Math.Max(0,Math.Min(rect.Left,GetSystemMetrics(0)-width));if(!MoveWindow(hwnd,left,rect.Top,width,rect.Bottom-rect.Top,true))throw new Exception("Could not resize window");}
   public static bool WhiteWidth(IntPtr hwnd){Rect rect;GetClientRect(hwnd,out rect);IntPtr dc=GetDC(hwnd);try{uint a=GetPixel(dc,3,100),b=GetPixel(dc,rect.Right-3,100),c=GetPixel(dc,rect.Right-3,200);Console.WriteLine("Paper pixel probe: width="+rect.Right+", left="+a.ToString("X")+", right="+b.ToString("X")+","+c.ToString("X"));return a==0xFFFFFF && b==0xFFFFFF && c==0xFFFFFF;}finally{ReleaseDC(hwnd,dc);}}
+  [StructLayout(LayoutKind.Sequential)] struct ScrollInfo {public uint Size,Mask;public int Min,Max;public uint Page;public int Pos,Track;}
+  [DllImport("user32.dll")] static extern bool GetScrollInfo(IntPtr hwnd,int bar,ref ScrollInfo info);
+  public static bool HorizontalTravel(IntPtr hwnd){ScrollInfo info=new ScrollInfo();info.Size=(uint)Marshal.SizeOf(typeof(ScrollInfo));info.Mask=7;if(!GetScrollInfo(hwnd,0,ref info))throw new Exception("Could not inspect horizontal scrollbar");return info.Max-info.Min-Math.Max(0,(int)info.Page-1)>0;}
+  public static bool PageEdgeMarks(IntPtr hwnd){Rect r;GetClientRect(hwnd,out r);IntPtr dc=GetDC(hwnd);try{int left=0,right=0;for(int y=20;y<Math.Min(r.Bottom,350);y++){for(int x=0;x<5;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){left++;break;}}for(int x=Math.Max(0,r.Right-20);x<r.Right;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){right++;break;}}}return left>10 && right>10;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
@@ -375,23 +379,45 @@ try {
   Start-Sleep -Milliseconds 500
   $startupView=[MathomirUiProbe]::Child($main,0xE900)
   if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Startup paper leaves a gray strip at the left or right edge.'}
+  if([MathomirUiProbe]::HorizontalTravel($startupView)){throw 'Fit width leaves horizontal scrolling available.'}
   $fitButton=[MathomirUiProbe]::Child($main,1117)
   if($fitButton -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($fitButton)){throw 'Visible Fit width button is missing.'}
   $originalWindow=[MathomirUiProbe]::WindowRect($main)
   [MathomirUiProbe]::Resize($main,$originalWindow,-170)
   Start-Sleep -Milliseconds 300
   if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Paper width did not follow window resizing.'}
+  if([MathomirUiProbe]::HorizontalTravel($startupView)){throw 'Fit width leaves horizontal scrolling available.'}
   [MathomirUiProbe]::Resize($main,$originalWindow,(1000-($originalWindow.Right-$originalWindow.Left)))
   Start-Sleep -Milliseconds 200
   [MathomirUiProbe]::Send($startupView,273,32778)|Out-Null
   Start-Sleep -Milliseconds 100
   if([MathomirUiProbe]::WhiteWidth($startupView)){throw 'Manual zoom was immediately overridden by auto-fit.'}
+  if(![MathomirUiProbe]::HorizontalTravel($startupView)){throw 'Manual zoom did not restore horizontal scrolling.'}
   [MathomirUiProbe]::Send($fitButton,245,0)|Out-Null
   Start-Sleep -Milliseconds 100
   if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Fit width button did not remove the gray strip.'}
+  if([MathomirUiProbe]::HorizontalTravel($startupView)){throw 'Fit width leaves horizontal scrolling available.'}
   [MathomirUiProbe]::Resize($main,$originalWindow,0)
   Start-Sleep -Milliseconds 300
   if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Fit width mode did not stay active after restoring window size.'}
+  if([MathomirUiProbe]::HorizontalTravel($startupView)){throw 'Restoring the window reactivated horizontal scrolling in Fit width mode.'}
+  [MathomirUiProbe]::Send($startupView,276,3)|Out-Null
+  Start-Sleep -Milliseconds 100
+  if([MathomirUiProbe]::HorizontalTravel($startupView) -or ![MathomirUiProbe]::WhiteWidth($startupView)){throw 'A bottom scrollbar action displaced the fitted page.'}
+  $edgeFixture=Join-Path (Split-Path $exe) 'page-edges-smoke.mom'
+  @'
+<?xml version="1.0"?>
+<mathomir>
+<o t="2" X="16" Y="100"><dw t="21" d="96|0,0;0,6400" /></o>
+<o t="2" X="1213" Y="100"><dw t="21" d="96|0,0;0,6400" /></o>
+</mathomir>
+'@ | Set-Content -LiteralPath $edgeFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$edgeFixture)
+  Start-Sleep -Milliseconds 350
+  [MathomirUiProbe]::Send($fitButton,245,0)|Out-Null
+  Start-Sleep -Milliseconds 150
+  if(![MathomirUiProbe]::PageEdgeMarks($startupView)){throw 'Fit width clipped a marker at the left or right paper edge.'}
+  if([MathomirUiProbe]::HorizontalTravel($startupView)){throw 'Loading a document restored horizontal travel in Fit width mode.'}
   Write-Output 'Page width passed: startup fills between scrollbars, resize follows width, manual zoom remains usable, visible Fit width button restores filling.'
   [MathomirUiProbe]::Send($main,273,32775)|Out-Null
   [MathomirUiProbe]::Send($startupView,276,0)|Out-Null
@@ -618,7 +644,7 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v17' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v18' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 
