@@ -799,13 +799,16 @@ try {
     @{name='semicircle';xmin=-1.7;xmax=1.3;ymin=-.2;ymax=1.4;formula='<elm tp="8" E1=""><ex><var t="1" f="00" /><opr s="-" /><elm tp="3" E1="b" E2="p"><ex><var t="x" f="00" /></ex><ex><var t="2" f="00" /></ex></elm></ex></elm>';cx=1;cy=0}
   )
   foreach($case in $cases){
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    $domainFixture=Join-Path (Split-Path $exe) ('graph-domain-'+$case.name+'-smoke.mom')
     $axis=@($case.xmin,$case.xmax,$case.ymin,$case.ymax)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
     $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;16000,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o><o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o></mathomir>'
     $xml|Set-Content -LiteralPath $domainFixture -Encoding ascii
-    [MathomirUiProbe]::Send($view,258,27)|Out-Null
     [MathomirUiProbe]::OpenFile($main,$domainFixture)
     Start-Sleep -Milliseconds 2000
     [MathomirUiProbe]::Mouse($view,512,0,850,50)
+    Write-Output ('Domain test window: '+[MathomirUiProbe]::Text($main))
     $area=[MathomirUiProbe]::PlotArea($view)
     if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
     else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
