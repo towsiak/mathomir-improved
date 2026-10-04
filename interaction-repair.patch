@@ -2969,7 +2969,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..42f450a 100644
+index fc832eb..6e49559 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3813,7 +3813,15 @@ index fc832eb..42f450a 100644
  	ViewZoom=240;
  	RepaintTheView(1);
  }
-@@ -4457,6 +4817,18 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4373,6 +4733,7 @@ UINT prevChar;
+ char lockRepeat;
+ void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
+ {
++    if(nChar==1 && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))return;
+ 	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
+ 	//initial keyboard testing (determining key codes when the shift key is used)
+ 	//if (keystringmode==2) {keystring3[keystringcnt++]=nChar;return;}
+@@ -4457,6 +4818,18 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -3832,7 +3840,7 @@ index fc832eb..42f450a 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +4844,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +4845,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -3840,7 +3848,7 @@ index fc832eb..42f450a 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5168,7 +5539,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5168,7 +5540,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  						short l,a=0,b;
  						//TheDocument[NumDocumentElements-1].Type=1;
  						TheDocument[NumDocumentElements-1].Object=(CObject*)(new CExpression(NULL,NULL,DefaultFontSize));
@@ -3849,7 +3857,7 @@ index fc832eb..42f450a 100644
  						{
  							((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSize=RootObjectFontSize;
  							//((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -5360,7 +5731,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +5732,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -3858,7 +3866,7 @@ index fc832eb..42f450a 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +5785,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +5786,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -3875,7 +3883,7 @@ index fc832eb..42f450a 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5824,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5825,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -3904,7 +3912,7 @@ index fc832eb..42f450a 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +5915,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +5916,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -3913,7 +3921,7 @@ index fc832eb..42f450a 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6026,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6027,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -3965,7 +3973,7 @@ index fc832eb..42f450a 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5793,7 +6144,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5793,7 +6145,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  							fcolor=Toolbox->GetUniformFormattingColor();
  						}
  						int inserting_position=tmp->m_Selection-1;
@@ -3976,7 +3984,7 @@ index fc832eb..42f450a 100644
  						{
  							QuickTypeUsed=2;
  							LastQuickTypeObject=ds;
-@@ -5836,7 +6189,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6190,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -3985,7 +3993,7 @@ index fc832eb..42f450a 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6471,18 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6472,18 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -4004,7 +4012,7 @@ index fc832eb..42f450a 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +6923,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +6924,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -4039,7 +4047,7 @@ index fc832eb..42f450a 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +7944,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7945,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -4053,7 +4061,7 @@ index fc832eb..42f450a 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8478,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8479,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -4081,7 +4089,7 @@ index fc832eb..42f450a 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +8931,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +8932,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -4092,7 +4100,7 @@ index fc832eb..42f450a 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9778,973 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9779,973 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -5066,7 +5074,7 @@ index fc832eb..42f450a 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10757,108 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10758,108 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -5175,7 +5183,7 @@ index fc832eb..42f450a 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10875,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10876,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -5183,7 +5191,7 @@ index fc832eb..42f450a 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11553,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11554,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -5219,7 +5227,7 @@ index fc832eb..42f450a 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11587,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11588,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -5227,7 +5235,7 @@ index fc832eb..42f450a 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +11702,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +11703,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -5235,7 +5243,7 @@ index fc832eb..42f450a 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12108,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12109,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -5243,7 +5251,7 @@ index fc832eb..42f450a 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12409,149 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12410,149 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
