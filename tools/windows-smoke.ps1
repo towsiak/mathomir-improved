@@ -53,7 +53,7 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern bool GetScrollInfo(IntPtr hwnd,int bar,ref ScrollInfo info);
   public static bool HorizontalTravel(IntPtr hwnd){ScrollInfo info=new ScrollInfo();info.Size=(uint)Marshal.SizeOf(typeof(ScrollInfo));info.Mask=7;if(!GetScrollInfo(hwnd,0,ref info))throw new Exception("Could not inspect horizontal scrollbar");return info.Max-info.Min-Math.Max(0,(int)info.Page-1)>0;}
   public static bool PageEdgeMarks(IntPtr hwnd){Rect r;GetClientRect(hwnd,out r);IntPtr dc=GetDC(hwnd);try{int left=0,right=0;for(int y=20;y<Math.Min(r.Bottom,350);y++){for(int x=0;x<5;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){left++;break;}}for(int x=Math.Max(0,r.Right-20);x<r.Right;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){right++;break;}}}return left>10 && right>10;}finally{ReleaseDC(hwnd,dc);}}
-  public static int[] PlotArea(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int left=102;while(left<250 && GetPixel(dc,left,170)==0xE0E0E0)left++;int bottom=418;while(bottom>300 && GetPixel(dc,170,bottom)==0xE0E0E0)bottom--;return new int[]{left,102,598,bottom};}finally{ReleaseDC(hwnd,dc);}}
+  public static int[] PlotArea(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int left=102;while(left<250 && GetPixel(dc,left,170)==0xE0E0E0)left++;int bottom=418;while(bottom>300 && GetPixel(dc,170,bottom)==0xE0E0E0)bottom--;return new int[]{left,102,498,bottom};}finally{ReleaseDC(hwnd,dc);}}
   public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;if(GetPixel(dc,cx,cy)!=0xFFFFFF)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=7;r++){left|=GetPixel(dc,cx-r,cy)==0;right|=GetPixel(dc,cx+r,cy)==0;top|=GetPixel(dc,cx,cy-r)==0;bottom|=GetPixel(dc,cx,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
@@ -803,9 +803,13 @@ try {
     [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
     $domainFixture=Join-Path (Split-Path $exe) ('graph-domain-'+$case.name+'-smoke.mom')
     $axis=@($case.xmin,$case.xmax,$case.ymin,$case.ymax)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
-    $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;16000,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o><o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o></mathomir>'
+    $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o><o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o></mathomir>'
     $xml|Set-Content -LiteralPath $domainFixture -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$domainFixture)
+    Start-Sleep -Milliseconds 300
+    [MathomirUiProbe]::Send($view,276,4)|Out-Null
+    [MathomirUiProbe]::Send($view,277,4)|Out-Null
+    [MathomirUiProbe]::Send($view,273,32775)|Out-Null
     Start-Sleep -Milliseconds 2000
     [MathomirUiProbe]::Mouse($view,512,0,850,50)
     Write-Output ('Domain test window: '+[MathomirUiProbe]::Text($main))
