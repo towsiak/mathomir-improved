@@ -451,6 +451,15 @@ try {
   $cancelledSize=if ($cancelledExpression.HasAttribute('fh')) {[int]$cancelledExpression.fh} else {[int]$cancelledExpression.fnt_h}
   if ($cancelledSize -ne 100) { throw "Escape did not restore the original font size: $cancelledSize." }
   Write-Output 'Resize regression passed: 30 identical drag events do not compound size, grip stays at the object corner, nested root stays proportional, release stops growth, Undo and Escape restore size.'
+  for($x=105;$x -le 190;$x+=5){[MathomirUiProbe]::Mouse($view,512,0,$x,140)}
+  [MathomirUiProbe]::SizeGrip($view)|Out-Null
+  [MathomirUiProbe]::Mouse($view,512,0,900,50)
+  Start-Sleep -Milliseconds 100
+  $lingeringGrip=$true
+  try{[MathomirUiProbe]::SizeGrip($view)|Out-Null}catch{$lingeringGrip=$false}
+  if($lingeringGrip){throw 'Object grip lingered after moving the pointer away.'}
+  Write-Output 'Grip hover passed: leaving the object clears its grips.'
+
   [MathomirUiProbe]::Mouse($view,513,1,130,125)
   [MathomirUiProbe]::Mouse($view,514,0,130,125)
   [MathomirUiProbe]::Mouse($view,515,1,130,125)
