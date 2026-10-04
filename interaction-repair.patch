@@ -2099,7 +2099,7 @@ index f751ecf..4352081 100644
  	//only objects that were modified are deleted and (latter) recreated,
  	//objects that were not modified are not touched by undo restore.
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..aec7336 100644
+index bdcebb4..be9c01e 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -2127,8 +2127,8 @@ index bdcebb4..aec7336 100644
 -    LTEXT           "This software is free. You are welcome to use,",IDC_STATIC,43,65,185,8
 -    LTEXT           "reuse, copy, modify, distribute, rebrand...",IDC_STATIC,44,74,171,12
 +    ICON IDR_MAINFRAME, IDC_STATIC, 12, 12, 20, 20
-+    LTEXT "Math-o-mir Improved - v15", IDC_STATIC, 44, 12, 260, 14
-+    LTEXT "Windows build: 2026-10-03 | Version 2.1.15.0", IDC_STATIC, 44, 29, 260, 12
++    LTEXT "Math-o-mir Improved - v16", IDC_STATIC, 44, 12, 260, 14
++    LTEXT "Windows build: 2026-10-03 | Version 2.1.16.0", IDC_STATIC, 44, 29, 260, 12
 +    LTEXT "Based on Math-o-mir 2.1 beta5.", IDC_STATIC, 12, 49, 296, 12
 +    LTEXT "Original author: Danijel Gorupec. Original MIT license retained.", IDC_STATIC, 12, 65, 296, 24
 +    LTEXT "Improved fork: towsiak / mathomir-improved on GitHub.", IDC_STATIC, 12, 89, 296, 12
@@ -2274,8 +2274,8 @@ index bdcebb4..aec7336 100644
  VS_VERSION_INFO VERSIONINFO
 - FILEVERSION 2,1,0,4
 - PRODUCTVERSION 2,1,0,4
-+ FILEVERSION 2,1,15,0
-+ PRODUCTVERSION 2,1,15,0
++ FILEVERSION 2,1,16,0
++ PRODUCTVERSION 2,1,16,0
   FILEFLAGSMASK 0x3fL
  #ifdef _DEBUG
   FILEFLAGS 0x1L
@@ -2285,14 +2285,14 @@ index bdcebb4..aec7336 100644
          BEGIN
 -            VALUE "FileDescription", "Math-o-mir, the mathematical notepad."
 -            VALUE "FileVersion", "2.1"
-+            VALUE "FileDescription", "Math-o-mir Improved v15, the mathematical notepad."
-+            VALUE "FileVersion", "2.1.15.0"
++            VALUE "FileDescription", "Math-o-mir Improved v16, the mathematical notepad."
++            VALUE "FileVersion", "2.1.16.0"
              VALUE "InternalName", "mathomir.exe"
              VALUE "OriginalFilename", "mathomir.exe"
 -            VALUE "ProductName", "Math-o-mir"
 -            VALUE "ProductVersion", "2.1"
 +            VALUE "ProductName", "Math-o-mir Improved"
-+            VALUE "ProductVersion", "2.1.15.0"
++            VALUE "ProductVersion", "2.1.16.0"
          END
      END
      BLOCK "VarFileInfo"
@@ -2542,7 +2542,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..e1e0d68 100644
+index fc832eb..95067b3 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3322,7 +3322,7 @@ index fc832eb..e1e0d68 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5807,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5807,45 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -3333,6 +3333,23 @@ index fc832eb..e1e0d68 100644
 +            tElementStruct *element=textExpression->m_pElementList+textExpression->m_IsKeyboardEntry-1;
 +            if (element->Type==1 && element->pElementObject && element->pElementObject->m_Text)
 +            { textRun=element->pElementObject; textPosition=textExpression->m_KeyboardCursorPos; previousText=textRun->Data1; }
++        }
++        if(nChar==' ' && !textRun && LastEditedExp2==textExpression && KeystrokesListLen>0 && KeystrokesListLen<16)
++        {
++            char code[17]; memcpy(code,KeystrokesList,KeystrokesListLen);code[KeystrokesListLen]=' ';
++            int length=KeystrokesListLen+1;
++            CExpression *pattern=Toolbox->CheckForKeycodes(code,&length);
++            int first=KeystrokeNumElements[0],last=textExpression->m_IsKeyboardEntry-1;
++            if(pattern && first>=0 && last>=first && last<textExpression->m_NumElements)
++            {
++                UndoSave("Typing shortcut",0);
++                CExpression *copy=new CExpression(NULL,NULL,100);copy->CopyExpression(pattern,0);
++                for(int i=first;i<=last;i++)textExpression->DeleteElement(first);
++                textExpression->InsertEmptyElement(first,1,0);
++                textExpression->m_IsKeyboardEntry=first+1;textExpression->m_KeyboardCursorPos=0;
++                ClipboardExpression=copy;nChar=6;
++                KeystrokesListLen=0;KeystrokesList[0]=0;
++            }
 +        }
  		if (nChar!=-1) ret=((CExpression*)(KeyboardEntryObject))->KeyboardKeyHit(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,1);
 +        if (textRun && KeyboardEntryObject==(CObject*)textExpression && ret==1)
@@ -3351,7 +3368,7 @@ index fc832eb..e1e0d68 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +5898,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +5915,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -3360,7 +3377,7 @@ index fc832eb..e1e0d68 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6009,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6026,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -3412,7 +3429,7 @@ index fc832eb..e1e0d68 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5836,7 +6170,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6187,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -3421,7 +3438,7 @@ index fc832eb..e1e0d68 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6452,18 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6469,18 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -3440,7 +3457,7 @@ index fc832eb..e1e0d68 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +6904,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +6921,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -3475,7 +3492,7 @@ index fc832eb..e1e0d68 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +7925,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7942,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -3489,7 +3506,7 @@ index fc832eb..e1e0d68 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8459,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8476,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -3517,7 +3534,7 @@ index fc832eb..e1e0d68 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +8912,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +8929,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -3528,7 +3545,7 @@ index fc832eb..e1e0d68 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9759,934 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9776,934 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4463,7 +4480,7 @@ index fc832eb..e1e0d68 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10699,108 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10716,108 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4572,7 +4589,7 @@ index fc832eb..e1e0d68 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10817,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10834,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -4580,7 +4597,7 @@ index fc832eb..e1e0d68 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11495,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11512,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -4616,7 +4633,7 @@ index fc832eb..e1e0d68 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10965,3 +12348,99 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12365,99 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -4916,7 +4933,7 @@ index 05446cf..2f603d8 100644
 +#define IDC_TABLE_BORDERS 1124
 +#define IDC_TABLE_ALIGN 1125
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..5246c90 100644
+index b9c3f38..b28edaa 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -5319,7 +5336,105 @@ index b9c3f38..5246c90 100644
  		fread(&MovingDotSize,sizeof(int),1,fil);
  		fread(&MovingDotPermanent,sizeof(int),1,fil);
  		fread(&GRID,sizeof(int),1,fil);
-@@ -6063,6 +6036,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -5853,6 +5826,88 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+ unsigned int DoublestrokesTimer;
+ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+ {
++    // Built-in math casts commit with Space, so longer names remain untouched.
++    // Custom easycasts keep their existing immediate expansion behavior.
++    int builtinLength=*len;
++    if(builtinLength>1 && keystrokes[builtinLength-1]==' ')
++    {
++        struct DefaultCast { const char *name; short type; unsigned char symbol; bool greek; };
++        static const DefaultCast defaults[]={
++            {"lim",6,25,false},
++            {"sin",6,1,false},
++            {"cos",6,2,false},
++            {"tan",6,26,false},
++            {"sec",6,27,false},
++            {"csc",6,29,false},
++            {"ln",6,17,false},
++            {"log",6,19,false},
++
++            {"int",7,73,false},
++            {"iint",7,70,false},
++            {"iiint",7,69,false},
++            {"oint",7,79,false},
++            {"sum",7,83,false},
++            {"prod",7,80,false},
++            {"frac",4,0,false},
++            {"sqrt",8,1,false},
++            {"root",8,0,false},
++            {"vec",5,130,false},
++            {"vec2",5,129,false},
++            {"vec3",5,130,false},
++            {"mat",5,145,false},
++            {"mat3",5,162,false},
++            {"eq",2,61,false},
++            {"inf",1,165,false},
++            {"infty",1,165,false},
++            {"pi",1,112,true},
++            {"pm",2,177,false},
++            {"mp",2,178,false},
++            {"neq",2,185,false},
++            {"leq",2,163,false},
++            {"geq",2,179,false},
++            {"approx",2,187,false},
++            {"times",2,180,false},
++            {"cdot",2,215,false},
++            {"div",2,184,false},
++            {"to",2,174,false},
++            {"cup",2,200,false},
++            {"cap",2,199,false},
++            {"subset",2,204,false},
++            {"subseteq",2,205,false},
++            {"in",2,206,false},
++            {"notin",2,207,false},
++            {"forall",2,34,false},
++            {"exists",2,36,false},
++            {"nabla",2,209,false},
++            {"partial",6,24,false},
++            {"binom",4,32,false},
++            {"case",10,5,false},
++            {"alpha",1,97,true},
++            {"beta",1,98,true},
++            {"gamma",1,103,true},
++            {"delta",1,100,true},
++            {"theta",1,113,true},
++            {"lambda",1,108,true},
++            {"mu",1,109,true},
++            {"sigma",1,115,true},
++            {"omega",1,119,true},
++        };
++        for(int i=0;i<(int)(sizeof(defaults)/sizeof(defaults[0]));i++)
++        {
++            const DefaultCast &cast=defaults[i];
++            int length=(int)strlen(cast.name);
++            if(length!=builtinLength-1 || memcmp(keystrokes,cast.name,length)!=0)continue;
++            static CExpression *templates[sizeof(defaults)/sizeof(defaults[0])]={0};
++            if(!templates[i])
++            {
++                templates[i]=new CExpression(NULL,NULL,100);
++                templates[i]->InsertEmptyElement(0,cast.type,(char)cast.symbol);
++                if(cast.greek)templates[i]->m_pElementList->pElementObject->Data2[0]|=0x60;
++            }
++            return templates[i];
++        }
++        return NULL;
++    }
+ 	//first we check for double-strokes
+ 	int l2=*len;
+ 	if (l2<1) return NULL;
+@@ -5896,7 +5951,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+ 			char *keycode=&ToolboxMembers[i].Keycodes[j][0];
+ 
+ 			int l=(int)strlen(keycode);
+-			if (l<1) continue;
++			if (l<1 || l>l2) continue;
+ 
+ 			if (memcmp(keystrokes+l2-l,keycode,l)==0)
+ 			{
+@@ -6063,6 +6118,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
