@@ -2630,7 +2630,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..750117c 100644
+index fc832eb..a997ff6 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3724,7 +3724,7 @@ index fc832eb..750117c 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9773,945 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9773,956 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -3773,7 +3773,7 @@ index fc832eb..750117c 100644
 +        if (!outside && item<(UINT)GetCount() && GetItemRect(item,&rectangle)!=LB_ERR && rectangle.PtInRect(point))
 +        {
 +            SetCurSel(item);
-+            GetParent()->SendMessage(WM_COMMAND,MAKEWPARAM(IDC_FEATURE_RESULTS,LBN_DBLCLK),(LPARAM)m_hWnd);
++            GetParent()->PostMessage(WM_COMMAND,MAKEWPARAM(IDC_FEATURE_RESULTS,LBN_DBLCLK),(LPARAM)m_hWnd);
 +        }
 +    }
 +    DECLARE_MESSAGE_MAP()
@@ -3923,7 +3923,7 @@ index fc832eb..750117c 100644
 +        DWORD_PTR index=results.GetItemData(row);
 +        if (index>=entries.size()) return;
 +        command=entries[index].command; drawingMode=entries[index].drawingMode;
-+        if (inlineView) { ShowWindow(SW_HIDE); inlineView->RunFeatureCommand(command,drawingMode); }
++        if (inlineView) { inlineView->SetFocus(); ShowWindow(SW_HIDE); inlineView->RunFeatureCommand(command,drawingMode); }
 +        else CDialog::OnOK();
 +    }
 +    virtual void OnCancel() { if (inlineView) { ShowWindow(SW_HIDE); inlineView->SetFocus(); } else CDialog::OnCancel(); }
@@ -3998,7 +3998,10 @@ index fc832eb..750117c 100644
 +    else if (command)
 +    {
 +        if (RotationHandleDocument()) prevTouchedObject=RotationHandleDocument();
-+        theApp.m_pMainWnd->SendMessage(WM_COMMAND,MAKEWPARAM(command,0),0);
++        // Dispatch view commands directly even when a toolbar or popup held focus.
++        SetFocus();
++        if (!OnCmdMsg(command,CN_COMMAND,NULL,NULL))
++            theApp.m_pMainWnd->SendMessage(WM_COMMAND,MAKEWPARAM(command,0),0);
 +    }
 +
 +    SetFocus();
@@ -4034,6 +4037,8 @@ index fc832eb..750117c 100644
 +    CQuickActionBar *bar;
 +    CQuickSearchEdit() : bar(NULL) {}
 +    virtual BOOL PreTranslateMessage(MSG *message);
++    afx_msg void OnLButtonDown(UINT flags,CPoint point);
++    DECLARE_MESSAGE_MAP()
 +};
 +class CQuickActionBar : public CWnd
 +{
@@ -4099,7 +4104,6 @@ index fc832eb..750117c 100644
 +        dropdown.ShowWindow(SW_SHOWNOACTIVATE);
 +    }
 +    afx_msg void Changed() { if (GetFocus()==&search) ShowResults(); }
-+    afx_msg void Focused() { ShowResults(); }
 +    afx_msg void FitWidth() {HideResults();if(view)view->RunFeatureCommand(ID_FIT_PAGE_WIDTH,-1);}
 +    afx_msg void Font() { HideResults(); if (view) view->RunFeatureCommand(ID_FONT_ALL_OBJECTS,-1); }
 +    afx_msg void Rotate() { HideResults(); if (view) view->RunFeatureCommand(ID_ROTATE_WITH_MOUSE,-1); }
@@ -4109,13 +4113,20 @@ index fc832eb..750117c 100644
 +};
 +BEGIN_MESSAGE_MAP(CQuickActionBar,CWnd)
 +    ON_EN_CHANGE(1112,Changed)
-+    ON_EN_SETFOCUS(1112,Focused)
 +    ON_BN_CLICKED(1113,Font)
 +    ON_BN_CLICKED(1114,Rotate)
 +    ON_BN_CLICKED(1115,Mode)
 +    ON_BN_CLICKED(1116,Colors)
 +    ON_BN_CLICKED(1117,FitWidth)
 +END_MESSAGE_MAP()
++BEGIN_MESSAGE_MAP(CQuickSearchEdit,CEdit)
++    ON_WM_LBUTTONDOWN()
++END_MESSAGE_MAP()
++void CQuickSearchEdit::OnLButtonDown(UINT flags,CPoint point)
++{
++    CEdit::OnLButtonDown(flags,point);
++    if (bar) bar->ShowResults();
++}
 +BOOL CQuickSearchEdit::PreTranslateMessage(MSG *message)
 +{
 +    if (message->message==WM_KEYDOWN && bar)
@@ -4670,7 +4681,7 @@ index fc832eb..750117c 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10724,108 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10735,108 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4779,7 +4790,7 @@ index fc832eb..750117c 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10842,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10853,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -4787,7 +4798,7 @@ index fc832eb..750117c 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11520,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11531,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -4823,7 +4834,7 @@ index fc832eb..750117c 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11554,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11565,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -4831,7 +4842,7 @@ index fc832eb..750117c 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +11669,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +11680,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -4839,7 +4850,7 @@ index fc832eb..750117c 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12075,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12086,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -4847,7 +4858,7 @@ index fc832eb..750117c 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12376,131 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12387,131 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
