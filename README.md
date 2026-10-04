@@ -12,7 +12,7 @@ This repository contains modifications to his application; it does not claim aut
 
 ## Repair status
 
-Windows builds are produced through GitHub Actions. v14 includes a permanent feature search, move/resize/rotate grips, larger font choices and smart fitting, RAD/DEG controls, π fraction labels for graph axes, expanded function reference cards, US Letter defaults, and interaction/printing repairs.
+Windows builds are produced through GitHub Actions. v15 includes a permanent feature search, move/resize/rotate grips, larger font choices and smart fitting, RAD/DEG controls, π fraction labels for graph axes, expanded function reference cards, US Letter defaults, and interaction/printing repairs.
 
 The Windows runner verifies startup, search filtering, angle-mode controls, the About box, grip movement with Undo, and typing then finishing an annotation above a root. v13 fixes cumulative resize growth and anchors the grip to the object corner. Resize feel, caret behavior and printer dialogs still need hands-on verification. The reported annotated-root crash has not been reproduced; this build includes a defensive change to hover-reference traversal.
 
@@ -33,3 +33,9 @@ To reopen work after a crash, launch the app and type **recover** in the visible
 Ordinary drawings—including braces, arrows, lines, shapes and groups of drawings—now use the round mouse rotation grip. Hover over the object or use **Rotate**, drag to turn, hold Shift for 15-degree steps, or press Escape to cancel. Nested text labels turn with the diagram. Live graphs, bitmap images and special drawing containers are not included in this geometry rotation.
 
 Search **number line** or **interval** to choose `(a,b)`, `[a,b]`, `(a,b]`, or `[a,b)`, then click to place. The endpoints use hollow circles or filled dots, with editable a/b labels and a thicker interval segment. They can be moved, resized and rotated like other drawing objects.
+
+## Tables and palette shortcuts
+
+The brace/arrow drawing palette has five new icons: a configurable table and the four interval presets. The table dialog sets rows, columns, font size, cell alignment, and full-grid/outer/header/no borders before placement. Choose **Place table**, click in the document, and use the native editable cells for text or equations. Search **table** opens the same setup.
+
+A second move grip sits immediately to the right and slightly below the resize corner. Both move grips take priority over object selection. Grips clear when the pointer leaves the object/grip area or the document view, while active drags retain their handles.
