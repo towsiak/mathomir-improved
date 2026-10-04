@@ -55,6 +55,7 @@ public static class MathomirUiProbe {
   public static int[] PlotArea(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int left=102;while(left<250 && GetPixel(dc,left,170)==0xE0E0E0)left++;int bottom=418;while(bottom>300 && GetPixel(dc,170,bottom)==0xE0E0E0)bottom--;return new int[]{left,102,598,bottom};}finally{ReleaseDC(hwnd,dc);}}
   public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;if(GetPixel(dc,cx,cy)!=0xFFFFFF)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=7;r++){left|=GetPixel(dc,cx-r,cy)==0;right|=GetPixel(dc,cx+r,cy)==0;top|=GetPixel(dc,cx,cy-r)==0;bottom|=GetPixel(dc,cx,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
+  public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
@@ -798,7 +799,7 @@ try {
   )
   foreach($case in $cases){
     $axis=@($case.xmin,$case.xmax,$case.ymin,$case.ymax)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
-    $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;16000,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o></mathomir>'
+    $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;16000,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o><o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o></mathomir>'
     $xml|Set-Content -LiteralPath $domainFixture -Encoding ascii
     [MathomirUiProbe]::Send($view,258,27)|Out-Null
     [MathomirUiProbe]::OpenFile($main,$domainFixture)
@@ -807,9 +808,11 @@ try {
     $area=[MathomirUiProbe]::PlotArea($view)
     if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
     else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
+    if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw 'Graph repaint covered text placed above the graph.'}
     Write-Output "Native graph domain passed: $($case.name)"
   }
 
+  [MathomirUiProbe]::OpenFile($main,$fixture)
   Start-Sleep -Milliseconds 300
   $recoveryFolder=Join-Path $env:LOCALAPPDATA 'MathomirImproved/Recovery'
   $before=@(Get-ChildItem $recoveryFolder -Filter 'Recovery-*.mom' -ErrorAction SilentlyContinue).Count
