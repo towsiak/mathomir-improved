@@ -191,7 +191,7 @@ index 209a634..099b0f6 100644
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..c2649a4 100644
+index 531282c..b564441 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -370,16 +370,7 @@ index 531282c..c2649a4 100644
  	m_Color=-1;
  	m_IsHeadline=0;
  	m_DrawParentheses=0;
-@@ -3987,6 +4081,8 @@ int CExpression::KeyboardStop(void)
- 				e->DeleteElement(e->m_NumElements-1); //remove the last element if it is the newline element
- 	}
- 
-+    if(nChar==' ' && ExpandDefaultMathCast(DC,zoom,fcolor))return 1;
-+
- 	//m_IsKeyboardEntry contains ordinal number (with offset +1) of the element that 
- 	//is being edited. The edited element can only be variable (type==1)
- 	if ((m_IsKeyboardEntry<=0) || (m_IsKeyboardEntry>m_NumElements)) {AdjustMatrix();return 0;}
-@@ -4383,7 +4479,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
+@@ -4383,7 +4477,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
  		this->m_KeyboardCursorPos=0;
  		CExpression *parent=this;
  		while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
@@ -388,7 +379,7 @@ index 531282c..c2649a4 100644
  		return 2;
  	}
  	/*if ((strnicmp(theElement->pElementObject->Data1,"\\text",5)==0)
-@@ -4875,6 +4971,41 @@ char LastCursorPositionKey;
+@@ -4875,6 +4969,41 @@ char LastCursorPositionKey;
  char IsDoubleStrokeConversionUsed;
  //this function receives messages when a key is hit (handling of keyboard)
  #pragma optimize("s",on)
@@ -414,7 +405,7 @@ index 531282c..c2649a4 100644
 +    token+=' ';int length=token.GetLength();
 +    CExpression *pattern=Toolbox->CheckForKeycodes((char*)(LPCTSTR)token,&length);
 +    if(!pattern)return false;
-+    UndoSave("Typing shortcut",0);
++    ((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("Typing shortcut",0);
 +    CExpression *copy=new CExpression(NULL,NULL,m_FontSize);copy->CopyExpression(pattern,0);
 +    short l,a,b;copy->CalculateSize(dc,zoom,&l,&a,&b);
 +    for(int i=first;i<=last;i++)DeleteElement(first);
@@ -430,6 +421,15 @@ index 531282c..c2649a4 100644
  int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, UINT nFlags,int fcolor,char is_external)
  {
  	//******************************************************************************
+@@ -4892,6 +5021,8 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+ 	if (m_KeyboardCursorPos>23) m_KeyboardCursorPos=23;
+ 	
+ 
++    if(nChar==' ' && ExpandDefaultMathCast(DC,zoom,fcolor))return 1;
++
+ 	//m_IsKeyboardEntry contains ordinal number (with offset +1) of the element that 
+ 	//is being edited. The edited element can only be variable (type==1)
+ 	tElementStruct *theElement;
 @@ -6352,7 +6483,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  			while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
  			if (parent)
