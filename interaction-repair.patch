@@ -2518,7 +2518,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..cff9300 100644
+index fc832eb..0e1c205 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3473,7 +3473,7 @@ index fc832eb..cff9300 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9728,923 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9728,924 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4105,6 +4105,7 @@ index fc832eb..cff9300 100644
 +    if (ViewOnlyMode) return;
 +    tDocumentStruct *object=prevTouchedObject ? prevTouchedObject : RotationHandleDocument();
 +    if (!object) object=KeyboardEntryBaseObject ? KeyboardEntryBaseObject : SelectedDocumentObject;
++    if(IsDrawingMode && LastDrawingCreated>=0 && LastDrawingCreated<NumDocumentElements && CanRotateObject(TheDocument+LastDrawingCreated)) object=TheDocument+LastDrawingCreated;
 +    if (NumSelectedObjects)
 +        for (int i=0;i<NumDocumentElements;i++)
 +            if (CanRotateObject(TheDocument+i) && TheDocument[i].MovingDotState==3) { object=TheDocument+i; break; }
@@ -4397,7 +4398,7 @@ index fc832eb..cff9300 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10657,108 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10658,108 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4506,7 +4507,7 @@ index fc832eb..cff9300 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10775,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10776,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -4514,7 +4515,7 @@ index fc832eb..cff9300 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11453,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11454,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -4550,7 +4551,7 @@ index fc832eb..cff9300 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10965,3 +12306,47 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12307,47 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
