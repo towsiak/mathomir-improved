@@ -60,6 +60,8 @@ public static class MathomirUiProbe {
   public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
   public static void DumpRegion(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{StringBuilder text=new StringBuilder();text.Append("GRAPHPIXELS:");for(int j=-10;j<=10;j++)for(int i=-10;i<=10;i++){text.Append(GetPixel(dc,x+i,y+j).ToString("X6"));text.Append(',');}Console.WriteLine(text.ToString());}finally{ReleaseDC(hwnd,dc);}}
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;uint c=GetPixel(dc,cx,cy);if((c&255)<192||((c>>8)&255)<192||((c>>16)&255)<192)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=5;r++)for(int k=-2;k<=2;k++){left|=GetPixel(dc,cx-r,cy+k)==0;right|=GetPixel(dc,cx+r,cy+k)==0;top|=GetPixel(dc,cx+k,cy-r)==0;bottom|=GetPixel(dc,cx+k,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
+  public static int SafeGuidePixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=70;y<180;y++)if(GetPixel(dc,51,y)==0xE0E0E0)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
+  public static int PrintWarningPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=8;y<34;y++)for(int x=18;x<390;x++)if(GetPixel(dc,x,y)==0x1464AA)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
@@ -667,7 +669,7 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v18' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v20' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 
@@ -846,6 +848,48 @@ try {
   [xml]$restored=Get-Content $domainFixture -Raw
   if($restored.SelectNodes('/mathomir/o | /mathomir/obj').Count -lt 2){throw 'Undo did not restore objects deleted through Select all.'}
   Write-Output 'Select all passed: visible button, Delete clears all page objects, Undo restores them.'
+  foreach($unsafe in @($false,$true,$false)){
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    $marginFixture=Join-Path (Split-Path $exe) ('safe-margin-'+$unsafe+'-smoke.mom')
+    $x=if($unsafe){20}else{100}
+    ('<?xml version="1.0"?><mathomir><o t="1" X="'+$x+'" Y="120" ver="2"><ex fh="100"><var t="print" f="00" /></ex></o></mathomir>')|Set-Content $marginFixture -Encoding ascii
+    [MathomirUiProbe]::OpenFile($main,$marginFixture)
+    Start-Sleep -Milliseconds 400
+    [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+    [MathomirUiProbe]::Send($view,276,4)|Out-Null
+    for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
+    Start-Sleep -Milliseconds 300
+    if([MathomirUiProbe]::SafeGuidePixels($view) -lt 12){throw 'Faint printable guide was not visible.'}
+    $warning=[MathomirUiProbe]::PrintWarningPixels($view)
+    if($unsafe -and $warning -lt 10){throw 'Content crossing print margins did not show a warning.'}
+    if(!$unsafe -and $warning -gt 0){throw 'Print warning did not clear after content became safe.'}
+  }
+  Write-Output 'Print margin guide passed: dashed inset, crossing warning, warning clears when safe.'
+  foreach($radian in @($false,$true)){
+    [MathomirUiProbe]::PostMessage($main,273,[IntPtr]33052,[IntPtr]::Zero)|Out-Null
+    $unitDialog=[IntPtr]::Zero
+    for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$unitDialog=[MathomirUiProbe]::Window($appProcess.Id,'Unit circle maker');if($unitDialog -ne [IntPtr]::Zero){break}}
+    if($unitDialog -eq [IntPtr]::Zero){throw 'Unit circle maker did not open.'}
+    [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1133),334,[int]$radian)|Out-Null
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1130),$(if($radian){'pi/6'}else{'30'}))
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1131),$(if($radian){'5*pi/6'}else{'150'}))
+    [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1134),334,[int]$radian)|Out-Null
+    [MathomirUiProbe]::PostMessage($unitDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+    for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($unitDialog)){break}}
+    if([MathomirUiProbe]::IsWindowVisible($unitDialog)){throw 'Valid unit circle angles were rejected.'}
+    [MathomirUiProbe]::Mouse($view,512,0,150,150)
+    [MathomirUiProbe]::Mouse($view,513,1,150,150)
+    [MathomirUiProbe]::Mouse($view,514,0,150,150)
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$unitSaved=Get-Content $marginFixture -Raw
+    $unitObject=$unitSaved.SelectSingleNode('/mathomir/*[last()]')
+    if($unitObject.GetAttribute('t') -ne '2' -and $unitObject.GetAttribute('type') -ne '2'){throw 'Unit circle was not placed as a drawing.'}
+    if($unitObject.SelectNodes('.//subexp').Count -lt 4){Write-Output $unitObject.OuterXml;throw 'Unit circle labels and exact coordinates were missing.'}
+    if($unitObject.SelectNodes('.//fra | .//elm[@tp="4"]').Count -lt 2){Write-Output $unitObject.OuterXml;throw 'Exact coordinate fractions were not retained.'}
+  }
+  Write-Output 'Unit circle maker passed: degree and pi-fraction input, clockwise/counterclockwise choices, native drawing and exact editable coordinate labels.'
+
   [MathomirUiProbe]::OpenFile($main,$fixture)
   Start-Sleep -Milliseconds 300
   $recoveryFolder=Join-Path $env:LOCALAPPDATA 'MathomirImproved/Recovery'
