@@ -808,7 +808,7 @@ try {
     [MathomirUiProbe]::OpenFile($main,$domainFixture)
     Start-Sleep -Milliseconds 300
     [MathomirUiProbe]::Send($view,276,4)|Out-Null
-    [MathomirUiProbe]::Send($view,277,4)|Out-Null
+    for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
     [MathomirUiProbe]::Send($view,273,32775)|Out-Null
     Start-Sleep -Milliseconds 2000
     [MathomirUiProbe]::Mouse($view,512,0,850,50)
