@@ -12,7 +12,7 @@ This repository contains modifications to his application; it does not claim aut
 
 ## Repair status
 
-Windows builds are produced through GitHub Actions. v19 includes a permanent feature search, move/resize/rotate grips, larger font choices and smart fitting, RAD/DEG controls, π fraction labels for graph axes, expanded function reference cards, US Letter defaults, and interaction/printing repairs.
+Windows builds are produced through GitHub Actions. v20 includes a permanent feature search, move/resize/rotate grips, larger font choices and smart fitting, RAD/DEG controls, π fraction labels for graph axes, expanded function reference cards, US Letter defaults, and interaction/printing repairs.
 
 The Windows runner verifies startup, search filtering, angle-mode controls, the About box, grip movement with Undo, and typing then finishing an annotation above a root. v13 fixes cumulative resize growth and anchors the grip to the object corner. Resize feel, caret behavior and printer dialogs still need hands-on verification. The reported annotated-root crash has not been reproduced; this build includes a defensive change to hover-reference traversal.
 
@@ -40,10 +40,13 @@ The brace/arrow drawing palette has five new icons: a configurable table and the
 
 A second move grip sits immediately to the right and slightly below the resize corner. Both move grips take priority over object selection. Grips clear when the pointer leaves the object/grip area or the document view, while active drags retain their handles.
 
-Default math shortcuts (v19): type the name and press Space in math mode. inf/infty, pi, frac, sqrt/root, lim, int/iint/iiint/oint, sum/prod, vec/vec2/vec3, mat/mat3, eq/neq/leq/geq/approx, pm/mp/times/cdot/div/to, cup/cap/subset/subseteq/in/notin/forall/exists, nabla/partial/binom/case, alpha/beta/gamma/delta/theta/lambda/mu/sigma/omega, sin/cos/tan/sec/csc/ln/log. vec is a three-cell column vector; mat is 2x2. Text mode and longer names do not expand. Existing custom easycasts remain available.
+Default math shortcuts (v20): type the name and press Space in math mode. inf/infty, pi, frac, sqrt/root, lim, int/iint/iiint/oint, sum/prod, vec/vec2/vec3, mat/mat3, eq/neq/leq/geq/approx, pm/mp/times/cdot/div/to, cup/cap/subset/subseteq/in/notin/forall/exists, nabla/partial/binom/case, alpha/beta/gamma/delta/theta/lambda/mu/sigma/omega, sin/cos/tan/sec/csc/ln/log. vec is a three-cell column vector; mat is 2x2. Text mode and longer names do not expand. Existing custom easycasts remain available.
 
 V17 page width: starts fitted to the available window width. The visible Fit width button beside Search (also View > Fit page width) removes gray side strips and follows window resizing. Manual zoom or horizontal scrolling exits fit mode; click Fit width to restore it. US Letter printing dimensions are unchanged.
 
 Search focus repair: choosing a result returns keyboard focus to the document. The dropdown reopens through an explicit Search click, typing, arrow keys, or Ctrl+K, rather than a Windows focus-restoration notification. Result clicks dispatch after the mouse event finishes, and view commands run directly even when a toolbar held focus. Windows checks cover mouse selection, pointer movement, and opening/closing a searched dialog.
 
 V18: Fit width rounds down to keep both paper edges visible and disables horizontal scrollbar travel while fitting. Manual zoom restores scrolling. Graphs inspect original divisors and negative-power bases for excluded points, numerically check two-sided finite limits, and paint holes with open circles. Pole crossings break the curve. Real odd-denominator rational powers retain their negative-x branch; plotted domain endpoints are refined, the last sample is drawn, and fitting preserves ordinary extrema and updates after editing a function. Detection is numerical within the visible x window, not a symbolic proof for every possible expression.
+
+Print guide: a faint dashed quarter-inch safety inset on every page, enlarged to printer hardware margins measured from a print/preview DC when available. A warning pulses for three seconds when page content crosses the inset and clears when safe. The guide and warning never print.
+Unit circle maker: drawing palette circle icon or Search 'unit circle'; configure start/end angles in degrees or radians (pi/6 etc.), arc direction, radius, angle labels, exact endpoint coordinates, common angle ticks, and an end-angle right triangle. Click OK then click to place; native grips move, scale and rotate the grouped drawing.
