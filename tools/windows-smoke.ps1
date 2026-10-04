@@ -62,7 +62,7 @@ public static class MathomirUiProbe {
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;uint c=GetPixel(dc,cx,cy);if((c&255)<192||((c>>8)&255)<192||((c>>16)&255)<192)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=5;r++)for(int k=-2;k<=2;k++){left|=GetPixel(dc,cx-r,cy+k)==0;right|=GetPixel(dc,cx+r,cy+k)==0;top|=GetPixel(dc,cx+k,cy-r)==0;bottom|=GetPixel(dc,cx+k,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
   public static int SafeGuidePixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=70;y<180;y++)if(GetPixel(dc,51,y)==0xE0E0E0)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int PrintWarningPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=8;y<34;y++)for(int x=18;x<390;x++)if(GetPixel(dc,x,y)==0x1464AA)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
-  public static int GraphLegendPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=103;y<123;y++)for(int x=156;x<177;x++)if(GetPixel(dc,x,y)==0)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
+  public static int GraphLegendPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=103;y<130;y++)for(int x=156;x<190;x++){uint color=GetPixel(dc,x,y);if((color&255)<160 && ((color>>8)&255)<160 && ((color>>16)&255)<160)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
@@ -825,7 +825,7 @@ try {
     Start-Sleep -Milliseconds 2000
     [MathomirUiProbe]::Mouse($view,512,0,850,50)
     Write-Output ('Domain test window: '+[MathomirUiProbe]::Text($main))
-    if([MathomirUiProbe]::GraphLegendPixels($view) -lt 5){throw 'Persistent function legend was not visible at the top of the graph.'}
+    if([MathomirUiProbe]::GraphLegendPixels($view) -lt 5){[MathomirUiProbe]::DumpRegion($view,169,115);throw 'Persistent function legend was not visible at the top of the graph.'}
     $area=[MathomirUiProbe]::PlotArea($view)
     if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
     else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
@@ -903,6 +903,19 @@ try {
     if($triangle.SelectNodes('.//subexp').Count -lt 6 -or $triangle.SelectNodes('.//elm[@tp="8"] | .//roo | .//root').Count -lt 1){Write-Output $triangle.OuterXml;throw 'Teaching triangle lost its marked angles or exact radical side.'}
   }
   Write-Output 'Teaching triangles passed: both presets place grouped drawings with six editable labels and exact radical sides.'
+  foreach($ray in @(33055,33056,33057,33058)){
+    [MathomirUiProbe]::Send($view,273,$ray)|Out-Null
+    [MathomirUiProbe]::Mouse($view,512,0,300,300)
+    [MathomirUiProbe]::Mouse($view,513,1,300,300)
+    [MathomirUiProbe]::Mouse($view,514,0,300,300)
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$raySaved=Get-Content $marginFixture -Raw
+    $rayObject=$raySaved.SelectSingleNode('/mathomir/*[last()]')
+    if($rayObject.SelectNodes('.//subexp').Count -lt 1 -or !$rayObject.SelectSingleNode('.//dw | .//draw')){throw 'Semi-infinite ray preset lost its editable endpoint or drawing.'}
+  }
+  Write-Output 'Number line rays passed: four open/closed and left/right palette commands place editable diagrams.'
+
 
 
   [MathomirUiProbe]::OpenFile($main,$fixture)
