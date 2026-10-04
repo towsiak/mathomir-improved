@@ -816,7 +816,7 @@ try {
     Write-Output ('Domain test window: '+[MathomirUiProbe]::Text($main))
     $area=[MathomirUiProbe]::PlotArea($view)
     if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
-    else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
+    else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
     if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw 'Graph repaint covered text placed above the graph.'}
     Write-Output "Native graph domain passed: $($case.name)"
   }
