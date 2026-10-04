@@ -33,6 +33,7 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="SendMessageTimeoutW")] static extern IntPtr SendTextTimeout(IntPtr hwnd, uint msg, IntPtr wparam, string text, uint flags, uint ms, out UIntPtr result);
   public static string Text(IntPtr hwnd) { var text=new StringBuilder(512); GetWindowText(hwnd,text,512); return text.ToString(); }
   public static string Class(IntPtr hwnd) { var text=new StringBuilder(128); GetClassName(hwnd,text,128); return text.ToString(); }
+  public static void DeleteKey(IntPtr hwnd){UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)46,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Delete key did not respond");}
   public static long Send(IntPtr hwnd,uint msg,int wparam) { UIntPtr result; if(SendMessageTimeout(hwnd,msg,(IntPtr)wparam,IntPtr.Zero,2,3000,out result)==IntPtr.Zero) throw new Exception("Window did not respond to message "+msg); return (long)result.ToUInt64(); }
   [DllImport("kernel32.dll")] static extern IntPtr GlobalAlloc(uint flags,UIntPtr bytes);
   [DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr memory);
@@ -826,7 +827,7 @@ try {
   $selectButton=[MathomirUiProbe]::Child($main,1118)
   if($selectButton -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($selectButton)){throw 'Visible Select all button is missing.'}
   [MathomirUiProbe]::Send($selectButton,245,0)|Out-Null
-  [MathomirUiProbe]::Send($view,256,46)|Out-Null
+  [MathomirUiProbe]::DeleteKey($view)
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$cleared=Get-Content $domainFixture -Raw
   if($cleared.SelectNodes('/mathomir/o | /mathomir/obj').Count -ne 0){throw 'Select all followed by Delete left page objects behind.'}
