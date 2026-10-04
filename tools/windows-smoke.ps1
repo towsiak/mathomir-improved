@@ -401,6 +401,20 @@ try {
   $restoredObject=$undone.SelectSingleNode('/mathomir/*[self::o or self::obj]')
   if ($restoredObject.X -ne '100' -or $restoredObject.Y -ne '150') { throw ("Undo did not restore the grip move. Saved position: $($restoredObject.X), $($restoredObject.Y)") }
   Write-Output 'Move grip smoke passed: drag without whole-object selection, save expected position, Undo restores position.'
+  for($x=105;$x -le 190;$x+=5){[MathomirUiProbe]::Mouse($view,512,0,$x,140)}
+  $corner=[MathomirUiProbe]::SizeGrip($view)
+  $lowerX=$corner[0]+22;$lowerY=$corner[1]+12
+  [MathomirUiProbe]::Mouse($view,513,1,$lowerX,$lowerY)
+  [MathomirUiProbe]::Mouse($view,512,1,($lowerX+20),($lowerY+15))
+  [MathomirUiProbe]::Mouse($view,514,0,($lowerX+20),($lowerY+15))
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$lowerMoved=Get-Content $fixture -Raw
+  $lowerObject=$lowerMoved.SelectSingleNode('/mathomir/*[1]')
+  if($lowerObject.X -ne '120' -or $lowerObject.Y -ne '165'){throw 'Lower-right move grip did not move by the pointer displacement.'}
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  Write-Output 'Second move grip passed: right/below the resize corner, correct displacement, Undo.'
+
   for ($x=105; $x -le 190; $x+=5) { [MathomirUiProbe]::Mouse($view,512,0,$x,140) }
   $sizeGrip=[MathomirUiProbe]::SizeGrip($view)
   [MathomirUiProbe]::Mouse($view,513,1,$sizeGrip[0],$sizeGrip[1])
@@ -534,9 +548,34 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v14' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v15' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
+
+  [MathomirUiProbe]::PostMessage($main,273,[IntPtr]33046,[IntPtr]::Zero)|Out-Null
+  $tableDialog=[IntPtr]::Zero
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$tableDialog=[MathomirUiProbe]::Window($appProcess.Id,'Configure table');if($tableDialog -ne [IntPtr]::Zero){break}}
+  if($tableDialog -eq [IntPtr]::Zero){throw 'Table setup did not open.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($tableDialog,1121),'3')
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($tableDialog,1122),'4')
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($tableDialog,1123),'150')
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($tableDialog,1125),334,1)|Out-Null
+  [MathomirUiProbe]::PostMessage($tableDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+  Start-Sleep -Milliseconds 200
+  [MathomirUiProbe]::Mouse($view,512,0,450,220)
+  [MathomirUiProbe]::Mouse($view,513,1,450,220)
+  [MathomirUiProbe]::Mouse($view,514,0,450,220)
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$tableSaved=Get-Content $fixture -Raw
+  $tableObject=$tableSaved.SelectSingleNode('/mathomir/*[last()]')
+  $cells=$tableObject.SelectSingleNode('./*[self::ex or self::expr]/*[self::bra or self::elm[@tp="5"]]/*[self::ex or self::expr]')
+  if(!$cells){Write-Output $tableObject.OuterXml;throw 'Editable table was not placed.'}
+  if($cells.SelectNodes('./col_sep').Count -ne 9){throw 'Configured table did not create four columns in three rows.'}
+  if($cells.SelectNodes('./row_sep').Count -lt 2){throw 'Configured table did not create three rows.'}
+  if($cells.SelectNodes('./col_sep[contains(@data,"-")]').Count -ne 9){throw 'Table borders were not retained.'}
+  $tableFont=$tableObject.SelectSingleNode('./*[self::ex or self::expr]')
+  if(($tableFont.fh -ne '150') -and ($tableFont.fnt_h -ne '150')){throw 'Configured table font was not retained.'}
+  Write-Output 'Table setup passed: row/column/font/alignment controls, placement, native editable cells and saved borders.'
   $intervalCounts=@()
   foreach($command in 33042,33043,33044,33045){
     [MathomirUiProbe]::Send($main,273,$command)|Out-Null
