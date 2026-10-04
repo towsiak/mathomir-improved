@@ -808,6 +808,11 @@ try {
     $domainFixture=Join-Path (Split-Path $exe) ('graph-domain-'+$case.name+'-smoke.mom')
     $axis=@($case.xmin,$case.xmax,$case.ymin,$case.ymax)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
     $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o><o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o></mathomir>'
+    $label='<o t="1" X="200" Y="220" ver="2"><ex fh="100"><var t="overlay" f="00" color="1" /></ex></o>'
+    $frame='<o t="2" X="190" Y="185"><dw d="32|0,0;3840,0;:,1920;0,:;:,0" /></o>'
+    if($case.name -eq 'rational' -or $case.name -eq 'semicircle'){
+      $xml=$xml.Replace($label,'').Replace('<mathomir>','<mathomir>'+$frame+$label)
+    }else{$xml=$xml.Replace('</mathomir>',$frame+'</mathomir>')}
     $xml|Set-Content -LiteralPath $domainFixture -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$domainFixture)
     Start-Sleep -Milliseconds 300
@@ -821,6 +826,11 @@ try {
     if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
     else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
     if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw 'Graph repaint covered text placed above the graph.'}
+    foreach($position in @(@(350,300),@(465,390),@(850,50))){
+      [MathomirUiProbe]::Mouse($view,512,0,$position[0],$position[1])
+      Start-Sleep -Milliseconds 150
+      if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw "Graph hover covered boxed text in $($case.name)."}
+    }
     Write-Output "Native graph domain passed: $($case.name)"
   }
 
