@@ -627,6 +627,23 @@ try {
   [xml]$rotationUndo=Get-Content $fixture -Raw
   if($rotationUndo.SelectSingleNode('/mathomir/*[last()]').OuterXml -ne $beforeRotation){throw 'Undo did not restore interval geometry.'}
   Write-Output 'Interval and drawing rotation passed: four presets, correct open/closed dots, editable labels rotate with the drawing, Undo restores geometry.'
+  foreach($tool in 33047..33050) {
+    [MathomirUiProbe]::Send($main,273,$tool)|Out-Null
+    for($click=0;$click -lt 20;$click++) {
+      [MathomirUiProbe]::Mouse($view,512,0,800,160)
+      [MathomirUiProbe]::Mouse($view,513,1,800,160)
+      [MathomirUiProbe]::Mouse($view,514,0,800,160)
+    }
+    [MathomirUiProbe]::Mouse($view,512,0,780,180)
+    [MathomirUiProbe]::Mouse($view,513,1,780,180)
+    [MathomirUiProbe]::Mouse($view,512,1,820,210)
+    [MathomirUiProbe]::Mouse($view,514,0,820,210)
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$drawingSaved=Get-Content $fixture -Raw
+    if(!$drawingSaved.SelectSingleNode('/mathomir/*[last()]/*[self::dw or self::draw]')){throw "Drawing tool $tool failed after repeated clicks."}
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+  }
+  Write-Output 'Drawing-mode regression passed: 20 clicks without Escape followed by a stroke, for pen, line, rectangle and ellipse.'
   $castY=110
   foreach($code in @('inf','frac','int','lim','vec','eq','sqrt','pm','pi','sin','subseteq')) {
     [MathomirUiProbe]::Send($view,258,27)|Out-Null
