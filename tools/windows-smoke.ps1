@@ -51,7 +51,7 @@ public static class MathomirUiProbe {
   [StructLayout(LayoutKind.Sequential)] struct Point {public int X,Y;}
   [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr hwnd,ref Point point);
   [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
-  public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { if(msg==512 && flags==0){Point point=new Point{X=x,Y=y};ClientToScreen(hwnd,ref point);SetCursorPos(point.X,point.Y);System.Threading.Thread.Sleep(10);} UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
+  public static void Mouse(IntPtr hwnd,uint msg,int flags,int x,int y) { if(msg==512 && flags==0){Point point=new Point{X=x,Y=y};ClientToScreen(hwnd,ref point);SetCursorPos(point.X,point.Y);System.Threading.Thread.Sleep(50);} UIntPtr result; int position=(y<<16)|(x&65535); if(SendMessageTimeout(hwnd,msg,(IntPtr)flags,(IntPtr)position,2,3000,out result)==IntPtr.Zero) throw new Exception("Mouse action did not respond"); }
   [DllImport("user32.dll")] static extern IntPtr GetMenu(IntPtr hwnd);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetMenuString(IntPtr menu,uint id,StringBuilder text,int count,uint flags);
   public static string MenuText(IntPtr hwnd,uint id) {var text=new StringBuilder(256);GetMenuString(GetMenu(hwnd),id,text,256,0);return text.ToString();}
@@ -362,6 +362,7 @@ try {
     if ($appProcess.MainWindowHandle -ne 0) { $main=$appProcess.MainWindowHandle; break }
   }
   if ($main -eq [IntPtr]::Zero) { throw 'No main window was created.' }
+  Start-Sleep -Milliseconds 500
   [MathomirUiProbe]::PostMessage($main,273,[IntPtr]0xE101,[IntPtr]::Zero) | Out-Null
   $open=[IntPtr]::Zero
   for ($attempt=0; $attempt -lt 80; $attempt++) {
