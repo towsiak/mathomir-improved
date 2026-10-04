@@ -669,7 +669,7 @@ try {
     if($code -eq 'inf') {
       $symbol=$cast.SelectSingleNode('./var | ./elm[@tp="1"]')
       $font=if($symbol.HasAttribute('f')){$symbol.f}else{$symbol.fnt}
-      if($font -ne '60'){Write-Output $cast.OuterXml;throw 'Infinity is not using the native math symbol font.'}
+      if(!$font -or ([Convert]::ToInt32($font.Substring(0,2),16) -band 224) -ne 96){Write-Output $cast.OuterXml;throw 'Infinity is not using the native math symbol font.'}
     }
     if($code -eq 'frac' -and !$cast.SelectSingleNode('./fra | ./elm[@tp="4"]')){Write-Output $cast.OuterXml;throw 'Fraction shortcut lost its structure.'}
     if($code -eq 'vec' -and !$cast.SelectSingleNode('./bra | ./elm[@tp="5"]')){throw 'Vector shortcut lost its editable cells.'}
