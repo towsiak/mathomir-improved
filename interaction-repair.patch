@@ -191,7 +191,7 @@ index 209a634..099b0f6 100644
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..523be84 100644
+index 531282c..c2649a4 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -370,7 +370,16 @@ index 531282c..523be84 100644
  	m_Color=-1;
  	m_IsHeadline=0;
  	m_DrawParentheses=0;
-@@ -4383,7 +4477,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
+@@ -3987,6 +4081,8 @@ int CExpression::KeyboardStop(void)
+ 				e->DeleteElement(e->m_NumElements-1); //remove the last element if it is the newline element
+ 	}
+ 
++    if(nChar==' ' && ExpandDefaultMathCast(DC,zoom,fcolor))return 1;
++
+ 	//m_IsKeyboardEntry contains ordinal number (with offset +1) of the element that 
+ 	//is being edited. The edited element can only be variable (type==1)
+ 	if ((m_IsKeyboardEntry<=0) || (m_IsKeyboardEntry>m_NumElements)) {AdjustMatrix();return 0;}
+@@ -4383,7 +4479,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
  		this->m_KeyboardCursorPos=0;
  		CExpression *parent=this;
  		while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
@@ -379,7 +388,49 @@ index 531282c..523be84 100644
  		return 2;
  	}
  	/*if ((strnicmp(theElement->pElementObject->Data1,"\\text",5)==0)
-@@ -6352,7 +6446,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -4875,6 +4971,41 @@ char LastCursorPositionKey;
+ char IsDoubleStrokeConversionUsed;
+ //this function receives messages when a key is hit (handling of keyboard)
+ #pragma optimize("s",on)
++bool CExpression::ExpandDefaultMathCast(CDC *dc,short zoom,int color)
++{
++    if(m_IsKeyboardEntry<1 || m_IsKeyboardEntry>m_NumElements)return false;
++    int last=m_IsKeyboardEntry-1,first=last;
++    tElementStruct *current=m_pElementList+last;
++    if(current->Type!=1 || !current->pElementObject || current->pElementObject->m_Text)return false;
++    if(m_KeyboardCursorPos!=(int)strlen(current->pElementObject->Data1))return false;
++    CString token;
++    for(int i=last;i>=0;i--)
++    {
++        tElementStruct *item=m_pElementList+i;
++        if(item->Type!=1 || !item->pElementObject || item->pElementObject->m_Text)break;
++        const char *letters=item->pElementObject->Data1;
++        bool word=true;for(int j=0;letters[j];j++)if(!((letters[j]>='a' && letters[j]<='z') || (letters[j]>='0' && letters[j]<='9')))word=false;
++        if(!word || (!letters[0] && i!=last))break;
++        token=CString(letters)+token;first=i;
++        if(token.GetLength()>15)return false;
++    }
++    if(token.IsEmpty())return false;
++    token+=' ';int length=token.GetLength();
++    CExpression *pattern=Toolbox->CheckForKeycodes((char*)(LPCTSTR)token,&length);
++    if(!pattern)return false;
++    UndoSave("Typing shortcut",0);
++    CExpression *copy=new CExpression(NULL,NULL,m_FontSize);copy->CopyExpression(pattern,0);
++    short l,a,b;copy->CalculateSize(dc,zoom,&l,&a,&b);
++    for(int i=first;i<=last;i++)DeleteElement(first);
++    InsertEmptyElement(first,1,0,color);m_IsKeyboardEntry=first+1;m_KeyboardCursorPos=0;
++    CExpression *oldClipboard=ClipboardExpression;ClipboardExpression=copy;
++    KeyboardEntryObject=(CObject*)this;
++    KeyboardKeyHit(dc,zoom,6,0,0,color,0);
++    if(ClipboardExpression==copy){delete copy;ClipboardExpression=NULL;}
++    ClipboardExpression=oldClipboard;
++    return true;
++}
++
+ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, UINT nFlags,int fcolor,char is_external)
+ {
+ 	//******************************************************************************
+@@ -6352,7 +6483,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  			while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
  			if (parent)
  			{
@@ -388,7 +439,7 @@ index 531282c..523be84 100644
  			}
  			if ((UseToolbar)  && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
  			return 1;
-@@ -6565,7 +6659,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6565,7 +6696,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  
  			if ((ch=='B') || (ch=='I') || //bold, italic
  				(ch=='U') || (ch=='S') || (ch=='O') || //underline, strikeout, overline
@@ -397,7 +448,7 @@ index 531282c..523be84 100644
  				(ch=='N')) //normalization
  			{
  				((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("font formatting",20218);			
-@@ -6578,12 +6672,18 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6578,12 +6709,18 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  						{
  							for (int jj=0;jj<24;jj++)
  							{
@@ -418,7 +469,7 @@ index 531282c..523be84 100644
  						if (ch=='G') ts->pElementObject->m_Color=2;
  						if (ch=='N') ts->pElementObject->m_Color=-1;
  					}
-@@ -6592,7 +6692,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6592,7 +6729,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  					if (ch=='S') ts->Decoration=1;
  					if (ch=='N') ts->Decoration=0;
  				}				
@@ -427,7 +478,7 @@ index 531282c..523be84 100644
  				if ((UseToolbar)  && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
  				return 1;
  			}
-@@ -8778,6 +8878,27 @@ keyboardkeyhit_addtoexponent:
+@@ -8778,6 +8915,27 @@ keyboardkeyhit_addtoexponent:
  			theElement=KeyboardSplitVariable();
  			if (m_KeyboardCursorPos==0) IsEditedVariableEmpty=1;
  
@@ -455,7 +506,22 @@ index 531282c..523be84 100644
  			if (IsEditedVariableEmpty) 
  				DeleteElement(m_IsKeyboardEntry-1);
  			else
-@@ -11078,6 +11199,13 @@ int PaintText(CDC *DC,int X, int Y,char *text, char *font, short *spacing, short
+@@ -10507,6 +10665,14 @@ int CExpression::KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt
+ 	
+ 	}
+ 
++    if(nChar==' ' && ExpandDefaultMathCast(DC,zoom,fcolor))
++    {
++        CExpression *parent=this;while(parent->m_pPaternalExpression)parent=parent->m_pPaternalExpression;
++        short l,a,b;parent->CalculateSize(DC,zoom,&l,&a,&b);parent->GetKeyboardCursorPos(x,y);
++        ClipboardExpression=tmp_clipboard_storage;
++        ((CMainFrame*)(theApp.m_pMainWnd))->UndoEnableSaving();
++        return 2; // keep the cursor inside the newly inserted pattern
++    }
+ 	//adds the character
+ 	CExpression *newFocus;
+ 	if (KeyboardKeyHit(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,2)==0) 
+@@ -11078,6 +11244,13 @@ int PaintText(CDC *DC,int X, int Y,char *text, char *font, short *spacing, short
  
  int CExpression::Autocomplete(int is_internal)
  {
@@ -469,7 +535,7 @@ index 531282c..523be84 100644
  	if (is_internal)
  	{
  		int i;
-@@ -11644,7 +11772,7 @@ autowraptext_start:
+@@ -11644,7 +11817,7 @@ autowraptext_start:
  int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  {
  	int len=0;
@@ -478,7 +544,7 @@ index 531282c..523be84 100644
  	static char tabs[17];
  
  	if (num_tabs>16) num_tabs=16;
-@@ -11694,6 +11822,13 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
+@@ -11694,6 +11867,13 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  		itoa(m_IsHeadline,tmp,10);
  		strcat(tmpstr,tmp);
  	}
@@ -492,7 +558,7 @@ index 531282c..523be84 100644
  	if (m_IsVertical)
  	{
  		strcat(tmpstr,"\" vert=\"");
-@@ -11852,6 +11987,7 @@ char * CExpression::XML_input(char * file)
+@@ -11852,6 +12032,7 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"txt")==0) {m_StartAsText=1;old_version_text_decode=1;}
  		if (strcmp(attribute,"hed")==0) m_IsHeadline=atoi(value);
  		if (strcmp(attribute,"vert")==0) m_IsVertical=atoi(value);
@@ -500,7 +566,7 @@ index 531282c..523be84 100644
  		if ((strcmp(attribute,"color")==0) || (strcmp(attribute,"clr")==0)) m_Color=atoi(value);
  		if (strcmp(attribute,"alig")==0) m_Alignment=atoi(value);
  		if ((strcmp(attribute,"brack")==0) || (strcmp(attribute,"br")==0)) m_ParenthesesFlags=atoi(value);
-@@ -11862,6 +11998,7 @@ char * CExpression::XML_input(char * file)
+@@ -11862,6 +12043,7 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"b_data")==0) m_ParenthesesFlags|=(atoi(value)<<2);
  
  	} while (attribute[0]);
@@ -508,7 +574,7 @@ index 531282c..523be84 100644
  
  	int found_anything=0;
  	int is_matrix=0;
-@@ -12021,18 +12158,18 @@ char * CExpression::XML_input(char * file)
+@@ -12021,18 +12203,18 @@ char * CExpression::XML_input(char * file)
  int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,char output_type)
  {
  	int len=0;
@@ -530,7 +596,7 @@ index 531282c..523be84 100644
  		strcat(tmpstr,"\">\r\n");
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
-@@ -12257,7 +12394,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12257,7 +12439,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -539,7 +605,7 @@ index 531282c..523be84 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12272,7 +12409,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12272,7 +12454,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  int CExpression::LaTeX_output(char * output, char only_calculate)
  {
  	int len=0;
@@ -548,7 +614,7 @@ index 531282c..523be84 100644
  	char *tabs="";
  	char output_type=3;
  	int num_tabs=0;
-@@ -12281,7 +12418,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12281,7 +12463,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  
  	//memset(tabs,9,num_tabs);tabs[num_tabs]=0; //generating the tablist string
  
@@ -557,7 +623,7 @@ index 531282c..523be84 100644
  	{
  		//color of the expression - if m_Color==-1, then the color is inherited or default
  	}*/
-@@ -12486,7 +12623,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12486,7 +12668,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -566,7 +632,7 @@ index 531282c..523be84 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12567,7 +12704,7 @@ int IsCharacterLow(char ch,char font)
+@@ -12567,7 +12749,7 @@ int IsCharacterLow(char ch,char font)
  
  int CExpression::CalcChecksum()
  {
@@ -575,7 +641,7 @@ index 531282c..523be84 100644
  		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
  		
  	int c=m_NumElements;
-@@ -12581,6 +12718,7 @@ int CExpression::CalcChecksum()
+@@ -12581,6 +12763,7 @@ int CExpression::CalcChecksum()
  		//c+=128*m_ParentheseHeightFactor;
  		c+=256*(m_Color+4*m_StartAsText+8*m_IsVertical);
  		c+=768*m_Alignment;
@@ -583,7 +649,7 @@ index 531282c..523be84 100644
  		if (m_pPaternalExpression) c+=500;
  		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
  		c+=m_InternalInsertionPoint;
-@@ -14353,6 +14491,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
+@@ -14353,6 +14536,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
  	}
  	return 0;
  getkeyboardcursorpos_finish:
@@ -591,7 +657,7 @@ index 531282c..523be84 100644
  
  	if ((m_IsVertical) && (m_pPaternalExpression==NULL))
  	{
-@@ -16978,7 +17117,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16978,7 +17162,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl*pow(10.0,-exxp);
@@ -600,7 +666,7 @@ index 531282c..523be84 100644
  				exxp--;
  				if (exxp<-100) 	{rr=0.0;exxp=0;break;}
  			}
-@@ -16988,7 +17127,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16988,7 +17172,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl/pow(10.0,exxp);
@@ -609,7 +675,7 @@ index 531282c..523be84 100644
  				exxp++;
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
-@@ -24194,6 +24333,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
+@@ -24194,6 +24378,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
  
  	CExpression *arg=(CExpression*)((m_pElementList+Position)->pElementObject->Expression1);
  	if (!arg) return 0;
@@ -648,7 +714,7 @@ index 531282c..523be84 100644
  
  	{
  		int cnt=0;
-@@ -24454,6 +24625,7 @@ computesincos_end:
+@@ -24454,6 +24670,7 @@ computesincos_end:
  		if (rval)
  		{
  			double N=PF.N1/PF.N2;
@@ -656,7 +722,7 @@ index 531282c..523be84 100644
  			int prec=PF.prec1;
  			{
  				if (fabs(N)<1e-100)
-@@ -24477,6 +24649,7 @@ computesincos_end:
+@@ -24477,6 +24694,7 @@ computesincos_end:
  				if (function_type)
  				{
  					int is_ok=0;
@@ -664,7 +730,7 @@ index 531282c..523be84 100644
  					if (function_type==1) {res=sin(N);is_ok=1;}
  					if (function_type==2) {res=cos(N);is_ok=1;}
  					if (function_type==3) {res=tan(N);is_ok=1;}
-@@ -24484,8 +24657,9 @@ computesincos_end:
+@@ -24484,8 +24702,9 @@ computesincos_end:
  					if (function_type==5) {res=1.0/cos(N);is_ok=1;} //secant
  					if (function_type==6) {res=1.0/sin(N);is_ok=1;} //cosecant
  
@@ -675,7 +741,7 @@ index 531282c..523be84 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -24552,11 +24726,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+@@ -24552,11 +24771,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
  					if (function_type==1) {res=asin(N);is_ok=1;} //arcsin
  					if (function_type==2) {res=acos(N);is_ok=1;} //arccos
  					if (function_type==3) {res=atan(N);is_ok=1;} //arctan
@@ -690,7 +756,7 @@ index 531282c..523be84 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -25178,7 +25353,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
+@@ -25178,7 +25398,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
  	return 1;
  }
  //int sshit=0;
@@ -699,7 +765,7 @@ index 531282c..523be84 100644
  {
  	if (wwwwxxxx==0) {InitializeCriticalSection(&section3);wwwwxxxx=1;}
  	int cntrr=0;
-@@ -25191,7 +25366,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25191,7 +25411,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  
  	//first replace all variables with the given value
  
@@ -708,7 +774,7 @@ index 531282c..523be84 100644
  
  	try
  	{
-@@ -25295,7 +25470,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25295,7 +25515,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  		LeaveCriticalSection(&section3);
  		return retval;
  	}
@@ -718,7 +784,7 @@ index 531282c..523be84 100644
  	if (PF.N1*PF.N2<0)
  	{is_call_from_ploter=0;LeaveCriticalSection(&section3);return -1e+48;}
 diff --git a/Mathomir/Expression.h b/Mathomir/Expression.h
-index 36238b0..3746c64 100644
+index 36238b0..cbff598 100644
 --- a/Mathomir/Expression.h
 +++ b/Mathomir/Expression.h
 @@ -139,6 +139,7 @@ public:
@@ -740,7 +806,15 @@ index 36238b0..3746c64 100644
  	short GetActualFontSize(short zoom);
  	int InsertEmptyElement(short position,short Type,char Operator, int color=-1);
  	void SelectExpression(char Select);
-@@ -266,7 +271,7 @@ public:
+@@ -179,6 +184,7 @@ public:
+ 	int RemoveEmptyVariable(CDC *DC,tElementStruct *theElement,char no_recomutation=0);
+ 	int ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, UINT nFlags,int fcolor, tElementStruct *theElement);
+ 
++	bool ExpandDefaultMathCast(CDC *dc,short zoom,int color);
+ 	int KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, UINT nFlags, int fcolor, char extern_call);
+ 	// only to be called from KeyboardHit function!!
+ 	tElementStruct* KeyboardSplitVariable(void);
+@@ -266,7 +272,7 @@ public:
  	int Derivate(CExpression * variable,int internall_call=0);
  
  	void *PlotterPrepareVariablePositions(void *VarPos=NULL);
@@ -2553,7 +2627,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..d7262d7 100644
+index fc832eb..2e4dacb 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -3352,7 +3426,7 @@ index fc832eb..d7262d7 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5808,45 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5808,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -3363,23 +3437,6 @@ index fc832eb..d7262d7 100644
 +            tElementStruct *element=textExpression->m_pElementList+textExpression->m_IsKeyboardEntry-1;
 +            if (element->Type==1 && element->pElementObject && element->pElementObject->m_Text)
 +            { textRun=element->pElementObject; textPosition=textExpression->m_KeyboardCursorPos; previousText=textRun->Data1; }
-+        }
-+        if(nChar==' ' && !textRun && LastEditedExp2==textExpression && KeystrokesListLen>0 && KeystrokesListLen<16)
-+        {
-+            char code[17]; memcpy(code,KeystrokesList,KeystrokesListLen);code[KeystrokesListLen]=' ';
-+            int length=KeystrokesListLen+1;
-+            CExpression *pattern=Toolbox->CheckForKeycodes(code,&length);
-+            int first=KeystrokeNumElements[0],last=textExpression->m_IsKeyboardEntry-1;
-+            if(pattern && first>=0 && last>=first && last<textExpression->m_NumElements)
-+            {
-+                UndoSave("Typing shortcut",0);
-+                CExpression *copy=new CExpression(NULL,NULL,100);copy->CopyExpression(pattern,0);
-+                for(int i=first;i<=last;i++)textExpression->DeleteElement(first);
-+                textExpression->InsertEmptyElement(first,1,0);
-+                textExpression->m_IsKeyboardEntry=first+1;textExpression->m_KeyboardCursorPos=0;
-+                ClipboardExpression=copy;nChar=6;
-+                KeystrokesListLen=0;KeystrokesList[0]=0;
-+            }
 +        }
  		if (nChar!=-1) ret=((CExpression*)(KeyboardEntryObject))->KeyboardKeyHit(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,1);
 +        if (textRun && KeyboardEntryObject==(CObject*)textExpression && ret==1)
@@ -3398,7 +3455,7 @@ index fc832eb..d7262d7 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +5916,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +5899,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -3407,7 +3464,7 @@ index fc832eb..d7262d7 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6027,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6010,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -3459,7 +3516,18 @@ index fc832eb..d7262d7 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5836,7 +6188,7 @@ if ((nChar!=6) )
+@@ -5793,7 +6128,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+ 							fcolor=Toolbox->GetUniformFormattingColor();
+ 						}
+ 						int inserting_position=tmp->m_Selection-1;
+-						if (tmp->KeyboardQuickType(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,&x,&y))
++                        int quickResult=tmp->KeyboardQuickType(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,&x,&y);
++                        if(quickResult==2)KeyboardEntryBaseObject=ds;
++                        if(quickResult)
+ 						{
+ 							QuickTypeUsed=2;
+ 							LastQuickTypeObject=ds;
+@@ -5836,7 +6173,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -3468,7 +3536,7 @@ index fc832eb..d7262d7 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6470,18 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6455,18 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -3487,7 +3555,7 @@ index fc832eb..d7262d7 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +6922,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +6907,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -3522,7 +3590,7 @@ index fc832eb..d7262d7 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +7943,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +7928,13 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -3536,7 +3604,7 @@ index fc832eb..d7262d7 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8477,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8462,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -3564,7 +3632,7 @@ index fc832eb..d7262d7 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +8930,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +8915,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -3575,7 +3643,7 @@ index fc832eb..d7262d7 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9777,938 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9762,938 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4514,7 +4582,7 @@ index fc832eb..d7262d7 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10721,108 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10706,108 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4623,7 +4691,7 @@ index fc832eb..d7262d7 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10839,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10824,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -4631,7 +4699,7 @@ index fc832eb..d7262d7 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11517,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11502,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -4667,7 +4735,7 @@ index fc832eb..d7262d7 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10965,3 +12370,113 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12355,113 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
