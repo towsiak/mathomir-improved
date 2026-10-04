@@ -889,6 +889,19 @@ try {
     if($unitObject.SelectNodes('.//fra | .//elm[@tp="4"]').Count -lt 2){Write-Output $unitObject.OuterXml;throw 'Exact coordinate fractions were not retained.'}
   }
   Write-Output 'Unit circle maker passed: degree and pi-fraction input, clockwise/counterclockwise choices, native drawing and exact editable coordinate labels.'
+  foreach($preset in @(33053,33054)){
+    [MathomirUiProbe]::Send($view,273,$preset)|Out-Null
+    [MathomirUiProbe]::Mouse($view,512,0,200,180)
+    [MathomirUiProbe]::Mouse($view,513,1,200,180)
+    [MathomirUiProbe]::Mouse($view,514,0,200,180)
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$triangleSaved=Get-Content $marginFixture -Raw
+    $triangle=$triangleSaved.SelectSingleNode('/mathomir/*[last()]')
+    if($triangle.SelectNodes('.//subexp').Count -lt 6 -or $triangle.SelectNodes('.//elm[@tp="8"] | .//roo | .//root').Count -lt 1){Write-Output $triangle.OuterXml;throw 'Teaching triangle lost its marked angles or exact radical side.'}
+  }
+  Write-Output 'Teaching triangles passed: both presets place grouped drawings with six editable labels and exact radical sides.'
+
 
   [MathomirUiProbe]::OpenFile($main,$fixture)
   Start-Sleep -Milliseconds 300
