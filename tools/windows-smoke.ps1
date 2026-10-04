@@ -52,6 +52,9 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern bool GetScrollInfo(IntPtr hwnd,int bar,ref ScrollInfo info);
   public static bool HorizontalTravel(IntPtr hwnd){ScrollInfo info=new ScrollInfo();info.Size=(uint)Marshal.SizeOf(typeof(ScrollInfo));info.Mask=7;if(!GetScrollInfo(hwnd,0,ref info))throw new Exception("Could not inspect horizontal scrollbar");return info.Max-info.Min-Math.Max(0,(int)info.Page-1)>0;}
   public static bool PageEdgeMarks(IntPtr hwnd){Rect r;GetClientRect(hwnd,out r);IntPtr dc=GetDC(hwnd);try{int left=0,right=0;for(int y=20;y<Math.Min(r.Bottom,350);y++){for(int x=0;x<5;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){left++;break;}}for(int x=Math.Max(0,r.Right-20);x<r.Right;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80){right++;break;}}}return left>10 && right>10;}finally{ReleaseDC(hwnd,dc);}}
+  public static int[] PlotArea(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int left=102;while(left<250 && GetPixel(dc,left,170)==0xE0E0E0)left++;int bottom=418;while(bottom>300 && GetPixel(dc,170,bottom)==0xE0E0E0)bottom--;return new int[]{left,102,598,bottom};}finally{ReleaseDC(hwnd,dc);}}
+  public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
+  public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;if(GetPixel(dc,cx,cy)!=0xFFFFFF)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=7;r++){left|=GetPixel(dc,cx-r,cy)==0;right|=GetPixel(dc,cx+r,cy)==0;top|=GetPixel(dc,cx,cy-r)==0;bottom|=GetPixel(dc,cx,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
@@ -588,6 +591,20 @@ try {
   [xml]$decimalSaved=Get-Content -LiteralPath $fixture -Raw
   $decimalMinimum=$decimalSaved.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]')
   if ($decimalMinimum.alig -eq '2' -or $decimalMinimum.alig -eq '1') { throw 'Decimal graph mode did not restore linear labels.' }
+  [MathomirUiProbe]::Mouse($view,512,0,480,410)
+  [MathomirUiProbe]::Mouse($view,513,1,480,410)
+  [MathomirUiProbe]::Mouse($view,514,0,480,410)
+  Start-Sleep -Milliseconds 500
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$buttonPi=Get-Content -LiteralPath $fixture -Raw
+  if($buttonPi.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]').alig -ne '2'){throw 'The graph pi/decimal button did not enable pi fractions.'}
+  [MathomirUiProbe]::Mouse($view,512,0,480,410)
+  [MathomirUiProbe]::Mouse($view,513,1,480,410)
+  [MathomirUiProbe]::Mouse($view,514,0,480,410)
+  Start-Sleep -Milliseconds 500
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$buttonDecimal=Get-Content -LiteralPath $fixture -Raw
+  if($buttonDecimal.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[1]/*[self::ex or self::expr]').alig -eq '2'){throw 'The graph pi/decimal button did not return to decimal labels.'}
   Write-Output 'Graph axis smoke passed: pi fraction mode and decimal mode both save correctly.'
   $search=[MathomirUiProbe]::Child($main,1112)
   if ($search -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($search)) { throw 'The permanent Search field is missing or hidden.' }
@@ -772,6 +789,27 @@ try {
     $castY+=35
   }
   Write-Output 'Default casts passed: infinity, fraction, integral, limit, vector, equals, root, plus/minus, pi, sine and subseteq expand with Space.'
+  $domainFixture=Join-Path (Split-Path $exe) 'graph-domain-smoke.mom'
+  $cases=@(
+    @{name='sinc';xmin=-2.7;xmax=3.3;ymin=-.2;ymax=1.4;formula='<fra E1="n" E2="d"><ex><fun t="sin" f="20" E1=""><ex br="2"><var t="x" f="00" /></ex></fun></ex><ex><var t="x" f="00" /></ex></fra>';hx=0;hy=1},
+    @{name='rational';xmin=-3.13;xmax=6.07;ymin=-2;ymax=2;formula='<fra E1="n" E2="d"><ex><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="+" /><var t="2" f="00" /></ex></elm><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="-" /><var t="1" f="00" /></ex></elm></ex><ex><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="+" /><var t="2" f="00" /></ex></elm><elm tp="5" E1=""><ex><var t="x" f="00" /><opr s="-" /><var t="5" f="00" /></ex></elm></ex></fra>';hx=-2;hy=(3/7)},
+    @{name='power';xmin=-2.7;xmax=3.3;ymin=-.2;ymax=3;formula='<elm tp="3" E1="b" E2="p"><ex><var t="x" f="00" /></ex><ex><fra E1="n" E2="d"><ex><var t="2" f="00" /></ex><ex><var t="3" f="00" /></ex></fra></ex></elm>';cx=-1;cy=1},
+    @{name='semicircle';xmin=-1.7;xmax=1.3;ymin=-.2;ymax=1.4;formula='<elm tp="8" E1=""><ex><var t="1" f="00" /><opr s="-" /><elm tp="3" E1="b" E2="p"><ex><var t="x" f="00" /></ex><ex><var t="2" f="00" /></ex></elm></ex></elm>';cx=1;cy=0}
+  )
+  foreach($case in $cases){
+    $axis=@($case.xmin,$case.xmax,$case.ymin,$case.ymax)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
+    $xml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;16000,32;:,10240;32,:;:,32" />'+($axis -join '')+'<subexp d="0,0;4000,1000"><ex fh="100">'+$case.formula+'</ex></subexp></o></mathomir>'
+    $xml|Set-Content -LiteralPath $domainFixture -Encoding ascii
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::OpenFile($main,$domainFixture)
+    Start-Sleep -Milliseconds 2000
+    [MathomirUiProbe]::Mouse($view,512,0,850,50)
+    $area=[MathomirUiProbe]::PlotArea($view)
+    if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
+    else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
+    Write-Output "Native graph domain passed: $($case.name)"
+  }
+
   Start-Sleep -Milliseconds 300
   $recoveryFolder=Join-Path $env:LOCALAPPDATA 'MathomirImproved/Recovery'
   $before=@(Get-ChildItem $recoveryFolder -Filter 'Recovery-*.mom' -ErrorAction SilentlyContinue).Count
