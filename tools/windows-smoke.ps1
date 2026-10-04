@@ -40,6 +40,13 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr hwnd);
   [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr hwnd,IntPtr dc);
   [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc,int x,int y);
+  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;}
+  [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hwnd,out Rect rect);
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd,out Rect rect);
+  [DllImport("user32.dll")] static extern bool MoveWindow(IntPtr hwnd,int x,int y,int width,int height,bool repaint);
+  public static Rect WindowRect(IntPtr hwnd){Rect rect;GetWindowRect(hwnd,out rect);return rect;}
+  public static void Resize(IntPtr hwnd,Rect rect,int delta){if(!MoveWindow(hwnd,rect.Left,rect.Top,rect.Right-rect.Left+delta,rect.Bottom-rect.Top,true))throw new Exception("Could not resize window");}
+  public static bool WhiteWidth(IntPtr hwnd){Rect rect;GetClientRect(hwnd,out rect);IntPtr dc=GetDC(hwnd);try{return GetPixel(dc,3,100)==0xFFFFFF && GetPixel(dc,rect.Right-3,100)==0xFFFFFF && GetPixel(dc,rect.Right-3,200)==0xFFFFFF;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
@@ -363,6 +370,26 @@ try {
   }
   if ($main -eq [IntPtr]::Zero) { throw 'No main window was created.' }
   Start-Sleep -Milliseconds 500
+  $startupView=[MathomirUiProbe]::Child($main,0xE900)
+  if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Startup paper leaves a gray strip at the left or right edge.'}
+  $fitButton=[MathomirUiProbe]::Child($main,1117)
+  if($fitButton -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($fitButton)){throw 'Visible Fit width button is missing.'}
+  $originalWindow=[MathomirUiProbe]::WindowRect($main)
+  [MathomirUiProbe]::Resize($main,$originalWindow,-170)
+  Start-Sleep -Milliseconds 300
+  if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Paper width did not follow window resizing.'}
+  [MathomirUiProbe]::Send($main,273,32778)|Out-Null
+  Start-Sleep -Milliseconds 100
+  if([MathomirUiProbe]::WhiteWidth($startupView)){throw 'Manual zoom was immediately overridden by auto-fit.'}
+  [MathomirUiProbe]::Send($fitButton,245,0)|Out-Null
+  Start-Sleep -Milliseconds 100
+  if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Fit width button did not remove the gray strip.'}
+  [MathomirUiProbe]::Resize($main,$originalWindow,0)
+  Start-Sleep -Milliseconds 300
+  if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Fit width mode did not stay active after restoring window size.'}
+  Write-Output 'Page width passed: startup fills between scrollbars, resize follows width, manual zoom remains usable, visible Fit width button restores filling.'
+  [MathomirUiProbe]::Send($main,273,32775)|Out-Null
+  [MathomirUiProbe]::Send($startupView,276,0)|Out-Null
   [MathomirUiProbe]::PostMessage($main,273,[IntPtr]0xE101,[IntPtr]::Zero) | Out-Null
   $open=[IntPtr]::Zero
   for ($attempt=0; $attempt -lt 80; $attempt++) {
@@ -561,7 +588,7 @@ try {
   }
   if ($about -eq [IntPtr]::Zero) { throw 'The updated About dialog did not open.' }
   $aboutText=[MathomirUiProbe]::AllText($about)
-  if ($aboutText -notmatch 'Improved - v16' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
+  if ($aboutText -notmatch 'Improved - v17' -or $aboutText -notmatch 'Danijel Gorupec' -or $aboutText -notmatch 'MIT license') { throw 'About version or author credit is missing.' }
   [MathomirUiProbe]::PostMessage($about,273,[IntPtr]1,[IntPtr]::Zero) | Out-Null
   Write-Output "Windows UI smoke passed: visible Search, $fontMatchCount font results, no-match filter, smart sizing, RAD/DEG, About and original author credit."
 
@@ -731,3 +758,4 @@ try {
   Get-Content (Join-Path (Split-Path $exe) 'smoke-stderr.txt') -ErrorAction SilentlyContinue
   Get-ChildItem (Split-Path $exe) -Filter 'asan*' | ForEach-Object { Get-Content $_.FullName }
 }
+
