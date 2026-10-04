@@ -588,6 +588,11 @@ try {
   Start-Sleep -Milliseconds 500
   if([MathomirUiProbe]::Focus($main) -ne $view){throw 'Keyboard focus jumped back into Search after moving across the page.'}
   [MathomirUiProbe]::Send($main,273,33007)|Out-Null
+  [MathomirUiProbe]::SetText($search,'use radians')
+  [MathomirUiProbe]::PostMessage($search,256,[IntPtr]13,[IntPtr]::Zero)|Out-Null
+  Start-Sleep -Milliseconds 800
+  if([MathomirUiProbe]::IsWindowVisible($popup) -or [MathomirUiProbe]::Focus($main) -ne $view){throw 'Keyboard search selection did not return focus to the page.'}
+  [MathomirUiProbe]::Send($main,273,33007)|Out-Null
   [MathomirUiProbe]::SetText($search,'about')
   [MathomirUiProbe]::Mouse($list,513,1,20,8)
   [MathomirUiProbe]::Mouse($list,514,0,20,8)
