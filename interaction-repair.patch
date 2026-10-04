@@ -2967,7 +2967,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..51435e8 100644
+index fc832eb..e07cc29 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4088,7 +4088,7 @@ index fc832eb..51435e8 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9776,957 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9776,968 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -4724,6 +4724,17 @@ index fc832eb..51435e8 100644
 +    }
 +
 +    if (ViewOnlyMode || IsDrawingMode || FreePlacementGesture) return;
++    tDocumentStruct *hover=ResizeHandleDocument();
++    if(hover && !ViewOnlyMode && !IsDrawingMode && !PrintRendering)
++    {
++        CRect outline((hover->absolute_X-ViewX)*ViewZoom/100-3,
++            (hover->absolute_Y-hover->Above-ViewY)*ViewZoom/100-3,
++            (hover->absolute_X+hover->Length-ViewX)*ViewZoom/100+3,
++            (hover->absolute_Y+hover->Below-ViewY)*ViewZoom/100+3);
++        int saved=dc->SaveDC();CPen pen(PS_DOT,1,RGB(232,232,232));
++        dc->SelectObject(&pen);dc->SelectStockObject(NULL_BRUSH);dc->Rectangle(outline);
++        dc->RestoreDC(saved);
++    }
 +    PaintMoveGrip(dc);
 +    PaintSizeHandle(dc);
 +    tDocumentStruct *object=RotationHandleDocument();
@@ -5046,7 +5057,7 @@ index fc832eb..51435e8 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10739,108 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10750,108 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -5155,7 +5166,7 @@ index fc832eb..51435e8 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +10857,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +10868,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -5163,7 +5174,7 @@ index fc832eb..51435e8 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11535,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11546,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -5199,7 +5210,7 @@ index fc832eb..51435e8 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11569,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11580,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -5207,7 +5218,7 @@ index fc832eb..51435e8 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +11684,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +11695,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -5215,7 +5226,7 @@ index fc832eb..51435e8 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12090,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12101,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -5223,7 +5234,7 @@ index fc832eb..51435e8 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12391,138 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12402,138 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
