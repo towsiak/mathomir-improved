@@ -867,7 +867,7 @@ index 36238b0..cbff598 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..3555935 100644
+index 1ef18dd..971843b 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -2072,7 +2072,7 @@ index 1ef18dd..3555935 100644
  					X=Xmin*pow(10.0,i*f2);
 -				*(YY[kk]+i)=Func[kk]->PlotterCalculateFunctionValue(X,VarPos[kk]);
 +				*(YY[kk]+i)=Func[kk]->PlotterCalculateFunctionValue(X,VarPos[kk],is_x_pi!=0);
-+                if(kk==0 && i==0)GraphDiagnostic("first sample x,y,width,height",X,YY[kk][i],Xlen,Ylen);
++                if(i==0)GraphDiagnostic("slot,sample y,width,height",kk,YY[kk][i],Xlen,Ylen);
  			}
  		}
  

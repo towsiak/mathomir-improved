@@ -843,7 +843,7 @@ try {
         if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Vertical line did not span the plot in $($case.name) at y=$height."}
       }
       $px=[int]($area[0]+.8*($area[2]-$area[0]));$py=[int]($area[3]-(1-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]))
-      if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,4,0x0000CC00)){throw 'An ordinary horizontal function disappeared beside a vertical line.'}
+      if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,4,0x0000CC00)){[MathomirUiProbe]::DumpRegion($view,$px,$py);Write-Output $xml;throw 'An ordinary horizontal function disappeared beside a vertical line.'}
     }
     if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw 'Graph repaint covered text placed above the graph.'}
     foreach($position in @(@(350,300),@(465,390),@(850,50))){
