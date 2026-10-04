@@ -574,7 +574,8 @@ try {
   [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($tableDialog,1123),'150')
   [MathomirUiProbe]::Send([MathomirUiProbe]::Child($tableDialog,1125),334,1)|Out-Null
   [MathomirUiProbe]::PostMessage($tableDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
-  Start-Sleep -Milliseconds 200
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($tableDialog)){break}}
+  Start-Sleep -Milliseconds 400
   [MathomirUiProbe]::Mouse($view,512,0,450,220)
   [MathomirUiProbe]::Mouse($view,513,1,450,220)
   [MathomirUiProbe]::Mouse($view,514,0,450,220)
@@ -587,7 +588,7 @@ try {
   if($cells.SelectNodes('./row_sep').Count -lt 2){throw 'Configured table did not create three rows.'}
   if($cells.SelectNodes('./col_sep[contains(@data,"-")]').Count -ne 9){throw 'Table borders were not retained.'}
   $tableFont=$tableObject.SelectSingleNode('./*[self::ex or self::expr]')
-  if(($tableFont.fh -ne '150') -and ($tableFont.fnt_h -ne '150')){throw 'Configured table font was not retained.'}
+  if(($tableFont.fh -ne '150') -and ($tableFont.fnt_h -ne '150')){Write-Output $tableObject.OuterXml;throw 'Configured table font was not retained.'}
   Write-Output 'Table setup passed: row/column/font/alignment controls, placement, native editable cells and saved borders.'
   $intervalCounts=@()
   foreach($command in 33042,33043,33044,33045){
