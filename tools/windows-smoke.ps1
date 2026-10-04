@@ -1,3 +1,4 @@
+$env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $ErrorActionPreference = 'Stop'
 function Get-GraphRange([xml]$document) {
   $graph=$document.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]')
@@ -848,6 +849,9 @@ try {
   if([MathomirUiProbe]::Text($main) -notmatch 'Recovered document'){throw 'Latest recovery was not reopened.'}
   Write-Output 'Recovery smoke passed: latest edits, two timestamped immutable versions, forced crash, restart and reopen Latest.'
 } finally {
+  $graphLog=Join-Path (Split-Path $exe) 'graph-diagnostics.txt'
+  if(Test-Path $graphLog){Get-Content $graphLog -Tail 100|Write-Output}
+
   $appProcess.Refresh()
   if ($appProcess.HasExited) {Write-Output "App exit code: $($appProcess.ExitCode)"}
   if ($env:MATHOMIR_DIAGNOSTIC_STARTUP -and !$appProcess.HasExited) {for($wait=0;$wait -lt 20 -and !$appProcess.HasExited;$wait++){Start-Sleep -Milliseconds 250;$appProcess.Refresh()}}
