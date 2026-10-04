@@ -64,7 +64,8 @@ public static class MathomirUiProbe {
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;uint c=GetPixel(dc,cx,cy);if((c&255)<192||((c>>8)&255)<192||((c>>16)&255)<192)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=5;r++)for(int k=-2;k<=2;k++){left|=GetPixel(dc,cx-r,cy+k)==0;right|=GetPixel(dc,cx+r,cy+k)==0;top|=GetPixel(dc,cx+k,cy-r)==0;bottom|=GetPixel(dc,cx+k,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
   public static int SafeGuidePixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=70;y<180;y++)if(GetPixel(dc,51,y)==0xE0E0E0)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int PrintWarningPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=8;y<34;y++)for(int x=18;x<390;x++)if(GetPixel(dc,x,y)==0x1464AA)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
-  public static int GraphLegendPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=103;y<130;y++)for(int x=156;x<190;x++){uint color=GetPixel(dc,x,y);if((color&255)+((color>>8)&255)+((color>>16)&255)<650)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
+  public static int GraphControlBackground(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=104;y<116;y++)for(int x=154;x<167;x++)if(ColorClose(GetPixel(dc,x,y),0xE0E0E0))count++;return count;}finally{ReleaseDC(hwnd,dc);}}
+  public static int GraphLegendPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=126;y<176;y++)for(int x=156;x<190;x++){uint color=GetPixel(dc,x,y);if((color&255)+((color>>8)&255)+((color>>16)&255)<650)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
@@ -852,6 +853,10 @@ try {
       Start-Sleep -Milliseconds 150
       if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw "Graph hover covered boxed text in $($case.name)."}
     }
+    [MathomirUiProbe]::Mouse($view,512,0,350,300)
+    Start-Sleep -Milliseconds 150
+    if([MathomirUiProbe]::GraphControlBackground($view) -lt 40){[MathomirUiProbe]::DumpRegion($view,160,110);throw 'Function legend covered the graph control row.'}
+    if([MathomirUiProbe]::GraphLegendPixels($view) -lt 5){throw 'Function labels disappeared from their separate row while controls were visible.'}
     Write-Output "Native graph domain passed: $($case.name)"
   }
 

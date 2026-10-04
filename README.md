@@ -53,3 +53,5 @@ Unit circle maker: drawing palette circle icon or Search 'unit circle'; configur
 
 Unit-circle points: filled start/end markers are enabled by default; common angles can also be marked. Enter optional extra point angles separated by commas (up to 32) in degrees or radians; angle and coordinate labels follow the existing switches. Extra points are marked even when automatic endpoint markers are off.
 Vertical lines: enter x=3, x=-2, x=0, or x=1/2 in any colored graph slot. Constant expressions are evaluated with the usual math engine, and the line spans the visible height alongside ordinary functions. Saving, zooming and printing retain the equation. Variable-dependent x= equations are not supported.
+
+Graph header layout: a reserved top row for zoom/Fit/analysis/axis-label controls; colored function expressions wrap in rows beneath it. The right-hand function button column stays clear.

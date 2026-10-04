@@ -279,3 +279,5 @@ Unit circle maker: drawing palette circle icon or Search 'unit circle'; configur
 \nTeaching triangle palette presets: 45-45-90 with sides 1, 1, sqrt(2), and 30-60-90 with sides 1, sqrt(3), 2. Native exact radical labels, marked angles, right-angle square; grouped for moving, resizing and rotation.\n\nGraph legend: small f1-f8 labels and native function expressions along the top, each matched to its curve color; wraps into rows and updates when the graph expression changes.\n\nNumber-line palette includes four semi-infinite rays: open or solid endpoint, extending left or right, each with an editable endpoint label.\n
 Unit-circle points: filled endpoint markers and optional comma-separated extra point angles, with editable angle/coordinate labels.
 Vertical graph lines: x=constant in any graph slot, including negative values and fractions; alongside ordinary functions, with zoom, save and print support.
+
+Graph header layout: a reserved top row for zoom/Fit/analysis/axis-label controls; colored function expressions wrap in rows beneath it. The right-hand function button column stays clear.
