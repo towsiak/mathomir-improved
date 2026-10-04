@@ -57,6 +57,7 @@ public static class MathomirUiProbe {
   // Fixed bounds of the 400 by 320 graph fixture at (100,100), zoom 100.
   // Pixel color scans confuse horizontal grid lines with the bottom margin.
   public static int[] PlotArea(IntPtr hwnd){return new int[]{152,102,498,396};}
+  public static bool CurveColorNear(IntPtr hwnd,int x,int y,int radius,uint color){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==color)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
   public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
   public static void DumpRegion(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{StringBuilder text=new StringBuilder();text.Append("GRAPHPIXELS:");for(int j=-10;j<=10;j++)for(int i=-10;i<=10;i++){text.Append(GetPixel(dc,x+i,y+j).ToString("X6"));text.Append(',');}Console.WriteLine(text.ToString());}finally{ReleaseDC(hwnd,dc);}}
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;uint c=GetPixel(dc,cx,cy);if((c&255)<192||((c>>8)&255)<192||((c>>16)&255)<192)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=5;r++)for(int k=-2;k<=2;k++){left|=GetPixel(dc,cx-r,cy+k)==0;right|=GetPixel(dc,cx+r,cy+k)==0;top|=GetPixel(dc,cx+k,cy-r)==0;bottom|=GetPixel(dc,cx+k,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
@@ -842,7 +843,7 @@ try {
         if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw "Vertical line did not span the plot in $($case.name) at y=$height."}
       }
       $px=[int]($area[0]+.8*($area[2]-$area[0]));$py=[int]($area[3]-(1-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]))
-      if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){throw 'An ordinary horizontal function disappeared beside a vertical line.'}
+      if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,4,0x0000CC00)){throw 'An ordinary horizontal function disappeared beside a vertical line.'}
     }
     if([MathomirUiProbe]::RedOverlay($view) -lt 15){throw 'Graph repaint covered text placed above the graph.'}
     foreach($position in @(@(350,300),@(465,390),@(850,50))){
