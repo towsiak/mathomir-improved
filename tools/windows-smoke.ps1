@@ -43,10 +43,11 @@ public static class MathomirUiProbe {
   [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;}
   [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr hwnd,out Rect rect);
   [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr hwnd,out Rect rect);
+  [DllImport("user32.dll")] static extern int GetSystemMetrics(int index);
   [DllImport("user32.dll")] static extern bool MoveWindow(IntPtr hwnd,int x,int y,int width,int height,bool repaint);
   public static Rect WindowRect(IntPtr hwnd){Rect rect;GetWindowRect(hwnd,out rect);return rect;}
-  public static void Resize(IntPtr hwnd,Rect rect,int delta){if(!MoveWindow(hwnd,rect.Left,rect.Top,rect.Right-rect.Left+delta,rect.Bottom-rect.Top,true))throw new Exception("Could not resize window");}
-  public static bool WhiteWidth(IntPtr hwnd){Rect rect;GetClientRect(hwnd,out rect);IntPtr dc=GetDC(hwnd);try{return GetPixel(dc,3,100)==0xFFFFFF && GetPixel(dc,rect.Right-3,100)==0xFFFFFF && GetPixel(dc,rect.Right-3,200)==0xFFFFFF;}finally{ReleaseDC(hwnd,dc);}}
+  public static void Resize(IntPtr hwnd,Rect rect,int delta){int width=Math.Min(GetSystemMetrics(0),rect.Right-rect.Left+delta);int left=Math.Max(0,Math.Min(rect.Left,GetSystemMetrics(0)-width));if(!MoveWindow(hwnd,left,rect.Top,width,rect.Bottom-rect.Top,true))throw new Exception("Could not resize window");}
+  public static bool WhiteWidth(IntPtr hwnd){Rect rect;GetClientRect(hwnd,out rect);IntPtr dc=GetDC(hwnd);try{uint a=GetPixel(dc,3,100),b=GetPixel(dc,rect.Right-3,100),c=GetPixel(dc,rect.Right-3,200);Console.WriteLine("Paper pixel probe: width="+rect.Right+", left="+a.ToString("X")+", right="+b.ToString("X")+","+c.ToString("X"));return a==0xFFFFFF && b==0xFFFFFF && c==0xFFFFFF;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
