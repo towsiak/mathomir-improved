@@ -378,7 +378,9 @@ try {
   [MathomirUiProbe]::Resize($main,$originalWindow,-170)
   Start-Sleep -Milliseconds 300
   if(![MathomirUiProbe]::WhiteWidth($startupView)){throw 'Paper width did not follow window resizing.'}
-  [MathomirUiProbe]::Send($main,273,32778)|Out-Null
+  [MathomirUiProbe]::Resize($main,$originalWindow,(1000-($originalWindow.Right-$originalWindow.Left)))
+  Start-Sleep -Milliseconds 200
+  [MathomirUiProbe]::Send($startupView,273,32778)|Out-Null
   Start-Sleep -Milliseconds 100
   if([MathomirUiProbe]::WhiteWidth($startupView)){throw 'Manual zoom was immediately overridden by auto-fit.'}
   [MathomirUiProbe]::Send($fitButton,245,0)|Out-Null
