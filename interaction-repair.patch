@@ -3109,7 +3109,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..fffd96e 100644
+index fc832eb..cffb867 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -5516,7 +5516,7 @@ index fc832eb..fffd96e 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12494,346 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12494,358 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -5692,6 +5692,7 @@ index fc832eb..fffd96e 100644
 +    IntervalLine(drawing,tipX,tipY,tipX-tx*10+ty*5,tipY-ty*10-tx*5,2);IntervalLine(drawing,tipX,tipY,tipX-tx*10-ty*5,tipY-ty*10+tx*5,2);
 +    for(int endpoint=0;endpoint<2;endpoint++)
 +    {
++        if(endpoint && fabs(remainder(setup.end-setup.start,360.))<1e-8)continue;
 +        double angle=endpoint?setup.end:setup.start,a=angle*pi/180,x=c+r*cos(a),y=c-r*sin(a);IntervalLine(drawing,c,c,x,y,2);if(setup.points)UnitPoint(drawing,x,y);
 +        CExpression label(NULL,NULL,80);
 +        if(setup.labels){UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a),0,0);}
@@ -5702,19 +5703,30 @@ index fc832eb..fffd96e 100644
 +        }
 +    }
 +    if(setup.triangle){double x=c+r*cos(end),y=c-r*sin(end);IntervalLine(drawing,c,c,x,c);IntervalLine(drawing,x,c,x,y);double dx=x>=c?-7:7,dy=y>=c?7:-7;IntervalLine(drawing,x+dx,c,x+dx,c+dy);IntervalLine(drawing,x+dx,c+dy,x,c+dy);}
++    const int commonAngles[]={0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330};
 +    if(setup.common)
 +    {
-+        const int angles[]={0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330};
-+        for(int i=0;i<16;i++){double a=angles[i]*pi/180;if(setup.points)UnitPoint(drawing,c+r*cos(a),c-r*sin(a));IntervalLine(drawing,c+(r-4)*cos(a),c-(r-4)*sin(a),c+(r+4)*cos(a),c-(r+4)*sin(a));
-+            if(fabs(remainder(setup.start-angles[i],360.))<1e-8 || fabs(remainder(setup.end-angles[i],360.))<1e-8)continue;
-+            CExpression label(NULL,NULL,65);UnitAngleLabel(&label,angles[i],setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+20)*cos(a)-12,c-(r+20)*sin(a),0,0);}
++        for(int i=0;i<16;i++)
++        {
++            double angle=commonAngles[i],a=angle*pi/180;
++            bool endpoint=fabs(remainder(setup.start-angle,360.))<1e-8 || fabs(remainder(setup.end-angle,360.))<1e-8;
++            bool extra=false;
++            for(size_t j=0;j<setup.pointAngles.size();j++)if(fabs(remainder(setup.pointAngles[j]-angle,360.))<1e-8)extra=true;
++            if(setup.points && !endpoint && !extra)UnitPoint(drawing,c+r*cos(a),c-r*sin(a));
++            IntervalLine(drawing,c+(r-4)*cos(a),c-(r-4)*sin(a),c+(r+4)*cos(a),c-(r+4)*sin(a));
++            if(endpoint || extra)continue;
++            CExpression label(NULL,NULL,65);UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+20)*cos(a)-12,c-(r+20)*sin(a),0,0);
++        }
 +    }
 +    for(size_t i=0;i<setup.pointAngles.size();i++)
 +    {
-+        double angle=setup.pointAngles[i],a=angle*pi/180;UnitPoint(drawing,c+r*cos(a),c-r*sin(a));
-+        bool duplicate=fabs(remainder(angle-setup.start,360.))<1e-8 || fabs(remainder(angle-setup.end,360.))<1e-8;
++        double angle=setup.pointAngles[i],a=angle*pi/180;
++        bool endpoint=fabs(remainder(angle-setup.start,360.))<1e-8 || fabs(remainder(angle-setup.end,360.))<1e-8;
++        bool duplicate=false;
 +        for(size_t j=0;j<i;j++)if(fabs(remainder(angle-setup.pointAngles[j],360.))<1e-8)duplicate=true;
 +        if(duplicate)continue;
++        if(!endpoint || !setup.points)UnitPoint(drawing,c+r*cos(a),c-r*sin(a));
++        if(endpoint)continue;
 +        if(setup.labels){CExpression label(NULL,NULL,65);UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a),0,0);}
 +        if(setup.coordinates){CExpression label(NULL,NULL,70);label.InsertEmptyElement(0,2,'(');UnitValue(&label,cos(a));label.InsertEmptyElement(label.m_NumElements,2,',');UnitValue(&label,sin(a));label.InsertEmptyElement(label.m_NumElements,2,')');drawing->CopyExpressionIntoSubgroup(&label,c+(r+65)*cos(a)-25,c-(r+65)*sin(a)+10,0,0);}
 +    }

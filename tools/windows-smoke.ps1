@@ -898,7 +898,8 @@ try {
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1130),$(if($radian){'pi/6'}else{'30'}))
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1131),$(if($radian){'5*pi/6'}else{'150'}))
     [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1134),334,[int]$radian)|Out-Null
-    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1140),$(if($radian){'pi/4, -pi/2'}else{'45, -90'}))
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1140),$(if($radian){'pi/4, -pi/2, pi/3, 7*pi/3, pi/6'}else{'45, -90, 60, 420, 30'}))
+    [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1137),241,1)|Out-Null
     if([MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1139),240,0) -ne 1){throw 'Unit circle point markers were not enabled by default.'}
     [MathomirUiProbe]::PostMessage($unitDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
     for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($unitDialog)){break}}
@@ -911,6 +912,7 @@ try {
     [xml]$unitSaved=Get-Content $marginFixture -Raw
     $unitObject=$unitSaved.SelectSingleNode('/mathomir/*[last()]')
     if($unitObject.GetAttribute('t') -ne '2' -and $unitObject.GetAttribute('type') -ne '2'){throw 'Unit circle was not placed as a drawing.'}
+    if($unitObject.SelectNodes('.//subexp').Count -ne 21){Write-Output $unitObject.OuterXml;throw 'Common, extra, and coterminal angles produced duplicate or missing unit circle labels.'}
     if($unitObject.SelectNodes('.//subexp').Count -lt 8){Write-Output $unitObject.OuterXml;throw 'Unit circle labels and exact coordinates were missing.'}
     if($unitObject.SelectNodes('.//fra | .//elm[@tp="4"]').Count -lt 2){Write-Output $unitObject.OuterXml;throw 'Exact coordinate fractions were not retained.'}
   }
