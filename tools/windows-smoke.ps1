@@ -550,15 +550,15 @@ try {
     $labels=$interval.SelectNodes('./subexp')
     if($labels.Count -ne 2){throw "Interval $command did not place with two editable endpoint labels."}
     $segments=0
-    foreach($line in $interval.SelectNodes('./dw')){$segments+=($line.d.Split(';').Count-1)}
+    foreach($line in $interval.SelectNodes('./*[self::dw or self::draw]')){if($line.HasAttribute('d')){$segments+=($line.d.Split(';').Count-1)}else{$segments+=@($line.Attributes | Where-Object {$_.Name -match '^X[0-9]+$'}).Count-1}}
     $intervalCounts+=$segments
   }
-  if($intervalCounts[1]-$intervalCounts[0] -ne 18 -or $intervalCounts[2]-$intervalCounts[0] -ne 9 -or $intervalCounts[3]-$intervalCounts[0] -ne 9){throw "Endpoint fill choices are inconsistent: $intervalCounts"}
+  if($intervalCounts[1]-$intervalCounts[0] -ne 18 -or $intervalCounts[2]-$intervalCounts[0] -ne 9 -or $intervalCounts[3]-$intervalCounts[0] -ne 9){Write-Output $interval.OuterXml;throw "Endpoint fill choices are inconsistent: $intervalCounts"}
   $beforeRotation=$interval.OuterXml
   $intervalX=0;$intervalY=0
   foreach($obj in $intervalSaved.SelectNodes('/mathomir/*')){if($obj.HasAttribute('X')){$intervalX=[int]$obj.X};if($obj.HasAttribute('Y')){$intervalY=[int]$obj.Y}}
-  $axisData=$interval.SelectSingleNode('./dw').d.Split('|')[1].Split(';')[0].Split(',')
-  $axisY=[int]$axisData[1]/32
+  $firstLine=$interval.SelectSingleNode('./*[self::dw or self::draw]')
+  if($firstLine.HasAttribute('d')){$axisData=$firstLine.d.Split('|')[1].Split(';')[0].Split(',');$axisY=[int]$axisData[1]/32}else{$axisY=[int]$firstLine.Y1/1000}
   for($probe=15;$probe -lt 50;$probe+=5){[MathomirUiProbe]::Mouse($view,512,0,($intervalX+$probe),($intervalY+$axisY))}
   [MathomirUiProbe]::Send($main,273,33008)|Out-Null
   $handleX=$intervalX+252;$handleY=$intervalY-10
