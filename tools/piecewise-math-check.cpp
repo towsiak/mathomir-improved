@@ -1,8 +1,20 @@
 #include "Piecewise.h"
+#include "GraphDiscontinuities.h"
 #include <cassert>
 #include <iostream>
 static double Evaluate(const char *s,double x=0,bool radians=true){Piecewise::Formula p;std::string e;assert(p.Parse(s,e));return p.Value(x,radians);}
 int main(){
+ for(double span:{1e-10,1e-6,1.0,6000.0,1e10}) {
+  double limit=0;
+  assert(GraphDiscontinuities::HoleLimit([](double x){return std::sin(x)/x;},0,span,limit));
+  assert(std::fabs(limit-1)<1e-7);
+  assert(GraphDiscontinuities::HoleLimit([](double x){return ((x+2)*(x-1))/((x+2)*(x-5));},-2,span,limit));
+  assert(std::fabs(limit-3.0/7)<1e-7);
+  assert(!GraphDiscontinuities::HoleLimit([](double x){return 1/x;},0,span,limit));
+  assert(!GraphDiscontinuities::HoleLimit([](double x){return 1/(x*x);},0,span,limit));
+  assert(!GraphDiscontinuities::HoleLimit([](double x){return x<0?-1.0:1.0;},0,span,limit));
+ }
+
  assert(Evaluate("-x^2",3)==-9);assert(Evaluate("(-x)^2",3)==9);assert(Evaluate("2^3^2")==512);
  assert(Evaluate("2x+3",4)==11);assert(Evaluate("(x+1)(x-1)",4)==15);assert(Evaluate("1/2+3/4")==1.25);
  assert(std::fabs(Evaluate("sin(pi/2)")-1)<1e-12);assert(std::fabs(Evaluate("sin(x)",90,false)-1)<1e-12);

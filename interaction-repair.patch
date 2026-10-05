@@ -2764,10 +2764,10 @@ index 0000000..7dac989
 +}
 diff --git a/Mathomir/GraphDiscontinuities.h b/Mathomir/GraphDiscontinuities.h
 new file mode 100644
-index 0000000..ba6505e
+index 0000000..8af9eb0
 --- /dev/null
 +++ b/Mathomir/GraphDiscontinuities.h
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,61 @@
 +#pragma once
 +#include <cmath>
 +#include <vector>
@@ -2808,19 +2808,25 @@ index 0000000..ba6505e
 +}
 +template<class Evaluate> bool HoleLimit(Evaluate evaluate,double x,double span,double& value) {
 +    if(!Finite(x)||!Finite(span)||span<=0)return false;
-+    double previousGap=0,previousValue=0;
-+    for(int i=0;i<5;i++) {
-+        double h=span*1e-3*std::pow(0.1,i);
++    // Use a local neighbourhood, rather than letting viewport zoom determine
++    // whether a removable discontinuity has a limit. Require repeated agreement
++    // before accepting it; poles and jumps must remain excluded.
++    const double scale=std::max(1.0,std::fabs(x));
++    double h=std::max(scale*1e-4,std::min(span*1e-3,scale*1e-2));
++    double previousValue=0;int agreements=0;
++    for(int i=0;i<14;i++,h*=0.1) {
 +        if(x-h==x || x+h==x)return false;
 +        double left=evaluate(x-h),right=evaluate(x+h);
-+        if(!Finite(left)||!Finite(right))return false;
++        if(!Finite(left)||!Finite(right)){agreements=0;continue;}
 +        double gap=std::fabs(left-right),mean=(left+right)/2;
-+        double tolerance=1e-5*(1+std::fabs(mean));
-+        if(i>=3 && (gap>tolerance || std::fabs(mean-previousValue)>tolerance))return false;
-+        if(i>0 && gap>previousGap*1.5+tolerance)return false;
-+        previousGap=gap;previousValue=mean;
++        double tolerance=1e-7*(1+std::fabs(mean));
++        if(i>0 && gap<=tolerance && std::fabs(mean-previousValue)<=tolerance)
++            ++agreements;
++        else agreements=0;
++        previousValue=mean;
++        if(agreements>=3){value=mean;return true;}
 +    }
-+    value=previousValue;return true;
++    return false;
 +}
 +}
 diff --git a/Mathomir/GraphZoom.h b/Mathomir/GraphZoom.h

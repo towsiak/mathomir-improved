@@ -830,6 +830,20 @@ try {
     @{name='power';xmin=-2.7;xmax=3.3;ymin=-.2;ymax=3;formula='<elm tp="3" E1="b" E2="p"><ex><var t="x" f="00" /></ex><ex><fra E1="n" E2="d"><ex><var t="2" f="00" /></ex><ex><var t="3" f="00" /></ex></fra></ex></elm>';cx=-1;cy=1},
     @{name='semicircle';xmin=-1.7;xmax=1.3;ymin=-.2;ymax=1.4;formula='<elm tp="8" E1=""><ex><var t="1" f="00" /><opr s="-" /><elm tp="3" E1="b" E2="p"><ex><var t="x" f="00" /></ex><ex><var t="2" f="00" /></ex></elm></ex></elm>';cx=1;cy=0}
   )
+  # Hole markers must survive graph-range zoom, including a range that made
+  # the old viewport-sized limit estimator reject sinc's removable hole.
+  $zoomCases=@()
+  foreach($source in @($cases | Where-Object {$_.ContainsKey('hx')})) {
+    foreach($span in @(0.0001,100.0,6000.0)) {
+      if($source.name -eq 'rational' -and $span -eq 6000.0){continue}
+      $zoomCase=$source.Clone()
+      $zoomCase.name=$source.name+'-range-'+$span
+      $zoomCase.xmin=$source.hx-$span*.45
+      $zoomCase.xmax=$source.hx+$span*.55
+      $zoomCases+=$zoomCase
+    }
+  }
+  $cases+=$zoomCases
   foreach($case in $cases){
     [MathomirUiProbe]::Send($view,258,27)|Out-Null
     [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
