@@ -102,6 +102,8 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetMenuString(IntPtr menu,uint id,StringBuilder text,int count,uint flags);
   public static string MenuText(IntPtr hwnd,uint id) {var text=new StringBuilder(256);GetMenuString(GetMenu(hwnd),id,text,256,0);return text.ToString();}
   public static void SetText(IntPtr hwnd,string text) { UIntPtr result; if(SendTextTimeout(hwnd,12,IntPtr.Zero,text,2,3000,out result)==IntPtr.Zero) throw new Exception("Search text did not respond"); }
+  public static Rect ClientRect(IntPtr hwnd){Rect rect;GetClientRect(hwnd,out rect);return rect;}
+  public static IntPtr CaptionChild(IntPtr parent,string caption){IntPtr found=IntPtr.Zero;EnumChildWindows(parent,(hwnd,p)=>{if(Text(hwnd)==caption){found=hwnd;return false;}return true;},IntPtr.Zero);return found;}
   public static IntPtr Child(IntPtr parent,int id) { IntPtr found=IntPtr.Zero; EnumChildWindows(parent,(hwnd,p)=>{if(GetDlgCtrlID(hwnd)==id){found=hwnd;return false;} return true;},IntPtr.Zero); return found; }
   public static IntPtr Window(int process,string caption) { IntPtr found=IntPtr.Zero; EnumWindows((hwnd,p)=>{uint pid; GetWindowThreadProcessId(hwnd,out pid); if(pid==process && IsWindowVisible(hwnd) && Text(hwnd)==caption){found=hwnd;return false;}return true;},IntPtr.Zero); return found; }
   public static IntPtr Dialog(int process) { IntPtr found=IntPtr.Zero; EnumWindows((hwnd,p)=>{uint pid; GetWindowThreadProcessId(hwnd,out pid); if(pid==process && IsWindowVisible(hwnd) && Class(hwnd)=="#32770"){found=hwnd;return false;}return true;},IntPtr.Zero); return found; }
@@ -995,10 +997,39 @@ try {
   }
   Write-Output 'Geometry palette passed: eight shapes and parallel lines with Z/F/U angle patterns place and reopen as native drawings.'
 
-  [MathomirUiProbe]::PostMessage($main,273,[IntPtr]33071,[IntPtr]::Zero)|Out-Null
+  $marginFixture=Join-Path (Split-Path $exe) 'piecewise-created-smoke.mom'
+  '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content -LiteralPath $marginFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$marginFixture)
+  Start-Sleep -Milliseconds 150
+  [MathomirUiProbe]::Send($view,276,4)|Out-Null
+  for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
+  [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+  # Open the editor through its actual drawing-palette icon, next to Plotter.
+  $toolbox=[MathomirUiProbe]::CaptionChild($main,'Toolbox')
+  if($toolbox -eq [IntPtr]::Zero){throw 'Drawing palette was missing.'}
+  $toolRect=[MathomirUiProbe]::WindowRect($toolbox)
+  $toolSize=$toolRect.Right-$toolRect.Left
+  $client=[MathomirUiProbe]::ClientRect($main)
+  $itemHeight=[int][Math]::Floor(($client.Bottom-[Math]::Floor($toolSize/2)-$toolSize-7)/8)
+  $itemHeight=[Math]::Max([Math]::Floor($toolSize/3),[Math]::Min([Math]::Floor(2*$toolSize/3),$itemHeight))
+  if($itemHeight -lt $toolSize/2){$itemHeight+=[Math]::Floor([Math]::Floor($toolSize/3)/8)}
+  $itemHeight=$itemHeight -band 0xFFFE
+  $arrowX=$toolSize-3;$arrowY=[Math]::Floor($toolSize/2)+7*$itemHeight-3
+  [MathomirUiProbe]::Mouse($toolbox,512,0,$arrowX,$arrowY)
+  [MathomirUiProbe]::Mouse($toolbox,513,1,$arrowX,$arrowY)
+  [MathomirUiProbe]::Mouse($toolbox,514,0,$arrowX,$arrowY)
+  Start-Sleep -Milliseconds 100
+  $palette=[MathomirUiProbe]::Window($appProcess.Id,'Subtoolbox')
+  if($palette -eq [IntPtr]::Zero){throw 'Graph drawing palette did not open.'}
+  $pieceX=[int](6*$toolSize/2+$toolSize/4);$pieceY=[int]($toolSize/3)
+  [MathomirUiProbe]::Mouse($palette,512,0,$pieceX,$pieceY)
+  [MathomirUiProbe]::PostMessage($palette,513,[IntPtr]1,[IntPtr](($pieceY -shl 16) -bor $pieceX))|Out-Null
+  [MathomirUiProbe]::PostMessage($palette,514,[IntPtr]0,[IntPtr](($pieceY -shl 16) -bor $pieceX))|Out-Null
+
   $pieceDialog=[IntPtr]::Zero
   for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$pieceDialog=[MathomirUiProbe]::Window($appProcess.Id,'Piecewise function grapher');if($pieceDialog -ne [IntPtr]::Zero){break}}
-  if($pieceDialog -eq [IntPtr]::Zero){throw 'Piecewise editor did not open.'}
+  if($pieceDialog -eq [IntPtr]::Zero){throw 'Piecewise editor did not open from the palette icon.'}
+  Write-Output 'Piecewise palette passed: icon beside Plotter opens the editor.'
   [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
   if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'f\(0\) = 1'){throw 'Piecewise value check selected the wrong branch at the boundary.'}
   [MathomirUiProbe]::Send([MathomirUiProbe]::Child($pieceDialog,1207),241,0)|Out-Null
@@ -1023,7 +1054,32 @@ try {
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$pieceSaved=Get-Content $marginFixture -Raw
   if($pieceSaved.SelectNodes('/mathomir/*[last()]//piece').Count -ne 2){Write-Output $pieceSaved.OuterXml;throw 'Piecewise graph did not save its formula and interval metadata.'}
+  if(!$pieceSaved.SelectSingleNode('/mathomir/*[last()]/*[self::dw or self::draw][@spec="51"]')){throw 'New piecewise graph was hidden inside a group.'}
+  Start-Sleep -Milliseconds 1500
+  [MathomirUiProbe]::Mouse($view,512,0,850,50)
+  foreach($sample in @(@(-1,1,0),@(1,2,0x0000CC00))){
+    $px=[int](202+($sample[0]+5)/10*546);$py=[int](566-($sample[1]+3)/9*414)
+    if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,5,$sample[2])){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw 'Editor-created piecewise graph did not paint both branches.'}
+  }
+  Write-Output 'Piecewise placement passed: editor-created graph paints both colored branches.'
 
+
+  $groupFixture=Join-Path (Split-Path $exe) 'piecewise-grouped-smoke.mom'
+  $placed=$pieceSaved.SelectSingleNode('/mathomir/*[last()]')
+  $legacy=$pieceSaved.Clone()
+  $legacyObject=$legacy.SelectSingleNode('/mathomir/*[last()]')
+  $group=$legacy.CreateElement('gr');$group.SetAttribute('d','0,0;19200,14080')
+  while($legacyObject.HasChildNodes){$group.AppendChild($legacyObject.FirstChild)|Out-Null}
+  $legacyObject.AppendChild($group)|Out-Null
+  $legacy.Save($groupFixture)
+  [MathomirUiProbe]::OpenFile($main,$groupFixture)
+  Start-Sleep -Milliseconds 1500
+  [MathomirUiProbe]::Mouse($view,512,0,850,50)
+  foreach($sample in @(@(-1,1,0),@(1,2,0x0000CC00))){
+    $px=[int](202+($sample[0]+5)/10*546);$py=[int](566-($sample[1]+3)/9*414)
+    if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,5,$sample[2])){throw 'Previously grouped piecewise graph remained blank after reopening.'}
+  }
+  Write-Output 'Grouped graph passed: earlier piecewise graphs paint after reopening.'
   $pieceFixture=Join-Path (Split-Path $exe) 'piecewise-endpoints-smoke.mom'
   $pieceAxes=@(-5,5,-2,4)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
   $pieceSlots=@(-1,2,1)|ForEach-Object {'<subexp d="0,0;4000,1000"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
