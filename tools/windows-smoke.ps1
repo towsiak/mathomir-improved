@@ -942,9 +942,9 @@ try {
   }
   Write-Output 'Number line rays passed: four open/closed and left/right palette commands place editable diagrams.'
 
-  $geometrySegments=@(3,5,4,4,4,4,96,96,6,42,42,42)
-  foreach($shape in 0..11){
-    [MathomirUiProbe]::Send($view,273,33059+$shape)|Out-Null
+  $geometrySegments=@(3,5,4,4,4,4,96,96,6,42,42,42,3)
+  foreach($shape in 0..12){
+    [MathomirUiProbe]::Send($view,273,$(if($shape -eq 12){33072}else{33059+$shape}))|Out-Null
     [MathomirUiProbe]::Mouse($view,512,0,300,300)
     [MathomirUiProbe]::Mouse($view,513,1,300,300)
     [MathomirUiProbe]::Mouse($view,514,0,300,300)
@@ -964,6 +964,87 @@ try {
     Start-Sleep -Milliseconds 100
   }
   Write-Output 'Geometry palette passed: eight shapes and parallel lines with Z/F/U angle patterns place and reopen as native drawings.'
+
+  [MathomirUiProbe]::PostMessage($main,273,[IntPtr]33071,[IntPtr]::Zero)|Out-Null
+  $pieceDialog=[IntPtr]::Zero
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$pieceDialog=[MathomirUiProbe]::Window($appProcess.Id,'Piecewise function grapher');if($pieceDialog -ne [IntPtr]::Zero){break}}
+  if($pieceDialog -eq [IntPtr]::Zero){throw 'Piecewise editor did not open.'}
+  [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'f\(0\) = 1'){throw 'Piecewise value check selected the wrong branch at the boundary.'}
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($pieceDialog,1207),241,0)|Out-Null
+  [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'undefined'){throw 'Excluded boundary was treated as included.'}
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($pieceDialog,1207),241,1)|Out-Null
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1206),'-1')
+  [MathomirUiProbe]::Send($pieceDialog,273,1185)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'overlap'){throw 'Overlapping piecewise intervals were not rejected.'}
+  [MathomirUiProbe]::Send($pieceDialog,273,1170)|Out-Null
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1200),'sin(')
+  [MathomirUiProbe]::Send($pieceDialog,273,1185)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'Piece 1'){throw 'Invalid piecewise formula did not identify its row.'}
+  [MathomirUiProbe]::Send($pieceDialog,273,1170)|Out-Null
+  [MathomirUiProbe]::PostMessage($pieceDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($pieceDialog)){break}}
+  if([MathomirUiProbe]::IsWindowVisible($pieceDialog)){throw 'Valid piecewise definition could not be placed.'}
+  [MathomirUiProbe]::Mouse($view,512,0,150,150)
+  [MathomirUiProbe]::Mouse($view,513,1,150,150)
+  [MathomirUiProbe]::Mouse($view,514,0,150,150)
+  [MathomirUiProbe]::Send($view,258,27)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$pieceSaved=Get-Content $marginFixture -Raw
+  if($pieceSaved.SelectNodes('/mathomir/*[last()]/piece').Count -ne 2){throw 'Piecewise graph did not save its formula and interval metadata.'}
+
+  $pieceFixture=Join-Path (Split-Path $exe) 'piecewise-endpoints-smoke.mom'
+  $pieceAxes=@(-5,5,-2,4)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
+  $pieceSlots=@(0,2,1)|ForEach-Object {'<subexp d="0,0;4000,1000"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
+  $pieceXml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($pieceAxes -join '')+($pieceSlots -join '')+'<piece f="30" lo="-inf" hi="0" lc="0" hc="0" rad="1" /><piece f="32" lo="0" hi="inf" lc="0" hc="0" rad="1" /><piece f="31" lo="0" hi="0" lc="1" hc="1" rad="1" /></o></mathomir>'
+  $pieceXml|Set-Content -LiteralPath $pieceFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$pieceFixture)
+  Start-Sleep -Milliseconds 300
+  [MathomirUiProbe]::Send($view,276,4)|Out-Null
+  for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
+  [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+  Start-Sleep -Milliseconds 2000
+  [MathomirUiProbe]::Mouse($view,512,0,850,50)
+  $area=[MathomirUiProbe]::PlotArea($view)
+  $px=[int]($area[0]+.5*($area[2]-$area[0]));$py=[int]($area[3]-(2/6)*($area[3]-$area[1]))
+  if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw 'Piecewise excluded endpoint did not show an open circle.'}
+  $py=[int]($area[3]-(3/6)*($area[3]-$area[1]))
+  if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,2,0x000000CC)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw 'Isolated included point did not show a filled dot.'}
+  foreach($sample in @(@(-2,0,0),@(2,2,0x0000CC00))){
+    $px=[int]($area[0]+($sample[0]+5)/10*($area[2]-$area[0]));$py=[int]($area[3]-($sample[1]+2)/6*($area[3]-$area[1]))
+    if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,3,$sample[2])){throw 'Piecewise branch was not drawn inside its interval.'}
+  }
+  foreach($sample in @(@(-2,2,0x0000CC00),@(2,0,0))){
+    $px=[int]($area[0]+($sample[0]+5)/10*($area[2]-$area[0]));$py=[int]($area[3]-($sample[1]+2)/6*($area[3]-$area[1]))
+    if([MathomirUiProbe]::CurveColorNear($view,$px,$py,2,$sample[2])){throw 'Piecewise branch extended beyond its interval.'}
+  }
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [MathomirUiProbe]::OpenFile($main,$pieceFixture)
+  Start-Sleep -Milliseconds 300
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$pieceRoundTrip=Get-Content $pieceFixture -Raw
+  if($pieceRoundTrip.SelectNodes('//piece').Count -ne 3 -or $pieceRoundTrip.SelectSingleNode('//piece[@lo="0" and @hi="0" and @lc="1" and @hc="1"]') -eq $null){throw 'Piecewise endpoint definitions changed after reopening.'}
+  Write-Output 'Piecewise grapher passed: editor validation and branch evaluation, native graph creation, interval clipping, open endpoints, isolated filled points, and saved/reopened definitions.'
+
+  foreach($hatch in @(33073,33074)){
+    [MathomirUiProbe]::Send($view,273,$hatch)|Out-Null
+    [MathomirUiProbe]::Mouse($view,513,1,200,450)
+    for($hx=202;$hx -le 340;$hx+=2){[MathomirUiProbe]::Mouse($view,512,1,$hx,450)}
+    [MathomirUiProbe]::Mouse($view,514,0,340,450)
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$hatchSaved=Get-Content $pieceFixture -Raw
+    $hatchLines=$hatchSaved.SelectNodes('/mathomir/*[last()]//dw | /mathomir/*[last()]//draw')
+    if($hatchLines.Count -lt 20){throw 'Fine hatch brush did not produce closely spaced lines.'}
+    foreach($line in $hatchLines){
+      if($line.HasAttribute('d')){if([int]$line.GetAttribute('d').Split('|')[0] -lt 32){throw 'Fine hatch lines were not bold.'}}
+      elseif([int]$line.GetAttribute('width') -lt 1000){throw 'Fine hatch lines were not bold.'}
+    }
+  }
+  Write-Output 'Fine bold hatching passed: both brush directions retain dense spacing and heavier line widths.'
+
+
 
 
 

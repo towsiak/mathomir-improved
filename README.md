@@ -59,3 +59,15 @@ Graph header layout: a reserved top row for zoom/Fit/analysis/axis-label control
 ## Geometry palette
 
 Open **Geometry** on the menu bar, or the dedicated triangle-icon toolbox palette, to place a triangle, right triangle, square, rectangle, parallelogram, trapezoid, circle, or ellipse. Four more entries provide parallel lines and Z (alternate), F (corresponding), and U (co-interior) angle diagrams, with parallel marks, angle arcs, and thicker pattern strokes. Click in the document to place; move, resize, or rotate with the normal drawing grips. Search **Geometry** finds the same presets.
+
+## Piecewise function grapher
+
+Open **Graph > Piecewise function grapher** or search **piecewise**. The editor has eight formula rows, lower/upper bounds and independent endpoint inclusion checkboxes. Leave unused formulas blank. Blank bounds or `-inf`/`inf` give unbounded intervals; fractions and `pi` expressions work in bounds. Equal finite bounds with both endpoints included create an isolated point. Intervals may have gaps, but overlaps—including two included ends at the same boundary—are rejected.
+
+Formulas accept x, numbers, pi, e, arithmetic, powers, implicit multiplication (such as 2x), and sin, cos, tan, sqrt, abs, exp, ln and base-10 log. Functions require parentheses. The radians checkbox governs trig independently of the graph's axis-label mode. **Check definition** validates rows; **Evaluate f(x)** identifies the active branch or explains why a value is undefined. Jump, absolute-value and step examples are provided. Set all four graph-window bounds before placing.
+
+The graph shows each formula and its interval in matching colors, clips branches to their intervals, and draws open/filled endpoint markers. A closed point is painted after open dots when they coincide. Natural domain restrictions and discontinuities remain in effect. Definitions survive save/reopen, copying and Undo. Select or point at an existing piecewise graph and reopen the editor to update it; its colored formula buttons also open the editor. The usual zoom, fit, move and resize controls apply.
+
+The portable math checks can be run with `g++ -std=c++11 -I source/Mathomir tools/piecewise-math-check.cpp -o piecewise-check`, followed by `./piecewise-check`, after preparing the patched upstream source. Windows UI checks additionally verify interval clipping, endpoint dots and persistence.
+
+The geometry palette also includes an **obtuse triangle**. The drawing palette and Geometry menu offer **Fine bold hatch downward/upward** brushes. They use 40% of the original hatch spacing and approximately three times its line width; apply both directions for a crosshatch with smaller openings. The original hatch tools remain available.

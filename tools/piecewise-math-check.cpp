@@ -1,0 +1,25 @@
+#include "Piecewise.h"
+#include <cassert>
+#include <iostream>
+static double Evaluate(const char *s,double x=0,bool radians=true){Piecewise::Formula p;std::string e;assert(p.Parse(s,e));return p.Value(x,radians);}
+int main(){
+ assert(Evaluate("-x^2",3)==-9);assert(Evaluate("(-x)^2",3)==9);assert(Evaluate("2^3^2")==512);
+ assert(Evaluate("2x+3",4)==11);assert(Evaluate("(x+1)(x-1)",4)==15);assert(Evaluate("1/2+3/4")==1.25);
+ assert(std::fabs(Evaluate("sin(pi/2)")-1)<1e-12);assert(std::fabs(Evaluate("sin(x)",90,false)-1)<1e-12);
+ assert(Evaluate("abs(x)",-3)==3);assert(std::fabs(Evaluate("ln(exp(2))")-2)<1e-12);assert(Evaluate("log(100)")==2);
+ assert(std::fabs(Evaluate("x^(2/3)",-8)-4)<1e-12);assert(!Piecewise::Finite(Evaluate("sqrt(x)",-1)));
+ assert(!Piecewise::Finite(Evaluate("1/x",0)));assert(!Piecewise::Finite(Evaluate("tan(pi/2)")));
+ Piecewise::Formula f;std::string error;
+ for(const char *bad:{"sin(","2+","foo(x)","x=2","sin x","1..2","x;delete","1e999"})assert(!f.Parse(bad,error));
+ double bound;assert(Piecewise::Bound("pi/3",true,bound,error));assert(std::fabs(bound-3.141592653589793/3)<1e-12);assert(!Piecewise::Bound("x+1",true,bound,error));
+ Piecewise::Row a,b,c;a.formula="x^2";a.high=0;b.formula="x+1";b.low=0;b.leftClosed=true;
+ std::vector<Piecewise::Row> rows={a,b};assert(Piecewise::Validate(rows,true,error));assert(rows[0].Contains(-1));assert(!rows[0].Contains(0));assert(rows[1].Contains(0));
+ rows[0].rightClosed=true;assert(!Piecewise::Validate(rows,true,error));rows[0].rightClosed=false;rows[1].low=-1;assert(!Piecewise::Validate(rows,true,error));
+ b.low=1;rows={a,b};assert(Piecewise::Validate(rows,true,error));assert(!rows[0].Contains(.5)&&!rows[1].Contains(.5));
+ a.formula="0";a.high=0;b.formula="2";b.low=0;b.leftClosed=false;c.formula="1";c.low=c.high=0;c.leftClosed=c.rightClosed=true;
+ rows={a,b,c};assert(Piecewise::Validate(rows,true,error));assert(rows[2].Contains(0));rows[2].rightClosed=false;assert(!Piecewise::Validate(rows,true,error));
+ c.formula="1/x";c.low=c.high=0;c.leftClosed=c.rightClosed=true;rows={c};assert(!Piecewise::Validate(rows,true,error));
+ for(int i=0;i<100;i++){double x=(i-50)/10.;assert(std::fabs(Evaluate("x^2+2x+1",x)-(x+1)*(x+1))<1e-10);}
+ assert(Piecewise::Unhex(Piecewise::Hex("sin(x)/(x+1)"))=="sin(x)/(x+1)");
+ std::cout<<"Piecewise math passed: precedence, implicit multiplication, functions, trig units, domains, bounds, overlaps, gaps, and isolated points.\n";
+}
