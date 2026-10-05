@@ -1066,7 +1066,7 @@ try {
 
   foreach($test in @('outline','line')){
     $shaderFixture=Join-Path (Split-Path $exe) ('smart-shader-'+$test+'-smoke.mom')
-    $boundary=if($test -eq 'outline'){'<dw d="32|0,0;6400,0;:,6400;0,:;:,0" /><dw d="32|2560,2560;3840,:;:,3840;2560,:;:,2560" />'}else{'<dw d="32|0,3200;9600,:" />'}
+    $boundary=if($test -eq 'outline'){'<dw d="32|0,0;6400,0;6400,6400;0,6400;0,0" /><dw d="32|2560,2560;3840,2560;3840,3840;2560,3840;2560,2560" />'}else{'<dw d="32|0,3200;9600,3200" />'}
     ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100">'+$boundary+'</o></mathomir>')|Set-Content -LiteralPath $shaderFixture -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$shaderFixture)
     Start-Sleep -Milliseconds 300
