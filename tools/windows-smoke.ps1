@@ -1068,6 +1068,7 @@ try {
   $placed=$pieceSaved.SelectSingleNode('/mathomir/*[last()]')
   $legacy=$pieceSaved.Clone()
   $legacyObject=$legacy.SelectSingleNode('/mathomir/*[last()]')
+  foreach($slot in $legacyObject.SelectNodes('./subexp[position()>4]/*[self::ex or self::expr]')){$slot.RemoveAll();$slot.SetAttribute('fh','100')}
   $group=$legacy.CreateElement('gr');$group.SetAttribute('d','0,0;19200,14080')
   while($legacyObject.HasChildNodes){$group.AppendChild($legacyObject.FirstChild)|Out-Null}
   $legacyObject.AppendChild($group)|Out-Null
