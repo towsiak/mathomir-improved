@@ -55,3 +55,7 @@ Unit-circle points: filled start/end markers are enabled by default; common angl
 Vertical lines: enter x=3, x=-2, x=0, or x=1/2 in any colored graph slot. Constant expressions are evaluated with the usual math engine, and the line spans the visible height alongside ordinary functions. Saving, zooming and printing retain the equation. Variable-dependent x= equations are not supported.
 
 Graph header layout: a reserved top row for zoom/Fit/analysis/axis-label controls; colored function expressions wrap in rows beneath it. The right-hand function button column stays clear.
+
+## Geometry palette
+
+Open **Geometry** on the menu bar, or the dedicated triangle-icon toolbox palette, to place a triangle, right triangle, square, rectangle, parallelogram, trapezoid, circle, or ellipse. Four more entries provide parallel lines and Z (alternate), F (corresponding), and U (co-interior) angle diagrams, with parallel marks, angle arcs, and thicker pattern strokes. Click in the document to place; move, resize, or rotate with the normal drawing grips. Search **Geometry** finds the same presets.

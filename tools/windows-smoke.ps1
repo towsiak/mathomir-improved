@@ -942,6 +942,27 @@ try {
   }
   Write-Output 'Number line rays passed: four open/closed and left/right palette commands place editable diagrams.'
 
+  $geometrySegments=@(3,5,4,4,4,4,96,96,6,42,42,42)
+  foreach($shape in 0..11){
+    [MathomirUiProbe]::Send($view,273,33059+$shape)|Out-Null
+    [MathomirUiProbe]::Mouse($view,512,0,300,300)
+    [MathomirUiProbe]::Mouse($view,513,1,300,300)
+    [MathomirUiProbe]::Mouse($view,514,0,300,300)
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$geometrySaved=Get-Content $marginFixture -Raw
+    $geometryObject=$geometrySaved.SelectSingleNode('/mathomir/*[last()]')
+    $lines=$geometryObject.SelectNodes('.//dw | .//draw')
+    $segments=0
+    foreach($line in $lines){$segments+=($line.GetAttribute('d').Split(';').Count-1)}
+    if($segments -ne $geometrySegments[$shape]){Write-Output $geometryObject.OuterXml;throw "Geometry preset $shape did not retain its outline, parallel marks, or angle arcs."}
+    if($geometryObject.SelectSingleNode('.//*[@spec]')){throw 'Geometry preset became a special container instead of an editable native drawing.'}
+    [MathomirUiProbe]::OpenFile($main,$marginFixture)
+    Start-Sleep -Milliseconds 100
+  }
+  Write-Output 'Geometry palette passed: eight shapes and parallel lines with Z/F/U angle patterns place and reopen as native drawings.'
+
+
 
 
   [MathomirUiProbe]::OpenFile($main,$fixture)
