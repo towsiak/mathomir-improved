@@ -2764,7 +2764,7 @@ index 0000000..7dac989
 +}
 diff --git a/Mathomir/GraphDiscontinuities.h b/Mathomir/GraphDiscontinuities.h
 new file mode 100644
-index 0000000..8af9eb0
+index 0000000..ced67bd
 --- /dev/null
 +++ b/Mathomir/GraphDiscontinuities.h
 @@ -0,0 +1,61 @@
@@ -2811,8 +2811,8 @@ index 0000000..8af9eb0
 +    // Use a local neighbourhood, rather than letting viewport zoom determine
 +    // whether a removable discontinuity has a limit. Require repeated agreement
 +    // before accepting it; poles and jumps must remain excluded.
-+    const double scale=std::max(1.0,std::fabs(x));
-+    double h=std::max(scale*1e-4,std::min(span*1e-3,scale*1e-2));
++    const double scale=(std::max)(1.0,std::fabs(x));
++    double h=(std::max)(scale*1e-4,(std::min)(span*1e-3,scale*1e-2));
 +    double previousValue=0;int agreements=0;
 +    for(int i=0;i<14;i++,h*=0.1) {
 +        if(x-h==x || x+h==x)return false;
