@@ -792,15 +792,16 @@ index 531282c..f0cad5b 100644
  int CExpression::CalcChecksum()
  {
 -	if ((m_NumElements==1) && (m_pElementList->Type==5)) //special () =()	
-+	if ((m_NumElements==1) && (m_pElementList->Type==5) && (!m_RotationMilliDegrees || CalcStructuralChecksumOnly)) //special () =()
++	if ((m_NumElements==1) && (m_pElementList->Type==5) && ((!m_RotationMilliDegrees && m_BackgroundColor<0) || CalcStructuralChecksumOnly)) //special () =()
  		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
  		
  	int c=m_NumElements;
-@@ -12581,6 +12768,7 @@ int CExpression::CalcChecksum()
+@@ -12581,6 +12768,8 @@ int CExpression::CalcChecksum()
  		//c+=128*m_ParentheseHeightFactor;
  		c+=256*(m_Color+4*m_StartAsText+8*m_IsVertical);
  		c+=768*m_Alignment;
 +		c^=(unsigned int)m_RotationMilliDegrees*8191U;
++		c^=m_BackgroundColor+1;
  		if (m_pPaternalExpression) c+=500;
  		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
  		c+=m_InternalInsertionPoint;
