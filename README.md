@@ -71,3 +71,9 @@ The graph shows each formula and its interval in matching colors, clips branches
 The portable math checks can be run with `g++ -std=c++11 -I source/Mathomir tools/piecewise-math-check.cpp -o piecewise-check`, followed by `./piecewise-check`, after preparing the patched upstream source. Windows UI checks additionally verify interval clipping, endpoint dots and persistence.
 
 The geometry palette also includes an **obtuse triangle**. The drawing palette and Geometry menu offer **Fine bold hatch downward/upward** brushes. They use 40% of the original hatch spacing and approximately three times its line width; apply both directions for a crosshatch with smaller openings. The original hatch tools remain available.
+
+## Smart shader and typed backgrounds
+
+**Smart hatch downward/upward** are separate brushes in the drawing palette and Geometry menu. They recognize closed polygon/circle outlines, nested contours and holes, clip each hatch stroke at boundaries, and leave a small inset to avoid edge overshoot. Outside closed outlines they can follow a standalone straight line: start beside the line on the side you want to shade; that side stays fixed for the stroke. Open lines shorter than 40 drawing units are ignored as guides. Graph containers and bitmap images are not outline sources. Original and fine/bold hatch brushes remain available.
+
+Use the visible **Background** button, **Colors > Background colors**, or **Edit > Typed object background** to color the background of typed math or text objects. Eight light colors, a custom color chooser, and clear/transparent are available. Apply while editing, to the last touched typed object, or to selected typed objects. The background is part of the editable expression and survives copying, save/reopen, and Undo.

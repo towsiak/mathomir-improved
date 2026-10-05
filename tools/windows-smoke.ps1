@@ -1,3 +1,18 @@
+
+function ShaderPoints($object){
+  $ox=[double]$object.GetAttribute('X');$oy=[double]$object.GetAttribute('Y')
+  foreach($line in $object.SelectNodes('.//dw | .//draw')){
+    if($line.HasAttribute('d')){
+      $px=0;$py=0
+      foreach($pair in $line.GetAttribute('d').Split('|')[1].Split(';')){
+        $xy=$pair.Split(',');if($xy[0] -ne ':'){$px=[double]$xy[0]};if($xy[1] -ne ':'){$py=[double]$xy[1]}
+        [pscustomobject]@{x=$ox+$px/32;y=$oy+$py/32}
+      }
+    }else{
+      for($index=1;$line.HasAttribute('X'+$index);$index++){[pscustomobject]@{x=$ox+[double]$line.GetAttribute('X'+$index)/1000;y=$oy+[double]$line.GetAttribute('Y'+$index)/1000}}
+    }
+  }
+}
 $env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $ErrorActionPreference = 'Stop'
 function Get-GraphRange([xml]$document) {
@@ -59,6 +74,7 @@ public static class MathomirUiProbe {
   public static int[] PlotArea(IntPtr hwnd){return new int[]{152,102,498,396};}
   public static bool ColorClose(uint pixel,uint color){return Math.Abs((int)(pixel&255)-(int)(color&255))<=16 && Math.Abs((int)((pixel>>8)&255)-(int)((color>>8)&255))<=16 && Math.Abs((int)((pixel>>16)&255)-(int)((color>>16)&255))<=16;}
   public static bool CurveColorNear(IntPtr hwnd,int x,int y,int radius,uint color){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(ColorClose(GetPixel(dc,x+i,y+j),color))return true;return false;}finally{ReleaseDC(hwnd,dc);}}
+  public static int CountColor(IntPtr hwnd,int x,int y,int width,int height,uint color){IntPtr dc=GetDC(hwnd);try{int count=0;for(int j=y;j<y+height;j++)for(int i=x;i<x+width;i++)if(ColorClose(GetPixel(dc,i,j),color))count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
   public static void DumpRegion(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{StringBuilder text=new StringBuilder();text.Append("GRAPHPIXELS:");for(int j=-10;j<=10;j++)for(int i=-10;i<=10;i++){text.Append(GetPixel(dc,x+i,y+j).ToString("X6"));text.Append(',');}Console.WriteLine(text.ToString());}finally{ReleaseDC(hwnd,dc);}}
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;uint c=GetPixel(dc,cx,cy);if((c&255)<192||((c>>8)&255)<192||((c>>16)&255)<192)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=5;r++)for(int k=-2;k<=2;k++){left|=GetPixel(dc,cx-r,cy+k)==0;right|=GetPixel(dc,cx+r,cy+k)==0;top|=GetPixel(dc,cx+k,cy-r)==0;bottom|=GetPixel(dc,cx+k,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
@@ -992,7 +1008,7 @@ try {
   [MathomirUiProbe]::Send($view,258,27)|Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$pieceSaved=Get-Content $marginFixture -Raw
-  if($pieceSaved.SelectNodes('/mathomir/*[last()]/piece').Count -ne 2){throw 'Piecewise graph did not save its formula and interval metadata.'}
+  if($pieceSaved.SelectNodes('/mathomir/*[last()]//piece').Count -ne 2){Write-Output $pieceSaved.OuterXml;throw 'Piecewise graph did not save its formula and interval metadata.'}
 
   $pieceFixture=Join-Path (Split-Path $exe) 'piecewise-endpoints-smoke.mom'
   $pieceAxes=@(-5,5,-2,4)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
@@ -1043,6 +1059,59 @@ try {
     }
   }
   Write-Output 'Fine bold hatching passed: both brush directions retain dense spacing and heavier line widths.'
+
+  $shaderFixture=Join-Path (Split-Path $exe) 'smart-shader-smoke.mom'
+  foreach($test in @('outline','line')){
+    $boundary=if($test -eq 'outline'){'<dw d="32|0,0;6400,0;:,6400;0,:;:,0" /><dw d="32|2560,2560;3840,:;:,3840;2560,:;:,2560" />'}else{'<dw d="32|0,3200;9600,:" />'}
+    ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100">'+$boundary+'</o></mathomir>')|Set-Content -LiteralPath $shaderFixture -Encoding ascii
+    [MathomirUiProbe]::OpenFile($main,$shaderFixture)
+    Start-Sleep -Milliseconds 300
+    foreach($command in @(33075,33076)){
+      [MathomirUiProbe]::Send($view,273,$command)|Out-Null
+      $sx=if($test -eq 'outline'){105}else{200};$sy=if($test -eq 'outline'){150}else{205}
+      [MathomirUiProbe]::Mouse($view,513,1,$sx,$sy)
+      for($dx=2;$dx -le 50;$dx+=2){[MathomirUiProbe]::Mouse($view,512,1,($sx+$dx),$sy)}
+      if($test -eq 'line'){[MathomirUiProbe]::Mouse($view,512,1,($sx+50),190)}
+      [MathomirUiProbe]::Mouse($view,514,0,($sx+50),$sy)
+      [MathomirUiProbe]::Send($view,258,27)|Out-Null
+      [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+      [xml]$shaderSaved=Get-Content $shaderFixture -Raw
+      $shaderObject=$shaderSaved.SelectSingleNode('/mathomir/*[last()]')
+      $points=@(ShaderPoints $shaderObject)
+      if($points.Count -lt 4){Write-Output $shaderSaved.OuterXml;throw 'Smart shader produced no trimmed strokes.'}
+      foreach($point in $points){
+        if($test -eq 'outline' -and ($point.x -lt 100 -or $point.x -gt 300 -or $point.y -lt 100 -or $point.y -gt 300)){Write-Output $shaderObject.OuterXml;throw 'Smart shading escaped the closed outline.'}
+        if($test -eq 'line' -and $point.y -lt 199.9){Write-Output $shaderObject.OuterXml;throw 'Inequality shading crossed its single boundary line.'}
+      }
+    }
+  }
+  Write-Output 'Smart shader passed: closed-outline trimming and single-line shading remain on the chosen side in both hatch directions.'
+
+  $backgroundFixture=Join-Path (Split-Path $exe) 'typed-background-smoke.mom'
+  '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="120"><ex fh="100"><fra E1="n" E2="d"><ex><var t="1" f="00" /></ex><ex><var t="2" f="00" /></ex></fra></ex></o><o t="1" X="100" Y="220"><ex fh="100" stxt="1"><var t="Background text" f="00" /></ex></o></mathomir>'|Set-Content -LiteralPath $backgroundFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$backgroundFixture)
+  Start-Sleep -Milliseconds 300
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($main,1118),245,0)|Out-Null
+  [MathomirUiProbe]::Send($view,273,33080)|Out-Null
+  [MathomirUiProbe]::Send($view,258,27)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$backgroundSaved=Get-Content $backgroundFixture -Raw
+  if($backgroundSaved.SelectNodes('/mathomir/*/*[@bg]').Count -ne 2){throw 'Background colors did not apply to both math and text objects.'}
+  [MathomirUiProbe]::OpenFile($main,$backgroundFixture)
+  Start-Sleep -Milliseconds 300
+  if([MathomirUiProbe]::CountColor($view,80,70,320,220,0x00AAF8FF) -lt 30){throw 'Typed object backgrounds were not visible after reopening.'}
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($main,1118),245,0)|Out-Null
+  [MathomirUiProbe]::Send($view,273,33078)|Out-Null
+  [MathomirUiProbe]::Send($view,258,27)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$backgroundCleared=Get-Content $backgroundFixture -Raw
+  if($backgroundCleared.SelectNodes('//*[@bg]').Count -ne 0){throw 'Clear background did not restore transparency.'}
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$backgroundUndo=Get-Content $backgroundFixture -Raw
+  if($backgroundUndo.SelectNodes('/mathomir/*/*[@bg]').Count -ne 2){throw 'Undo did not restore typed object backgrounds.'}
+  Write-Output 'Typed backgrounds passed: math and text mode, rendering after reopen, clearing transparency, and Undo.'
+
 
 
 
