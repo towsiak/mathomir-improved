@@ -1012,8 +1012,8 @@ try {
 
   $pieceFixture=Join-Path (Split-Path $exe) 'piecewise-endpoints-smoke.mom'
   $pieceAxes=@(-5,5,-2,4)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
-  $pieceSlots=@(0,2,1)|ForEach-Object {'<subexp d="0,0;4000,1000"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
-  $pieceXml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($pieceAxes -join '')+($pieceSlots -join '')+'<piece f="30" lo="-inf" hi="0" lc="0" hc="0" rad="1" /><piece f="32" lo="0" hi="inf" lc="0" hc="0" rad="1" /><piece f="31" lo="0" hi="0" lc="1" hc="1" rad="1" /></o></mathomir>'
+  $pieceSlots=@(-1,2,1)|ForEach-Object {'<subexp d="0,0;4000,1000"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
+  $pieceXml='<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($pieceAxes -join '')+($pieceSlots -join '')+'<piece f="2d31" lo="-inf" hi="0" lc="0" hc="0" rad="1" /><piece f="32" lo="0" hi="inf" lc="0" hc="0" rad="1" /><piece f="31" lo="0" hi="0" lc="1" hc="1" rad="1" /></o></mathomir>'
   $pieceXml|Set-Content -LiteralPath $pieceFixture -Encoding ascii
   [MathomirUiProbe]::OpenFile($main,$pieceFixture)
   Start-Sleep -Milliseconds 300
@@ -1023,15 +1023,15 @@ try {
   Start-Sleep -Milliseconds 2000
   [MathomirUiProbe]::Mouse($view,512,0,850,50)
   $area=[MathomirUiProbe]::PlotArea($view)
-  $px=[int]($area[0]+.5*($area[2]-$area[0]));$py=[int]($area[3]-(2/6)*($area[3]-$area[1]))
+  $px=[int]($area[0]+.5*($area[2]-$area[0]));$py=[int]($area[3]-(1/6)*($area[3]-$area[1]))
   if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw 'Piecewise excluded endpoint did not show an open circle.'}
   $py=[int]($area[3]-(3/6)*($area[3]-$area[1]))
   if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,2,0x000000CC)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw 'Isolated included point did not show a filled dot.'}
-  foreach($sample in @(@(-2,0,0),@(2,2,0x0000CC00))){
+  foreach($sample in @(@(-2,-1,0),@(2,2,0x0000CC00))){
     $px=[int]($area[0]+($sample[0]+5)/10*($area[2]-$area[0]));$py=[int]($area[3]-($sample[1]+2)/6*($area[3]-$area[1]))
     if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,3,$sample[2])){throw 'Piecewise branch was not drawn inside its interval.'}
   }
-  foreach($sample in @(@(-2,2,0x0000CC00),@(2,0,0))){
+  foreach($sample in @(@(-2,2,0x0000CC00),@(2,-1,0))){
     $px=[int]($area[0]+($sample[0]+5)/10*($area[2]-$area[0]));$py=[int]($area[3]-($sample[1]+2)/6*($area[3]-$area[1]))
     if([MathomirUiProbe]::CurveColorNear($view,$px,$py,2,$sample[2])){throw 'Piecewise branch extended beyond its interval.'}
   }
@@ -1052,7 +1052,8 @@ try {
     [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
     [xml]$hatchSaved=Get-Content $pieceFixture -Raw
     $hatchLines=$hatchSaved.SelectNodes('/mathomir/*[last()]//dw | /mathomir/*[last()]//draw')
-    if($hatchLines.Count -lt 20){throw 'Fine hatch brush did not produce closely spaced lines.'}
+    Write-Output ('Fine hatch '+$hatch+' line count: '+$hatchLines.Count)
+    if($hatchLines.Count -lt 20){Write-Output $hatchSaved.OuterXml;throw 'Fine hatch brush did not produce closely spaced lines.'}
     foreach($line in $hatchLines){
       if($line.HasAttribute('d')){if([int]$line.GetAttribute('d').Split('|')[0] -lt 32){throw 'Fine hatch lines were not bold.'}}
       elseif([int]$line.GetAttribute('width') -lt 1000){throw 'Fine hatch lines were not bold.'}
