@@ -84,6 +84,7 @@ public static class MathomirUiProbe {
   public static int GraphLegendPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=126;y<176;y++)for(int x=156;x<190;x++){uint color=GetPixel(dc,x,y);if((color&255)+((color>>8)&255)+((color>>16)&255)<650)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
+  public static int[] GripNear(IntPtr hwnd,int cx,int cy,bool delete){IntPtr dc=GetDC(hwnd);try{if(delete){int x0=99999,y0=99999,x1=-1,y1=-1;for(int y=cy-25;y<=cy+25;y++)for(int x=cx-15;x<=cx+15;x++)if(GetPixel(dc,x,y)==0x002D2DB4){x0=Math.Min(x0,x);y0=Math.Min(y0,y);x1=Math.Max(x1,x);y1=Math.Max(y1,y);}if(x1>=0)return new int[]{(x0+x1)/2,(y0+y1)/2};}else{for(int y=cy-20;y<=cy+20;y++)for(int x=cx-20;x<=cx+20;x++){bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};}}throw new Exception("Object grip was not visible near "+cx+","+cy);}finally{ReleaseDC(hwnd,dc);}}
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
   [DllImport("user32.dll")] static extern IntPtr GetFocus();
@@ -1118,6 +1119,68 @@ try {
   [xml]$backgroundUndo=Get-Content $backgroundFixture -Raw
   if($backgroundUndo.SelectNodes('/mathomir/*/*[@bg]').Count -ne 2){throw 'Undo did not restore typed object backgrounds.'}
   Write-Output 'Typed backgrounds passed: math and text mode, rendering after reopen, clearing transparency, and Undo.'
+
+  foreach($kind in @('ordinary','piecewise')){
+    $gripFixture=Join-Path (Split-Path $exe) ('graph-resize-'+$kind+'-smoke.mom')
+    $gripXml=$pieceXml
+    if($kind -eq 'ordinary'){$gripXml=$gripXml -replace '<piece[^>]+/>',''}
+    $gripXml|Set-Content -LiteralPath $gripFixture -Encoding ascii
+    [MathomirUiProbe]::OpenFile($main,$gripFixture)
+    Start-Sleep -Milliseconds 1500
+    [MathomirUiProbe]::Mouse($view,512,0,150,150)
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$beforeGrip=Get-Content $gripFixture -Raw
+    $rangeBefore=@(Get-GraphRange $beforeGrip)
+    $frameBefore=$beforeGrip.SelectSingleNode('//draw[@spec="51"] | //dw[@spec="51"]')
+    $widthBefore=if($frameBefore.HasAttribute('d')){[double]$frameBefore.d.Split('|')[1].Split(';')[1].Split(',')[0]/32}else{[double]$frameBefore.X2/1000}
+    $resizeGrip=[MathomirUiProbe]::GripNear($view,514,434,$false)
+    [MathomirUiProbe]::Mouse($view,512,0,$resizeGrip[0],$resizeGrip[1])
+    [MathomirUiProbe]::Mouse($view,513,1,$resizeGrip[0],$resizeGrip[1])
+    for($repeat=0;$repeat -lt 20;$repeat++){[MathomirUiProbe]::Mouse($view,512,1,($resizeGrip[0]+80),($resizeGrip[1]+60))}
+    [MathomirUiProbe]::Mouse($view,514,0,($resizeGrip[0]+80),($resizeGrip[1]+60))
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$afterGrip=Get-Content $gripFixture -Raw
+    $frameAfter=$afterGrip.SelectSingleNode('//draw[@spec="51"] | //dw[@spec="51"]')
+    $widthAfter=if($frameAfter.HasAttribute('d')){[double]$frameAfter.d.Split('|')[1].Split(';')[1].Split(',')[0]/32}else{[double]$frameAfter.X2/1000}
+    if($widthAfter -le $widthBefore*1.05 -or $widthAfter -gt $widthBefore*1.5){throw 'Placed graph did not enlarge once from the drag snapshot.'}
+    $rangeAfter=@(Get-GraphRange $afterGrip)
+    for($index=0;$index -lt 4;$index++){if($rangeAfter[$index] -ne $rangeBefore[$index]){throw 'Resizing changed graph coordinate bounds.'}}
+    if($kind -eq 'piecewise' -and $afterGrip.SelectNodes('//piece').Count -ne 3){throw 'Graph resize lost piecewise definitions.'}
+    [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$undoGrip=Get-Content $gripFixture -Raw
+    if($undoGrip.SelectSingleNode('//draw[@spec="51"] | //dw[@spec="51"]').OuterXml -ne $frameBefore.OuterXml){throw 'Undo did not restore graph frame size.'}
+    [MathomirUiProbe]::Mouse($view,512,0,150,150)
+    $deleteGrip=[MathomirUiProbe]::GripNear($view,88,432,$true)
+    [MathomirUiProbe]::Mouse($view,512,0,$deleteGrip[0],$deleteGrip[1])
+    [MathomirUiProbe]::Mouse($view,513,1,$deleteGrip[0],$deleteGrip[1])
+    [MathomirUiProbe]::Mouse($view,514,0,$deleteGrip[0],$deleteGrip[1])
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$deletedGrip=Get-Content $gripFixture -Raw
+    if($deletedGrip.mathomir.ChildNodes.Count -ne 0){throw 'Lower-left delete grip did not remove the graph.'}
+    [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$restoredGrip=Get-Content $gripFixture -Raw
+    if($restoredGrip.SelectNodes('//draw[@spec="51"] | //dw[@spec="51"]').Count -ne 1){throw 'Undo did not restore deleted graph.'}
+  }
+  [MathomirUiProbe]::OpenFile($main,$backgroundFixture)
+  Start-Sleep -Milliseconds 350
+  foreach($target in @(@(105,220,237),@(105,120,145))){
+    [MathomirUiProbe]::Mouse($view,512,0,$target[0],$target[1])
+    $deleteGrip=[MathomirUiProbe]::GripNear($view,88,$target[2],$true)
+    [MathomirUiProbe]::Mouse($view,512,0,$deleteGrip[0],$deleteGrip[1])
+    [MathomirUiProbe]::Mouse($view,513,1,$deleteGrip[0],$deleteGrip[1])
+    [MathomirUiProbe]::Mouse($view,514,0,$deleteGrip[0],$deleteGrip[1])
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$deletedTyped=Get-Content $backgroundFixture -Raw
+    if($deletedTyped.mathomir.ChildNodes.Count -ne 1){throw 'Lower-left delete grip did not remove only the targeted typed object.'}
+    [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$restoredTyped=Get-Content $backgroundFixture -Raw
+    if($restoredTyped.mathomir.ChildNodes.Count -ne 2){throw 'Undo did not restore the typed object deleted with its grip.'}
+  }
+  Write-Output 'Graph grips passed: ordinary/piecewise enlargement, repeated drag stability, unchanged coordinate bounds and definitions, Undo, and lower-left deletion for graphs, math and text.'
+
 
 
 
