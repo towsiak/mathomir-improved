@@ -954,7 +954,10 @@ try {
     $geometryObject=$geometrySaved.SelectSingleNode('/mathomir/*[last()]')
     $lines=$geometryObject.SelectNodes('.//dw | .//draw')
     $segments=0
-    foreach($line in $lines){$segments+=($line.GetAttribute('d').Split(';').Count-1)}
+    foreach($line in $lines){
+      if($line.HasAttribute('d')){$segments+=($line.GetAttribute('d').Split(';').Count-1)}
+      else {$segments+=(@($line.Attributes | Where-Object {$_.Name -match '^X[0-9]+$'}).Count-1)}
+    }
     if($segments -ne $geometrySegments[$shape]){Write-Output $geometryObject.OuterXml;throw "Geometry preset $shape did not retain its outline, parallel marks, or angle arcs."}
     if($geometryObject.SelectSingleNode('.//*[@spec]')){throw 'Geometry preset became a special container instead of an editable native drawing.'}
     [MathomirUiProbe]::OpenFile($main,$marginFixture)
