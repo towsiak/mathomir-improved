@@ -177,6 +177,24 @@ index 944279c..525b970 100644
  
  	if (IsSpecialDrawing)
  	{
+@@ -2042,6 +2084,17 @@ int CDrawing::CalcChecksum(void)
+ 		ret*=i;
+ 	}
++	if(IsSpecialDrawing==51 && SpecialData){
++		CFunctionPlotter *plot=(CFunctionPlotter*)SpecialData;
++		unsigned int metadata=plot->pieceRadians?1u:2u;
++		for(size_t i=0;i<plot->pieces.size();++i){
++			const Piecewise::Row &row=plot->pieces[i];
++			char bounds[128];sprintf(bounds,"%.17g|%.17g|%d|%d",row.low,row.high,(int)row.leftClosed,(int)row.rightClosed);
++			for(size_t j=0;j<row.formula.size();++j)metadata=metadata*33u+(unsigned char)row.formula[j];
++			for(const char *p=bounds;*p;++p)metadata=metadata*33u+(unsigned char)*p;
++		}
++		if(!plot->pieces.empty())ret^=metadata;
++	}
+ 	return ret;
+ }
+ 
+ //copies expression data into windows clipboard
 @@ -2159,6 +2201,8 @@ CObject* CDrawing::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y, in
  	{
  		sz=MovingDotSize/3+1; 
@@ -439,13 +457,13 @@ index 531282c..f0cad5b 100644
 +    if (memory.CreateCompatibleDC(screen) && bitmap.CreateCompatibleBitmap(screen,width,height))
 +    {
 +        CBitmap *old=memory.SelectObject(&bitmap);
-+        memory.FillSolidRect(0,0,width,height,m_BackgroundColor>=0?RGB(255,0,255):RGB(255,255,255));
++        memory.FillSolidRect(0,0,width,height,m_BackgroundColor>=0?(m_BackgroundColor==RGB(1,2,3)?RGB(2,3,4):RGB(1,2,3)):RGB(255,255,255));
 +        transform.eDx=(FLOAT)-minX; transform.eDy=(FLOAT)-minY;
 +        if (::SetGraphicsMode(memory.m_hDC,GM_ADVANCED) && ::SetWorldTransform(memory.m_hDC,&transform))
 +        {
 +            PaintExpressionUnrotated(&memory,zoom,0,m_OverallAbove,NULL,color);
 +            ::ModifyWorldTransform(memory.m_hDC,NULL,MWT_IDENTITY);
-+            DC->TransparentBlt(X,Y-height/2,width,height,&memory,0,0,width,height,m_BackgroundColor>=0?RGB(255,0,255):RGB(255,255,255));
++            DC->TransparentBlt(X,Y-height/2,width,height,&memory,0,0,width,height,m_BackgroundColor>=0?(m_BackgroundColor==RGB(1,2,3)?RGB(2,3,4):RGB(1,2,3)):RGB(255,255,255));
 +        }
 +        memory.SelectObject(old);
 +    }
