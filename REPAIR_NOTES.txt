@@ -281,3 +281,12 @@ Unit-circle points: filled endpoint markers and optional comma-separated extra p
 Vertical graph lines: x=constant in any graph slot, including negative values and fractions; alongside ordinary functions, with zoom, save and print support.
 
 Graph header layout: a reserved top row for zoom/Fit/analysis/axis-label controls; colored function expressions wrap in rows beneath it. The right-hand function button column stays clear.
+
+Piecewise palette and rendering repair (2026-10-05):
+Open the drawing palette and click the piecewise icon beside Plotter, define
+branches, choose Place graph, then click the page. Placement preserves the
+whole graph and loads its formula expressions. Earlier saved graphs with
+valid piece definitions rebuild empty formula slots when reopened, including
+grouped graphs. Empty self-closing XML formulas also load correctly.
+Windows UI checks exercise the palette click, actual colored curves, saved
+blank-graph recovery, grouped graphs, endpoint markers, and resize/Undo.

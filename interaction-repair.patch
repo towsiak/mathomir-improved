@@ -361,7 +361,7 @@ index 209a634..099b0f6 100644
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..7a21d50 100644
+index 531282c..f874bf2 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -755,15 +755,22 @@ index 531282c..7a21d50 100644
  		if ((strcmp(attribute,"color")==0) || (strcmp(attribute,"clr")==0)) m_Color=atoi(value);
  		if (strcmp(attribute,"alig")==0) m_Alignment=atoi(value);
  		if ((strcmp(attribute,"brack")==0) || (strcmp(attribute,"br")==0)) m_ParenthesesFlags=atoi(value);
-@@ -11862,6 +12048,7 @@ char * CExpression::XML_input(char * file)
+@@ -11862,6 +12048,14 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"b_data")==0) m_ParenthesesFlags|=(atoi(value)<<2);
  
  	} while (attribute[0]);
 +	if (m_RotationMilliDegrees) m_IsVertical=0;
++    // XML writers may serialize an empty formula as <ex ... />.
++    // Do not consume the following slots while looking for a closing tag.
++    if(file[-2]=='/'){
++        InsertEmptyElement(0,0,0);
++        if(old_version_text_decode)m_StartAsText=realStartAsText;
++        return file;
++    }
  
  	int found_anything=0;
  	int is_matrix=0;
-@@ -12021,18 +12208,18 @@ char * CExpression::XML_input(char * file)
+@@ -12021,18 +12215,18 @@ char * CExpression::XML_input(char * file)
  int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,char output_type)
  {
  	int len=0;
@@ -785,7 +792,7 @@ index 531282c..7a21d50 100644
  		strcat(tmpstr,"\">\r\n");
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
-@@ -12257,7 +12444,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12257,7 +12451,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -794,7 +801,7 @@ index 531282c..7a21d50 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12272,7 +12459,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12272,7 +12466,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  int CExpression::LaTeX_output(char * output, char only_calculate)
  {
  	int len=0;
@@ -803,7 +810,7 @@ index 531282c..7a21d50 100644
  	char *tabs="";
  	char output_type=3;
  	int num_tabs=0;
-@@ -12281,7 +12468,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12281,7 +12475,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  
  	//memset(tabs,9,num_tabs);tabs[num_tabs]=0; //generating the tablist string
  
@@ -812,7 +819,7 @@ index 531282c..7a21d50 100644
  	{
  		//color of the expression - if m_Color==-1, then the color is inherited or default
  	}*/
-@@ -12486,7 +12673,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12486,7 +12680,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -821,7 +828,7 @@ index 531282c..7a21d50 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12567,7 +12754,7 @@ int IsCharacterLow(char ch,char font)
+@@ -12567,7 +12761,7 @@ int IsCharacterLow(char ch,char font)
  
  int CExpression::CalcChecksum()
  {
@@ -830,7 +837,7 @@ index 531282c..7a21d50 100644
  		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
  		
  	int c=m_NumElements;
-@@ -12581,6 +12768,8 @@ int CExpression::CalcChecksum()
+@@ -12581,6 +12775,8 @@ int CExpression::CalcChecksum()
  		//c+=128*m_ParentheseHeightFactor;
  		c+=256*(m_Color+4*m_StartAsText+8*m_IsVertical);
  		c+=768*m_Alignment;
@@ -839,7 +846,7 @@ index 531282c..7a21d50 100644
  		if (m_pPaternalExpression) c+=500;
  		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
  		c+=m_InternalInsertionPoint;
-@@ -14353,6 +14542,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
+@@ -14353,6 +14549,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
  	}
  	return 0;
  getkeyboardcursorpos_finish:
@@ -847,7 +854,7 @@ index 531282c..7a21d50 100644
  
  	if ((m_IsVertical) && (m_pPaternalExpression==NULL))
  	{
-@@ -16978,7 +17168,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16978,7 +17175,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl*pow(10.0,-exxp);
@@ -856,7 +863,7 @@ index 531282c..7a21d50 100644
  				exxp--;
  				if (exxp<-100) 	{rr=0.0;exxp=0;break;}
  			}
-@@ -16988,7 +17178,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16988,7 +17185,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl/pow(10.0,exxp);
@@ -865,7 +872,7 @@ index 531282c..7a21d50 100644
  				exxp++;
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
-@@ -17177,6 +17367,15 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17177,6 +17374,15 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  
  	CExpression *exp=(CExpression*)(ts->pElementObject->Expression2);
  	CExpression *arg=(CExpression*)(ts->pElementObject->Expression1);
@@ -881,7 +888,7 @@ index 531282c..7a21d50 100644
  
  	//take care about exponent
  
-@@ -17223,7 +17422,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17223,7 +17429,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  		PF.prec1=0;
  		ret=exp->StrikeoutCommonFactors(0,exp->m_NumElements-1,1,NULL,0,0,1,&PF);
  		exp->StrikeoutRemove(0,exp->m_NumElements-1);
@@ -890,7 +897,7 @@ index 531282c..7a21d50 100644
  	}
  	else
  	{
-@@ -17335,7 +17534,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17335,7 +17541,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  				}
  
  				double Re,Im=0;
@@ -908,7 +915,7 @@ index 531282c..7a21d50 100644
  				{
  					//result might be imaginary number
  					precision2++;
-@@ -24194,6 +24402,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
+@@ -24194,6 +24409,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
  
  	CExpression *arg=(CExpression*)((m_pElementList+Position)->pElementObject->Expression1);
  	if (!arg) return 0;
@@ -947,7 +954,7 @@ index 531282c..7a21d50 100644
  
  	{
  		int cnt=0;
-@@ -24454,6 +24694,7 @@ computesincos_end:
+@@ -24454,6 +24701,7 @@ computesincos_end:
  		if (rval)
  		{
  			double N=PF.N1/PF.N2;
@@ -955,7 +962,7 @@ index 531282c..7a21d50 100644
  			int prec=PF.prec1;
  			{
  				if (fabs(N)<1e-100)
-@@ -24477,6 +24718,7 @@ computesincos_end:
+@@ -24477,6 +24725,7 @@ computesincos_end:
  				if (function_type)
  				{
  					int is_ok=0;
@@ -963,7 +970,7 @@ index 531282c..7a21d50 100644
  					if (function_type==1) {res=sin(N);is_ok=1;}
  					if (function_type==2) {res=cos(N);is_ok=1;}
  					if (function_type==3) {res=tan(N);is_ok=1;}
-@@ -24484,8 +24726,9 @@ computesincos_end:
+@@ -24484,8 +24733,9 @@ computesincos_end:
  					if (function_type==5) {res=1.0/cos(N);is_ok=1;} //secant
  					if (function_type==6) {res=1.0/sin(N);is_ok=1;} //cosecant
  
@@ -974,7 +981,7 @@ index 531282c..7a21d50 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -24552,11 +24795,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+@@ -24552,11 +24802,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
  					if (function_type==1) {res=asin(N);is_ok=1;} //arcsin
  					if (function_type==2) {res=acos(N);is_ok=1;} //arccos
  					if (function_type==3) {res=atan(N);is_ok=1;} //arctan
@@ -989,7 +996,7 @@ index 531282c..7a21d50 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -25178,7 +25422,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
+@@ -25178,7 +25429,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
  	return 1;
  }
  //int sshit=0;
@@ -998,7 +1005,7 @@ index 531282c..7a21d50 100644
  {
  	if (wwwwxxxx==0) {InitializeCriticalSection(&section3);wwwwxxxx=1;}
  	int cntrr=0;
-@@ -25191,7 +25435,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25191,7 +25442,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  
  	//first replace all variables with the given value
  
@@ -1007,7 +1014,7 @@ index 531282c..7a21d50 100644
  
  	try
  	{
-@@ -25295,7 +25539,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25295,7 +25546,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  		LeaveCriticalSection(&section3);
  		return retval;
  	}
@@ -2948,7 +2955,7 @@ index 0000000..6965d76
 +}
 +}
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
-index f751ecf..d8a8535 100644
+index f751ecf..a702205 100644
 --- a/Mathomir/MainFrm.cpp
 +++ b/Mathomir/MainFrm.cpp
 @@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
@@ -3034,6 +3041,14 @@ index f751ecf..d8a8535 100644
  	//first check what object do we need to delete
  	//only objects that were modified are deleted and (latter) recreated,
  	//objects that were not modified are not touched by undo restore.
+@@ -1652,6 +1675,7 @@ int CMainFrame::UndoRelease(int exit_app)
+ //function must be fast!
+ char * CMainFrame::XML_search(char * text, char * file)
+ {
++    if(!file)return NULL;
+ 	char is_quotation=0;
+ 	char is_inside=0;
+ 	int text_len=(int)strlen(text);
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
 index bdcebb4..141a371 100644
 --- a/Mathomir/Mathomir.rc

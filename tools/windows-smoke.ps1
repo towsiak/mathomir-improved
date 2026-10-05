@@ -1069,6 +1069,16 @@ try {
   $legacy=$pieceSaved.Clone()
   $legacyObject=$legacy.SelectSingleNode('/mathomir/*[last()]')
   foreach($slot in $legacyObject.SelectNodes('./subexp[position()>4]/*[self::ex or self::expr]')){$slot.RemoveAll();$slot.SetAttribute('fh','100')}
+  $blankFixture=Join-Path (Split-Path $exe) 'piecewise-blank-slots-smoke.mom'
+  $legacy.Save($blankFixture)
+  [MathomirUiProbe]::OpenFile($main,$blankFixture)
+  Start-Sleep -Milliseconds 1500
+  [MathomirUiProbe]::Mouse($view,512,0,850,50)
+  foreach($sample in @(@(-1,1,0),@(1,2,0x0000CC00))){
+    $px=[int](202+($sample[0]+5)/10*546);$py=[int](566-($sample[1]+3)/9*414)
+    if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,5,$sample[2])){[MathomirUiProbe]::DumpRegion($view,$px,$py);Write-Output $legacy.OuterXml;throw 'Earlier piecewise graph with empty formula slots remained blank after reopening.'}
+  }
+  Write-Output 'Piecewise recovery passed: empty saved formula slots rebuild and paint after reopening.'
   $group=$legacy.CreateElement('gr');$group.SetAttribute('d','0,0;19200,14080')
   while($legacyObject.HasChildNodes){$group.AppendChild($legacyObject.FirstChild)|Out-Null}
   $legacyObject.AppendChild($group)|Out-Null
@@ -1078,7 +1088,7 @@ try {
   [MathomirUiProbe]::Mouse($view,512,0,850,50)
   foreach($sample in @(@(-1,1,0),@(1,2,0x0000CC00))){
     $px=[int](202+($sample[0]+5)/10*546);$py=[int](566-($sample[1]+3)/9*414)
-    if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,5,$sample[2])){throw 'Previously grouped piecewise graph remained blank after reopening.'}
+    if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,5,$sample[2])){[MathomirUiProbe]::DumpRegion($view,$px,$py);Write-Output $legacy.OuterXml;throw 'Previously grouped piecewise graph remained blank after reopening.'}
   }
   Write-Output 'Grouped graph passed: earlier piecewise graphs paint after reopening.'
   $pieceFixture=Join-Path (Split-Path $exe) 'piecewise-endpoints-smoke.mom'

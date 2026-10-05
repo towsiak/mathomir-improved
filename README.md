@@ -62,7 +62,7 @@ Open **Geometry** on the menu bar, or the dedicated triangle-icon toolbox palett
 
 ## Piecewise function grapher
 
-Open **Graph > Piecewise function grapher** or search **piecewise**. The editor has eight formula rows, lower/upper bounds and independent endpoint inclusion checkboxes. Leave unused formulas blank. Blank bounds or `-inf`/`inf` give unbounded intervals; fractions and `pi` expressions work in bounds. Equal finite bounds with both endpoints included create an isolated point. Intervals may have gaps, but overlaps—including two included ends at the same boundary—are rejected.
+Open the drawing palette and click the **piecewise graph icon beside Plotter**, use **Graph > Piecewise function grapher**, or search **piecewise**. The editor has eight formula rows, lower/upper bounds and independent endpoint inclusion checkboxes. Leave unused formulas blank. Blank bounds or `-inf`/`inf` give unbounded intervals; fractions and `pi` expressions work in bounds. Equal finite bounds with both endpoints included create an isolated point. Intervals may have gaps, but overlaps—including two included ends at the same boundary—are rejected.
 
 Formulas accept x, numbers, pi, e, arithmetic, powers, implicit multiplication (such as 2x), and sin, cos, tan, sqrt, abs, exp, ln and base-10 log. Functions require parentheses. The radians checkbox governs trig independently of the graph's axis-label mode. **Check definition** validates rows; **Evaluate f(x)** identifies the active branch or explains why a value is undefined. Jump, absolute-value and step examples are provided. Set all four graph-window bounds before placing.
 
