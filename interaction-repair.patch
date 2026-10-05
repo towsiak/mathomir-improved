@@ -1059,7 +1059,7 @@ index 36238b0..97028e5 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..9319fa1 100644
+index 1ef18dd..c409b0a 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -2058,18 +2058,18 @@ index 1ef18dd..9319fa1 100644
 +char *CFunctionPlotter::XML_input(char *file)
 +{
 +    if(strncmp(file,"piece ",6)!=0)return file;
-+    Piecewise::Row row;char attribute[64],value[384];file+=5;
++    Piecewise::Row row;bool proposedRadians=pieceRadians;char attribute[64],value[384];file+=5;
 +    do {
 +        file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,384);if(!file)return NULL;
 +        if(strcmp(attribute,"f")==0)row.formula=Piecewise::Unhex(value);
-+        if(strcmp(attribute,"lo")==0)row.low=strtod(value,NULL);
-+        if(strcmp(attribute,"hi")==0)row.high=strtod(value,NULL);
++        if(strcmp(attribute,"lo")==0)row.low=Piecewise::StoredBound(value);
++        if(strcmp(attribute,"hi")==0)row.high=Piecewise::StoredBound(value);
 +        if(strcmp(attribute,"lc")==0)row.leftClosed=atoi(value)!=0;
 +        if(strcmp(attribute,"hc")==0)row.rightClosed=atoi(value)!=0;
-+        if(strcmp(attribute,"rad")==0)pieceRadians=atoi(value)!=0;
++        if(strcmp(attribute,"rad")==0)proposedRadians=atoi(value)!=0;
 +    }while(attribute[0]);
 +    std::vector<Piecewise::Row> proposed=pieces;proposed.push_back(row);std::string error;
-+    if(Piecewise::Validate(proposed,pieceRadians,error))pieces=proposed;
++    if(Piecewise::Validate(proposed,proposedRadians,error)){pieces=proposed;pieceRadians=proposedRadians;}
 +    return file;
  }
 -
@@ -2764,43 +2764,57 @@ index 0000000..7dac989
 +}
 diff --git a/Mathomir/GraphDiscontinuities.h b/Mathomir/GraphDiscontinuities.h
 new file mode 100644
-index 0000000..ced67bd
+index 0000000..f90092d
 --- /dev/null
 +++ b/Mathomir/GraphDiscontinuities.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,75 @@
 +#pragma once
 +#include <cmath>
 +#include <vector>
 +#include <algorithm>
++#include <limits>
 +
 +// Numerical domain analysis; no function-name or example-specific cases.
 +namespace GraphDiscontinuities {
 +inline bool Finite(double value) { return std::isfinite(value) && std::fabs(value)<1e40; }
-+inline void AddRoot(std::vector<double>& roots,double x,double span) {
-+    for (size_t i=0;i<roots.size();++i) if(std::fabs(roots[i]-x)<=1e-8*span)return;
++inline void AddRoot(std::vector<double>& roots,double x) {
++    // Deduplicate at numerical precision, not at a fraction of the viewport.
++    for (size_t i=0;i<roots.size();++i) {
++        double scale=(std::max)(1.0,(std::max)(std::fabs(x),std::fabs(roots[i])));
++        if(std::fabs(roots[i]-x)<=1e-10+64*std::numeric_limits<double>::epsilon()*scale)return;
++    }
 +    if(roots.size()<128)roots.push_back(x);
 +}
-+template<class Evaluate> void Roots(Evaluate evaluate,double low,double high,std::vector<double>& roots) {
-+    if(!Finite(low)||!Finite(high)||high<=low)return;
++template<class Evaluate> bool RootResidual(Evaluate evaluate,double x) {
++    double scale=(std::max)(1.0,std::fabs(x)),h=(std::max)(1e-4,64*std::numeric_limits<double>::epsilon()*scale);
++    double residual=evaluate(x),left=evaluate(x-h),right=evaluate(x+h);
++    return Finite(residual)&&Finite(left)&&Finite(right) &&
++        std::fabs(residual)<=1e-10*(1+std::fabs(left)+std::fabs(right));
++}
++template<class Evaluate> void Roots(Evaluate evaluate,double low,double high,std::vector<double>& roots,int depth=0) {
++    if(!Finite(low)||!Finite(high)||high<=low || roots.size()>=128)return;
 +    const int count=256;double span=high-low,step=span/count;
 +    double a=low,fa=evaluate(a),previous=fa;
-+    for(int i=1;i<=count;i++) {
++    for(int i=1;i<=count && roots.size()<128;i++) {
 +        double b=low+step*i,fb=evaluate(b);
 +        if(Finite(fa)&&Finite(fb)) {
-+            if(fa==0 && fb!=0)AddRoot(roots,a,span);
-+            if(fb==0 && fa!=0)AddRoot(roots,b,span);
++            if(fa==0 && fb!=0)AddRoot(roots,a);
++            if(fb==0 && fa!=0)AddRoot(roots,b);
 +            if((fa<0 && fb>0)||(fa>0 && fb<0)) {
 +                double l=a,r=b,fl=fa;bool valid=true;
-+                for(int k=0;k<48;k++){double m=(l+r)/2,fm=evaluate(m);if(!Finite(fm)){valid=false;break;}if(fm==0){l=r=m;break;}if((fl<0)==(fm<0)){l=m;fl=fm;}else r=m;}
-+                double root=(l+r)/2,residual=evaluate(root);
-+                if(valid && Finite(residual) && std::fabs(residual)<=1e-9*(1+std::fabs(fa)+std::fabs(fb)))AddRoot(roots,root,span);
++                for(int k=0;k<80;k++){double m=(l+r)/2,fm=evaluate(m);if(!Finite(fm)){valid=false;break;}if(fm==0){l=r=m;break;}if((fl<0)==(fm<0)){l=m;fl=fm;}else r=m;}
++                double root=(l+r)/2;
++                if(valid && RootResidual(evaluate,root))AddRoot(roots,root);
 +            }
 +            // Even multiplicity roots need not change sign.
 +            if(i>1 && Finite(previous) && std::fabs(fa)<std::fabs(previous) && std::fabs(fa)<std::fabs(fb)) {
++                // Two or more roots can occupy one coarse sample interval.
++                // Re-scan valleys locally before minimizing an even root.
++                if(depth<6)Roots(evaluate,a-step,b,roots,depth+1);
 +                double l=a-step,r=b;
-+                for(int k=0;k<52;k++){double p=l+(r-l)/3,q=r-(r-l)/3;double fp=evaluate(p),fq=evaluate(q);if(!Finite(fp)||!Finite(fq))break;if(std::fabs(fp)<std::fabs(fq))r=q;else l=p;}
-+                double root=(l+r)/2,residual=evaluate(root);
-+                if(Finite(residual) && std::fabs(residual)<=1e-12*(1+std::fabs(previous)+std::fabs(fb)))AddRoot(roots,root,span);
++                for(int k=0;k<96;k++){double p=l+(r-l)/3,q=r-(r-l)/3;double fp=evaluate(p),fq=evaluate(q);if(!Finite(fp)||!Finite(fq))break;if(std::fabs(fp)<std::fabs(fq))r=q;else l=p;}
++                double root=(l+r)/2;
++                if(RootResidual(evaluate,root))AddRoot(roots,root);
 +            }
 +        }
 +        previous=fa;a=b;fa=fb;
@@ -6664,10 +6678,10 @@ index 0000000..3bd012b
 +}
 diff --git a/Mathomir/Piecewise.h b/Mathomir/Piecewise.h
 new file mode 100644
-index 0000000..892ef97
+index 0000000..18afb16
 --- /dev/null
 +++ b/Mathomir/Piecewise.h
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,99 @@
 +#pragma once
 +#include <string>
 +#include <vector>
@@ -6742,11 +6756,18 @@ index 0000000..892ef97
 +    if(s.empty() || s=="-inf" || s=="inf" || s=="+inf"){v=s=="-inf" || (s.empty()&&lower)?-std::numeric_limits<double>::infinity():std::numeric_limits<double>::infinity();return true;}
 +    Formula p;if(!p.Parse(s,error))return false;if(p.usesX){error="Bounds must be constants, not expressions containing x.";return false;}v=p.Value(0);if(!Finite(v)){error="A bound must be finite or inf/-inf.";return false;}return true;
 +}
++// Saved bounds must consume the whole field; strtod alone treats junk as zero.
++inline double StoredBound(const char *text){
++    char *end=NULL;double value=std::strtod(text,&end);
++    if(end==text || *end || value!=value)return std::numeric_limits<double>::quiet_NaN();
++    return value;
++}
 +inline bool Validate(std::vector<Row> &rows,bool radians,std::string &error){
 +    if(rows.empty() || rows.size()>8){error="Enter between one and eight pieces.";return false;}
 +    for(size_t i=0;i<rows.size();i++){
 +        Row &r=rows[i];std::string reason;
 +        if(!r.program.Parse(r.formula,reason)){error="Piece "+Number(i+1)+": "+reason;return false;}
++        if(r.low!=r.low || r.high!=r.high){error="Piece "+Number(i+1)+": interval bounds are invalid.";return false;}
 +        if(r.low>r.high || (r.low==r.high && (!r.leftClosed || !r.rightClosed))){error="Piece "+Number(i+1)+": lower bound must precede upper bound; a single point needs both endpoints included.";return false;}
 +        if(r.low==std::numeric_limits<double>::infinity() || r.high==-std::numeric_limits<double>::infinity()){error="Infinity is on the wrong side of an interval.";return false;}
 +        if(!Finite(r.low))r.leftClosed=false;if(!Finite(r.high))r.rightClosed=false;

@@ -835,7 +835,6 @@ try {
   $zoomCases=@()
   foreach($source in @($cases | Where-Object {$_.ContainsKey('hx')})) {
     foreach($span in @(0.0001,100.0,6000.0)) {
-      if($source.name -eq 'rational' -and $span -eq 6000.0){continue}
       $zoomCase=$source.Clone()
       $zoomCase.name=$source.name+'-range-'+$span
       $zoomCase.xmin=$source.hx-$span*.45

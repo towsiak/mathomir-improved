@@ -4,6 +4,21 @@
 #include <iostream>
 static double Evaluate(const char *s,double x=0,bool radians=true){Piecewise::Formula p;std::string e;assert(p.Parse(s,e));return p.Value(x,radians);}
 int main(){
+ for(double span:{100.0,6000.0,1e9}) {
+  std::vector<double> roots;
+  GraphDiscontinuities::Roots([](double x){return (x+2)*(x-5);},-2-span*.45,-2+span*.55,roots);
+  assert(roots.size()==2);bool left=false,right=false;
+  for(double x:roots){left|=std::fabs(x+2)<1e-8;right|=std::fabs(x-5)<1e-8;}assert(left&&right);
+  roots.clear();GraphDiscontinuities::Roots([](double x){return x*x+1;},-span*.45,span*.55,roots);assert(roots.empty());
+  roots.clear();GraphDiscontinuities::Roots([](double x){return (x-.37)*(x-.37);},-span*.45,span*.55,roots);assert(roots.size()==1 && std::fabs(roots[0]-.37)<1e-8);
+ }
+ {std::vector<Piecewise::Row> rows(1);rows[0].formula="x";std::string error;
+  for(const char *invalid:{"nan","junk","1junk",""}){rows[0].low=Piecewise::StoredBound(invalid);assert(!Piecewise::Validate(rows,true,error));}
+  assert(Piecewise::StoredBound("-inf")==-std::numeric_limits<double>::infinity());
+  assert(Piecewise::StoredBound("inf")==std::numeric_limits<double>::infinity());
+  assert(Piecewise::StoredBound("1.25")==1.25);
+ }
+
  for(double span:{1e-10,1e-6,1.0,6000.0,1e10}) {
   double limit=0;
   assert(GraphDiscontinuities::HoleLimit([](double x){return std::sin(x)/x;},0,span,limit));
