@@ -1045,6 +1045,7 @@ try {
 
   foreach($hatch in @(33073,33074)){
     [MathomirUiProbe]::Send($view,273,$hatch)|Out-Null
+    [MathomirUiProbe]::Mouse($view,512,0,200,450)
     [MathomirUiProbe]::Mouse($view,513,1,200,450)
     for($hx=202;$hx -le 340;$hx+=2){[MathomirUiProbe]::Mouse($view,512,1,$hx,450)}
     [MathomirUiProbe]::Mouse($view,514,0,340,450)
@@ -1070,6 +1071,7 @@ try {
     foreach($command in @(33075,33076)){
       [MathomirUiProbe]::Send($view,273,$command)|Out-Null
       $sx=if($test -eq 'outline'){105}else{200};$sy=if($test -eq 'outline'){150}else{205}
+      [MathomirUiProbe]::Mouse($view,512,0,$sx,$sy)
       [MathomirUiProbe]::Mouse($view,513,1,$sx,$sy)
       for($dx=2;$dx -le 50;$dx+=2){[MathomirUiProbe]::Mouse($view,512,1,($sx+$dx),$sy)}
       if($test -eq 'line'){[MathomirUiProbe]::Mouse($view,512,1,($sx+50),190)}
