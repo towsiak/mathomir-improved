@@ -1036,6 +1036,8 @@ try {
     if([MathomirUiProbe]::CurveColorNear($view,$px,$py,2,$sample[2])){throw 'Piecewise branch extended beyond its interval.'}
   }
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [MathomirUiProbe]::OpenFile($main,$marginFixture)
+  Start-Sleep -Milliseconds 300
   [MathomirUiProbe]::OpenFile($main,$pieceFixture)
   Start-Sleep -Milliseconds 300
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
@@ -1100,6 +1102,8 @@ try {
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$backgroundSaved=Get-Content $backgroundFixture -Raw
   if($backgroundSaved.SelectNodes('/mathomir/*/*[@bg]').Count -ne 2){throw 'Background colors did not apply to both math and text objects.'}
+  [MathomirUiProbe]::OpenFile($main,$pieceFixture)
+  Start-Sleep -Milliseconds 300
   [MathomirUiProbe]::OpenFile($main,$backgroundFixture)
   Start-Sleep -Milliseconds 300
   if([MathomirUiProbe]::CountColor($view,80,70,320,220,0x00AAF8FF) -lt 30){throw 'Typed object backgrounds were not visible after reopening.'}
