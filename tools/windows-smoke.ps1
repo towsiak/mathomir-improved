@@ -1062,8 +1062,8 @@ try {
   }
   Write-Output 'Fine bold hatching passed: both brush directions retain dense spacing and heavier line widths.'
 
-  $shaderFixture=Join-Path (Split-Path $exe) 'smart-shader-smoke.mom'
   foreach($test in @('outline','line')){
+    $shaderFixture=Join-Path (Split-Path $exe) ('smart-shader-'+$test+'-smoke.mom')
     $boundary=if($test -eq 'outline'){'<dw d="32|0,0;6400,0;:,6400;0,:;:,0" /><dw d="32|2560,2560;3840,:;:,3840;2560,:;:,2560" />'}else{'<dw d="32|0,3200;9600,:" />'}
     ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100">'+$boundary+'</o></mathomir>')|Set-Content -LiteralPath $shaderFixture -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$shaderFixture)
@@ -1084,7 +1084,7 @@ try {
       if($points.Count -lt 4){Write-Output $shaderSaved.OuterXml;throw 'Smart shader produced no trimmed strokes.'}
       foreach($point in $points){
         if($test -eq 'outline' -and ($point.x -lt 100 -or $point.x -gt 300 -or $point.y -lt 100 -or $point.y -gt 300)){Write-Output $shaderObject.OuterXml;throw 'Smart shading escaped the closed outline.'}
-        if($test -eq 'line' -and $point.y -lt 199.9){Write-Output $shaderObject.OuterXml;throw 'Inequality shading crossed its single boundary line.'}
+        if($test -eq 'line' -and $point.y -lt 199.9){Write-Output $shaderSaved.OuterXml;throw 'Inequality shading crossed its single boundary line.'}
       }
     }
   }
