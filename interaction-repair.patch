@@ -9,7 +9,7 @@ index 0000000..2f73a4e
 +static const char *ImprovedColorNames[8]={"Black","Red","Green","Blue","Gray","Orange","Purple","Teal"};
 +inline unsigned int ImprovedColor(int index){return ImprovedColors[index>=0&&index<8?index:0];}
 diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
-index 944279c..f819377 100644
+index 944279c..525b970 100644
 --- a/Mathomir/Drawing.cpp
 +++ b/Mathomir/Drawing.cpp
 @@ -19,6 +19,10 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -130,6 +130,33 @@ index 944279c..f819377 100644
  				
  				for (int ii=Drawing_temp_start;ii<NumItems;ii++)
  				{
+@@ -853,7 +891,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+ 									//the di2 completely covers di
+ 									di->X1=di2->X1;di->Y1=di2->Y1;
+ 									di->X2=di2->X2;di->Y2=di2->Y2;
+-									for (int j=ii;j<NumItems;j++) *(Items+j)=*(Items+j+1);
++									for (int j=ii;j<NumItems-1;j++) *(Items+j)=*(Items+j+1);
+ 									NumItems--;
+ 									break;
+ 								}
+@@ -862,7 +900,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+ 									//the di2 covers only one part of di
+ 									di->X1=di2->X1;
+ 									di->Y1=di2->Y1;
+-									for (int j=ii;j<NumItems;j++) *(Items+j)=*(Items+j+1);
++									for (int j=ii;j<NumItems-1;j++) *(Items+j)=*(Items+j+1);
+ 									NumItems--;
+ 									if (di>di2) di--;
+ 								}
+@@ -872,7 +910,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+ 									//the di2 covers only other part of di
+ 									di->X2=di2->X2;
+ 									di->Y2=di2->Y2;
+-									for (int j=ii;j<NumItems;j++) *(Items+j)=*(Items+j+1);
++									for (int j=ii;j<NumItems-1;j++) *(Items+j)=*(Items+j+1);
+ 									NumItems--;
+ 									if (di>di2) di--;
+ 							}
 @@ -1455,6 +1493,10 @@ int CDrawing::EndCreatingItem(int *X, int *Y, int absX, int absY)
  		}
  	}
@@ -3494,7 +3521,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..733e33e 100644
+index fc832eb..de7b438 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -20,6 +20,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4750,7 +4777,7 @@ index fc832eb..733e33e 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9863,994 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9863,995 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -5034,6 +5061,7 @@ index fc832eb..733e33e 100644
 +        RestoreClipboardBackground();
 +        if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
 +        if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
++        extern bool FineBoldHatching;extern bool SmartHatching;FineBoldHatching=SmartHatching=false;
 +        IsDrawingMode=drawingMode;
 +        SetMousePointer();
 +        if (UseToolbar && Toolbox->Toolbar) Toolbox->Toolbar->ConfigureToolbar();
@@ -5745,7 +5773,7 @@ index fc832eb..733e33e 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10863,138 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10864,138 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -5884,7 +5912,7 @@ index fc832eb..733e33e 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +11011,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +11012,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -5892,7 +5920,7 @@ index fc832eb..733e33e 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11689,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11690,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -5928,7 +5956,7 @@ index fc832eb..733e33e 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11723,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11724,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -5936,7 +5964,7 @@ index fc832eb..733e33e 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +11838,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +11839,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -5944,7 +5972,7 @@ index fc832eb..733e33e 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12244,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12245,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -5952,7 +5980,7 @@ index fc832eb..733e33e 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12545,481 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12546,481 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
