@@ -1058,6 +1058,7 @@ try {
   [MathomirUiProbe]::Send([MathomirUiProbe]::Child($polygonDialog,1281),241,1)|Out-Null
   [MathomirUiProbe]::Send($polygonDialog,273,1281)|Out-Null
   [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($polygonDialog,1288),'(0,0); (2,2); (0,2); (2,0)')
+  [MathomirUiProbe]::Send($polygonDialog,273,(1288 -bor (0x300 -shl 16)))|Out-Null
   if([MathomirUiProbe]::IsWindowEnabled([MathomirUiProbe]::Child($polygonDialog,1))){throw 'Crossed polygon edges were accepted.'}
   [MathomirUiProbe]::Send($polygonDialog,273,1291)|Out-Null
   if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($polygonDialog,1298)) -notmatch 'Concave.*Area: 6 square units.*Perimeter: 14 units'){throw 'Concave polygon measurements were incorrect.'}
