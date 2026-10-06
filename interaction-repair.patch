@@ -371,7 +371,7 @@ index 209a634..ef0dfd9 100644
  		if (oper==17) strcpy(Data1,"ln");
  		if (oper==18) //log10
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..3dc4973 100644
+index 531282c..7848800 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -18,7 +18,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -994,7 +994,7 @@ index 531282c..3dc4973 100644
  
  	//we can drop the parentheses if the level inside is higher than the outside level
  	{
-@@ -24174,6 +24392,57 @@ int CExpression::GenerateASCIIFraction(int Position,double num, double denom, in
+@@ -24174,6 +24392,58 @@ int CExpression::GenerateASCIIFraction(int Position,double num, double denom, in
  	return 0;
  }
  
@@ -1022,8 +1022,9 @@ index 531282c..3dc4973 100644
 +    bool integerFits=std::fabs(result)<9e18;
 +    long long integer=integerFits?(long long)result:0;
 +    DeleteElement(Position);
-+    if(ComputationType==10)
++    if(ComputationType==10 && is_call_from_ploter)
 +    {
++        // Temporary plot values are never displayed; keep every stored bit.
 +        CExpression *target=this;int pos=Position;
 +        if(result<0){InsertEmptyElement(Position,5,'(');target=(CExpression*)(m_pElementList+Position)->pElementObject->Expression1;target->InsertEmptyElement(0,2,'-');pos=1;}
 +        target->InsertEmptyElement(pos,1,'0');
@@ -1052,7 +1053,7 @@ index 531282c..3dc4973 100644
  int CExpression::ComputeSinCos(int Position, char element_type, int ComputationType)
  {
  	int retval=0;
-@@ -24194,6 +24463,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
+@@ -24194,6 +24464,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
  
  	CExpression *arg=(CExpression*)((m_pElementList+Position)->pElementObject->Expression1);
  	if (!arg) return 0;
@@ -1091,7 +1092,7 @@ index 531282c..3dc4973 100644
  
  	{
  		int cnt=0;
-@@ -24454,6 +24755,7 @@ computesincos_end:
+@@ -24454,6 +24756,7 @@ computesincos_end:
  		if (rval)
  		{
  			double N=PF.N1/PF.N2;
@@ -1099,7 +1100,7 @@ index 531282c..3dc4973 100644
  			int prec=PF.prec1;
  			{
  				if (fabs(N)<1e-100)
-@@ -24477,6 +24779,7 @@ computesincos_end:
+@@ -24477,6 +24780,7 @@ computesincos_end:
  				if (function_type)
  				{
  					int is_ok=0;
@@ -1107,7 +1108,7 @@ index 531282c..3dc4973 100644
  					if (function_type==1) {res=sin(N);is_ok=1;}
  					if (function_type==2) {res=cos(N);is_ok=1;}
  					if (function_type==3) {res=tan(N);is_ok=1;}
-@@ -24484,8 +24787,9 @@ computesincos_end:
+@@ -24484,8 +24788,9 @@ computesincos_end:
  					if (function_type==5) {res=1.0/cos(N);is_ok=1;} //secant
  					if (function_type==6) {res=1.0/sin(N);is_ok=1;} //cosecant
  
@@ -1118,7 +1119,7 @@ index 531282c..3dc4973 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -24552,11 +24856,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+@@ -24552,11 +24857,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
  					if (function_type==1) {res=asin(N);is_ok=1;} //arcsin
  					if (function_type==2) {res=acos(N);is_ok=1;} //arccos
  					if (function_type==3) {res=atan(N);is_ok=1;} //arctan
@@ -1133,7 +1134,7 @@ index 531282c..3dc4973 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -25178,7 +25483,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
+@@ -25178,7 +25484,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
  	return 1;
  }
  //int sshit=0;
@@ -1142,7 +1143,7 @@ index 531282c..3dc4973 100644
  {
  	if (wwwwxxxx==0) {InitializeCriticalSection(&section3);wwwwxxxx=1;}
  	int cntrr=0;
-@@ -25191,7 +25496,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25191,7 +25497,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  
  	//first replace all variables with the given value
  
@@ -1151,7 +1152,7 @@ index 531282c..3dc4973 100644
  
  	try
  	{
-@@ -25295,7 +25600,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25295,7 +25601,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  		LeaveCriticalSection(&section3);
  		return retval;
  	}
