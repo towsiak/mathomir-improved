@@ -308,3 +308,16 @@ Graph and math presentation (October 6, 2026):
 - Polygon measurements use readable numbers and separators.
 - Heavy gray axis bands become white gutters with thin separators, and buttons use a lighter background. Clickable scale values and control positions are preserved.
 - Full-precision saved bounds, formulas and input syntax are preserved.
+
+FUNCTION PALETTE (2026-10-06)
+Open the ln / general-functions palette: ten additional editable templates
+are appended after f and g: floor, ceiling, absolute value, round, trunc,
+sgn, fract, cbrt, exp and sinc. Hover for definitions and examples.
+Type a function name followed by Space to insert its template. Enter the
+argument, then use the normal graph or calculation tools. These names also
+work in the piecewise grapher and its f(x) value check.
+round uses nearest integer with ties away from zero; trunc goes toward zero;
+fract(x)=x-floor(x) lies in [0,1), including for negative inputs. The frac
+shortcut still inserts a fraction. sinc(x)=sin(x)/x always uses radians, with
+sinc(0)=1. Real cube roots support negative numbers. Floor/ceiling preserve
+symbolic brackets. Step curves omit false connectors across finite jumps.

@@ -1081,6 +1081,74 @@ try {
   if($polygonReopened.SelectNodes('/mathomir/*').Count -ne 2 -or $polygonReopened.SelectNodes('/mathomir/*[last()]//subexp').Count -ne 12){throw 'Polygon geometry or labels changed after reopening.'}
   Write-Output 'Polygon constructor passed: actual geometry palette click, nine regular presets, preview, side-length measurements, labels off, custom concave vertices, crossing rejection, vertex/coordinate labels, square/reflex angle markers and saved/reopened native drawings.'
 
+  # Click every new function button in the ln / general-functions popup.
+  $functionFixture=Join-Path (Split-Path $exe) 'function-palette-smoke.mom'
+  '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $functionFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$functionFixture)
+  [MathomirUiProbe]::Send($view,276,4)|Out-Null
+  for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
+  [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+  $functionNames=@('floor','ceil','abs','round','trunc','sgn','fract','cbrt','exp','sinc')
+  for($index=0;$index -lt 10;$index++){
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    $arrowX=[int]($toolSize/2)-3;$arrowY=[int]($toolSize/2)+4*$itemHeight-3
+    [MathomirUiProbe]::Mouse($toolbox,512,0,$arrowX,$arrowY)
+    [MathomirUiProbe]::Mouse($toolbox,513,1,$arrowX,$arrowY)
+    [MathomirUiProbe]::Mouse($toolbox,514,0,$arrowX,$arrowY)
+    Start-Sleep -Milliseconds 80
+    $palette=[MathomirUiProbe]::Window($appProcess.Id,'Subtoolbox')
+    if($palette -eq [IntPtr]::Zero){throw 'Function palette did not open from ln.'}
+    $slot=18+$index;$iconX=[int]([Math]::Floor($slot/2)*$toolSize/2+$toolSize/4);$iconY=[int](($slot%2)*$itemHeight+$itemHeight/2)
+    [MathomirUiProbe]::Mouse($palette,512,0,$iconX,$iconY)
+    [MathomirUiProbe]::Mouse($palette,513,1,$iconX,$iconY)
+    [MathomirUiProbe]::Mouse($palette,514,0,$iconX,$iconY)
+    $placeX=170+($index%5)*120;$placeY=160+[Math]::Floor($index/5)*120
+    [MathomirUiProbe]::Mouse($view,512,0,$placeX,$placeY)
+    [MathomirUiProbe]::Mouse($view,513,1,$placeX,$placeY)
+    [MathomirUiProbe]::Mouse($view,514,0,$placeX,$placeY)
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$functionSaved=Get-Content $functionFixture -Raw
+    $last=$functionSaved.SelectSingleNode('/mathomir/*[last()]')
+    if($index -lt 3){
+      $shape=@('f','c','|')[$index]
+      if(!$last.SelectSingleNode(".//ex[@shp='$shape'] | .//expr[@b_shape='$shape']")){Write-Output $last.OuterXml;throw "Function palette $($functionNames[$index]) lost its brackets."}
+    }elseif(!$last.SelectSingleNode(".//fun[@t='$($functionNames[$index])']")){Write-Output $last.OuterXml;throw "Function palette $($functionNames[$index]) did not insert its native function."}
+  }
+  [MathomirUiProbe]::OpenFile($main,$functionFixture)
+  Write-Output 'Function palette passed: all ten actual buttons place and reopen native editable functions.'
+
+  # Exercise native Compute(10) through the plot worker, without piece metadata.
+  $nativeFunctions=Join-Path (Split-Path $exe) 'native-function-graphs-smoke.mom'
+  $expected=@(-2,-1,1.37,-1,-1,-1,.63,(-[Math]::Pow(1.37,1.0/3)),[Math]::Exp(-1.37),[Math]::Sin(-1.37)/(-1.37))
+  $colors=@(0,0x0000CC00,0x000000CC,0x00C00000,0x000080D0,0x00A03080,0x00808000,0x00909090)
+  foreach($batch in @(0,8)){
+    $axes=@(-3,3,-3,6)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
+    $slots=@();$count=[Math]::Min(8,10-$batch)
+    for($slot=0;$slot -lt $count;$slot++){
+      $name=$functionNames[$batch+$slot];$argument='<var t="x" f="00" />'
+      if($batch+$slot -lt 3){$shape=@('f','c','|')[$batch+$slot];$fn='<elm tp="5" E1=""><ex br="1" shp="'+$shape+'">'+$argument+'</ex></elm>'}
+      else{$fn='<fun t="'+$name+'" f="20" E1=""><ex br="1">'+$argument+'</ex></fun>'}
+      $offset=($slot*.4).ToString([Globalization.CultureInfo]::InvariantCulture)
+      $slots+='<subexp d="0,0;4000,1000"><ex fh="100">'+$fn+'<opr s="+" /><var t="'+$offset+'" f="00" /></ex></subexp>'
+    }
+    ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axes -join '')+($slots -join '')+'</o></mathomir>')|Set-Content $nativeFunctions -Encoding ascii
+    [MathomirUiProbe]::OpenFile($main,$nativeFunctions)
+    Start-Sleep -Milliseconds 1600
+    [MathomirUiProbe]::Mouse($view,512,0,850,50)
+    $area=[MathomirUiProbe]::PlotArea($view)
+    for($slot=0;$slot -lt $count;$slot++){
+      $value=$expected[$batch+$slot]+$slot*.4
+      $px=[int]($area[0]+(-1.37+3)/6*($area[2]-$area[0]));$py=[int]($area[3]-($value+3)/9*($area[3]-$area[1]))
+      if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,3,$colors[$slot])){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Native function $($functionNames[$batch+$slot]) did not plot its negative-input value."}
+    }
+    if($batch -eq 0){
+      $px=[int]($area[0]+4/6*($area[2]-$area[0]));$py=[int]($area[3]-3.5/9*($area[3]-$area[1]))
+      if([MathomirUiProbe]::CurveColorNear($view,$px,$py,2,0)){throw 'Floor graph drew a false vertical connector across its jump.'}
+    }
+  }
+  Write-Output 'Native function graphs passed: all ten negative-input curves evaluate and paint, and floor steps have no false connector.'
+
   $marginFixture=Join-Path (Split-Path $exe) 'piecewise-created-smoke.mom'
   '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content -LiteralPath $marginFixture -Encoding ascii
   [MathomirUiProbe]::OpenFile($main,$marginFixture)
@@ -1115,6 +1183,18 @@ try {
   if($pieceDialog -eq [IntPtr]::Zero){throw 'Piecewise editor did not open from the palette icon.'}
   Write-Output 'Piecewise palette passed: icon beside Plotter opens the editor.'
   if(![MathomirUiProbe]::IsWindowUnicode([MathomirUiProbe]::Child($pieceDialog,1188))){throw 'Mathematical results require a Unicode text control.'}
+  foreach($sample in @(@('floor(-1.2)','-2'),@('ceil(-1.2)','-1'),@('abs(-3)','3'),@('round(-1.5)','-2'),@('trunc(-1.8)','-1'),@('sgn(0)','0'),@('fract(-1.2)','0.8'),@('cbrt(-8)','-2'),@('exp(0)','1'),@('sinc(0)','1'))){
+    [MathomirUiProbe]::Send($pieceDialog,273,1170)|Out-Null
+    for($row=1;$row -lt 8;$row++){[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1200+$row*5),'')}
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1200),$sample[0])
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1201),'')
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1202),'')
+    [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
+    $readout=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)).Replace([string][char]0x2212,'-')
+    if(!$readout.Contains('f(0) = '+$sample[1])){throw "Function value check failed for $($sample[0]): $readout"}
+  }
+  [MathomirUiProbe]::Send($pieceDialog,273,1170)|Out-Null
+  Write-Output 'Function values passed: all ten functions, negative rounding, fractional part and sinc at zero in the native value dialog.'
   [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
   if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'f\(0\) = 1'){throw 'Piecewise value check selected the wrong branch at the boundary.'}
   $unicodeResult=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188))

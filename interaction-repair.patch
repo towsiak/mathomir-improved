@@ -329,18 +329,20 @@ index 2f39ec2..e161da1 100644
  	int ShowNumberWithPrecision(double number, double precision,char *string);
  };
 diff --git a/Mathomir/Element.cpp b/Mathomir/Element.cpp
-index 209a634..099b0f6 100644
+index 209a634..ef0dfd9 100644
 --- a/Mathomir/Element.cpp
 +++ b/Mathomir/Element.cpp
-@@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -18,7 +18,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  
  *********************************************************************************************************/
++#include "ScalarFunctions.h"
  #include "StdAfx.h"
 +#include "ColorPalette.h"
  #include ".\element.h"
  #include "expression.h"
  #include "Mathomir.h"
-@@ -74,8 +75,8 @@ const struct
+@@ -74,8 +76,8 @@ const struct
  
  //constructor of the CElement class
  //the 'CElement' represents an element of expression (in expression 'A+B' elemens are: 'A', '+', and 'B')
@@ -351,7 +353,7 @@ index 209a634..099b0f6 100644
  CElement::CElement()
  {
  	//most of initialization is already done in the overloaded 'new' operator
-@@ -1794,7 +1795,7 @@ void CElement::PaintExpression(CDC * DC, short zoom, short X, short Y,char IsBlu
+@@ -1794,7 +1796,7 @@ void CElement::PaintExpression(CDC * DC, short zoom, short X, short Y,char IsBlu
  	CMainFrame *mf;
  	HFONT hfont;
  
@@ -360,19 +362,29 @@ index 209a634..099b0f6 100644
  	if (m_Type==1)  //variable / constant
  	{
  		if (((IsBlue) && (m_Text) && ((CExpression*)m_pPaternalExpression)->m_InternalInsertionPoint>0) && (!Popup->IsWindowVisible()))
+@@ -2681,6 +2683,7 @@ void CElement::Empty(char oper)
+ 		if (oper==35) strcpy(Data1,"arcsch");
+ 		if (oper==36) strcpy(Data1,"func");
+ 		if (oper==40) strcpy(Data1,"arctan");
++        if (oper>=41 && oper<=50) strcpy(Data1,ScalarFunctions::Name(oper));
+ 
+ 		if (oper==17) strcpy(Data1,"ln");
+ 		if (oper==18) //log10
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..f874bf2 100644
+index 531282c..cd5e142 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
-@@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -18,7 +18,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  
  *********************************************************************************************************/
++#include "ScalarFunctions.h"
  #include "StdAfx.h"
 +#include "ColorPalette.h"
  #include "Mathomir.h"
  #include "mainfrm.h"
  #include "popupmenu.h"
-@@ -46,7 +47,7 @@ void PaintGuidlines(CDC *DC, int AbsoluteY);
+@@ -46,7 +48,7 @@ void PaintGuidlines(CDC *DC, int AbsoluteY);
  void CheckForExtendedGuidlines(int AbsoluteY);
  extern int EasycastListStart;
  extern char TextControlboxMode;
@@ -381,7 +393,7 @@ index 531282c..f874bf2 100644
  
  extern int SelectedGuidelineType;
  extern int GuidlineElement;
-@@ -60,6 +61,7 @@ int KeyboardExponentMode=0;
+@@ -60,11 +62,12 @@ int KeyboardExponentMode=0;
  CExpression *AutocompleteSource;
  int AutocompletePoints;
  int AutocompleteTriggered;
@@ -389,7 +401,29 @@ index 531282c..f874bf2 100644
  extern char TouchMouseMode;
  extern char DisableMultitouch;
  int CalcStructuralChecksumOnly; //for speed - as global variable (should be used with care in single thread)
-@@ -328,8 +330,8 @@ extern CExpression *TheKeyboardClipboard;
+ 
+-const char *FunctionListString="arcsin,arccos,arctan,arccot,arctg,arcsec,arccsc,cosec,csc,sec,sin,cos,tan,log,ln,par,ctg,tg,cot,lim,arch,arsh,arth,arcoth,arsech,arcsch,sech,csch,sh,ch,th,coth,Re,Im,max,min,exp,arg,Res,sum,int,";
++const char *FunctionListString="arcsin,arccos,arctan,arccot,arctg,arcsec,arccsc,cosec,csc,sec,sin,cos,tan,log,ln,par,ctg,tg,cot,lim,arch,arsh,arth,arcoth,arsech,arcsch,sech,csch,sh,ch,th,coth,Re,Im,max,min,exp,floor,ceil,abs,round,trunc,sgn,fract,cbrt,sinc,arg,Res,sum,int,";
+ 
+ const struct LIST_OF_KNOWN_FUNCTIONS
+ {
+@@ -72,6 +75,15 @@ const struct LIST_OF_KNOWN_FUNCTIONS
+ 	char oper;
+ 	char name[10];
+ } ListOfKnownFunctions[]={
++    {6,44,"round"},
++    {6,45,"trunc"},
++    {6,46,"sgn"},
++    {6,47,"fract"},
++    {6,48,"cbrt"},
++    {6,49,"exp"},
++    {6,50,"sinc"},
++    {5,'|',"abs"},
++
+ 	{6,23,"d"}, //differential
+ 	{6,24,"par"}, //partial differential
+ 	{6,24,"partial"}, //partial differential
+@@ -328,8 +340,8 @@ extern CExpression *TheKeyboardClipboard;
  #define xreturn(x) return x
  #endif
  
@@ -400,7 +434,7 @@ index 531282c..f874bf2 100644
  
  extern CExpression* ClipboardExpression;
  extern CExpression* prevClipboardExpression;
-@@ -453,7 +455,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
+@@ -453,7 +465,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
  //for displaying
  //this function should be relatively fast.
  
@@ -490,7 +524,7 @@ index 531282c..f874bf2 100644
  {
  	
  	try
-@@ -1320,7 +1403,7 @@ void CExpression::CalculateSizeReadjust(short zoom, short *length, short *above,
+@@ -1320,7 +1413,7 @@ void CExpression::CalculateSizeReadjust(short zoom, short *length, short *above,
  CBitmap *cursor_bitmap;
  //paints the expression - the expression must be already prepared for displaying (by call to CalculateSize)
  //this function must be fast!!
@@ -499,7 +533,7 @@ index 531282c..f874bf2 100644
  {
  	try
  	{
-@@ -1331,7 +1414,7 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
+@@ -1331,7 +1424,7 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
  
  	//determine the color of expression
  	if (m_Color!=-1) 
@@ -508,7 +542,7 @@ index 531282c..f874bf2 100644
  	else if ((m_IsHeadline) && (color==0) && (m_pPaternalExpression==NULL))
  		color=RGB(0,128,128);
  
-@@ -1419,7 +1502,8 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
+@@ -1419,7 +1512,8 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
  		DC->SetBkMode(TRANSPARENT);
  		DC->SetTextAlign(TA_BASELINE);
  	}
@@ -518,7 +552,7 @@ index 531282c..f874bf2 100644
  	{
  		//paint frame around selection ( if is selected or is keyboard entry mode)
  		if ((m_Selection==1) || (m_Selection==m_NumElements+1) || 
-@@ -2407,6 +2491,15 @@ void CExpression::DeselectExpression()
+@@ -2407,6 +2501,15 @@ void CExpression::DeselectExpression()
  //it work recursively (can return its subelements)
  CObject* CExpression::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y,short *IsExpression, char *IsParenthese,char ForceInsertionPoints)
  {
@@ -534,7 +568,7 @@ index 531282c..f874bf2 100644
  	int i;
  	if ((DC==NULL) || (X<-5000) || (X>30000) || (Y<-5000) || (Y>15000) || (IsExpression==NULL)) return NULL;
  
-@@ -3048,11 +3141,13 @@ int CExpression::CopyExpression(const CExpression* Original,const char OnlySelec
+@@ -3048,11 +3151,13 @@ int CExpression::CopyExpression(const CExpression* Original,const char OnlySelec
  	m_StartAsText=Original->m_StartAsText;
  	m_IsHeadline=Original->m_IsHeadline;
  	m_Color=Original->m_Color;
@@ -548,7 +582,7 @@ index 531282c..f874bf2 100644
  
  	if (OnlySelected==1)
  	{
-@@ -3135,6 +3230,8 @@ void CExpression::Delete(void)
+@@ -3135,6 +3240,8 @@ void CExpression::Delete(void)
  	m_MaxNumColumns=1;
  	m_IsComputed=0;
  	m_IsVertical=0;
@@ -557,7 +591,7 @@ index 531282c..f874bf2 100644
  	m_Color=-1;
  	m_IsHeadline=0;
  	m_DrawParentheses=0;
-@@ -4383,7 +4480,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
+@@ -4383,7 +4490,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
  		this->m_KeyboardCursorPos=0;
  		CExpression *parent=this;
  		while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
@@ -566,7 +600,7 @@ index 531282c..f874bf2 100644
  		return 2;
  	}
  	/*if ((strnicmp(theElement->pElementObject->Data1,"\\text",5)==0)
-@@ -4875,6 +4972,41 @@ char LastCursorPositionKey;
+@@ -4875,6 +4982,41 @@ char LastCursorPositionKey;
  char IsDoubleStrokeConversionUsed;
  //this function receives messages when a key is hit (handling of keyboard)
  #pragma optimize("s",on)
@@ -608,7 +642,7 @@ index 531282c..f874bf2 100644
  int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, UINT nFlags,int fcolor,char is_external)
  {
  	//******************************************************************************
-@@ -4892,6 +5024,8 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -4892,6 +5034,8 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  	if (m_KeyboardCursorPos>23) m_KeyboardCursorPos=23;
  	
  
@@ -617,7 +651,7 @@ index 531282c..f874bf2 100644
  	//m_IsKeyboardEntry contains ordinal number (with offset +1) of the element that 
  	//is being edited. The edited element can only be variable (type==1)
  	tElementStruct *theElement;
-@@ -6352,7 +6486,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6352,7 +6496,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  			while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
  			if (parent)
  			{
@@ -626,7 +660,7 @@ index 531282c..f874bf2 100644
  			}
  			if ((UseToolbar)  && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
  			return 1;
-@@ -6565,7 +6699,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6565,7 +6709,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  
  			if ((ch=='B') || (ch=='I') || //bold, italic
  				(ch=='U') || (ch=='S') || (ch=='O') || //underline, strikeout, overline
@@ -635,7 +669,7 @@ index 531282c..f874bf2 100644
  				(ch=='N')) //normalization
  			{
  				((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("font formatting",20218);			
-@@ -6578,12 +6712,18 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6578,12 +6722,18 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  						{
  							for (int jj=0;jj<24;jj++)
  							{
@@ -656,7 +690,7 @@ index 531282c..f874bf2 100644
  						if (ch=='G') ts->pElementObject->m_Color=2;
  						if (ch=='N') ts->pElementObject->m_Color=-1;
  					}
-@@ -6592,7 +6732,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6592,7 +6742,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  					if (ch=='S') ts->Decoration=1;
  					if (ch=='N') ts->Decoration=0;
  				}				
@@ -665,7 +699,7 @@ index 531282c..f874bf2 100644
  				if ((UseToolbar)  && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
  				return 1;
  			}
-@@ -8778,6 +8918,27 @@ keyboardkeyhit_addtoexponent:
+@@ -8778,6 +8928,27 @@ keyboardkeyhit_addtoexponent:
  			theElement=KeyboardSplitVariable();
  			if (m_KeyboardCursorPos==0) IsEditedVariableEmpty=1;
  
@@ -693,7 +727,7 @@ index 531282c..f874bf2 100644
  			if (IsEditedVariableEmpty) 
  				DeleteElement(m_IsKeyboardEntry-1);
  			else
-@@ -10507,6 +10668,14 @@ int CExpression::KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt
+@@ -10507,6 +10678,14 @@ int CExpression::KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt
  	
  	}
  
@@ -708,7 +742,7 @@ index 531282c..f874bf2 100644
  	//adds the character
  	CExpression *newFocus;
  	if (KeyboardKeyHit(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,2)==0) 
-@@ -11078,6 +11247,13 @@ int PaintText(CDC *DC,int X, int Y,char *text, char *font, short *spacing, short
+@@ -11078,6 +11257,13 @@ int PaintText(CDC *DC,int X, int Y,char *text, char *font, short *spacing, short
  
  int CExpression::Autocomplete(int is_internal)
  {
@@ -722,7 +756,7 @@ index 531282c..f874bf2 100644
  	if (is_internal)
  	{
  		int i;
-@@ -11644,7 +11820,7 @@ autowraptext_start:
+@@ -11644,7 +11830,7 @@ autowraptext_start:
  int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  {
  	int len=0;
@@ -731,7 +765,7 @@ index 531282c..f874bf2 100644
  	static char tabs[17];
  
  	if (num_tabs>16) num_tabs=16;
-@@ -11694,6 +11870,14 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
+@@ -11694,6 +11880,14 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  		itoa(m_IsHeadline,tmp,10);
  		strcat(tmpstr,tmp);
  	}
@@ -746,7 +780,7 @@ index 531282c..f874bf2 100644
  	if (m_IsVertical)
  	{
  		strcat(tmpstr,"\" vert=\"");
-@@ -11852,6 +12036,8 @@ char * CExpression::XML_input(char * file)
+@@ -11852,6 +12046,8 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"txt")==0) {m_StartAsText=1;old_version_text_decode=1;}
  		if (strcmp(attribute,"hed")==0) m_IsHeadline=atoi(value);
  		if (strcmp(attribute,"vert")==0) m_IsVertical=atoi(value);
@@ -755,7 +789,7 @@ index 531282c..f874bf2 100644
  		if ((strcmp(attribute,"color")==0) || (strcmp(attribute,"clr")==0)) m_Color=atoi(value);
  		if (strcmp(attribute,"alig")==0) m_Alignment=atoi(value);
  		if ((strcmp(attribute,"brack")==0) || (strcmp(attribute,"br")==0)) m_ParenthesesFlags=atoi(value);
-@@ -11862,6 +12048,14 @@ char * CExpression::XML_input(char * file)
+@@ -11862,6 +12058,14 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"b_data")==0) m_ParenthesesFlags|=(atoi(value)<<2);
  
  	} while (attribute[0]);
@@ -770,7 +804,7 @@ index 531282c..f874bf2 100644
  
  	int found_anything=0;
  	int is_matrix=0;
-@@ -12021,18 +12215,18 @@ char * CExpression::XML_input(char * file)
+@@ -12021,18 +12225,18 @@ char * CExpression::XML_input(char * file)
  int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,char output_type)
  {
  	int len=0;
@@ -792,7 +826,7 @@ index 531282c..f874bf2 100644
  		strcat(tmpstr,"\">\r\n");
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
-@@ -12257,7 +12451,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12257,7 +12461,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -801,7 +835,7 @@ index 531282c..f874bf2 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12272,7 +12466,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12272,7 +12476,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  int CExpression::LaTeX_output(char * output, char only_calculate)
  {
  	int len=0;
@@ -810,7 +844,7 @@ index 531282c..f874bf2 100644
  	char *tabs="";
  	char output_type=3;
  	int num_tabs=0;
-@@ -12281,7 +12475,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12281,7 +12485,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  
  	//memset(tabs,9,num_tabs);tabs[num_tabs]=0; //generating the tablist string
  
@@ -819,7 +853,7 @@ index 531282c..f874bf2 100644
  	{
  		//color of the expression - if m_Color==-1, then the color is inherited or default
  	}*/
-@@ -12486,7 +12680,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12486,7 +12690,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -828,7 +862,7 @@ index 531282c..f874bf2 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12567,7 +12761,7 @@ int IsCharacterLow(char ch,char font)
+@@ -12567,7 +12771,7 @@ int IsCharacterLow(char ch,char font)
  
  int CExpression::CalcChecksum()
  {
@@ -837,7 +871,7 @@ index 531282c..f874bf2 100644
  		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
  		
  	int c=m_NumElements;
-@@ -12581,6 +12775,8 @@ int CExpression::CalcChecksum()
+@@ -12581,6 +12785,8 @@ int CExpression::CalcChecksum()
  		//c+=128*m_ParentheseHeightFactor;
  		c+=256*(m_Color+4*m_StartAsText+8*m_IsVertical);
  		c+=768*m_Alignment;
@@ -846,7 +880,7 @@ index 531282c..f874bf2 100644
  		if (m_pPaternalExpression) c+=500;
  		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
  		c+=m_InternalInsertionPoint;
-@@ -14353,6 +14549,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
+@@ -14353,6 +14559,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
  	}
  	return 0;
  getkeyboardcursorpos_finish:
@@ -854,7 +888,21 @@ index 531282c..f874bf2 100644
  
  	if ((m_IsVertical) && (m_pPaternalExpression==NULL))
  	{
-@@ -16978,7 +17175,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -14936,7 +15143,12 @@ int CExpression::Compute(int StartPos, int EndPos,int ComputationType, int Outsi
+ 				if (strcmp(ts->pElementObject->Data1,"th")==0) is_hsincos=1;
+ 				if (strcmp(ts->pElementObject->Data1,"cth")==0) is_hsincos=1;
+ 
+-				if ((is_ln) || (is_log))
++                if (ScalarFunctions::Known(ts->pElementObject->Data1))
++                {
++                    while (((rval=ComputeScalarFunction(i+preoperator,ComputationType))<0) && (cnt<50)) cnt++;
++                    if (cnt) rval=-1;
++                }
++                else if ((is_ln) || (is_log))
+ 				{
+ 					//Logarithm
+ 					while (((rval=ComputeLog(i+preoperator,element_type,ComputationType))<0) && (cnt<50)) cnt++;
+@@ -16978,7 +17190,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl*pow(10.0,-exxp);
@@ -863,7 +911,7 @@ index 531282c..f874bf2 100644
  				exxp--;
  				if (exxp<-100) 	{rr=0.0;exxp=0;break;}
  			}
-@@ -16988,7 +17185,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16988,7 +17200,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl/pow(10.0,exxp);
@@ -872,7 +920,7 @@ index 531282c..f874bf2 100644
  				exxp++;
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
-@@ -17177,6 +17374,15 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17177,6 +17389,15 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  
  	CExpression *exp=(CExpression*)(ts->pElementObject->Expression2);
  	CExpression *arg=(CExpression*)(ts->pElementObject->Expression1);
@@ -888,7 +936,7 @@ index 531282c..f874bf2 100644
  
  	//take care about exponent
  
-@@ -17223,7 +17429,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17223,7 +17444,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  		PF.prec1=0;
  		ret=exp->StrikeoutCommonFactors(0,exp->m_NumElements-1,1,NULL,0,0,1,&PF);
  		exp->StrikeoutRemove(0,exp->m_NumElements-1);
@@ -897,7 +945,7 @@ index 531282c..f874bf2 100644
  	}
  	else
  	{
-@@ -17335,7 +17541,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17335,7 +17556,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  				}
  
  				double Re,Im=0;
@@ -915,7 +963,96 @@ index 531282c..f874bf2 100644
  				{
  					//result might be imaginary number
  					precision2++;
-@@ -24194,6 +24409,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
+@@ -23995,24 +24225,12 @@ int CExpression::ComputeParentheses(int Position, char element_type, int Computa
+ 		return retval;
+ 	}
+ 
+-	//ceiling and floor functions
+-	if ((argument->m_ParentheseShape=='c') || (argument->m_ParentheseShape=='f'))
+-	{
+-		if ((InsideLevel<MulLevel) && (InsideLevel!=-1)) return 1;
+-
+-		double N=1.0;
+-		int p=0;
+-		if (argument->IsPureNumber(0,argument->m_NumElements,&N,&p))
+-		{
+-			if (argument->m_ParentheseShape=='c')
+-				N=ceil(N);//(int)((N>0)?(N+1):(N));
+-			else
+-				N=floor(N);//(int)((N>0)?(N):(N-1));
+-			DeleteElement(Position);
+-			this->GenerateASCIINumber(N,(int)N,1,p,Position);
+-			return 1;
+-		}
+-	}
++    // Preserve symbolic floor/ceiling; never simplify their brackets away.
++    if(argument->m_ParentheseShape=='c' || argument->m_ParentheseShape=='f')
++    {
++        int result=ComputeScalarFunction(Position,ComputationType);
++        return result?result:retval;
++    }
+ 
+ 	//we can drop the parentheses if the level inside is higher than the outside level
+ 	{
+@@ -24174,6 +24392,57 @@ int CExpression::GenerateASCIIFraction(int Position,double num, double denom, in
+ 	return 0;
+ }
+ 
++int CExpression::ComputeScalarFunction(int Position, int ComputationType)
++{
++    if(Position<0 || Position>=m_NumElements)return 0;
++    CElement *element=(m_pElementList+Position)->pElementObject;
++    CExpression *arg=(CExpression*)element->Expression1;
++    if(!arg || !arg->m_NumElements)return 0;
++    const char *name=element->Data1;
++    if(element->m_Type==5)name=arg->m_ParentheseShape=='f'?"floor":"ceil";
++    if(!ScalarFunctions::Known(name))return 0;
++    int changed=0;
++    for(int i=0;i<50 && arg->Compute(0,arg->m_NumElements-1,ComputationType==10?10:0);i++)changed=-1;
++    double input=0;int precision=0;
++    if(!arg->IsPureNumber(0,arg->m_NumElements,&input,&precision))
++    {
++        tPureFactors factors;factors.N1=factors.N2=1.;factors.is_frac1=factors.prec1=0;
++        if(!arg->StrikeoutCommonFactors(0,arg->m_NumElements-1,1,NULL,0,0,1,&factors) || factors.N2==0)return changed;
++        input=factors.N1/factors.N2;
++    }
++    double result=ScalarFunctions::Value(name,input);
++    if(!std::isfinite(result))return changed;
++    // Avoid narrowing large integers. Keep the native full-precision number cache.
++    bool small=std::fabs(result)<9e18;
++    long long integer=small?(long long)result:0;
++    DeleteElement(Position);
++    if(ComputationType==10)
++    {
++        CExpression *target=this;int pos=Position;
++        if(result<0){InsertEmptyElement(Position,5,'(');target=(CExpression*)(m_pElementList+Position)->pElementObject->Expression1;target->InsertEmptyElement(0,2,'-');pos=1;}
++        target->InsertEmptyElement(pos,1,'0');
++        CElement *number=(target->m_pElementList+pos)->pElementObject;
++        number->Data1[15]=126;double magnitude=std::fabs(result);memcpy(number->Data1+16,&magnitude,sizeof(magnitude));
++    }
++    else if(result!=0 && (std::fabs(result)>1e100 || std::fabs(result)<1e-100))
++    {
++        // Native powers of ten retain proper typesetting outside the legacy range.
++        int exponent=(int)std::floor(std::log10(std::fabs(result)));
++        double scale=std::pow(10.,exponent);
++        double mantissa=scale?result/scale:(result/std::pow(10.,exponent+1))*10;
++        CExpression *target=this;int pos=Position;
++        InsertEmptyElement(Position,5,'(');target=(CExpression*)(m_pElementList+Position)->pElementObject->Expression1;pos=0;
++        pos+=target->GenerateASCIINumber(mantissa,0,0,115,pos);
++        target->InsertEmptyElement(pos++,2,(char)0xD7);
++        target->InsertEmptyElement(pos,3,0);
++        CElement *power=(target->m_pElementList+pos)->pElementObject;
++        ((CExpression*)power->Expression1)->GenerateASCIINumber(10,10,1,0,0);
++        ((CExpression*)power->Expression2)->GenerateASCIINumber(exponent,exponent,1,0,0);
++    }
++    else GenerateASCIINumber(result,integer,small && result==integer,115,Position);
++    return 1;
++}
++
+ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationType)
+ {
+ 	int retval=0;
+@@ -24194,6 +24463,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
  
  	CExpression *arg=(CExpression*)((m_pElementList+Position)->pElementObject->Expression1);
  	if (!arg) return 0;
@@ -954,7 +1091,7 @@ index 531282c..f874bf2 100644
  
  	{
  		int cnt=0;
-@@ -24454,6 +24701,7 @@ computesincos_end:
+@@ -24454,6 +24755,7 @@ computesincos_end:
  		if (rval)
  		{
  			double N=PF.N1/PF.N2;
@@ -962,7 +1099,7 @@ index 531282c..f874bf2 100644
  			int prec=PF.prec1;
  			{
  				if (fabs(N)<1e-100)
-@@ -24477,6 +24725,7 @@ computesincos_end:
+@@ -24477,6 +24779,7 @@ computesincos_end:
  				if (function_type)
  				{
  					int is_ok=0;
@@ -970,7 +1107,7 @@ index 531282c..f874bf2 100644
  					if (function_type==1) {res=sin(N);is_ok=1;}
  					if (function_type==2) {res=cos(N);is_ok=1;}
  					if (function_type==3) {res=tan(N);is_ok=1;}
-@@ -24484,8 +24733,9 @@ computesincos_end:
+@@ -24484,8 +24787,9 @@ computesincos_end:
  					if (function_type==5) {res=1.0/cos(N);is_ok=1;} //secant
  					if (function_type==6) {res=1.0/sin(N);is_ok=1;} //cosecant
  
@@ -981,7 +1118,7 @@ index 531282c..f874bf2 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -24552,11 +24802,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+@@ -24552,11 +24856,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
  					if (function_type==1) {res=asin(N);is_ok=1;} //arcsin
  					if (function_type==2) {res=acos(N);is_ok=1;} //arccos
  					if (function_type==3) {res=atan(N);is_ok=1;} //arctan
@@ -996,7 +1133,7 @@ index 531282c..f874bf2 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -25178,7 +25429,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
+@@ -25178,7 +25483,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
  	return 1;
  }
  //int sshit=0;
@@ -1005,7 +1142,7 @@ index 531282c..f874bf2 100644
  {
  	if (wwwwxxxx==0) {InitializeCriticalSection(&section3);wwwwxxxx=1;}
  	int cntrr=0;
-@@ -25191,7 +25442,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25191,7 +25496,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  
  	//first replace all variables with the given value
  
@@ -1014,7 +1151,7 @@ index 531282c..f874bf2 100644
  
  	try
  	{
-@@ -25295,7 +25546,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25295,7 +25600,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  		LeaveCriticalSection(&section3);
  		return retval;
  	}
@@ -1024,7 +1161,7 @@ index 531282c..f874bf2 100644
  	if (PF.N1*PF.N2<0)
  	{is_call_from_ploter=0;LeaveCriticalSection(&section3);return -1e+48;}
 diff --git a/Mathomir/Expression.h b/Mathomir/Expression.h
-index 36238b0..97028e5 100644
+index 36238b0..5ad0c9a 100644
 --- a/Mathomir/Expression.h
 +++ b/Mathomir/Expression.h
 @@ -139,7 +139,9 @@ public:
@@ -1056,7 +1193,15 @@ index 36238b0..97028e5 100644
  	int KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, UINT nFlags, int fcolor, char extern_call);
  	// only to be called from KeyboardHit function!!
  	tElementStruct* KeyboardSplitVariable(void);
-@@ -266,7 +273,7 @@ public:
+@@ -259,6 +266,7 @@ public:
+ 	int MatrixInvert(int ComputationType);
+ 	int GenerateASCIIFraction(int Position,double num, double denom, int precision , int is_fraction);
+ 	int ComputeSinCos(int Position, char element_type, int ComputationType);
++    int ComputeScalarFunction(int Position, int ComputationType);
+ 	int ComputeASinCos(int Position, char element_type, int ComputationType);
+ 	int ComputeHSinCos(int Position, char element_type, int ComputationType);
+ 
+@@ -266,7 +274,7 @@ public:
  	int Derivate(CExpression * variable,int internall_call=0);
  
  	void *PlotterPrepareVariablePositions(void *VarPos=NULL);
@@ -1066,7 +1211,7 @@ index 36238b0..97028e5 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..16674a2 100644
+index 1ef18dd..aa89e0e 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -1737,19 +1882,7 @@ index 1ef18dd..16674a2 100644
 -				c=Ymax-(Ymax-Ymin)*(double)max(m_Y1,m_Y2)/(double)Ylen;
 -				d=Ymax-(Ymax-Ymin)*(double)min(m_Y1,m_Y2)/(double)Ylen;
 -				if (m_Y1==m_Y2) {c=Ymin-(Ymax-Ymin);d=Ymax+(Ymax-Ymin);}
-+        if (TheState==102) // box zoom; tiny gestures zoom gently around the pointer
-+        {
-+            int width=max(1,(Base->Items)->X2/DRWZOOM-MX);
-+            int height=max(1,(Base->Items+1)->Y2/DRWZOOM-MY);
-+            double xmin,xmax,ymin,ymax; PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
-+            bool click=abs(m_X2-m_X1)*ViewZoom/100<8 || abs(m_Y2-m_Y1)*ViewZoom/100<8;
-+            double x1=(m_X1-MX)/(double)width,x2=(m_X2-MX)/(double)width;
-+            double y1=1-m_Y1/(double)height,y2=1-m_Y2/(double)height;
-+            if (click) { GraphZoom::Zoom(xmin,xmax,0.8,is_x_log,GraphZoom::Clamp(x1,0,1)); GraphZoom::Zoom(ymin,ymax,0.8,is_y_log,GraphZoom::Clamp(y1,0,1)); }
-+            else { GraphZoom::Box(xmin,xmax,x1,x2,is_x_log); GraphZoom::Box(ymin,ymax,y1,y2,is_y_log); }
-+            SetBounds(xmin,xmax,ymin,ymax); TheState=0; PlotFunction(1); return 0;
-+        }
- 
+-
 -				Ymin=c;
 -				Ymax=d;
 -			}
@@ -1787,7 +1920,19 @@ index 1ef18dd..16674a2 100644
 -			
 -
 -			return 0;
--
++        if (TheState==102) // box zoom; tiny gestures zoom gently around the pointer
++        {
++            int width=max(1,(Base->Items)->X2/DRWZOOM-MX);
++            int height=max(1,(Base->Items+1)->Y2/DRWZOOM-MY);
++            double xmin,xmax,ymin,ymax; PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
++            bool click=abs(m_X2-m_X1)*ViewZoom/100<8 || abs(m_Y2-m_Y1)*ViewZoom/100<8;
++            double x1=(m_X1-MX)/(double)width,x2=(m_X2-MX)/(double)width;
++            double y1=1-m_Y1/(double)height,y2=1-m_Y2/(double)height;
++            if (click) { GraphZoom::Zoom(xmin,xmax,0.8,is_x_log,GraphZoom::Clamp(x1,0,1)); GraphZoom::Zoom(ymin,ymax,0.8,is_y_log,GraphZoom::Clamp(y1,0,1)); }
++            else { GraphZoom::Box(xmin,xmax,x1,x2,is_x_log); GraphZoom::Box(ymin,ymax,y1,y2,is_y_log); }
++            SetBounds(xmin,xmax,ymin,ymax); TheState=0; PlotFunction(1); return 0;
++        }
+ 
 -		}
  		if (TheState==3) //moving the plot with mouse finished
  		{
@@ -1923,9 +2068,7 @@ index 1ef18dd..16674a2 100644
 -				Xmin/=10.0;
 -				Xmax*=10.0;
 -			}
-+        if ((edit_at_position==1) && (Base->NumItems>=8))
-+        { StepZoom(1.25); return 0; }
- 
+-
 -			if (is_y_log==0)
 -			{
 -				double dy=Ymax-Ymin;
@@ -1945,7 +2088,9 @@ index 1ef18dd..16674a2 100644
 -			((CExpression*)((Base->Items+4)->pSubdrawing))->GenerateASCIINumber(Xmin,(long long)Xmin,0,5,0);
 -			((CExpression*)((Base->Items+5)->pSubdrawing))->Delete();
 -			((CExpression*)((Base->Items+5)->pSubdrawing))->GenerateASCIINumber(Xmax,(long long)Xmax,0,5,0);
--
++        if ((edit_at_position==1) && (Base->NumItems>=8))
++        { StepZoom(1.25); return 0; }
+ 
 -			PlotFunction(1);
 -			return 0;
 -		}
@@ -2130,22 +2275,34 @@ index 1ef18dd..16674a2 100644
  			return 1;
  		}
  
-@@ -1611,23 +1575,147 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1611,23 +1575,160 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  	return 0;
  }
  
 -int CFunctionPlotter::XML_output(char * output, int num_tabs, char only_calculate)
-+double CFunctionPlotter::PieceValue(int slot,double x,CExpression *function,void *variables)
++static bool GraphHasSteps(CExpression *expression)
  {
 -	return 0;
-+    if(slot<(int)pieces.size())return pieces[slot].Contains(x)?pieces[slot].program.Value(x,pieceRadians):sqrt(-1.0);
-+    return function->PlotterCalculateFunctionValue(x,variables,is_x_pi!=0);
++    if(!expression)return false;
++    for(int i=0;i<expression->m_NumElements;i++){
++        CElement *e=(expression->m_pElementList+i)->pElementObject;
++        if(!e)continue;
++        if(e->m_Type==6 && ScalarFunctions::Steps(e->Data1))return true;
++        if(e->m_Type==5 && e->Expression1){char shape=((CExpression*)e->Expression1)->m_ParentheseShape;if(shape=='f'||shape=='c')return true;}
++        if(GraphHasSteps((CExpression*)e->Expression1)||GraphHasSteps((CExpression*)e->Expression2)||GraphHasSteps((CExpression*)e->Expression3))return true;
++    }
++    return false;
  }
--
+ 
 -char *CFunctionPlotter::XML_input(char * file)
-+int CFunctionPlotter::XML_output(char * output,int num_tabs,char only_calculate)
++double CFunctionPlotter::PieceValue(int slot,double x,CExpression *function,void *variables)
  {
 -	return file;
++    if(slot<(int)pieces.size())return pieces[slot].Contains(x)?pieces[slot].program.Value(x,pieceRadians):sqrt(-1.0);
++    return function->PlotterCalculateFunctionValue(x,variables,is_x_pi!=0);
++}
++int CFunctionPlotter::XML_output(char * output,int num_tabs,char only_calculate)
++{
 +    std::string text;
 +    for(size_t i=0;i<pieces.size();i++){
 +        const Piecewise::Row &r=pieces[i];
@@ -2285,7 +2442,7 @@ index 1ef18dd..16674a2 100644
  		ViewZoom=::ViewZoom;
  	int Xlen;
  	int Ylen;
-@@ -1641,7 +1729,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1641,7 +1742,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		{
  			abort_request=1;
  			Sleep(10);
@@ -2294,7 +2451,7 @@ index 1ef18dd..16674a2 100644
  			{
  				TerminateThread(ThreadHandle,0);
  				if (DrawingThreadUsed>0) DrawingThreadUsed--;
-@@ -1660,6 +1748,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1660,6 +1761,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		//reduce for size of 'borders' (coordinate system)
  		Xlen-=MX*ViewZoom/100;
  		Ylen-=MY*ViewZoom/100;
@@ -2302,7 +2459,7 @@ index 1ef18dd..16674a2 100644
  
  		//delete the previous bitmap, if dimensions are different
  		if (Plot)
-@@ -1711,36 +1800,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1711,36 +1813,51 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	tDocumentStruct *ds=TheDocument;
  	int i_cnt;
  	for (i_cnt=0;i_cnt<NumDocumentElements;i_cnt++,ds++)
@@ -2333,6 +2490,7 @@ index 1ef18dd..16674a2 100644
 -	CExpression *Func[4];
 +
 +	CExpression *Func[8];
++    bool hasSteps[8]={false};
 +    bool vertical[8]={false};double verticalX[8]={0};
 +    std::vector<CExpression*> divisors[8];
 +    std::vector<GraphDomainPoint> domainPoints[8];
@@ -2361,11 +2519,12 @@ index 1ef18dd..16674a2 100644
 +                    if(vertical[kk])any_found=1;
 +                    delete Func[kk];Func[kk]=NULL;continue;
 +                }
++                hasSteps[kk]=kk<(int)pieces.size()?pieces[kk].program.HasSteps():GraphHasSteps(Func[kk]);
 +                CollectGraphDivisors(Func[kk],divisors[kk]);
  				any_found=1;
  			}
  		}
-@@ -1748,30 +1850,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1748,30 +1865,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	if (!any_found) return 0;
  
  	any_function_defined=1;
@@ -2405,7 +2564,7 @@ index 1ef18dd..16674a2 100644
  				delete Func[kk];
  				Func[kk]=NULL;
  			}
-@@ -1780,32 +1884,42 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1780,32 +1899,42 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  
  	//create an arrays that will hold Y calculated values
@@ -2462,7 +2621,7 @@ index 1ef18dd..16674a2 100644
  		  (GetKeyState(33)&0x8000) ||
  		  (GetKeyState(34)&0x8000) ||
  		  (GetKeyState(VK_LEFT)&0x8000) ||
-@@ -1818,7 +1932,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1818,7 +1947,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		}
  
  		//compute 'y' value in this point 'x'
@@ -2471,7 +2630,7 @@ index 1ef18dd..16674a2 100644
  		{
  			if (abort_request) break;
  			if (Func[kk])
-@@ -1828,72 +1942,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1828,72 +1957,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  					X=((double)i+0)*f1+Xmin;
  				else
  					X=Xmin*pow(10.0,i*f2);
@@ -2573,7 +2732,7 @@ index 1ef18dd..16674a2 100644
  
  			//compute scaling factors
  			double F1=(is_y_log==0)?((double)Ylen/(double)(Ymax-Ymin)):((double)Ylen/log10(Ymax/Ymin));
-@@ -1901,8 +1992,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1901,8 +2007,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  			//now we start drawing pre-calculated points into the plotter bitmap
  			if (!abort_request)
@@ -2584,7 +2743,7 @@ index 1ef18dd..16674a2 100644
  					if (Func[kk])
  					{
  						double Y=(is_y_log==0)?((double)(*(YY[kk]+j)-Ymin)):(log10(*(YY[kk]+j))-log10(Ymin));
-@@ -1913,7 +2004,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1913,7 +2019,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  						double Y2=Y;
  						if (analyze)
  						{
@@ -2593,7 +2752,7 @@ index 1ef18dd..16674a2 100644
  							if ((j>1) && (j<i-1))
  							{
  								double n,a,b,c,d;
-@@ -1924,14 +2015,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1924,14 +2030,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								d=*(YY[kk]+j+2);
  								if ((b>a) && (b>c)) special_point=1; //maximum
  								if ((b<a) && (b<c)) special_point=2; //minimum
@@ -2611,7 +2770,7 @@ index 1ef18dd..16674a2 100644
  								if (Func[zz])
  								{
  									double a2,b2,c2;
-@@ -1970,11 +2061,38 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1970,11 +2076,40 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  						if (Y>16000) Y=16000;
  						if (Y<-16000) Y=-16000;
@@ -2621,6 +2780,8 @@ index 1ef18dd..16674a2 100644
 +                        double xb=is_x_log ? Xmin*pow(10.0,j*f2) : Xmin+j*f1;
 +                        for(size_t n=0;n<domainPoints[kk].size();n++)
 +                            if(domainPoints[kk][n].x>=xa && domainPoints[kk][n].x<=xb){crossExcluded=true;break;}
++                        if(j>0 && hasSteps[kk] && !crossExcluded && std::fabs(Y-prevy[kk])>1)
++                            crossExcluded=GraphDiscontinuities::FiniteJump([&](double x){return PieceValue(kk,x,Func[kk],VarPos[kk]);},xa,xb,*(YY[kk]+j-1),*(YY[kk]+j),(Ymax-Ymin)/(Ylen*2));
 +                        // Refine a valid/undefined transition instead of stopping one sample early.
 +                        if(j>0 && !crossExcluded && GraphDiscontinuities::Finite(*(YY[kk]+j-1))!=GraphDiscontinuities::Finite(*(YY[kk]+j)))
 +                        {
@@ -2652,7 +2813,7 @@ index 1ef18dd..16674a2 100644
  							mDC.MoveTo(Xp,Ylen-(int)prevy[kk]);
  							mDC.LineTo(X,Ylen-(int)Y);
  
-@@ -1990,13 +2108,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1990,13 +2125,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								}
  								else //paint colored point
  									mDC.FillSolidRect(X-2,zed-2,4,4,RGB(255,0,(special_point==3)?255:0));
@@ -2668,7 +2829,7 @@ index 1ef18dd..16674a2 100644
  								double Xd;
  								if (is_x_log==0)
  								{
-@@ -2015,7 +2133,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2015,7 +2150,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  								double Yd=*(YY[kk]+j);
  								double Ydd=fabs(*(YY[kk]+j-1)-Yd);
@@ -2677,7 +2838,7 @@ index 1ef18dd..16674a2 100644
  								{
  									if (is_y_log==0)
  										ShowNumberWithPrecision(Yd,max(Ydd,1/F1/density),txt2);
-@@ -2026,31 +2144,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2026,31 +2161,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								mDC.SetBkMode(TRANSPARENT);
  								if (special_point==1) //maximum
  								{
@@ -2718,7 +2879,7 @@ index 1ef18dd..16674a2 100644
  
  			if ((analyze) && (i==density*Xlen-1) && (!abort_request) && (PrintDC==NULL) && (Func[0]) && (is_x_log==0))
  			{
-@@ -2060,7 +2178,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2060,7 +2195,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  				for (int j=0;j<=i;j++)
  				if (!_isnan(*(YY[0]+j)))
  				{
@@ -2727,7 +2888,7 @@ index 1ef18dd..16674a2 100644
  					if (j<i)
  						Integral+=(*(YY[0]+j)+*(YY[0]+j+1))*f1/2.0;
  					else
-@@ -2076,27 +2194,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2076,27 +2211,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  					mDC.SetTextColor(0);
  					char tt[64];strcpy(tt,"Int=");
  					ShowNumberWithPrecision(Integral,f1,tt);
@@ -2785,7 +2946,7 @@ index 1ef18dd..16674a2 100644
  			Func[kk]->PlotterReleaseVariablePositions(VarPos[kk]);
  			delete Func[kk];
  		}
-@@ -2107,12 +2247,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2107,12 +2264,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	return 0;
  }
  
@@ -2839,7 +3000,7 @@ index 1ef18dd..16674a2 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+5)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2129,7 +2309,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2129,7 +2326,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=5)
@@ -2848,7 +3009,7 @@ index 1ef18dd..16674a2 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+4)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2146,7 +2326,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2146,7 +2343,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=8)
@@ -2857,7 +3018,7 @@ index 1ef18dd..16674a2 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+7)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2163,7 +2343,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2163,7 +2360,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=7)
@@ -2866,7 +3027,7 @@ index 1ef18dd..16674a2 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+6)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2193,12 +2373,15 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2193,12 +2390,15 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		if (*Ymax<=1e-100) *Ymax=1;
  		if (*Ymin<=1e-100) *Ymin=*Ymax/1e+10;
  	}
@@ -2882,7 +3043,7 @@ index 1ef18dd..16674a2 100644
  	precision=fabs(precision);
  	if (precision<1e-100) precision=1e-100;
  
-@@ -2246,7 +2429,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
+@@ -2246,7 +2446,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
  	if (t[0]=='-') {isminus=1;memmove(t,t+1,strlen(t));}
  
  	//leading zeros
@@ -2961,10 +3122,10 @@ index 0000000..7dac989
 +}
 diff --git a/Mathomir/GraphDiscontinuities.h b/Mathomir/GraphDiscontinuities.h
 new file mode 100644
-index 0000000..f90092d
+index 0000000..eaa3757
 --- /dev/null
 +++ b/Mathomir/GraphDiscontinuities.h
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,87 @@
 +#pragma once
 +#include <cmath>
 +#include <vector>
@@ -2974,6 +3135,18 @@ index 0000000..f90092d
 +// Numerical domain analysis; no function-name or example-specific cases.
 +namespace GraphDiscontinuities {
 +inline bool Finite(double value) { return std::isfinite(value) && std::fabs(value)<1e40; }
++// A true finite jump survives interval refinement. Continuous steep curves shrink.
++template<class Evaluate> bool FiniteJump(Evaluate evaluate,double a,double b,double fa,double fb,double visibleDelta) {
++    if(!Finite(fa)||!Finite(fb)||a>=b)return false;
++    double initial=std::fabs(fb-fa);
++    if(initial<=visibleDelta)return false;
++    for(int i=0;i<28;i++){
++        double m=a+(b-a)/2;if(m==a || m==b)break;
++        double fm=evaluate(m);if(!Finite(fm))return true;
++        if(std::fabs(fm-fa)>std::fabs(fb-fm)){b=m;fb=fm;}else{a=m;fa=fm;}
++    }
++    return std::fabs(fb-fa)>(std::max)(visibleDelta,initial*1e-6);
++}
 +inline void AddRoot(std::vector<double>& roots,double x) {
 +    // Deduplicate at numerical precision, not at a fraction of the viewport.
 +    for (size_t i=0;i<roots.size();++i) {
@@ -3256,7 +3429,7 @@ index 0000000..0b7e258
 +}
 +}
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..af1cc9f 100644
+index bdcebb4..93a7691 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -3553,7 +3726,7 @@ index bdcebb4..af1cc9f 100644
 +FONT 8,"MS Shell Dlg"
 +BEGIN
 +    LTEXT "Define f(x) in up to eight rows. Each formula applies only on its interval. Leave unused formula rows blank.",-1,10,8,568,14
-+    LTEXT "Formula: x, numbers, pi, e; + - * / ^; sin(x), cos(x), tan(x), sqrt(x), abs(x), exp(x), ln(x), log(x). Use parentheses.",-1,10,24,568,14
++    LTEXT "Functions: sin, cos, tan, sqrt, ln, log, floor, ceil, abs, round, trunc, sgn, fract, cbrt, exp, sinc. Use parentheses, e.g. floor(x).",-1,10,24,568,14
 +    PUSHBUTTON "Jump example",1170,10,42,86,16
 +    PUSHBUTTON "Absolute value",1171,102,42,86,16
 +    PUSHBUTTON "Step example",1172,194,42,86,16
@@ -3894,12 +4067,14 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..f4c8dc9 100644
+index fc832eb..7ab0378 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -20,6 +20,10 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -19,7 +19,12 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ 
  *********************************************************************************************************/
  
++#include "ScalarFunctions.h"
  #include "stdafx.h"
 +#include "ColorPalette.h"
 +#include "GeometryShapes.h"
@@ -3908,7 +4083,7 @@ index fc832eb..f4c8dc9 100644
  #include "Mathomir.h"
  
  #include "MathomirDoc.h"
-@@ -30,6 +34,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -30,6 +35,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  #include "popupmenu.h"
  #include "mainfrm.h"
  #include "math.h"
@@ -3917,7 +4092,7 @@ index fc832eb..f4c8dc9 100644
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -132,6 +138,208 @@ unsigned int LongClickStartTime;
+@@ -132,6 +139,224 @@ unsigned int LongClickStartTime;
  CPoint LongClickPosition;
  CExpression *LongClickObject;
  tDocumentStruct *prevTouchedObject=NULL;
@@ -3984,6 +4159,17 @@ index fc832eb..f4c8dc9 100644
 +    else if (n=="sum" || n=="product") result="Requires an expression and specified index limits.\nDomain/range depend on the terms and index limits.\nInfinite operations also require convergence.";
 +    else if (n=="rot" || n=="nabla") result="Requires the relevant differentiable scalar/vector field.\nDomain and output depend on the field and operator.\nCurl, gradient and divergence use different outputs.";
 +    else if (n=="Dirac delta") result="A distribution, not an ordinary real-valued function.\nOrdinary domain/range descriptions do not apply.\nIt is defined through its action inside integrals.";
++    if(ScalarFunctions::Known(n.GetString())){
++        result="Domain: all real numbers\n";
++        if(n=="fract")result+="Range: [0, 1)\n";
++        else if(n=="abs")result+="Range: [0, infinity)\n";
++        else if(n=="exp")result+="Range: (0, infinity)\n";
++        else if(n=="sgn")result+="Range: {-1, 0, 1}\n";
++        else if(n=="cbrt")result+="Range: all real numbers\n";
++        else if(n=="sinc")result+="Value at zero: 1\n";
++        else result+="Range: integers\n";
++        result+=ScalarFunctions::Description(n.GetString());
++    }
 +    if (result.IsEmpty()) result="Domain and range depend on this function's definition.\nCheck its formula, restrictions and any selected branch.\nNo built-in domain/range rule is available.";
 +    extern int TrigDegrees;
 +    CString raw=n+" (real-valued basics)\n"+result+"\nNumeric trig mode: "+(TrigDegrees ? "DEG - degrees" : "RAD - radians");
@@ -4004,6 +4190,11 @@ index fc832eb..f4c8dc9 100644
 +    }
 +    if (element->m_Type==8) return BasicFunctionHelp("root");
 +    if (element->m_Type==5 && element->Expression1 && ((CExpression*)element->Expression1)->m_ParentheseShape=='|') return BasicFunctionHelp("abs");
++    if(element->m_Type==5 && element->Expression1){
++        char shape=((CExpression*)element->Expression1)->m_ParentheseShape;
++        if(shape=='f')return BasicFunctionHelp("floor");
++        if(shape=='c')return BasicFunctionHelp("ceil");
++    }
 +    if (element->m_Type==4) return BasicFunctionHelp("fraction");
 +    if (element->m_Type==7) return BasicFunctionHelp(element->Data1[0]=='S' ? "sum" : (element->Data1[0]=='P' ? "product" : "integral"));
 +    if (element->m_Type==3)
@@ -4126,7 +4317,7 @@ index fc832eb..f4c8dc9 100644
  char IsWindowOutOfFocus;
  
  #define NUM_SPECIAL_KEYS 21
-@@ -157,6 +365,10 @@ struct
+@@ -157,6 +382,10 @@ struct
  
  
  
@@ -4137,7 +4328,7 @@ index fc832eb..f4c8dc9 100644
  CExpression *TheKeyboardClipboard;
  
  IMPLEMENT_DYNCREATE(CMathomirView, CView)
-@@ -167,6 +379,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -167,6 +396,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -4147,7 +4338,7 @@ index fc832eb..f4c8dc9 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +428,39 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +445,39 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
@@ -4187,7 +4378,7 @@ index fc832eb..f4c8dc9 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -292,6 +540,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -292,6 +557,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  CMathomirView::CMathomirView()
  {
  	// TODO: add construction code here
@@ -4195,7 +4386,7 @@ index fc832eb..f4c8dc9 100644
  	m_PopupMenuObject=NULL;
  	pMainView=this;
  	pMainViewBase=(CView*)this;
-@@ -489,8 +738,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
+@@ -489,8 +755,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
  int NumRullerGuidelines=0;
  
  
@@ -4257,7 +4448,7 @@ index fc832eb..f4c8dc9 100644
  	tDocumentStruct *ds=TheDocument;
  	int SelectedElement;
  	NumRullerGuidelines=0;
-@@ -509,6 +810,14 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -509,6 +827,14 @@ void CMathomirView::OnDraw(CDC* pDC)
  
  		ClientArea.right=pDC->GetDeviceCaps(PHYSICALWIDTH);
  		ClientArea.bottom=pDC->GetDeviceCaps(PHYSICALHEIGHT);
@@ -4272,7 +4463,7 @@ index fc832eb..f4c8dc9 100644
  		ViewZoom=(short)(100*ClientArea.bottom/PaperHeight);
  		ViewY=(PagePrinted-1)*PaperHeight+5+pDC->GetDeviceCaps(PHYSICALOFFSETY)*100/ViewZoom;
  		ViewX=15+pDC->GetDeviceCaps(PHYSICALOFFSETX)*100/ViewZoom;
-@@ -576,17 +885,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +902,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -4295,7 +4486,7 @@ index fc832eb..f4c8dc9 100644
  				}
  				else
  				{
-@@ -624,19 +934,24 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,19 +951,24 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -4321,7 +4512,7 @@ index fc832eb..f4c8dc9 100644
  			int RelativeHeight=(PaperHeight)*ViewZoom/100;
  			int RelativeStart=-(ViewY%PaperHeight)*ViewZoom/100;
  
-@@ -725,8 +1040,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -725,8 +1057,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		}
  
  
@@ -4337,7 +4528,7 @@ index fc832eb..f4c8dc9 100644
  			if ((ds->absolute_Y<-1000) && (ds->absolute_Y>-1200))
  			{
  				if (NumRullerGuidelines<13) RullerGuidelines[NumRullerGuidelines++]=NumDocumentElements-i-1;
-@@ -753,6 +1075,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +1092,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -4347,7 +4538,7 @@ index fc832eb..f4c8dc9 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -761,7 +1086,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -761,7 +1103,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					if (ds->Type==1)
  						((CExpression*)(ds->Object))->PaintExpression(&bitmapDC,ViewZoom,RelativeX,RelativeY,&TheClientRect);
@@ -4356,7 +4547,7 @@ index fc832eb..f4c8dc9 100644
  						((CDrawing*)(ds->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,ds->absolute_X,ds->absolute_Y,&TheClientRect);
  				}
  
-@@ -785,6 +1110,8 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -785,6 +1127,8 @@ void CMathomirView::OnDraw(CDC* pDC)
  			}
  		}
  
@@ -4365,7 +4556,7 @@ index fc832eb..f4c8dc9 100644
  		if ((prevNumSelectedObjects!=NumSelectedObjects) && ((prevNumSelectedObjects<3) || (NumSelectedObjects<3)))
  		{
  			if ((UseToolbar) && (Toolbox) &&(Toolbox->Toolbar)) {Toolbox->Toolbar->ConfigureToolbar();}
-@@ -795,13 +1122,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -795,13 +1139,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			tmpDrawing->PaintDrawing(&bitmapDC,ViewZoom,(MovingStartX/10-ViewX)*ViewZoom/100,(MovingStartY/10-ViewY)*ViewZoom/100,-1,-1);
  		}
@@ -4382,7 +4573,7 @@ index fc832eb..f4c8dc9 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1122,11 +1451,13 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1122,11 +1468,13 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					lasttillen=tillen;
  					bitmapDC.SelectClipRgn(NULL);
@@ -4396,7 +4587,7 @@ index fc832eb..f4c8dc9 100644
  				}
  
  				int RelativeX=TillenRelativeX+(ds->absolute_X-vX)*Tillens.Zoom/100;
-@@ -1198,6 +1529,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1198,6 +1546,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			if (myrgn) 
  			{
  				bitmapDC.SelectClipRgn(NULL);
@@ -4404,7 +4595,7 @@ index fc832eb..f4c8dc9 100644
  				delete myrgn;
  			}
  
-@@ -1229,6 +1561,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1229,6 +1578,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				CRgn myrgn;
  				myrgn.CreateRectRgn(RegionX,RegionY,RegionX+RegionW,RegionY+RegionH);
  				bitmapDC.SelectClipRgn(&myrgn);
@@ -4412,7 +4603,7 @@ index fc832eb..f4c8dc9 100644
  
  
  				ds=TheDocument;
-@@ -1264,6 +1597,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1264,6 +1614,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  					}
  				}
  				bitmapDC.SelectClipRgn(NULL);
@@ -4420,7 +4611,7 @@ index fc832eb..f4c8dc9 100644
  			}
  
  
-@@ -1279,6 +1613,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1279,6 +1630,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_MASKPEN);
  			int xx=PreopenDrawingToolboxX-ToolboxSize;
  			int yy=PreopenDrawingToolboxY-ToolboxSize;
@@ -4428,7 +4619,7 @@ index fc832eb..f4c8dc9 100644
  			CPen pen1;
  			CBrush brush1;
  			brush1.CreateSolidBrush(RGB(240,240,255));
-@@ -1290,9 +1625,10 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1290,9 +1642,10 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.MoveTo(xx+2*ToolboxSize/3+3,yy);bitmapDC.LineTo(xx+2*ToolboxSize/3+3,yy+ToolboxSize+5);
  			bitmapDC.MoveTo(xx,yy+ToolboxSize/3+1);bitmapDC.LineTo(xx+ToolboxSize+5,yy+ToolboxSize/3+1);
  			bitmapDC.MoveTo(xx,yy+2*ToolboxSize/3+3);bitmapDC.LineTo(xx+ToolboxSize+5,yy+2*ToolboxSize/3+3);
@@ -4440,7 +4631,7 @@ index fc832eb..f4c8dc9 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1685,68 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1702,68 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -4509,7 +4700,7 @@ index fc832eb..f4c8dc9 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1838,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1855,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -4518,7 +4709,7 @@ index fc832eb..f4c8dc9 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +2185,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +2202,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -4547,7 +4738,7 @@ index fc832eb..f4c8dc9 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2051,7 +2463,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -2051,7 +2480,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  		//ds->absolute_Y=AbsoluteY;
  		//ds->Type=1; //expression
  		ds->Object=(CObject*)new CExpression(NULL,NULL,DefaultFontSize);
@@ -4556,7 +4747,7 @@ index fc832eb..f4c8dc9 100644
  		{
  			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
  			//((CExpression*)(ds->Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -2169,12 +2581,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2598,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -4572,7 +4763,7 @@ index fc832eb..f4c8dc9 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2595,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2612,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -4584,7 +4775,7 @@ index fc832eb..f4c8dc9 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2609,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2626,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -4597,7 +4788,7 @@ index fc832eb..f4c8dc9 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2238,6 +2655,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2238,6 +2672,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  
  void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  {
@@ -4605,7 +4796,7 @@ index fc832eb..f4c8dc9 100644
  	PaintDrawingHotspot(1);
  	SelectedTab=0;
  	if (Tillens.Show) {Tillens.Show=0;InvalidateRect(NULL,1);}
-@@ -2300,7 +2718,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+@@ -2300,7 +2735,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  		ViewX=nPos;
  		if (ViewX<0) ViewX=0;
  		InvalidateRect(NULL,0);
@@ -4614,7 +4805,7 @@ index fc832eb..f4c8dc9 100644
  	}
  	if (nSBCode==SB_THUMBTRACK)
  	{
-@@ -2722,7 +3140,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
+@@ -2722,7 +3157,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
  		if ((IsDrawingMode<10) || (IsDrawingMode>13)) //not for rasters (linear and logaritmic)
  		if ((IsDrawingMode<18) || (IsDrawingMode>26)) //not for section line, Okay, ?, !, X and diagonals
  		{
@@ -4623,7 +4814,7 @@ index fc832eb..f4c8dc9 100644
  			
  			int w=SelectedLineWidth*ViewZoom/100;
  			int dot_shape=1;
-@@ -2812,6 +3230,75 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +3247,75 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -4699,7 +4890,7 @@ index fc832eb..f4c8dc9 100644
  
  	try
  	{
-@@ -3338,6 +3825,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3842,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -4707,7 +4898,7 @@ index fc832eb..f4c8dc9 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +3925,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +3942,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -4720,7 +4911,7 @@ index fc832eb..f4c8dc9 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +4047,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +4064,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
@@ -4728,7 +4919,7 @@ index fc832eb..f4c8dc9 100644
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +4100,52 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +4117,52 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -4809,7 +5000,7 @@ index fc832eb..f4c8dc9 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4103,6 +4612,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4103,6 +4629,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  	if (MouseWheelDelta>=120)
  	{
@@ -4817,7 +5008,7 @@ index fc832eb..f4c8dc9 100644
  		MouseWheelDelta=0;
  		//zoom increasing
  
-@@ -4127,6 +4637,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4127,6 +4654,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  	}
  	if (MouseWheelDelta<=-120)
  	{
@@ -4825,7 +5016,7 @@ index fc832eb..f4c8dc9 100644
  		MouseWheelDelta=0;
  
  		if (ViewZoom>=480) ViewZoom=400;
-@@ -4169,31 +4680,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4697,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -4858,7 +5049,7 @@ index fc832eb..f4c8dc9 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4201,6 +4688,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4201,6 +4705,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  void CMathomirView::OnZoom40()
  {
@@ -4866,7 +5057,7 @@ index fc832eb..f4c8dc9 100644
  	ViewZoom=40;
  	RepaintTheView(1);
  
-@@ -4208,6 +4696,7 @@ void CMathomirView::OnZoom40()
+@@ -4208,6 +4713,7 @@ void CMathomirView::OnZoom40()
  
  void CMathomirView::OnZoom60()
  {
@@ -4874,7 +5065,7 @@ index fc832eb..f4c8dc9 100644
  	ViewZoom=60;
  	RepaintTheView(1);
  }
-@@ -4326,7 +4815,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4326,7 +4832,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  	//prevViewZoom=ViewZoom;
  
  
@@ -4884,7 +5075,7 @@ index fc832eb..f4c8dc9 100644
  	SetScrollRange(SB_VERT,0,ViewMaxY,0);
  	SetScrollPos(SB_HORZ,ViewX,1);
  	SetScrollPos(SB_VERT,ViewY,1);
-@@ -4341,24 +4831,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4341,24 +4848,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  
  void CMathomirView::OnZoom80()
  {
@@ -4913,7 +5104,7 @@ index fc832eb..f4c8dc9 100644
  	ViewZoom=240;
  	RepaintTheView(1);
  }
-@@ -4373,6 +4867,7 @@ UINT prevChar;
+@@ -4373,6 +4884,7 @@ UINT prevChar;
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -4921,7 +5112,7 @@ index fc832eb..f4c8dc9 100644
  	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
  	//initial keyboard testing (determining key codes when the shift key is used)
  	//if (keystringmode==2) {keystring3[keystringcnt++]=nChar;return;}
-@@ -4457,6 +4952,18 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +4969,18 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -4940,7 +5131,7 @@ index fc832eb..f4c8dc9 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +4979,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +4996,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -4948,7 +5139,7 @@ index fc832eb..f4c8dc9 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5168,7 +5674,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5168,7 +5691,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  						short l,a=0,b;
  						//TheDocument[NumDocumentElements-1].Type=1;
  						TheDocument[NumDocumentElements-1].Object=(CObject*)(new CExpression(NULL,NULL,DefaultFontSize));
@@ -4957,7 +5148,7 @@ index fc832eb..f4c8dc9 100644
  						{
  							((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSize=RootObjectFontSize;
  							//((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -5360,7 +5866,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +5883,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -4966,7 +5157,7 @@ index fc832eb..f4c8dc9 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +5920,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +5937,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -4983,7 +5174,7 @@ index fc832eb..f4c8dc9 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5959,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5976,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -5012,7 +5203,7 @@ index fc832eb..f4c8dc9 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +6050,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +6067,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -5021,7 +5212,7 @@ index fc832eb..f4c8dc9 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6161,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6178,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -5073,7 +5264,7 @@ index fc832eb..f4c8dc9 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5793,7 +6279,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5793,7 +6296,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  							fcolor=Toolbox->GetUniformFormattingColor();
  						}
  						int inserting_position=tmp->m_Selection-1;
@@ -5084,7 +5275,7 @@ index fc832eb..f4c8dc9 100644
  						{
  							QuickTypeUsed=2;
  							LastQuickTypeObject=ds;
-@@ -5836,7 +6324,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6341,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -5093,7 +5284,7 @@ index fc832eb..f4c8dc9 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6606,23 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6623,23 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -5117,7 +5308,7 @@ index fc832eb..f4c8dc9 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +7063,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +7080,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -5152,7 +5343,7 @@ index fc832eb..f4c8dc9 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +8084,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +8101,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -5167,7 +5358,7 @@ index fc832eb..f4c8dc9 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8619,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8636,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -5195,7 +5386,7 @@ index fc832eb..f4c8dc9 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +9072,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +9089,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -5206,7 +5397,7 @@ index fc832eb..f4c8dc9 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9919,1005 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9936,1005 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -6212,7 +6403,7 @@ index fc832eb..f4c8dc9 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10930,138 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10947,138 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -6351,7 +6542,7 @@ index fc832eb..f4c8dc9 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +11078,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +11095,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -6359,7 +6550,7 @@ index fc832eb..f4c8dc9 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11756,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11773,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -6395,7 +6586,7 @@ index fc832eb..f4c8dc9 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11790,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11807,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -6403,7 +6594,7 @@ index fc832eb..f4c8dc9 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +11905,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +11922,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -6411,7 +6602,7 @@ index fc832eb..f4c8dc9 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12311,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12328,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -6419,7 +6610,7 @@ index fc832eb..f4c8dc9 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12612,607 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12629,607 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -7144,13 +7335,14 @@ index 0000000..3bd012b
 +}
 diff --git a/Mathomir/Piecewise.h b/Mathomir/Piecewise.h
 new file mode 100644
-index 0000000..249bcf1
+index 0000000..5cc6327
 --- /dev/null
 +++ b/Mathomir/Piecewise.h
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,108 @@
 +#pragma once
 +#include <string>
 +#include "MathDisplay.h"
++#include "ScalarFunctions.h"
 +#include <vector>
 +#include <cmath>
 +#include <cstdlib>
@@ -7181,7 +7373,7 @@ index 0000000..249bcf1
 +        if(name=="x")return Add(Node('x'));
 +        if(name=="pi")return Add(Node('n',3.14159265358979323846));
 +        if(name=="e")return Add(Node('n',2.71828182845904523536));
-+        if(name!="sin" && name!="cos" && name!="tan" && name!="sqrt" && name!="abs" && name!="exp" && name!="ln" && name!="log")throw std::runtime_error("Use x, pi, e, sin, cos, tan, sqrt, abs, exp, ln, or log.");
++        if(name!="sin" && name!="cos" && name!="tan" && name!="sqrt" && name!="ln" && name!="log" && !ScalarFunctions::Known(name.c_str()))throw std::runtime_error("Unknown function. Use sin, cos, tan, sqrt, ln, log, floor, ceil, abs, round, trunc, sgn, fract, cbrt, exp, or sinc.");
 +        if(!Take('('))throw std::runtime_error("Functions require parentheses, for example sin(x).");
 +        int a=Sum();if(!Take(')'))throw std::runtime_error("Missing function closing parenthesis.");Node n('f',0,a);n.name=name;return Add(n);
 +    }
@@ -7189,12 +7381,14 @@ index 0000000..249bcf1
 +public:
 +    std::vector<Node> nodes;int root;bool usesX;
 +    Formula():pos(0),depth(0),root(-1),usesX(false){}
++    bool HasSteps()const{for(size_t i=0;i<nodes.size();i++)if(nodes[i].op=='f' && ScalarFunctions::Steps(nodes[i].name.c_str()))return true;return false;}
 +    bool Parse(std::string input,std::string &error){try{text=input;pos=0;depth=0;nodes.clear();root=Sum();Space();if(pos!=text.size())throw std::runtime_error("Unexpected character at position "+Number((double)pos+1)+".");usesX=false;for(size_t i=0;i<nodes.size();i++)if(nodes[i].op=='x')usesX=true;return true;}catch(const std::exception &e){error=e.what();root=-1;return false;}}
 +    double Value(double x,bool radians=true,int i=-1)const {
 +        if(i<0)i=root;if(i<0)return std::numeric_limits<double>::quiet_NaN();const Node &n=nodes[i];
 +        if(n.op=='x')return x;if(n.op=='n')return n.number;
 +        double a=Value(x,radians,n.a),b=n.b>=0?Value(x,radians,n.b):0;
 +        if(n.op=='+')return a+b;if(n.op=='-')return a-b;if(n.op=='*')return a*b;if(n.op=='/')return b==0?std::numeric_limits<double>::quiet_NaN():a/b;if(n.op=='~')return -a;if(n.op=='^'){if(a>=0 || std::floor(b)==b)return std::pow(a,b);for(int q=3;q<=99;q+=2){double n=std::floor(b*q+.5);if(std::fabs(b*q-n)<1e-12)return (std::fmod(std::fabs(n),2.)>.5?-1:1)*std::pow(-a,b);}return std::numeric_limits<double>::quiet_NaN();}
++        if(ScalarFunctions::Known(n.name.c_str()))return ScalarFunctions::Value(n.name.c_str(),a);
 +        if(n.name=="sqrt")return std::sqrt(a);if(n.name=="abs")return std::fabs(a);if(n.name=="exp")return std::exp(a);if(n.name=="ln")return std::log(a);if(n.name=="log")return std::log10(a);
 +        if(!radians)a*=3.14159265358979323846/180.;if(n.name=="sin")return std::sin(a);if(n.name=="cos")return std::cos(a);return std::fabs(std::cos(a))<1e-14?std::numeric_limits<double>::quiet_NaN():std::tan(a);
 +    }
@@ -7206,8 +7400,11 @@ index 0000000..249bcf1
 +        if(n.op=='/' || n.op=='^'){std::string tag=n.op=='/'?"fra":"elm tp=\"3\"";std::string close=n.op=='/'?"fra":"elm";return "<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(n.a)+"</ex><ex>"+Xml(n.b)+"</ex></"+close+">";}
 +        if(n.op=='f'){
 +            if(n.name=="sqrt")return "<elm tp=\"8\" E1=\"\"><ex>"+Xml(n.a)+"</ex></elm>";
-+            if(n.name=="exp")return "<elm tp=\"3\" E1=\"\" E2=\"\"><ex><var t=\"2.718281828459045\" f=\"00\" /></ex><ex>"+Xml(n.a)+"</ex></elm>";
-+            if(n.name=="abs")return "<elm tp=\"8\" E1=\"\"><ex><elm tp=\"3\" E1=\"\" E2=\"\"><ex>"+Xml(n.a)+"</ex><ex><var t=\"2\" f=\"00\" /></ex></elm></ex></elm>";
++
++            if(n.name=="abs" || n.name=="floor" || n.name=="ceil"){
++                std::string shape=n.name=="abs"?"|":n.name=="floor"?"f":"c";
++                return "<elm tp=\"5\" E1=\"\"><ex br=\"1\" shp=\""+shape+"\">"+Xml(n.a)+"</ex></elm>";
++            }
 +            return "<fun t=\""+n.name+"\" f=\"20\" E1=\"\"><ex br=\"2\">"+Xml(n.a)+"</ex></fun>";
 +        }
 +        return Group(n.a)+"<opr s=\""+std::string(1,n.op)+"\" />"+Group(n.b);
@@ -7518,6 +7715,60 @@ index 05446cf..51859c6 100644
 +
 +#define ID_POLYGON_CONSTRUCTOR 33088
 +#define IDD_POLYGON_CONSTRUCTOR 185
+diff --git a/Mathomir/ScalarFunctions.h b/Mathomir/ScalarFunctions.h
+new file mode 100644
+index 0000000..f6c90d6
+--- /dev/null
++++ b/Mathomir/ScalarFunctions.h
+@@ -0,0 +1,48 @@
++#pragma once
++#include <cmath>
++#include <cstring>
++#include <limits>
++
++// One definition for native calculations and the piecewise evaluator.
++namespace ScalarFunctions {
++inline const char *Name(int code) {
++    static const char *names[]={"floor","ceil","abs","round","trunc","sgn","fract","cbrt","exp","sinc"};
++    return code>=41 && code<=50 ? names[code-41] : "";
++}
++inline bool Known(const char *name) {
++    for(int code=41;code<=50;code++)if(std::strcmp(name,Name(code))==0)return true;
++    return false;
++}
++inline bool Steps(const char *name) {
++    return std::strcmp(name,"floor")==0 || std::strcmp(name,"ceil")==0 ||
++        std::strcmp(name,"round")==0 || std::strcmp(name,"trunc")==0 ||
++        std::strcmp(name,"sgn")==0 || std::strcmp(name,"fract")==0;
++}
++inline const char *Description(const char *name) {
++    if(std::strcmp(name,"floor")==0)return "Floor: greatest integer less than or equal to x. floor(-1.2) = -2.";
++    if(std::strcmp(name,"ceil")==0)return "Ceiling: least integer greater than or equal to x. ceil(-1.2) = -1.";
++    if(std::strcmp(name,"abs")==0)return "Absolute value: distance from zero. abs(-3) = 3.";
++    if(std::strcmp(name,"round")==0)return "Round to nearest integer; halfway values go away from zero. round(-1.5) = -2.";
++    if(std::strcmp(name,"trunc")==0)return "Truncate toward zero. trunc(-1.8) = -1.";
++    if(std::strcmp(name,"sgn")==0)return "Sign: -1 for negative x, 0 at zero, +1 for positive x.";
++    if(std::strcmp(name,"fract")==0)return "Fractional part: x - floor(x), in [0, 1). fract(-1.2) = 0.8. Use frac for a fraction template.";
++    if(std::strcmp(name,"cbrt")==0)return "Real cube root, including negative inputs. cbrt(-8) = -2.";
++    if(std::strcmp(name,"exp")==0)return "Exponential: exp(x) = e raised to x. exp(0) = 1.";
++    if(std::strcmp(name,"sinc")==0)return "Unnormalized sinc: sin(x)/x in radians; sinc(0) = 1. Independent of the angle setting.";
++    return "";
++}
++inline double Value(const char *name,double x) {
++    if(!std::isfinite(x))return std::numeric_limits<double>::quiet_NaN();
++    if(std::strcmp(name,"floor")==0)return std::floor(x);
++    if(std::strcmp(name,"ceil")==0)return std::ceil(x);
++    if(std::strcmp(name,"abs")==0)return std::fabs(x);
++    if(std::strcmp(name,"round")==0)return std::round(x);
++    if(std::strcmp(name,"trunc")==0)return std::trunc(x);
++    if(std::strcmp(name,"sgn")==0)return x>0?1:(x<0?-1:0);
++    if(std::strcmp(name,"fract")==0)return x-std::floor(x);
++    if(std::strcmp(name,"cbrt")==0)return std::cbrt(x);
++    if(std::strcmp(name,"exp")==0)return std::exp(x);
++    if(std::strcmp(name,"sinc")==0){if(std::fabs(x)<1e-4){double t=x*x;return 1-t/6+t*t/120;}return std::sin(x)/x;}
++    return std::numeric_limits<double>::quiet_NaN();
++}
++}
 diff --git a/Mathomir/SmartShader.h b/Mathomir/SmartShader.h
 new file mode 100644
 index 0000000..e7d2db1
@@ -7607,19 +7858,21 @@ index 0000000..e7d2db1
 +};
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..6b392d6 100644
+index b9c3f38..8568462 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
-@@ -19,6 +19,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  
  *********************************************************************************************************/
++#include "ScalarFunctions.h"
  #include "stdafx.h"
 +#include "ColorPalette.h"
 +#include "GeometryShapes.h"
  #include "Mathomir.h"
  #include "Toolbox.h"
  #include ".\toolbox.h"
-@@ -331,7 +333,7 @@ const struct
+@@ -331,7 +334,7 @@ const struct
  	{72,"Left","Left align",25},//25
  	{73,"Center","Center align",25},//26
  	{74,"Right","Right align",25},//27
@@ -7628,7 +7881,25 @@ index b9c3f38..6b392d6 100644
  	{14,"Italic","Italic (i)",25},//29
  	{6,"U.line","Underline (u)",25},//30
  	{130,"U.brace","Under brace",25},//31
-@@ -693,12 +695,29 @@ CToolbox::CToolbox(int IsSubtoolbox)
+@@ -594,6 +597,17 @@ CToolbox::CToolbox(int IsSubtoolbox)
+ 		AddSubmember(106,24); //partial derivation
+ 		AddSubmember(106,'f'); AddAccelerator('F'); //general function f
+ 		AddSubmember(106,'g'); AddAccelerator('G');//general function g
++        AddSubmember(5,'f'); // floor
++        AddSubmember(5,'c'); // ceiling
++        AddSubmember(5,'|'); // absolute value
++        AddSubmember(106,44); // round
++        AddSubmember(106,45); // trunc
++        AddSubmember(106,46); // sgn
++        AddSubmember(106,47); // fract
++        AddSubmember(106,48); // cbrt
++        AddSubmember(106,49); // exp
++        AddSubmember(106,50); // sinc
++
+ 		ToolboxNumMembers++;
+ 
+ 		AddSubmember(6,1);   //sin
+@@ -693,12 +707,29 @@ CToolbox::CToolbox(int IsSubtoolbox)
  		AddDrawingSubmember(26,30,30); //diagonals / / / ...
  		AddDrawingSubmember(50,20,20); //drawing box
  		AddDrawingSubmember(51,20,20); //function ploter
@@ -7658,7 +7929,7 @@ index b9c3f38..6b392d6 100644
  		memset((void*)&ToolboxFontFormating,0,(size_t)sizeof(ToolboxFontFormating));
  		AddFontFormating(0,0,0,0); //sans-serif
  		AddFontFormating(0,0,1,0); //sans-serif, italic
-@@ -753,6 +772,7 @@ CToolbox::CToolbox(int IsSubtoolbox)
+@@ -753,6 +784,7 @@ CToolbox::CToolbox(int IsSubtoolbox)
  	if (IsSubtoolbox==0)
  	{
  		LoadSettings(NULL);
@@ -7666,7 +7937,7 @@ index b9c3f38..6b392d6 100644
  		//init symbolic calculator (to be called only once)
  		ToolboxMembers[0].Submembers[0]->InitCalculator();
  
-@@ -862,7 +882,41 @@ int CToolbox::AddDrawingSubmember(int form, int Cx, int Cy)
+@@ -862,7 +894,41 @@ int CToolbox::AddDrawingSubmember(int form, int Cx, int Cy)
  {
  	int member=ToolboxNumMembers;
  	ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers]=(CExpression*)new CDrawing();
@@ -7709,7 +7980,7 @@ index b9c3f38..6b392d6 100644
  	ToolboxMembers[member].Above[ToolboxMembers[member].NumSubmembers]=-1; //indicates that this is drawing
  	ToolboxMembers[member].NumSubmembers++;
  	return 0;
-@@ -1948,6 +2002,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1948,6 +2014,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
  					{
  						yes=1;
  						if (parent->m_IsVertical) parent->m_IsVertical=0; else parent->m_IsVertical=1;
@@ -7717,7 +7988,7 @@ index b9c3f38..6b392d6 100644
  					}
  					if (icon==19)
  					{
-@@ -2159,76 +2214,15 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2159,76 +2226,15 @@ void CToolbox::PaintColorbox(CDC * dc)
  
  	int t3=ToolboxSize/3;
  	int tmpy=max(0,ToolboxSize-60)/16;
@@ -7803,7 +8074,7 @@ index b9c3f38..6b392d6 100644
  
  	//painting the line sizes
  	len=ToolboxSize/6;
-@@ -2290,8 +2284,11 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2290,8 +2296,11 @@ void CToolbox::PaintColorbox(CDC * dc)
  	if (m_SelectedColor==0) this->ShowHelptext("black color","","Alt+B","",6070);
  	if (m_SelectedColor==1) this->ShowHelptext("red color","","Alt+R","",6071);
  	if (m_SelectedColor==2) this->ShowHelptext("green color","","Alt+G","",6072);
@@ -7817,7 +8088,7 @@ index b9c3f38..6b392d6 100644
  
  	if ((m_SelectedColor>=10) && (m_SelectedColor<=19)) this->ShowHelptext("line width","","","",6080);
  	if (m_SelectedColor==20) this->ShowHelptext("node edit","","Ctrl","",6090);
-@@ -3516,6 +3513,7 @@ int prevKeyboardElement=-1;
+@@ -3516,6 +3525,7 @@ int prevKeyboardElement=-1;
  int prevToolbarItem=-1;
  void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -7825,7 +8096,7 @@ index b9c3f38..6b392d6 100644
  	try
  	{
  	
-@@ -3642,7 +3640,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3642,7 +3652,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			else
  				m_IsArrowSelected=0;
  			m_SelectedElement=-1;
@@ -7834,7 +8105,7 @@ index b9c3f38..6b392d6 100644
  
  			if ((ClipboardExpression==NULL) && (ClipboardDrawing==NULL))
  				if (m_FontModeElement!=prevFontElement)
-@@ -3659,7 +3657,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3659,7 +3669,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (m_FontModeElement!=-1)
  			{
  				m_FontModeElement=-1;
@@ -7843,7 +8114,7 @@ index b9c3f38..6b392d6 100644
  			}
  
  			point.y-=ToolboxSize/2; //subsctract the header size
-@@ -3679,13 +3677,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3679,13 +3689,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				if (Xres+Yres>=-ToolboxSize/5-3)
  				{
  					//the mouse is pointing at subtoolbox opening arrow
@@ -7859,7 +8130,7 @@ index b9c3f38..6b392d6 100644
  					m_IsArrowSelected=0;
  				}
  				
-@@ -3709,8 +3707,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3709,8 +3719,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				//color box
  				if (y<ToolboxSize/3) //selecting color
  				{
@@ -7870,7 +8141,7 @@ index b9c3f38..6b392d6 100644
  				}
  				else if (y<2*ToolboxSize/3) //selecting line width
  				{
-@@ -3724,7 +3722,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3724,7 +3734,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				}
  				else
  					m_SelectedColor=-1;
@@ -7879,7 +8150,7 @@ index b9c3f38..6b392d6 100644
  			}
  			else
  			{
-@@ -3747,7 +3745,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3747,7 +3757,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  					else if (point.x<2*ToolboxSize/3) m_SelectedTextControl=3;
  					else m_SelectedTextControl=4;
  				}
@@ -7888,7 +8159,7 @@ index b9c3f38..6b392d6 100644
  			}
  
  		}
-@@ -3771,13 +3769,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3771,13 +3781,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (Xres+Yres<=ToolboxSize/5-1)
  			{
  				//the mouse is pointing at subtoolbox opening arrow
@@ -7904,7 +8175,7 @@ index b9c3f38..6b392d6 100644
  				m_IsArrowSelected=0;
  			}
  			
-@@ -3793,7 +3791,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3793,7 +3803,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			theApp.m_pMainWnd->SetActiveWindow();
  			element=m_SelectedElement=font_element;
  			m_IsArrowSelected=0;
@@ -7913,7 +8184,7 @@ index b9c3f38..6b392d6 100644
  		}
  	}
  	else if (m_IsSubtoolbox==-2)
-@@ -3804,7 +3802,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3804,7 +3814,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		m_IsArrowSelected=0;
  		if ((row==4) && (point.x>ToolboxSize*5)) m_IsArrowSelected=1;
  		font_element=m_SelectedElement=row*100+key;
@@ -7922,7 +8193,7 @@ index b9c3f38..6b392d6 100644
  	}
  	else if (m_IsSubtoolbox==-1)
  	{
-@@ -3818,7 +3816,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3818,7 +3828,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			//the mouse is pointing at the toolbox element
  			if (point.x>2*ToolboxSize+delta_center) m_IsArrowSelected=1; else m_IsArrowSelected=0;
  			m_SelectedElement=font_element;
@@ -7931,7 +8202,7 @@ index b9c3f38..6b392d6 100644
  		}
  	}
  	else if (m_IsContextMenu)
-@@ -3902,7 +3900,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3902,7 +3912,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				m_KeyboardElement=i;
  				element=i;
  				//ToolboxKeyboardElements.Key[i]->SelectExpression(1);
@@ -7940,7 +8211,7 @@ index b9c3f38..6b392d6 100644
  				break;
  			}
  		}
-@@ -3911,17 +3909,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3911,17 +3921,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		{
  			element=255;
  			if (AlternateVirtualKeyboard!=3) AlternateVirtualKeyboard=2;
@@ -7961,7 +8232,7 @@ index b9c3f38..6b392d6 100644
  		}
  	}
  	else if (m_IsToolbar)
-@@ -3979,7 +3977,7 @@ finish_toolbox_mousemove:
+@@ -3979,7 +3989,7 @@ finish_toolbox_mousemove:
  			(prevToolboxElement!=element))
  		{
  			m_SelectedElement=element;
@@ -7970,7 +8241,7 @@ index b9c3f38..6b392d6 100644
  		}
  		prevToolboxElement=element;
  
-@@ -3988,7 +3986,7 @@ finish_toolbox_mousemove:
+@@ -3988,7 +3998,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) m_FontModeElement=-1;
@@ -7979,7 +8250,7 @@ index b9c3f38..6b392d6 100644
  
  		}
  
-@@ -4005,14 +4003,14 @@ finish_toolbox_mousemove:
+@@ -4005,14 +4015,14 @@ finish_toolbox_mousemove:
  
  		if (prevSelectedTextControl>0)
  		{
@@ -7996,7 +8267,7 @@ index b9c3f38..6b392d6 100644
  		}
  		prevSelectedColor=m_SelectedColor;
  	}
-@@ -4036,7 +4034,7 @@ finish_toolbox_mousemove:
+@@ -4036,7 +4046,7 @@ finish_toolbox_mousemove:
  				(m_IsSubtoolbox==-4))
  			{
  				m_SelectedElement=element;
@@ -8005,7 +8276,7 @@ index b9c3f38..6b392d6 100644
  			}
  		}
  		prevSubtoolboxElement=element;
-@@ -4047,7 +4045,7 @@ finish_toolbox_mousemove:
+@@ -4047,7 +4057,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) {m_SelectedElement=-1;}
@@ -8014,7 +8285,7 @@ index b9c3f38..6b392d6 100644
  		}
  		
  		prevFontElement=font_element;
-@@ -4069,7 +4067,7 @@ finish_toolbox_mousemove:
+@@ -4069,7 +4079,7 @@ finish_toolbox_mousemove:
  		{
  
  			if (element==-1) {m_KeyboardElement=-1;}
@@ -8023,7 +8294,7 @@ index b9c3f38..6b392d6 100644
  		}
  		prevKeyboardElement=element;
  	}
-@@ -4103,6 +4101,16 @@ finish_toolbox_mousemove:
+@@ -4103,6 +4113,16 @@ finish_toolbox_mousemove:
  				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
  				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
  				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
@@ -8040,7 +8311,15 @@ index b9c3f38..6b392d6 100644
  			}
  			else
  			{
-@@ -5658,8 +5666,8 @@ int CToolbox::LoadSettings(char * filename)
+@@ -4135,6 +4155,7 @@ finish_toolbox_mousemove:
+ 			strcat(buff,ToolboxKeycodes[i].name);
+ 			if (key&0x400) {strcpy(buff,"\'");strcat(buff,ToolboxKeycodes[i].name);strcat(buff,"\'");}
+ 		}
++        if(ScalarFunctions::Known(command)){text=(char*)ScalarFunctions::Description(command);langid=0;}
+ 		this->ShowHelptext(text,command,buff,easycast,langid);
+ 
+ 		}
+@@ -5658,8 +5679,8 @@ int CToolbox::LoadSettings(char * filename)
  		fread(&ForceHighQualityImage,sizeof(int),1,fil);
  		fread(&ForceHalftoneImage,sizeof(int),1,fil);
  		fread(&DefaultFontSize,sizeof(int),1,fil);
@@ -8051,7 +8330,7 @@ index b9c3f38..6b392d6 100644
  		fread(&MovingDotSize,sizeof(int),1,fil);
  		fread(&MovingDotPermanent,sizeof(int),1,fil);
  		fread(&GRID,sizeof(int),1,fil);
-@@ -5853,6 +5861,88 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5853,6 +5874,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  unsigned int DoublestrokesTimer;
  CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  {
@@ -8070,6 +8349,17 @@ index b9c3f38..6b392d6 100644
 +            {"csc",6,29,false},
 +            {"ln",6,17,false},
 +            {"log",6,19,false},
++            {"floor",5,'f',false},
++            {"ceil",5,'c',false},
++            {"abs",5,'|',false},
++            {"round",6,44,false},
++            {"trunc",6,45,false},
++            {"sgn",6,46,false},
++            {"fract",6,47,false},
++            {"cbrt",6,48,false},
++            {"exp",6,49,false},
++            {"sinc",6,50,false},
++
 +
 +            {"int",7,73,false},
 +            {"iint",7,70,false},
@@ -8140,7 +8430,7 @@ index b9c3f38..6b392d6 100644
  	//first we check for double-strokes
  	int l2=*len;
  	if (l2<1) return NULL;
-@@ -5896,7 +5986,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+@@ -5896,7 +6010,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  			char *keycode=&ToolboxMembers[i].Keycodes[j][0];
  
  			int l=(int)strlen(keycode);
@@ -8149,7 +8439,7 @@ index b9c3f38..6b392d6 100644
  
  			if (memcmp(keystrokes+l2-l,keycode,l)==0)
  			{
-@@ -6063,6 +6153,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6063,6 +6177,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
@@ -8165,7 +8455,7 @@ index b9c3f38..6b392d6 100644
  	if (ToolboxMembers[member].Above[submember]==-1) //drawing element
  	{
  		if (ToolboxMembers[member].userdef_mask&(1<<submember))
-@@ -6078,6 +6177,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6078,6 +6201,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  		else
  		{
  			IsDrawingMode=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;

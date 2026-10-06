@@ -91,3 +91,9 @@ The live preview shows the shape at equal scales with area and perimeter in coor
 Graph presentation uses proper −∞ and +∞ symbols, ∈ membership notation, Unicode minus signs, and scientific exponents in display labels and evaluation results. Function help uses π, °, ≥, ≤ and ≠. Full-precision formulas and saved bounds retain their existing syntax. Unbounded editor fields are blank; the existing `inf` input shortcut still works. White graph gutters and thin separators replace the gray bands; clickable scale values and all controls remain available.
 
 Check presentation with `g++ -std=c++11 -I source/Mathomir tools/math-display-check.cpp -o math-display-check && ./math-display-check`. The Windows UI checks also inspect the actual native dialog text for both signed infinities.
+
+The **ln / general-functions palette** also includes floor, ceiling, absolute
+value, round, trunc, sgn, fract, cbrt, exp and sinc. The functions work in
+native calculations, ordinary graphs, and piecewise formulas/value checks.
+`fract(x) = x - floor(x)`; `round` breaks ties away from zero; `trunc` rounds
+toward zero. `sinc(x) = sin(x)/x` uses radians, with `sinc(0) = 1`.
