@@ -1088,6 +1088,14 @@ try {
   [MathomirUiProbe]::Send($view,276,4)|Out-Null
   for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
   [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+  $toolbox=[MathomirUiProbe]::CaptionChild($main,'Toolbox')
+  $toolRect=[MathomirUiProbe]::WindowRect($toolbox);$toolSize=$toolRect.Right-$toolRect.Left
+  $client=[MathomirUiProbe]::ClientRect($main)
+  $itemHeight=[int][Math]::Floor(($client.Bottom-[Math]::Floor($toolSize/2)-$toolSize-7)/8)
+  $itemHeight=[Math]::Max([Math]::Floor($toolSize/3),[Math]::Min([Math]::Floor(2*$toolSize/3),$itemHeight))
+  if($itemHeight -lt $toolSize/2){$itemHeight+=[Math]::Floor([Math]::Floor($toolSize/3)/8)}
+  $itemHeight=$itemHeight -band 0xFFFE
+  $subHeight=[int][Math]::Floor(2*$toolSize/3)
   $functionNames=@('floor','ceil','abs','round','trunc','sgn','fract','cbrt','exp','sinc')
   for($index=0;$index -lt 10;$index++){
     [MathomirUiProbe]::Send($view,258,27)|Out-Null
@@ -1098,7 +1106,7 @@ try {
     Start-Sleep -Milliseconds 80
     $palette=[MathomirUiProbe]::Window($appProcess.Id,'Subtoolbox')
     if($palette -eq [IntPtr]::Zero){throw 'Function palette did not open from ln.'}
-    $slot=18+$index;$iconX=[int]([Math]::Floor($slot/2)*$toolSize/2+$toolSize/4);$iconY=[int](($slot%2)*$itemHeight+$itemHeight/2)
+    $slot=18+$index;$iconX=[int]([Math]::Floor($slot/2)*$toolSize/2+$toolSize/4);$iconY=[int](($slot%2)*$subHeight+$subHeight/2)
     [MathomirUiProbe]::Mouse($palette,512,0,$iconX,$iconY)
     [MathomirUiProbe]::Mouse($palette,513,1,$iconX,$iconY)
     [MathomirUiProbe]::Mouse($palette,514,0,$iconX,$iconY)
@@ -1120,7 +1128,10 @@ try {
 
   # Exercise native Compute(10) through the plot worker, without piece metadata.
   $nativeFunctions=Join-Path (Split-Path $exe) 'native-function-graphs-smoke.mom'
-  $expected=@(-2,-1,1.37,-1,-1,-1,.63,(-[Math]::Pow(1.37,1.0/3)),[Math]::Exp(-1.37),[Math]::Sin(-1.37)/(-1.37))
+  $expected=@(-2,-1,1.37,-1,-1,-1,.63)
+  $expected+= -[Math]::Pow(1.37,(1.0/3))
+  $expected+= [Math]::Exp(-1.37)
+  $expected+= ([Math]::Sin(-1.37)/(-1.37))
   $colors=@(0,0x0000CC00,0x000000CC,0x00C00000,0x000080D0,0x00A03080,0x00808000,0x00909090)
   foreach($batch in @(0,8)){
     $axes=@(-3,3,-3,6)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
