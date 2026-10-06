@@ -1113,7 +1113,7 @@ try {
     if($index -lt 3){
       $shape=@('f','c','|')[$index]
       if(!$last.SelectSingleNode(".//ex[@shp='$shape'] | .//expr[@b_shape='$shape']")){Write-Output $last.OuterXml;throw "Function palette $($functionNames[$index]) lost its brackets."}
-    }elseif(!$last.SelectSingleNode(".//fun[@t='$($functionNames[$index])']")){Write-Output $last.OuterXml;throw "Function palette $($functionNames[$index]) did not insert its native function."}
+    }elseif(!$last.SelectSingleNode(".//fun[@t='$($functionNames[$index])'] | .//elm[@tp='6' and @tx='$($functionNames[$index])']")){Write-Output $last.OuterXml;throw "Function palette $($functionNames[$index]) did not insert its native function."}
   }
   [MathomirUiProbe]::OpenFile($main,$functionFixture)
   Write-Output 'Function palette passed: all ten actual buttons place and reopen native editable functions.'
