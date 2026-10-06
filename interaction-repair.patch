@@ -371,7 +371,7 @@ index 209a634..ef0dfd9 100644
  		if (oper==17) strcpy(Data1,"ln");
  		if (oper==18) //log10
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..7848800 100644
+index 531282c..a61d6a4 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -18,7 +18,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -524,6 +524,15 @@ index 531282c..7848800 100644
  {
  	
  	try
+@@ -1027,7 +1120,7 @@ void CExpression::CalculateSize(CDC *DC,short int zoom, short int * length, shor
+ 			ColumnStart=i+1;
+ 			l=MarginX;
+ 			Column++;
+-			if ((theElement->Type==11) && (i<m_NumElements)) continue;
++			if ((i<m_NumElements) && (theElement->Type==11)) continue;
+ 		}
+ 
+ 		if ((i==m_NumElements) || ((theElement->Type==12) && (i<m_NumElements-1)))
 @@ -1320,7 +1413,7 @@ void CExpression::CalculateSizeReadjust(short zoom, short *length, short *above,
  CBitmap *cursor_bitmap;
  //paints the expression - the expression must be already prepared for displaying (by call to CalculateSize)

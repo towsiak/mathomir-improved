@@ -1091,7 +1091,7 @@ try {
   $functionNames=@('floor','ceil','abs','round','trunc','sgn','fract','cbrt','exp','sinc')
   for($index=0;$index -lt 10;$index++){
     [MathomirUiProbe]::Send($view,258,27)|Out-Null
-    $arrowX=[int]($toolSize/2)-3;$arrowY=[int]($toolSize/2)+4*$itemHeight-3
+    $arrowX=[int]($toolSize/2)-3;$arrowY=[int]($toolSize/2)+5*$itemHeight-3
     [MathomirUiProbe]::Mouse($toolbox,512,0,$arrowX,$arrowY)
     [MathomirUiProbe]::Mouse($toolbox,513,1,$arrowX,$arrowY)
     [MathomirUiProbe]::Mouse($toolbox,514,0,$arrowX,$arrowY)
