@@ -371,7 +371,7 @@ index 209a634..ef0dfd9 100644
  		if (oper==17) strcpy(Data1,"ln");
  		if (oper==18) //log10
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..cd5e142 100644
+index 531282c..3dc4973 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -18,7 +18,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -1019,8 +1019,8 @@ index 531282c..cd5e142 100644
 +    double result=ScalarFunctions::Value(name,input);
 +    if(!std::isfinite(result))return changed;
 +    // Avoid narrowing large integers. Keep the native full-precision number cache.
-+    bool small=std::fabs(result)<9e18;
-+    long long integer=small?(long long)result:0;
++    bool integerFits=std::fabs(result)<9e18;
++    long long integer=integerFits?(long long)result:0;
 +    DeleteElement(Position);
 +    if(ComputationType==10)
 +    {
@@ -1045,7 +1045,7 @@ index 531282c..cd5e142 100644
 +        ((CExpression*)power->Expression1)->GenerateASCIINumber(10,10,1,0,0);
 +        ((CExpression*)power->Expression2)->GenerateASCIINumber(exponent,exponent,1,0,0);
 +    }
-+    else GenerateASCIINumber(result,integer,small && result==integer,115,Position);
++    else GenerateASCIINumber(result,integer,integerFits && result==integer,115,Position);
 +    return 1;
 +}
 +
