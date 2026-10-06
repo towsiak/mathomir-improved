@@ -41,6 +41,7 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
   [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wparam, IntPtr lparam);
@@ -996,6 +997,85 @@ try {
     Start-Sleep -Milliseconds 100
   }
   Write-Output 'Geometry palette passed: eight shapes and parallel lines with Z/F/U angle patterns place and reopen as native drawings.'
+
+  $polygonFixture=Join-Path (Split-Path $exe) 'polygon-created-smoke.mom'
+  '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content -LiteralPath $polygonFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$polygonFixture)
+  Start-Sleep -Milliseconds 150
+  [MathomirUiProbe]::Send($view,276,4)|Out-Null
+  for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
+  [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+  $toolbox=[MathomirUiProbe]::CaptionChild($main,'Toolbox')
+  $toolRect=[MathomirUiProbe]::WindowRect($toolbox);$toolSize=$toolRect.Right-$toolRect.Left
+  $client=[MathomirUiProbe]::ClientRect($main)
+  $itemHeight=[int][Math]::Floor(($client.Bottom-[Math]::Floor($toolSize/2)-$toolSize-7)/8)
+  $itemHeight=[Math]::Max([Math]::Floor($toolSize/3),[Math]::Min([Math]::Floor(2*$toolSize/3),$itemHeight))
+  if($itemHeight -lt $toolSize/2){$itemHeight+=[Math]::Floor([Math]::Floor($toolSize/3)/8)}
+  $itemHeight=$itemHeight -band 0xFFFE
+  $arrowX=[Math]::Floor($toolSize/2)-3;$arrowY=[Math]::Floor($toolSize/2)+8*$itemHeight-3
+  [MathomirUiProbe]::Mouse($toolbox,512,0,$arrowX,$arrowY)
+  [MathomirUiProbe]::Mouse($toolbox,513,1,$arrowX,$arrowY)
+  [MathomirUiProbe]::Mouse($toolbox,514,0,$arrowX,$arrowY)
+  Start-Sleep -Milliseconds 100
+  $palette=[MathomirUiProbe]::Window($appProcess.Id,'Subtoolbox')
+  if($palette -eq [IntPtr]::Zero){throw 'Geometry palette did not open.'}
+  $polygonX=[int](6*$toolSize/2+$toolSize/4);$polygonY=$toolSize
+  [MathomirUiProbe]::Mouse($palette,512,0,$polygonX,$polygonY)
+  [MathomirUiProbe]::PostMessage($palette,513,[IntPtr]1,[IntPtr](($polygonY -shl 16) -bor $polygonX))|Out-Null
+  [MathomirUiProbe]::PostMessage($palette,514,[IntPtr]0,[IntPtr](($polygonY -shl 16) -bor $polygonX))|Out-Null
+  $polygonDialog=[IntPtr]::Zero
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$polygonDialog=[MathomirUiProbe]::Window($appProcess.Id,'Polygon constructor');if($polygonDialog -ne [IntPtr]::Zero){break}}
+  if($polygonDialog -eq [IntPtr]::Zero){throw 'Polygon constructor did not open from its geometry palette icon.'}
+  foreach($index in 0..8){
+    [MathomirUiProbe]::Send([MathomirUiProbe]::Child($polygonDialog,1282),334,$index)|Out-Null
+    [MathomirUiProbe]::Send($polygonDialog,273,(1282 -bor (1 -shl 16)))|Out-Null
+    $count=@(3,4,5,6,7,8,9,10,12)[$index]
+    if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($polygonDialog,1298)) -notmatch "$count vertices"){throw 'Regular polygon preset did not refresh its preview/measurements.'}
+  }
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($polygonDialog,1283),'2')
+  if([MathomirUiProbe]::IsWindowEnabled([MathomirUiProbe]::Child($polygonDialog,1))){throw 'Invalid two-sided polygon was accepted.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($polygonDialog,1283),'5')
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($polygonDialog,1284),334,1)|Out-Null
+  [MathomirUiProbe]::Send($polygonDialog,273,(1284 -bor (1 -shl 16)))|Out-Null
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($polygonDialog,1285),'2')
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($polygonDialog,1298)) -notmatch 'Perimeter: 10 units'){throw 'Side length was interpreted as a circumradius.'}
+  foreach($id in @(1295,1296,1300)){[MathomirUiProbe]::Send([MathomirUiProbe]::Child($polygonDialog,$id),241,0)|Out-Null;[MathomirUiProbe]::Send($polygonDialog,273,$id)|Out-Null}
+  $preview=[MathomirUiProbe]::Child($polygonDialog,1299);$previewRect=[MathomirUiProbe]::ClientRect($preview)
+  Start-Sleep -Milliseconds 100
+  if([MathomirUiProbe]::CountColor($preview,0,0,$previewRect.Right,$previewRect.Bottom,0x0091501E) -lt 100){throw 'Polygon preview was blank.'}
+  [MathomirUiProbe]::PostMessage($polygonDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+  Start-Sleep -Milliseconds 150
+  [MathomirUiProbe]::Mouse($view,512,0,250,200);[MathomirUiProbe]::Mouse($view,513,1,250,200);[MathomirUiProbe]::Mouse($view,514,0,250,200)
+  [MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$polygonSaved=Get-Content $polygonFixture -Raw
+  $polygonObject=$polygonSaved.SelectSingleNode('/mathomir/*[last()]');$segments=0
+  foreach($line in $polygonObject.SelectNodes('.//dw | .//draw')){if($line.HasAttribute('d')){$segments+=($line.GetAttribute('d').Split(';').Count-1)}else{$segments+=(@($line.Attributes|Where-Object {$_.Name -match '^X[0-9]+$'}).Count-1)}}
+  if($segments -ne 5 -or $polygonObject.SelectNodes('.//subexp').Count -ne 0){Write-Output $polygonObject.OuterXml;throw 'Unlabeled pentagon did not retain exactly five outline edges.'}
+  [MathomirUiProbe]::OpenFile($main,$polygonFixture);Start-Sleep -Milliseconds 150
+  [MathomirUiProbe]::PostMessage($view,273,[IntPtr]33088,[IntPtr]::Zero)|Out-Null
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$polygonDialog=[MathomirUiProbe]::Window($appProcess.Id,'Polygon constructor');if($polygonDialog -ne [IntPtr]::Zero){break}}
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($polygonDialog,1280),241,0)|Out-Null
+  [MathomirUiProbe]::Send([MathomirUiProbe]::Child($polygonDialog,1281),241,1)|Out-Null
+  [MathomirUiProbe]::Send($polygonDialog,273,1281)|Out-Null
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($polygonDialog,1288),'(0,0); (2,2); (0,2); (2,0)')
+  if([MathomirUiProbe]::IsWindowEnabled([MathomirUiProbe]::Child($polygonDialog,1))){throw 'Crossed polygon edges were accepted.'}
+  [MathomirUiProbe]::Send($polygonDialog,273,1291)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($polygonDialog,1298)) -notmatch 'Concave.*Area: 6 square units.*Perimeter: 14 units'){throw 'Concave polygon measurements were incorrect.'}
+  foreach($id in @(1296,1301)){[MathomirUiProbe]::Send([MathomirUiProbe]::Child($polygonDialog,$id),241,1)|Out-Null;[MathomirUiProbe]::Send($polygonDialog,273,$id)|Out-Null}
+  [MathomirUiProbe]::PostMessage($polygonDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 150
+  [MathomirUiProbe]::Mouse($view,512,0,500,350);[MathomirUiProbe]::Mouse($view,513,1,500,350);[MathomirUiProbe]::Mouse($view,514,0,500,350)
+  [MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$polygonSaved=Get-Content $polygonFixture -Raw
+  $polygonObject=$polygonSaved.SelectSingleNode('/mathomir/*[last()]')
+  if($polygonObject.SelectNodes('.//subexp').Count -ne 12){Write-Output $polygonObject.OuterXml;throw 'Vertex labels, coordinates or angle labels were not retained.'}
+  $angleTokens=($polygonObject.SelectNodes('.//var | .//elm[@tp="1"]')|ForEach-Object {if($_.HasAttribute('t')){$_.t}else{$_.tx}}) -join ''
+  if($angleTokens -notmatch '270'){throw 'Concave angle was not labeled with its reflex angle.'}
+  if($polygonObject.SelectSingleNode('.//*[@spec]')){throw 'Polygon was not an editable native drawing.'}
+  [MathomirUiProbe]::OpenFile($main,$polygonFixture);Start-Sleep -Milliseconds 150
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$polygonReopened=Get-Content $polygonFixture -Raw
+  if($polygonReopened.SelectNodes('/mathomir/*').Count -ne 2 -or $polygonReopened.SelectNodes('/mathomir/*[last()]//subexp').Count -ne 12){throw 'Polygon geometry or labels changed after reopening.'}
+  Write-Output 'Polygon constructor passed: actual geometry palette click, nine regular presets, preview, side-length measurements, labels off, custom concave vertices, crossing rejection, vertex/coordinate labels, square/reflex angle markers and saved/reopened native drawings.'
 
   $marginFixture=Join-Path (Split-Path $exe) 'piecewise-created-smoke.mom'
   '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content -LiteralPath $marginFixture -Encoding ascii

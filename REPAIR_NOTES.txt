@@ -290,3 +290,12 @@ valid piece definitions rebuild empty formula slots when reopened, including
 grouped graphs. Empty self-closing XML formulas also load correctly.
 Windows UI checks exercise the palette click, actual colored curves, saved
 blank-graph recovery, grouped graphs, endpoint markers, and resize/Undo.
+
+Polygon constructor (2026-10-06): Geometry menu, geometry-palette polygon-plus
+icon, or Search polygon constructor. Nine regular presets and any 3-64 sides;
+circumradius/side length, rotation, clockwise order, and editable custom x,y
+vertices with fractions/pi/sqrt. Live preview, area/perimeter and page size.
+Separate vertex-label, coordinate, diagonal, angle-marker and angle-value
+checkboxes; right-angle squares and concave reflex angles. Place the polygon
+as a native drawing; labels remain editable. Concave examples, conversion
+of regular vertices to custom, reverse order, and clear validation errors.
