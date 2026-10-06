@@ -42,6 +42,7 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
   [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr hwnd);
+  [DllImport("user32.dll")] public static extern bool IsWindowUnicode(IntPtr hwnd);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr hwnd, StringBuilder text, int count);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr hwnd, uint msg, IntPtr wparam, IntPtr lparam);
@@ -1113,6 +1114,7 @@ try {
   for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$pieceDialog=[MathomirUiProbe]::Window($appProcess.Id,'Piecewise function grapher');if($pieceDialog -ne [IntPtr]::Zero){break}}
   if($pieceDialog -eq [IntPtr]::Zero){throw 'Piecewise editor did not open from the palette icon.'}
   Write-Output 'Piecewise palette passed: icon beside Plotter opens the editor.'
+  if(![MathomirUiProbe]::IsWindowUnicode([MathomirUiProbe]::Child($pieceDialog,1188))){throw 'Mathematical results require a Unicode text control.'}
   [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
   if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'f\(0\) = 1'){throw 'Piecewise value check selected the wrong branch at the boundary.'}
   $unicodeResult=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188))
