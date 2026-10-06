@@ -1066,7 +1066,7 @@ index 36238b0..97028e5 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..abda333 100644
+index 1ef18dd..16674a2 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -1424,7 +1424,7 @@ index 1ef18dd..abda333 100644
  					if ((fabs(first)<fabs(first+xstep)) && (fabs(first)<fabs(first-xstep)))
  					{
 -						DC->SelectObject(GetPenFromPool(1,0,RGB(224,224,224)));
-+						DC->SelectObject(GetPenFromPool(1,0,RGB(245,245,245)));
++						DC->SelectObject(GetPenFromPool(1,0,RGB(200,200,200)));
  						DC->MoveTo(X+x+1,Y);DC->LineTo(X+x+1,Y+Ylen-BottomMargin);
  						DC->MoveTo(X+x-1,Y);DC->LineTo(X+x-1,Y+Ylen-BottomMargin);
  					}
@@ -1477,7 +1477,7 @@ index 1ef18dd..abda333 100644
 +					if ((fabs(first)<fabs(first+ystep)) && (fabs(first)<fabs(first-ystep)))
  					{
 -						DC->SelectObject(GetPenFromPool(1,0,RGB(224,224,224)));
-+						DC->SelectObject(GetPenFromPool(1,0,RGB(245,245,245)));
++						DC->SelectObject(GetPenFromPool(1,0,RGB(200,200,200)));
  						DC->MoveTo(X+LeftMargin,Y+y+1);DC->LineTo(X+Xlen,Y+y+1);
  						DC->MoveTo(X+LeftMargin,Y+y-1);DC->LineTo(X+Xlen,Y+y-1);
  					}
