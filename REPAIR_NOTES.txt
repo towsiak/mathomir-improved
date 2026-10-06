@@ -299,3 +299,12 @@ Separate vertex-label, coordinate, diagonal, angle-marker and angle-value
 checkboxes; right-angle squares and concave reflex angles. Place the polygon
 as a native drawing; labels remain editable. Concave examples, conversion
 of regular vertices to custom, reverse order, and clear validation errors.
+
+Graph and math presentation (October 6, 2026):
+- Interval legends and evaluation results use proper signed infinity, membership and minus symbols.
+- Scientific axis/analysis labels use multiplication and superscript exponents; micro uses the micro symbol; rounded negative zero is suppressed.
+- Function help uses mathematical pi, degree and inequality symbols.
+- Unbounded piecewise editor fields stay blank, with help explaining how to enter them.
+- Polygon measurements use readable numbers and separators.
+- Heavy gray axis bands become white gutters with thin separators, and buttons use a lighter background. Clickable scale values and control positions are preserved.
+- Full-precision saved bounds, formulas and input syntax are preserved.

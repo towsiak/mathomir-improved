@@ -81,7 +81,8 @@ public static class MathomirUiProbe {
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;uint c=GetPixel(dc,cx,cy);if((c&255)<192||((c>>8)&255)<192||((c>>16)&255)<192)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=5;r++)for(int k=-2;k<=2;k++){left|=GetPixel(dc,cx-r,cy+k)==0;right|=GetPixel(dc,cx+r,cy+k)==0;top|=GetPixel(dc,cx+k,cy-r)==0;bottom|=GetPixel(dc,cx+k,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
   public static int SafeGuidePixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=70;y<180;y++)if(GetPixel(dc,51,y)==0xE0E0E0)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int PrintWarningPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=8;y<34;y++)for(int x=18;x<390;x++)if(GetPixel(dc,x,y)==0x1464AA)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
-  public static int GraphControlBackground(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=104;y<116;y++)for(int x=154;x<167;x++)if(ColorClose(GetPixel(dc,x,y),0xE0E0E0))count++;return count;}finally{ReleaseDC(hwnd,dc);}}
+  public static bool WhiteGraphGutter(IntPtr hwnd,int left,int bottom,int right){IntPtr dc=GetDC(hwnd);try{int white=0,total=0;for(int y=bottom+3;y<bottom+20;y+=2)for(int x=left+10;x<right-10;x+=7){total++;if(ColorClose(GetPixel(dc,x,y),0xFFFFFF))white++;}return total>0 && white*100/total>75;}finally{ReleaseDC(hwnd,dc);}}
+  public static int GraphControlBackground(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=104;y<116;y++)for(int x=154;x<167;x++)if(ColorClose(GetPixel(dc,x,y),0xF5F5F5))count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int GraphLegendPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=126;y<176;y++)for(int x=156;x<190;x++){uint color=GetPixel(dc,x,y);if((color&255)+((color>>8)&255)+((color>>16)&255)<650)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
@@ -869,6 +870,7 @@ try {
     Write-Output ('Domain test window: '+[MathomirUiProbe]::Text($main))
     if([MathomirUiProbe]::GraphLegendPixels($view) -lt 5){[MathomirUiProbe]::DumpRegion($view,169,115);throw 'Persistent function legend was not visible at the top of the graph.'}
     $area=[MathomirUiProbe]::PlotArea($view)
+    if(![MathomirUiProbe]::WhiteGraphGutter($view,$area[0],$area[3],$area[2])){throw 'The graph bottom gutter still has a heavy filled band.'}
     if($case.ContainsKey('hx')){$px=[int]($area[0]+($case.hx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.hy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::OpenCircle($view,$px,$py)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "No open circle in $($case.name) at $px,$py; plot area $area"}}
     else{$px=[int]($area[0]+($case.cx-$case.xmin)/($case.xmax-$case.xmin)*($area[2]-$area[0]));$py=[int]($area[3]-($case.cy-$case.ymin)/($case.ymax-$case.ymin)*($area[3]-$area[1]));if(![MathomirUiProbe]::CurveNear($view,$px,$py,4)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Missing real branch or domain endpoint in $($case.name) at $px,$py"}}
     if($case.ContainsKey('vertical')){
@@ -1113,6 +1115,18 @@ try {
   Write-Output 'Piecewise palette passed: icon beside Plotter opens the editor.'
   [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
   if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'f\(0\) = 1'){throw 'Piecewise value check selected the wrong branch at the boundary.'}
+  $unicodeResult=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188))
+  $expectedDomain='x '+[char]0x2208+' [0, +'+[char]0x221E+')'
+  if(!$unicodeResult.Contains($expectedDomain) -or $unicodeResult -match '\binf\b'){throw "Piecewise result did not show Unicode interval notation: $unicodeResult"}
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1201)) -ne '' -or [MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1208)) -ne ''){throw 'Unbounded editor fields should be blank, without raw inf text.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1186),'-1')
+  [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
+  $unicodeResult=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188))
+  $expectedDomain='x '+[char]0x2208+' ('+[char]0x2212+[char]0x221E+', 0)'
+  if(!$unicodeResult.Contains($expectedDomain)){throw "Negative-infinity result was not preserved by the native dialog: $unicodeResult"}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1186),'0')
+  Write-Output 'Math presentation passed: native evaluation shows membership, signed infinity and correct open/closed brackets; unbounded editor fields stay clean.'
+
   [MathomirUiProbe]::Send([MathomirUiProbe]::Child($pieceDialog,1207),241,0)|Out-Null
   [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
   if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)) -notmatch 'undefined'){throw 'Excluded boundary was treated as included.'}
