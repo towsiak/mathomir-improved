@@ -1258,6 +1258,21 @@ try {
   if(($approxUndo.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]').OuterXml) -match '20\.422410804'){throw 'Undo did not remove the appended approximation.'}
   Write-Output 'Direct operations passed: Ctrl+Enter derivative with original = result, no duplicate result on re-execution, Ctrl+Shift+Enter e^pi-e approximation, and Undo.'
 
+  # Enter the user's literal examples through WM_CHAR while editing.
+  foreach($typedCase in @(@{input='e^(pi)-e';approx=$true},@{input='d/dx(x^2+sin(x)+ln(x))';approx=$false})) {
+    $typedFixture=Join-Path (Split-Path $exe) ('typed-operation-'+$typedCase.approx+'-smoke.mom')
+    '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $typedFixture -Encoding ascii
+    [MathomirUiProbe]::OpenFile($main,$typedFixture);Start-Sleep -Milliseconds 400
+    [MathomirUiProbe]::Mouse($view,512,0,250,180);[MathomirUiProbe]::Mouse($view,513,1,250,180);[MathomirUiProbe]::Mouse($view,514,0,250,180)
+    foreach($character in $typedCase.input.ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$character)|Out-Null}
+    [MathomirUiProbe]::ExecuteKey($view,$typedCase.approx);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$typedSaved=Get-Content $typedFixture -Raw;$typedRoot=$typedSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
+    if($typedCase.approx){if($typedRoot.OuterXml -notmatch '20\.422410804'){Write-Output $typedRoot.OuterXml;throw 'Typed e^(pi)-e was not approximated.'}}
+    else{if(!$typedRoot.SelectSingleNode('./opr[@s="="] | ./elm[@tp="2"][@stp="="]') -or !$typedRoot.SelectSingleNode('.//fun[@t="cos"] | .//elm[@tp="6"][@tx="cos"]')){Write-Output $typedRoot.OuterXml;throw 'Typed d/dx formula did not produce an inline derivative.'}}
+  }
+  Write-Output 'Literal keyboard input passed: e^(pi)-e and d/dx(x^2+sin(x)+ln(x)) execute directly while editing.'
+
+
   $marginFixture=Join-Path (Split-Path $exe) 'piecewise-created-smoke.mom'
   '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content -LiteralPath $marginFixture -Encoding ascii
   [MathomirUiProbe]::OpenFile($main,$marginFixture)

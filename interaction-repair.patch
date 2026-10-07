@@ -4307,7 +4307,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..2dbc27f 100644
+index fc832eb..5d33c45 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,26 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -7085,7 +7085,7 @@ index fc832eb..2dbc27f 100644
 +    if(approximate){
 +        try{SymbolicDerivative::Parser parser;SymbolicDerivative::Expr parsed=parser.Parse(NativeSymbolic::Formula(&left));extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);
 +            if(!SymbolicDerivative::Finite(value)){AfxMessageBox("This expression has no finite real approximation, or contains a variable without a value.");return;}
-+            if(value==0 || (fabs(value)>=1e-100 && fabs(value)<=1e100))answer.GenerateASCIINumber(0,1,value,112);
++            if(value==0 || (fabs(value)>=1e-100 && fabs(value)<=1e100))answer.GenerateASCIINumber(value,0,0,112,0);
 +            else {int exponent=(int)floor(log10(fabs(value)));double mantissa=value/pow(10.,exponent);if(exponent<-300){mantissa=value/pow(10.,exponent+300);mantissa/=1e-300;}
 +                std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+SymbolicDerivative::Xml(SymbolicDerivative::Make('*',SymbolicDerivative::N(mantissa),SymbolicDerivative::Raw('^',SymbolicDerivative::N(10),SymbolicDerivative::N(exponent))))+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);}
 +        }catch(const std::exception &e){AfxMessageBox(e.what());return;}
@@ -7678,10 +7678,10 @@ index 94dd0e4..211c326 100644
  	afx_msg void OnFontsizeNormal();
 diff --git a/Mathomir/NativeSymbolic.h b/Mathomir/NativeSymbolic.h
 new file mode 100644
-index 0000000..2eb13b8
+index 0000000..576a1f9
 --- /dev/null
 +++ b/Mathomir/NativeSymbolic.h
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,56 @@
 +#pragma once
 +#include "SymbolicDerivative.h"
 +#include "Expression.h"
@@ -7694,6 +7694,7 @@ index 0000000..2eb13b8
 +    for(int i=start;i<end;i++){
 +        tElementStruct *ts=e->m_pElementList+i;if(ts->Type==0)continue;CElement *element=ts->pElementObject;if(!element)throw std::runtime_error("Incomplete expression.");
 +        CExpression *a=(CExpression*)element->Expression1,*b=(CExpression*)element->Expression2;std::string term;bool operand=true;
++        if(ts->Type==1 && !element->Data1[0] && Empty(a) && Empty(b))continue;
 +        if(ts->Type==1){if(a||b)throw std::runtime_error("Use plain-letter variables without subscripts in the derivative finder.");term=element->Data1;if((element->Data2[0]&0xE0)==0x60){if(term=="p")term="pi";else throw std::runtime_error("Use plain-letter variables in the derivative finder.");}}
 +        else if(ts->Type==2){char op=element->Data1[0];if(op==(char)0xD7)op='*';if(op!='+'&&op!='-'&&op!='*'&&op!='/')throw std::runtime_error("This operator is not supported by direct execution.");term=std::string(1,op);operand=false;}
 +        else if(ts->Type==3||ts->Type==4)term="("+Formula(a,0,-1,depth+1)+")"+(ts->Type==3?"^":"/")+"("+Formula(b,0,-1,depth+1)+")";
