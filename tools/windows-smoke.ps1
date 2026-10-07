@@ -542,6 +542,7 @@ try {
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$undoStroke=Get-Content $strokeFixture -Raw;if($undoStroke.SelectSingleNode('/mathomir/*[1]').OuterXml -ne $rawXml){throw 'Undo did not restore the original stroke.'}
   [MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,33092)|Out-Null;[MathomirUiProbe]::Send($main,273,33047)|Out-Null
+  for($click=0;$click -lt 20;$click++){[MathomirUiProbe]::Mouse($view,512,0,420,200);[MathomirUiProbe]::Mouse($view,513,1,420,200);[MathomirUiProbe]::Mouse($view,514,0,420,200)}
   [MathomirUiProbe]::Mouse($view,512,0,420,200);[MathomirUiProbe]::Mouse($view,513,1,420,200)
   for($i=1;$i -le 20;$i++){Start-Sleep -Milliseconds 70;$sy=[int](200+20*[Math]::Sin($i*3.141592653589793/20));[MathomirUiProbe]::Mouse($view,512,1,(420+6*$i),$sy)}
   [MathomirUiProbe]::Mouse($view,514,0,540,200);[MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
@@ -583,17 +584,22 @@ try {
   Write-Output 'Direct operations passed: Ctrl+Enter derivative with original = result, no duplicate result on re-execution, Ctrl+Shift+Enter e^pi-e approximation, and Undo.'
 
   # Enter the user's literal examples through WM_CHAR while editing.
+  $typedFailures=@()
   foreach($typedCase in @(@{input='e^(pi)-e';approx=$true},@{input='d/dx(x^2+sin(x)+ln(x))';approx=$false})) {
     $typedFixture=Join-Path (Split-Path $exe) ('typed-operation-'+$typedCase.approx+'-smoke.mom')
     '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $typedFixture -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$typedFixture);Start-Sleep -Milliseconds 400
     [MathomirUiProbe]::Mouse($view,512,0,250,180);[MathomirUiProbe]::Mouse($view,513,1,250,180);[MathomirUiProbe]::Mouse($view,514,0,250,180)
     foreach($character in $typedCase.input.ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$character)|Out-Null}
-    [MathomirUiProbe]::ExecuteKey($view,$typedCase.approx);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    $typedError=$null
+    try{[MathomirUiProbe]::ExecuteKey($view,$typedCase.approx)}catch{$typedError=$_.Exception.Message;Write-Output ('Typed operation error '+$typedCase.input+': '+$typedError);$message=[MathomirUiProbe]::Dialog($appProcess.Id);if($message -ne [IntPtr]::Zero){[MathomirUiProbe]::PostMessage($message,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 200}}
+    [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
     [xml]$typedSaved=Get-Content $typedFixture -Raw;$typedRoot=$typedSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
+    if($typedError){Write-Output ('Typed expression diagnostic '+$typedCase.input+': '+$typedRoot.OuterXml);$typedFailures+=$typedCase.input;continue}
     if($typedCase.approx){if($typedRoot.OuterXml -notmatch '20\.422410804'){Write-Output $typedRoot.OuterXml;throw 'Typed e^(pi)-e was not approximated.'}}
     else{if(!$typedRoot.SelectSingleNode('./opr[@s="="] | ./elm[@tp="2"][@stp="="]') -or !$typedRoot.SelectSingleNode('.//fun[@t="cos"] | .//elm[@tp="6"][@tx="cos"]')){Write-Output $typedRoot.OuterXml;throw 'Typed d/dx formula did not produce an inline derivative.'}}
   }
+  if($typedFailures.Count){throw ('Literal keyboard failures: '+($typedFailures -join '; '))}
   Write-Output 'Literal keyboard input passed: e^(pi)-e and d/dx(x^2+sin(x)+ln(x)) execute directly while editing.'
   if($autoStrokeFailed){throw 'Automatic smart smoothing failed to create a native saved curve.'}
 
