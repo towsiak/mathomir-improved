@@ -9,13 +9,15 @@ index 0000000..2f73a4e
 +static const char *ImprovedColorNames[8]={"Black","Red","Green","Blue","Gray","Orange","Purple","Teal"};
 +inline unsigned int ImprovedColor(int index){return ImprovedColors[index>=0&&index<8?index:0];}
 diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
-index 944279c..ca8ef3e 100644
+index 944279c..5f94d0a 100644
 --- a/Mathomir/Drawing.cpp
 +++ b/Mathomir/Drawing.cpp
-@@ -19,6 +19,10 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -19,6 +19,12 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  
  *********************************************************************************************************/
  #include "StdAfx.h"
++#include "SmartStroke.h"
++int FreehandSmoothingLevel=2;
 +bool FineBoldHatching=false;
 +bool SmartHatching=false;
 +#include "SmartShader.h"
@@ -23,7 +25,7 @@ index 944279c..ca8ef3e 100644
  #include ".\drawing.h"
  #include "Mathomir.h"
  #include "mainfrm.h"
-@@ -102,8 +106,33 @@ int Drawing_inside_create=0;
+@@ -102,8 +108,33 @@ int Drawing_inside_create=0;
  //ItemForm = 1-Rectangle, 2-Circle
  int Drawing_start_x,Drawing_start_y;
  #pragma optimize("s",on)
@@ -57,7 +59,7 @@ index 944279c..ca8ef3e 100644
  	Drawing_temp_form=ItemForm;
  	Drawing_temp_start=NumItems;	
  	int lw=SelectedLineWidth;
-@@ -400,11 +429,11 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -400,11 +431,11 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  					if (factorf==0) factorf=0.001;
  					double a1=atan2((double)Y-y1,(double)X-x1);
  					double a2=atan2((double)y2-Y,(double)x2-X);
@@ -73,7 +75,7 @@ index 944279c..ca8ef3e 100644
  					if (!Drawing_inside_create)
  					if (((l2+l3<l1+(double)20.0/factorf/(double)ffactor) && (!hor_vert_line)) || (hor_vert_line) ||
  						((l2+l3<l1*1.015) && (hor_vert_line)))
-@@ -734,6 +763,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -734,6 +765,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  	{
  		tDrawingItem *di;
  		int sz=12;
@@ -81,7 +83,7 @@ index 944279c..ca8ef3e 100644
  
  		int tt;
  		int a,b,c;
-@@ -788,13 +818,13 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -788,13 +820,13 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  
  			if (Drawing_temp_form==25)
  			{
@@ -97,7 +99,7 @@ index 944279c..ca8ef3e 100644
  				if ((tt==1) && (absY+absX>0)) {absY--;tt=0;}
  				if ((tt==1) && (absY+absX<0)) {absY++;tt=0;}
  			}
-@@ -805,7 +835,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -805,7 +837,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  				int l11=sz*DRWZOOM;
  				int sabsX=absX/10;
  				int sabsY=absY/10;
@@ -106,7 +108,7 @@ index 944279c..ca8ef3e 100644
  				{
  					tDocumentStruct *ds=TheDocument+i;
  					if ((ds->Type==2) && (ds->absolute_X<=sabsX+sz) && (ds->absolute_X+ds->Length>=sabsX-sz)
-@@ -818,6 +848,14 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -818,6 +850,14 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  						if (l1<l11) l11=l1;
  					}
  				}
@@ -121,7 +123,7 @@ index 944279c..ca8ef3e 100644
  				NumItems++;
  				if (NumItems>65000) NumItems=65000;
  				if (NumItems>NumItemsReserved)
-@@ -836,7 +874,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -836,7 +876,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  				di->X2=X+deltaX+l11;
  				di->Y2=Y+deltaY+((Drawing_temp_form==25)?l11:-l11);;
  				di->Type=1;
@@ -130,7 +132,7 @@ index 944279c..ca8ef3e 100644
  				
  				for (int ii=Drawing_temp_start;ii<NumItems;ii++)
  				{
-@@ -853,7 +891,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -853,7 +893,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  									//the di2 completely covers di
  									di->X1=di2->X1;di->Y1=di2->Y1;
  									di->X2=di2->X2;di->Y2=di2->Y2;
@@ -139,7 +141,7 @@ index 944279c..ca8ef3e 100644
  									NumItems--;
  									break;
  								}
-@@ -862,7 +900,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -862,7 +902,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  									//the di2 covers only one part of di
  									di->X1=di2->X1;
  									di->Y1=di2->Y1;
@@ -148,7 +150,7 @@ index 944279c..ca8ef3e 100644
  									NumItems--;
  									if (di>di2) di--;
  								}
-@@ -872,7 +910,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+@@ -872,7 +912,7 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
  									//the di2 covers only other part of di
  									di->X2=di2->X2;
  									di->Y2=di2->Y2;
@@ -157,18 +159,109 @@ index 944279c..ca8ef3e 100644
  									NumItems--;
  									if (di>di2) di--;
  							}
-@@ -1455,6 +1493,10 @@ int CDrawing::EndCreatingItem(int *X, int *Y, int absX, int absY)
- 		}
- 	}
- 
+@@ -1393,67 +1433,45 @@ int CDrawing::UpdateCreatingItem(int X, int Y, int absX, int absY)
+ extern int LeftClickTimer;
+ //the function returns X and Y coordinates of the upper left corner of the item
+ #pragma optimize("s",on)
++bool CDrawing::SmoothFreehand(int strength,short zoom)
++{
++    if((OriginalForm!=3 && !(OriginalForm==0 && NumItems>=5)) || IsSpecialDrawing || strength<=0 || NumItems<2 || NumItems>12000 || zoom<=0)return false;
++    const double scale=zoom/(100.0*DRWZOOM);std::vector<SmartStroke::Point> points;
++    for(int i=0;i<NumItems;i++){
++        if(Items[i].Type!=1 || (i>0 && (Items[i-1].X2!=Items[i].X1 || Items[i-1].Y2!=Items[i].Y1)))return false;
++        if(i==0)points.push_back(SmartStroke::Point(Items[i].X1*scale,Items[i].Y1*scale));
++        points.push_back(SmartStroke::Point(Items[i].X2*scale,Items[i].Y2*scale));
++    }
++    std::vector<SmartStroke::Point> filtered=SmartStroke::Smooth(points,strength);
++    if(filtered.size()<2 || filtered.size()>12001)return false;
++    short width=Items[0].LineWidth;tDrawingItem *replacement=(tDrawingItem*)malloc((filtered.size()-1)*sizeof(tDrawingItem));if(!replacement)return false;
++    int count=0;for(size_t i=1;i<filtered.size();i++){
++        tDrawingItem item;memset(&item,0,sizeof(item));item.Type=1;item.LineWidth=width;
++        item.X1=(int)floor(filtered[i-1].x/scale+.5);item.Y1=(int)floor(filtered[i-1].y/scale+.5);item.X2=(int)floor(filtered[i].x/scale+.5);item.Y2=(int)floor(filtered[i].y/scale+.5);
++        if(item.X1!=item.X2 || item.Y1!=item.Y2)replacement[count++]=item;
++    }
++    if(count==0){free(replacement);return false;}free(Items);Items=replacement;NumItems=(unsigned short)count;NumItemsReserved=(unsigned short)(filtered.size()-1);OriginalForm=3;return true;
++}
++
+ int CDrawing::EndCreatingItem(int *X, int *Y, int absX, int absY)
+ {	
+ 	
+ 	if ((X==NULL) || (Y==NULL)) return 0;
+ 	this->OriginalForm=Drawing_temp_form;
+-	if (!Drawing_inside_create)
+-	if ((Drawing_temp_form==3) || (Drawing_temp_form==14)) //freehand drawing, freehand arrow
+-	{
+-		int has_any=5;
+-		while (has_any)
+-		{
+-			has_any--;
+-			int delta=0;if (Drawing_temp_form==14) delta=2;
+-		}
+-		for (int ii=0;ii<NumItems;ii++)
+-		{
+-			tDrawingItem *di=Items+ii;
+-			if ((di->X1==di->X2) && (di->Y1==di->Y2))
+-			{
+-				for (int iii=ii+1;iii<NumItems-1;iii++)
+-					*(Items+iii)=*(Items+iii+1);
+-				NumItems--;
+-				ii--;
+-			}
+-		}
+-		while(NumItems>1)
+-		{
+-			//check if the last segment and semi-last segment can be joined)
+-			int x1=(Items+NumItems-1)->X2;
+-			int y1=(Items+NumItems-1)->Y2;
+-			int x2=(Items+NumItems-1)->X1;
+-			int y2=(Items+NumItems-1)->Y1;
+-			int x3=(Items+NumItems-2)->X1;
+-			int y3=(Items+NumItems-2)->Y1;
+-			float a1=atan2((float)(y1-y2),(float)(x1-x2));
+-			float a2=atan2((float)(y1-y3),(float)(y1-x3));
+-			if (fabs(a1-a2)<0.06)
+-			{
+-				(Items+NumItems-2)->Y2=y1;
+-				(Items+NumItems-2)->X2=x1;
+-				NumItems--;
+-			}
+-			else if ((x1==x2) && (x1==x3))
+-			{
+-				(Items+NumItems-2)->Y2=y1;
+-				NumItems--;
+-			}
+-			else if ((y1==y2) && (y1==y3))
+-			{
+-				(Items+NumItems-2)->X2=x1;
+-				NumItems--;
+-			}
+-			else if ((abs(y1-y2)<(3*DRWZOOM/2)) && (abs(x1-x2)<(3*DRWZOOM/2)))
+-			{
+-				(Items+NumItems-2)->X2=x1;
+-				NumItems--;
+-			}
+-			else
+-				break;
+-		}
+-	}
++    if (!Drawing_inside_create && (Drawing_temp_form==3 || Drawing_temp_form==14))
++    {
++        // Remove empty segments without dropping the next real segment.
++        for(int i=0;i<NumItems;){
++            if(Items[i].X1==Items[i].X2 && Items[i].Y1==Items[i].Y2){
++                memmove(Items+i,Items+i+1,(NumItems-i-1)*sizeof(tDrawingItem));NumItems--;
++            }else i++;
++        }
++        if(Drawing_temp_form==3)SmoothFreehand(FreehandSmoothingLevel,ViewZoom);
++    }
++
 +    // A click without a stroke is a valid cancelled drawing, not a segment.
 +    if((NumItems==0 || Items==NULL) && Drawing_temp_form!=6 && Drawing_temp_form!=7)
 +    { *X=0;*Y=0;return 0; }
-+
+ 
  	if ((Drawing_temp_form==6) || (Drawing_temp_form==7)) //eraser, large and small
  	{
- 		//rearange sizes and positions of all drawing objects (erased objects can be smaller)
-@@ -1863,7 +1905,7 @@ void CDrawing::PaintDrawing(CDC * DC, short zoom2, short X, short Y,int absX,int
+@@ -1863,7 +1881,7 @@ void CDrawing::PaintDrawing(CDC * DC, short zoom2, short X, short Y,int absX,int
  	int zoom=zoom2; //to change from short to int
  	if (zoom<0) {zoom=-zoom;no_background=1;}
  
@@ -177,7 +270,7 @@ index 944279c..ca8ef3e 100644
  
  	if (IsSpecialDrawing)
  	{
-@@ -2041,6 +2083,17 @@ int CDrawing::CalcChecksum(void)
+@@ -2041,6 +2059,17 @@ int CDrawing::CalcChecksum(void)
  		}
  		ret*=i;
  	}
@@ -195,7 +288,7 @@ index 944279c..ca8ef3e 100644
  	return ret;
  }
  
-@@ -2159,6 +2212,8 @@ CObject* CDrawing::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y, in
+@@ -2159,6 +2188,8 @@ CObject* CDrawing::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y, in
  	{
  		sz=MovingDotSize/3+1; 
  		if (ViewZoom>100) sz+=sz*(ViewZoom-100)/384;
@@ -204,7 +297,7 @@ index 944279c..ca8ef3e 100644
  	}
  	else
  		sz=0;
-@@ -2192,13 +2247,15 @@ CObject* CDrawing::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y, in
+@@ -2192,13 +2223,15 @@ CObject* CDrawing::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y, in
  					break;
  				}
  			}
@@ -227,7 +320,25 @@ index 944279c..ca8ef3e 100644
  			{
  				ret=(CObject*)this;
  				break;
-@@ -3307,6 +3364,15 @@ int CDrawing::SetLineWidth(int width)
+@@ -2299,6 +2332,7 @@ int CDrawing::XML_output(char * output, int num_tabs, char only_calculate)
+ 			len+=(int)strlen(tmpstr);
+ 			if (!only_calculate) {strcpy(output,tmpstr);output+=strlen(tmpstr);}
+ 
++			if(OriginalForm==3 && !IsSpecialDrawing && i==0){len+=9;if(!only_calculate){strcpy(output,"free=\"1\" ");output+=9;}}
+ 			if ((IsSpecialDrawing) && (i==0))
+ 			{
+ 				sprintf(tmpstr,"spec=\"%d\" ",IsSpecialDrawing);
+@@ -2436,7 +2470,8 @@ char *CDrawing::XML_input(char * file)
+ 				file=mf->XML_read_attribute(attribute,value,file,256);
+ 				if (file==NULL) return NULL;
+ 				int ttt=atoi(value);
+-				if (strcmp(attribute,"X1")==0) {di->X1=ttt*DRWZOOM/1000;}
++	            if(strcmp(attribute,"free")==0 && ttt==1)OriginalForm=3;
++			if (strcmp(attribute,"X1")==0) {di->X1=ttt*DRWZOOM/1000;}
+ 				if (strcmp(attribute,"Y1")==0) {di->Y1=ttt*DRWZOOM/1000;}
+ 				if (strcmp(attribute,"X2")==0) {di->X2=ttt*DRWZOOM/1000;}
+ 				if (strcmp(attribute,"Y2")==0) {di->Y2=ttt*DRWZOOM/1000;}
+@@ -3307,6 +3342,15 @@ int CDrawing::SetLineWidth(int width)
  
  int CDrawing::ScaleForFactor(float factorx,float factory)
  {
@@ -243,7 +354,7 @@ index 944279c..ca8ef3e 100644
  	for (int i=0;i<NumItems;i++)
  	{
  		tDrawingItem *di=Items+i;
-@@ -3377,27 +3443,23 @@ int CDrawing::RotateForAngle(float angle, int centerX, int centerY, int* newX1,
+@@ -3377,27 +3421,23 @@ int CDrawing::RotateForAngle(float angle, int centerX, int centerY, int* newX1,
  			di->X2=di->X1+w*DRWZOOM;
  			di->Y2=di->Y1+h*DRWZOOM;
  		}
@@ -289,7 +400,7 @@ index 944279c..ca8ef3e 100644
  		{
  			double rad=sqrt((double)(di->X1-centerX)*(double)(di->X1-centerX)+(double)(di->Y1-centerY)*(double)(di->Y1-centerY));
 diff --git a/Mathomir/Drawing.h b/Mathomir/Drawing.h
-index 2f39ec2..e161da1 100644
+index 2f39ec2..ead6326 100644
 --- a/Mathomir/Drawing.h
 +++ b/Mathomir/Drawing.h
 @@ -1,5 +1,6 @@
@@ -299,7 +410,15 @@ index 2f39ec2..e161da1 100644
  
  //scalling factor that defines drawings inner precision
  #define DRWZOOM 32
-@@ -111,10 +112,15 @@ public:
+@@ -32,6 +33,7 @@ public:
+ 	CDrawing(void);
+ 	~CDrawing(void);
+ 	int StartCreatingItem(int ItemForm);
++    bool SmoothFreehand(int strength,short zoom);
+ 	int EndCreatingItem(int *X, int *Y, int absX=0x7FFFFFFF, int absY=0x7FFFFFFF);  //return X and Y coordinates of the upper left corner
+ 	int UpdateCreatingItem(int X, int Y, int absX, int absY);
+ 	int Delete(void);
+@@ -111,10 +113,15 @@ public:
  class CFunctionPlotter
  {
  public:
@@ -315,7 +434,7 @@ index 2f39ec2..e161da1 100644
  	unsigned char abort_request;
  	unsigned char show_no_scale;
  	unsigned char calc_y;
-@@ -137,6 +143,12 @@ public:
+@@ -137,6 +144,12 @@ public:
  	char *XML_input(char * file);
  
  	int PlotFunction(int reset_plot, CDC *PrintDC=NULL,short zoom=0);
@@ -371,7 +490,7 @@ index 209a634..ef0dfd9 100644
  		if (oper==17) strcpy(Data1,"ln");
  		if (oper==18) //log10
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..a61d6a4 100644
+index 531282c..42727f5 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -18,7 +18,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -384,7 +503,15 @@ index 531282c..a61d6a4 100644
  #include "Mathomir.h"
  #include "mainfrm.h"
  #include "popupmenu.h"
-@@ -46,7 +48,7 @@ void PaintGuidlines(CDC *DC, int AbsoluteY);
+@@ -27,6 +29,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ #include "float.h"
+ #include "toolbox.h"
+ #include ".\expression.h"
++#include "NativeSymbolic.h"
+ #include "drawing.h"
+ #include "MathomirDoc.h"
+ #include "MathomirView.h"
+@@ -46,7 +49,7 @@ void PaintGuidlines(CDC *DC, int AbsoluteY);
  void CheckForExtendedGuidlines(int AbsoluteY);
  extern int EasycastListStart;
  extern char TextControlboxMode;
@@ -393,7 +520,7 @@ index 531282c..a61d6a4 100644
  
  extern int SelectedGuidelineType;
  extern int GuidlineElement;
-@@ -60,11 +62,12 @@ int KeyboardExponentMode=0;
+@@ -60,11 +63,12 @@ int KeyboardExponentMode=0;
  CExpression *AutocompleteSource;
  int AutocompletePoints;
  int AutocompleteTriggered;
@@ -407,7 +534,7 @@ index 531282c..a61d6a4 100644
  
  const struct LIST_OF_KNOWN_FUNCTIONS
  {
-@@ -72,6 +75,15 @@ const struct LIST_OF_KNOWN_FUNCTIONS
+@@ -72,6 +76,15 @@ const struct LIST_OF_KNOWN_FUNCTIONS
  	char oper;
  	char name[10];
  } ListOfKnownFunctions[]={
@@ -423,7 +550,7 @@ index 531282c..a61d6a4 100644
  	{6,23,"d"}, //differential
  	{6,24,"par"}, //partial differential
  	{6,24,"partial"}, //partial differential
-@@ -328,8 +340,8 @@ extern CExpression *TheKeyboardClipboard;
+@@ -328,8 +341,8 @@ extern CExpression *TheKeyboardClipboard;
  #define xreturn(x) return x
  #endif
  
@@ -434,7 +561,7 @@ index 531282c..a61d6a4 100644
  
  extern CExpression* ClipboardExpression;
  extern CExpression* prevClipboardExpression;
-@@ -453,7 +465,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
+@@ -453,7 +466,88 @@ int CExpression::InsertEmptyElement(short position, short type,char Operator,int
  //for displaying
  //this function should be relatively fast.
  
@@ -524,7 +651,7 @@ index 531282c..a61d6a4 100644
  {
  	
  	try
-@@ -1027,7 +1120,7 @@ void CExpression::CalculateSize(CDC *DC,short int zoom, short int * length, shor
+@@ -1027,7 +1121,7 @@ void CExpression::CalculateSize(CDC *DC,short int zoom, short int * length, shor
  			ColumnStart=i+1;
  			l=MarginX;
  			Column++;
@@ -533,7 +660,7 @@ index 531282c..a61d6a4 100644
  		}
  
  		if ((i==m_NumElements) || ((theElement->Type==12) && (i<m_NumElements-1)))
-@@ -1320,7 +1413,7 @@ void CExpression::CalculateSizeReadjust(short zoom, short *length, short *above,
+@@ -1320,7 +1414,7 @@ void CExpression::CalculateSizeReadjust(short zoom, short *length, short *above,
  CBitmap *cursor_bitmap;
  //paints the expression - the expression must be already prepared for displaying (by call to CalculateSize)
  //this function must be fast!!
@@ -542,7 +669,7 @@ index 531282c..a61d6a4 100644
  {
  	try
  	{
-@@ -1331,7 +1424,7 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
+@@ -1331,7 +1425,7 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
  
  	//determine the color of expression
  	if (m_Color!=-1) 
@@ -551,7 +678,7 @@ index 531282c..a61d6a4 100644
  	else if ((m_IsHeadline) && (color==0) && (m_pPaternalExpression==NULL))
  		color=RGB(0,128,128);
  
-@@ -1419,7 +1512,8 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
+@@ -1419,7 +1513,8 @@ void CExpression::PaintExpression(CDC * DC, short zoom, short X, short Y,RECT *C
  		DC->SetBkMode(TRANSPARENT);
  		DC->SetTextAlign(TA_BASELINE);
  	}
@@ -561,7 +688,7 @@ index 531282c..a61d6a4 100644
  	{
  		//paint frame around selection ( if is selected or is keyboard entry mode)
  		if ((m_Selection==1) || (m_Selection==m_NumElements+1) || 
-@@ -2407,6 +2501,15 @@ void CExpression::DeselectExpression()
+@@ -2407,6 +2502,15 @@ void CExpression::DeselectExpression()
  //it work recursively (can return its subelements)
  CObject* CExpression::SelectObjectAtPoint(CDC* DC, short zoom, short X, short Y,short *IsExpression, char *IsParenthese,char ForceInsertionPoints)
  {
@@ -577,7 +704,7 @@ index 531282c..a61d6a4 100644
  	int i;
  	if ((DC==NULL) || (X<-5000) || (X>30000) || (Y<-5000) || (Y>15000) || (IsExpression==NULL)) return NULL;
  
-@@ -3048,11 +3151,13 @@ int CExpression::CopyExpression(const CExpression* Original,const char OnlySelec
+@@ -3048,11 +3152,13 @@ int CExpression::CopyExpression(const CExpression* Original,const char OnlySelec
  	m_StartAsText=Original->m_StartAsText;
  	m_IsHeadline=Original->m_IsHeadline;
  	m_Color=Original->m_Color;
@@ -591,7 +718,7 @@ index 531282c..a61d6a4 100644
  
  	if (OnlySelected==1)
  	{
-@@ -3135,6 +3240,8 @@ void CExpression::Delete(void)
+@@ -3135,6 +3241,8 @@ void CExpression::Delete(void)
  	m_MaxNumColumns=1;
  	m_IsComputed=0;
  	m_IsVertical=0;
@@ -600,7 +727,7 @@ index 531282c..a61d6a4 100644
  	m_Color=-1;
  	m_IsHeadline=0;
  	m_DrawParentheses=0;
-@@ -4383,7 +4490,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
+@@ -4383,7 +4491,7 @@ int CExpression::ResolveKnownFunctions(CDC* DC, short zoom, UINT nChar, UINT nRp
  		this->m_KeyboardCursorPos=0;
  		CExpression *parent=this;
  		while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
@@ -609,7 +736,7 @@ index 531282c..a61d6a4 100644
  		return 2;
  	}
  	/*if ((strnicmp(theElement->pElementObject->Data1,"\\text",5)==0)
-@@ -4875,6 +4982,41 @@ char LastCursorPositionKey;
+@@ -4875,6 +4983,41 @@ char LastCursorPositionKey;
  char IsDoubleStrokeConversionUsed;
  //this function receives messages when a key is hit (handling of keyboard)
  #pragma optimize("s",on)
@@ -651,7 +778,7 @@ index 531282c..a61d6a4 100644
  int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, UINT nFlags,int fcolor,char is_external)
  {
  	//******************************************************************************
-@@ -4892,6 +5034,8 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -4892,6 +5035,8 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  	if (m_KeyboardCursorPos>23) m_KeyboardCursorPos=23;
  	
  
@@ -660,7 +787,7 @@ index 531282c..a61d6a4 100644
  	//m_IsKeyboardEntry contains ordinal number (with offset +1) of the element that 
  	//is being edited. The edited element can only be variable (type==1)
  	tElementStruct *theElement;
-@@ -6352,7 +6496,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6352,7 +6497,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  			while (parent->m_pPaternalExpression) parent=parent->m_pPaternalExpression;
  			if (parent)
  			{
@@ -669,7 +796,7 @@ index 531282c..a61d6a4 100644
  			}
  			if ((UseToolbar)  && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
  			return 1;
-@@ -6565,7 +6709,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6565,7 +6710,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  
  			if ((ch=='B') || (ch=='I') || //bold, italic
  				(ch=='U') || (ch=='S') || (ch=='O') || //underline, strikeout, overline
@@ -678,7 +805,7 @@ index 531282c..a61d6a4 100644
  				(ch=='N')) //normalization
  			{
  				((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("font formatting",20218);			
-@@ -6578,12 +6722,18 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6578,12 +6723,18 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  						{
  							for (int jj=0;jj<24;jj++)
  							{
@@ -699,7 +826,7 @@ index 531282c..a61d6a4 100644
  						if (ch=='G') ts->pElementObject->m_Color=2;
  						if (ch=='N') ts->pElementObject->m_Color=-1;
  					}
-@@ -6592,7 +6742,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
+@@ -6592,7 +6743,7 @@ int CExpression::KeyboardKeyHit(CDC* DC, short zoom, UINT nChar, UINT nRptCnt, U
  					if (ch=='S') ts->Decoration=1;
  					if (ch=='N') ts->Decoration=0;
  				}				
@@ -708,7 +835,7 @@ index 531282c..a61d6a4 100644
  				if ((UseToolbar)  && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
  				return 1;
  			}
-@@ -8778,6 +8928,27 @@ keyboardkeyhit_addtoexponent:
+@@ -8778,6 +8929,27 @@ keyboardkeyhit_addtoexponent:
  			theElement=KeyboardSplitVariable();
  			if (m_KeyboardCursorPos==0) IsEditedVariableEmpty=1;
  
@@ -736,7 +863,7 @@ index 531282c..a61d6a4 100644
  			if (IsEditedVariableEmpty) 
  				DeleteElement(m_IsKeyboardEntry-1);
  			else
-@@ -10507,6 +10678,14 @@ int CExpression::KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt
+@@ -10507,6 +10679,14 @@ int CExpression::KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt
  	
  	}
  
@@ -751,7 +878,7 @@ index 531282c..a61d6a4 100644
  	//adds the character
  	CExpression *newFocus;
  	if (KeyboardKeyHit(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,2)==0) 
-@@ -11078,6 +11257,13 @@ int PaintText(CDC *DC,int X, int Y,char *text, char *font, short *spacing, short
+@@ -11078,6 +11258,13 @@ int PaintText(CDC *DC,int X, int Y,char *text, char *font, short *spacing, short
  
  int CExpression::Autocomplete(int is_internal)
  {
@@ -765,7 +892,7 @@ index 531282c..a61d6a4 100644
  	if (is_internal)
  	{
  		int i;
-@@ -11644,7 +11830,7 @@ autowraptext_start:
+@@ -11644,7 +11831,7 @@ autowraptext_start:
  int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  {
  	int len=0;
@@ -774,7 +901,7 @@ index 531282c..a61d6a4 100644
  	static char tabs[17];
  
  	if (num_tabs>16) num_tabs=16;
-@@ -11694,6 +11880,14 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
+@@ -11694,6 +11881,14 @@ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
  		itoa(m_IsHeadline,tmp,10);
  		strcat(tmpstr,tmp);
  	}
@@ -789,7 +916,7 @@ index 531282c..a61d6a4 100644
  	if (m_IsVertical)
  	{
  		strcat(tmpstr,"\" vert=\"");
-@@ -11852,6 +12046,8 @@ char * CExpression::XML_input(char * file)
+@@ -11852,6 +12047,8 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"txt")==0) {m_StartAsText=1;old_version_text_decode=1;}
  		if (strcmp(attribute,"hed")==0) m_IsHeadline=atoi(value);
  		if (strcmp(attribute,"vert")==0) m_IsVertical=atoi(value);
@@ -798,7 +925,7 @@ index 531282c..a61d6a4 100644
  		if ((strcmp(attribute,"color")==0) || (strcmp(attribute,"clr")==0)) m_Color=atoi(value);
  		if (strcmp(attribute,"alig")==0) m_Alignment=atoi(value);
  		if ((strcmp(attribute,"brack")==0) || (strcmp(attribute,"br")==0)) m_ParenthesesFlags=atoi(value);
-@@ -11862,6 +12058,14 @@ char * CExpression::XML_input(char * file)
+@@ -11862,6 +12059,14 @@ char * CExpression::XML_input(char * file)
  		if (strcmp(attribute,"b_data")==0) m_ParenthesesFlags|=(atoi(value)<<2);
  
  	} while (attribute[0]);
@@ -813,7 +940,7 @@ index 531282c..a61d6a4 100644
  
  	int found_anything=0;
  	int is_matrix=0;
-@@ -12021,18 +12225,18 @@ char * CExpression::XML_input(char * file)
+@@ -12021,18 +12226,18 @@ char * CExpression::XML_input(char * file)
  int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,char output_type)
  {
  	int len=0;
@@ -835,7 +962,7 @@ index 531282c..a61d6a4 100644
  		strcat(tmpstr,"\">\r\n");
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
-@@ -12257,7 +12461,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12257,7 +12462,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -844,7 +971,7 @@ index 531282c..a61d6a4 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12272,7 +12476,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
+@@ -12272,7 +12477,7 @@ int CExpression::MathML_output(char * output, int num_tabs, char only_calculate,
  int CExpression::LaTeX_output(char * output, char only_calculate)
  {
  	int len=0;
@@ -853,7 +980,7 @@ index 531282c..a61d6a4 100644
  	char *tabs="";
  	char output_type=3;
  	int num_tabs=0;
-@@ -12281,7 +12485,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12281,7 +12486,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  
  	//memset(tabs,9,num_tabs);tabs[num_tabs]=0; //generating the tablist string
  
@@ -862,7 +989,7 @@ index 531282c..a61d6a4 100644
  	{
  		//color of the expression - if m_Color==-1, then the color is inherited or default
  	}*/
-@@ -12486,7 +12690,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
+@@ -12486,7 +12691,7 @@ int CExpression::LaTeX_output(char * output, char only_calculate)
  		{int tt=(int)strlen(tmpstr);len+=tt;if (!only_calculate) {strcpy(output,tmpstr);output+=tt;}}
  	}
  
@@ -871,7 +998,7 @@ index 531282c..a61d6a4 100644
  	{
  		strcpy(tmpstr,tabs);
  		strcat(tmpstr,"</mstyle>\r\n");
-@@ -12567,7 +12771,7 @@ int IsCharacterLow(char ch,char font)
+@@ -12567,7 +12772,7 @@ int IsCharacterLow(char ch,char font)
  
  int CExpression::CalcChecksum()
  {
@@ -880,7 +1007,7 @@ index 531282c..a61d6a4 100644
  		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
  		
  	int c=m_NumElements;
-@@ -12581,6 +12785,8 @@ int CExpression::CalcChecksum()
+@@ -12581,6 +12786,8 @@ int CExpression::CalcChecksum()
  		//c+=128*m_ParentheseHeightFactor;
  		c+=256*(m_Color+4*m_StartAsText+8*m_IsVertical);
  		c+=768*m_Alignment;
@@ -889,7 +1016,7 @@ index 531282c..a61d6a4 100644
  		if (m_pPaternalExpression) c+=500;
  		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
  		c+=m_InternalInsertionPoint;
-@@ -14353,6 +14559,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
+@@ -14353,6 +14560,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
  	}
  	return 0;
  getkeyboardcursorpos_finish:
@@ -897,7 +1024,7 @@ index 531282c..a61d6a4 100644
  
  	if ((m_IsVertical) && (m_pPaternalExpression==NULL))
  	{
-@@ -14936,7 +15143,12 @@ int CExpression::Compute(int StartPos, int EndPos,int ComputationType, int Outsi
+@@ -14936,7 +15144,12 @@ int CExpression::Compute(int StartPos, int EndPos,int ComputationType, int Outsi
  				if (strcmp(ts->pElementObject->Data1,"th")==0) is_hsincos=1;
  				if (strcmp(ts->pElementObject->Data1,"cth")==0) is_hsincos=1;
  
@@ -911,7 +1038,7 @@ index 531282c..a61d6a4 100644
  				{
  					//Logarithm
  					while (((rval=ComputeLog(i+preoperator,element_type,ComputationType))<0) && (cnt<50)) cnt++;
-@@ -16978,7 +17190,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16978,7 +17191,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl*pow(10.0,-exxp);
@@ -920,7 +1047,7 @@ index 531282c..a61d6a4 100644
  				exxp--;
  				if (exxp<-100) 	{rr=0.0;exxp=0;break;}
  			}
-@@ -16988,7 +17200,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
+@@ -16988,7 +17201,7 @@ int CExpression::GenerateASCIINumber(double number_dbl,long long number_int, cha
  			while (1)
  			{
  				rr=number_dbl/pow(10.0,exxp);
@@ -929,7 +1056,7 @@ index 531282c..a61d6a4 100644
  				exxp++;
  				if (exxp>100) {rr=(number_dbl<0)?-1.0:1.0;exxp=100;break;}
  			}
-@@ -17177,6 +17389,15 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17177,6 +17390,15 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  
  	CExpression *exp=(CExpression*)(ts->pElementObject->Expression2);
  	CExpression *arg=(CExpression*)(ts->pElementObject->Expression1);
@@ -945,7 +1072,7 @@ index 531282c..a61d6a4 100644
  
  	//take care about exponent
  
-@@ -17223,7 +17444,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17223,7 +17445,7 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  		PF.prec1=0;
  		ret=exp->StrikeoutCommonFactors(0,exp->m_NumElements-1,1,NULL,0,0,1,&PF);
  		exp->StrikeoutRemove(0,exp->m_NumElements-1);
@@ -954,7 +1081,7 @@ index 531282c..a61d6a4 100644
  	}
  	else
  	{
-@@ -17335,7 +17556,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
+@@ -17335,7 +17557,16 @@ int CExpression::ComputeExponent(int Position, char element_type, int Computatio
  				}
  
  				double Re,Im=0;
@@ -972,7 +1099,7 @@ index 531282c..a61d6a4 100644
  				{
  					//result might be imaginary number
  					precision2++;
-@@ -23995,24 +24225,12 @@ int CExpression::ComputeParentheses(int Position, char element_type, int Computa
+@@ -23995,24 +24226,12 @@ int CExpression::ComputeParentheses(int Position, char element_type, int Computa
  		return retval;
  	}
  
@@ -1003,7 +1130,7 @@ index 531282c..a61d6a4 100644
  
  	//we can drop the parentheses if the level inside is higher than the outside level
  	{
-@@ -24174,6 +24392,58 @@ int CExpression::GenerateASCIIFraction(int Position,double num, double denom, in
+@@ -24174,6 +24393,58 @@ int CExpression::GenerateASCIIFraction(int Position,double num, double denom, in
  	return 0;
  }
  
@@ -1062,7 +1189,7 @@ index 531282c..a61d6a4 100644
  int CExpression::ComputeSinCos(int Position, char element_type, int ComputationType)
  {
  	int retval=0;
-@@ -24194,6 +24464,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
+@@ -24194,6 +24465,38 @@ int CExpression::ComputeSinCos(int Position, char element_type, int ComputationT
  
  	CExpression *arg=(CExpression*)((m_pElementList+Position)->pElementObject->Expression1);
  	if (!arg) return 0;
@@ -1101,7 +1228,7 @@ index 531282c..a61d6a4 100644
  
  	{
  		int cnt=0;
-@@ -24454,6 +24756,7 @@ computesincos_end:
+@@ -24454,6 +24757,7 @@ computesincos_end:
  		if (rval)
  		{
  			double N=PF.N1/PF.N2;
@@ -1109,7 +1236,7 @@ index 531282c..a61d6a4 100644
  			int prec=PF.prec1;
  			{
  				if (fabs(N)<1e-100)
-@@ -24477,6 +24780,7 @@ computesincos_end:
+@@ -24477,6 +24781,7 @@ computesincos_end:
  				if (function_type)
  				{
  					int is_ok=0;
@@ -1117,7 +1244,7 @@ index 531282c..a61d6a4 100644
  					if (function_type==1) {res=sin(N);is_ok=1;}
  					if (function_type==2) {res=cos(N);is_ok=1;}
  					if (function_type==3) {res=tan(N);is_ok=1;}
-@@ -24484,8 +24788,9 @@ computesincos_end:
+@@ -24484,8 +24789,9 @@ computesincos_end:
  					if (function_type==5) {res=1.0/cos(N);is_ok=1;} //secant
  					if (function_type==6) {res=1.0/sin(N);is_ok=1;} //cosecant
  
@@ -1128,7 +1255,7 @@ index 531282c..a61d6a4 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -24552,11 +24857,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
+@@ -24552,11 +24858,12 @@ int CExpression::ComputeASinCos(int Position, char element_type, int Computation
  					if (function_type==1) {res=asin(N);is_ok=1;} //arcsin
  					if (function_type==2) {res=acos(N);is_ok=1;} //arccos
  					if (function_type==3) {res=atan(N);is_ok=1;} //arctan
@@ -1143,7 +1270,15 @@ index 531282c..a61d6a4 100644
  						if (prec<2) prec=2;
  						DeleteElement(Position);
  						GenerateASCIINumber(res,(long long)(res+((res>0)?0.01:-0.01)),(fabs(res-(long long)res)<1e-100)?1:0,prec,Position);
-@@ -25178,7 +25484,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
+@@ -24651,6 +24958,7 @@ int CExpression::ComputeHSinCos(int Position, char element_type, int Computation
+ //derivates the expression with the given variable
+ int CExpression::Derivate(CExpression * variable, int internal_call)
+ {
++    if(!internal_call){SymbolicDerivative::Result r;std::string error;if(!NativeSymbolic::Differentiate(this,variable,r,error))return 0;std::string xml="<ex fh=\""+SymbolicDerivative::Number(m_FontSize)+"\">"+SymbolicDerivative::Xml(r.derivative)+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);CExpression result(NULL,NULL,m_FontSize);result.XML_input(&data[0]);CopyExpression(&result,0);return 1;}
+ 	//if not function of the 'variable' then the derivation is zero
+ 	if (ContainsVariable(0,m_NumElements-1,variable,0,variable->m_NumElements)==0)
+ 	{
+@@ -25178,7 +25486,7 @@ int CExpression::PlotterReleaseVariablePositions(void *VarPos)
  	return 1;
  }
  //int sshit=0;
@@ -1152,7 +1287,7 @@ index 531282c..a61d6a4 100644
  {
  	if (wwwwxxxx==0) {InitializeCriticalSection(&section3);wwwwxxxx=1;}
  	int cntrr=0;
-@@ -25191,7 +25497,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25191,7 +25499,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  
  	//first replace all variables with the given value
  
@@ -1161,7 +1296,7 @@ index 531282c..a61d6a4 100644
  
  	try
  	{
-@@ -25295,7 +25601,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
+@@ -25295,7 +25603,7 @@ double CExpression::PlotterCalculateFunctionValue(double X,void *VP)
  		LeaveCriticalSection(&section3);
  		return retval;
  	}
@@ -3476,7 +3611,7 @@ index 0000000..0b7e258
 +}
 +}
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..93a7691 100644
+index bdcebb4..1f1816c 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -3643,10 +3778,35 @@ index bdcebb4..93a7691 100644
              MENUITEM "Default font size is &Large", ID_FONTSIZE_LARGE
              MENUITEM "Default font size is &Medium", ID_FONTSIZE_NORMAL
              MENUITEM "Default Font size is &Small", ID_FONTSIZE_SMALL
-@@ -410,12 +474,40 @@ BEGIN
+@@ -394,6 +458,7 @@ BEGIN
+         POPUP "Symbolic &Computation"
+         BEGIN
+             MENUITEM "&Enable",                     ID_SYMBOLICCALCULATOR_ENABLE
++            MENUITEM "Symbolic derivative finder...", ID_SYMBOLIC_DERIVATIVE
+             MENUITEM SEPARATOR
+             POPUP "Imaginary unit"
+             BEGIN
+@@ -410,12 +475,57 @@ BEGIN
              MENUITEM "Load settings...",            ID_SAVEOPTIONS_LOAD
          END
      END
++    POPUP "&Draw"
++    BEGIN
++        POPUP "Smart freehand smoothing"
++        BEGIN
++            MENUITEM "Off (raw strokes)", ID_SMOOTH_OFF
++            MENUITEM "Light", ID_SMOOTH_LIGHT
++            MENUITEM "Standard", ID_SMOOTH_STANDARD
++            MENUITEM "Strong", ID_SMOOTH_STRONG
++        END
++        MENUITEM "Smooth selected freehand curves", ID_SMOOTH_SELECTED
++    END
++    POPUP "&Calculus"
++    BEGIN
++        MENUITEM "Symbolic derivative finder...", ID_SYMBOLIC_DERIVATIVE
++        MENUITEM "Execute expression\tCtrl+Enter", ID_EXECUTE_EXPRESSION
++        MENUITEM "Approximate expression\tCtrl+Shift+Enter", ID_APPROXIMATE_EXPRESSION
++    END
 +    POPUP "&Graph"
 +    BEGIN
 +        MENUITEM "Piecewise function grapher...", ID_PIECEWISE_GRAPH
@@ -3684,7 +3844,7 @@ index bdcebb4..93a7691 100644
  END
  
  
-@@ -425,8 +517,8 @@ END
+@@ -425,8 +535,8 @@ END
  //
  
  VS_VERSION_INFO VERSIONINFO
@@ -3695,7 +3855,7 @@ index bdcebb4..93a7691 100644
   FILEFLAGSMASK 0x3fL
  #ifdef _DEBUG
   FILEFLAGS 0x1L
-@@ -441,12 +533,12 @@ BEGIN
+@@ -441,12 +551,12 @@ BEGIN
      BEGIN
          BLOCK "040904e4"
          BEGIN
@@ -3712,7 +3872,7 @@ index bdcebb4..93a7691 100644
          END
      END
      BLOCK "VarFileInfo"
-@@ -607,3 +699,179 @@ LANGUAGE 9, 1
+@@ -607,3 +717,212 @@ LANGUAGE 9, 1
  /////////////////////////////////////////////////////////////////////////////
  #endif    // not APSTUDIO_INVOKED
  
@@ -3891,6 +4051,39 @@ index bdcebb4..93a7691 100644
 +    CONTROL "Angle values",1301,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,378,313,100,14
 +    DEFPUSHBUTTON "Place polygon",IDOK,410,336,88,14
 +    PUSHBUTTON "Cancel",IDCANCEL,507,336,52,14
++END
++
++IDD_SYMBOLIC_DERIVATIVE DIALOGEX 0,0,586,382
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Symbolic derivative finder"
++FONT 8,"MS Shell Dlg"
++BEGIN
++    LTEXT "Enter a formula. The finder applies exact symbolic rules; other letters are constant parameters.",-1,10,8,566,14
++    LTEXT "f =",-1,10,29,20,12
++    EDITTEXT 1300,32,26,542,18,ES_AUTOHSCROLL
++    LTEXT "Variable",-1,10,54,38,12
++    EDITTEXT 1301,52,51,30,16,ES_AUTOHSCROLL
++    LTEXT "Order",-1,98,54,30,12
++    COMBOBOX 1302,130,51,138,95,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    PUSHBUTTON "Find derivative",1303,288,50,112,18
++    PUSHBUTTON "Polynomial",1310,10,78,76,16
++    PUSHBUTTON "Chain rule",1311,92,78,76,16
++    PUSHBUTTON "Quotient",1312,174,78,76,16
++    PUSHBUTTON "Variable power",1313,256,78,90,16
++    LTEXT "Use ^ for powers, * or 2x for products, and parentheses: sin(3x), ln(x^2+1), exp(x), sqrt(x).",-1,10,100,566,12
++    LTEXT "Also: trig/inverse trig, hyperbolic functions, log (base 10), abs, cbrt and step functions. Trig uses radians.",-1,10,114,566,12
++    LTEXT "Typeset preview",-1,10,132,566,12
++    CONTROL "",1304,"Static",SS_NOTIFY | WS_BORDER,10,146,566,64
++    LTEXT "Derivative formula (select and copy if needed)",-1,10,216,566,12
++    EDITTEXT 1305,10,229,566,24,ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
++    CONTROL "Include original function and derivative notation when placing",1306,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,258,350,14
++    LTEXT "Check at",-1,372,260,38,12
++    EDITTEXT 1307,414,257,64,17,ES_AUTOHSCROLL
++    PUSHBUTTON "Evaluate",1308,488,257,88,18
++    LTEXT "",1309,10,280,566,23
++    EDITTEXT 1314,10,307,566,46,ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
++    DEFPUSHBUTTON "Place editable result",IDOK,354,361,132,16
++    PUSHBUTTON "Cancel",IDCANCEL,496,361,80,16
 +END
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
 index 15ec728..c0ba4b7 100644
@@ -4114,15 +4307,16 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..7ab0378 100644
+index fc832eb..2dbc27f 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -19,7 +19,12 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -19,17 +19,26 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  
  *********************************************************************************************************/
  
 +#include "ScalarFunctions.h"
  #include "stdafx.h"
++#include "SymbolicDerivative.h"
 +#include "ColorPalette.h"
 +#include "GeometryShapes.h"
 +#include "PolygonConstructor.h"
@@ -4130,7 +4324,11 @@ index fc832eb..7ab0378 100644
  #include "Mathomir.h"
  
  #include "MathomirDoc.h"
-@@ -30,6 +35,8 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ #include "MathomirView.h"
+ #include ".\MathomirView.h"
+ #include "Expression.h"
++#include "NativeSymbolic.h"
+ #include "toolbox.h"
  #include "popupmenu.h"
  #include "mainfrm.h"
  #include "math.h"
@@ -4139,7 +4337,7 @@ index fc832eb..7ab0378 100644
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -132,6 +139,224 @@ unsigned int LongClickStartTime;
+@@ -132,6 +141,224 @@ unsigned int LongClickStartTime;
  CPoint LongClickPosition;
  CExpression *LongClickObject;
  tDocumentStruct *prevTouchedObject=NULL;
@@ -4364,7 +4562,7 @@ index fc832eb..7ab0378 100644
  char IsWindowOutOfFocus;
  
  #define NUM_SPECIAL_KEYS 21
-@@ -157,6 +382,10 @@ struct
+@@ -157,6 +384,10 @@ struct
  
  
  
@@ -4375,7 +4573,7 @@ index fc832eb..7ab0378 100644
  CExpression *TheKeyboardClipboard;
  
  IMPLEMENT_DYNCREATE(CMathomirView, CView)
-@@ -167,6 +396,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -167,6 +398,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -4385,7 +4583,7 @@ index fc832eb..7ab0378 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +445,39 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +447,45 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
@@ -4402,6 +4600,12 @@ index fc832eb..7ab0378 100644
 +    ON_COMMAND_RANGE(ID_BACKGROUND_CLEAR,ID_BACKGROUND_LAST,OnBackgroundColor)
 +    ON_COMMAND(ID_POLYGON_CONSTRUCTOR,OnPolygonConstructor)
 +    ON_COMMAND(ID_PIECEWISE_GRAPH,OnPiecewiseGraph)
++    ON_COMMAND(ID_SYMBOLIC_DERIVATIVE,OnSymbolicDerivative)
++    ON_COMMAND(ID_EXECUTE_EXPRESSION,OnExecuteExpression)
++    ON_COMMAND(ID_APPROXIMATE_EXPRESSION,OnApproximateExpression)
++    ON_COMMAND_RANGE(ID_SMOOTH_OFF,ID_SMOOTH_STRONG,OnFreehandSmoothing)
++    ON_UPDATE_COMMAND_UI_RANGE(ID_SMOOTH_OFF,ID_SMOOTH_STRONG,OnUpdateFreehandSmoothing)
++    ON_COMMAND(ID_SMOOTH_SELECTED,OnSmoothSelected)
 +    ON_COMMAND_RANGE(ID_GEOMETRY_TRIANGLE,ID_GEOMETRY_LAST,OnGeometryShape)
 +    ON_COMMAND(ID_INSERT_UNIT_CIRCLE,OnUnitCircle)
 +    ON_COMMAND_RANGE(ID_TRIANGLE_45,ID_TRIANGLE_30,OnSpecialTriangle)
@@ -4425,7 +4629,7 @@ index fc832eb..7ab0378 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -292,6 +557,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -292,6 +565,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  CMathomirView::CMathomirView()
  {
  	// TODO: add construction code here
@@ -4433,7 +4637,15 @@ index fc832eb..7ab0378 100644
  	m_PopupMenuObject=NULL;
  	pMainView=this;
  	pMainViewBase=(CView*)this;
-@@ -489,8 +755,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
+@@ -392,6 +666,7 @@ int CMathomirView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+ 	if (CView::OnCreate(lpCreateStruct) == -1)
+ 		return -1;
+ 
++	extern int FreehandSmoothingLevel;FreehandSmoothingLevel=max(0,min(3,theApp.GetProfileInt("Drawing","FreehandSmoothing",2)));
+ 	SetTimer(1,10,NULL); //this is for cursor and copy-paste
+ 	return 0;
+ }
+@@ -489,8 +764,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
  int NumRullerGuidelines=0;
  
  
@@ -4495,7 +4707,7 @@ index fc832eb..7ab0378 100644
  	tDocumentStruct *ds=TheDocument;
  	int SelectedElement;
  	NumRullerGuidelines=0;
-@@ -509,6 +827,14 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -509,6 +836,14 @@ void CMathomirView::OnDraw(CDC* pDC)
  
  		ClientArea.right=pDC->GetDeviceCaps(PHYSICALWIDTH);
  		ClientArea.bottom=pDC->GetDeviceCaps(PHYSICALHEIGHT);
@@ -4510,7 +4722,7 @@ index fc832eb..7ab0378 100644
  		ViewZoom=(short)(100*ClientArea.bottom/PaperHeight);
  		ViewY=(PagePrinted-1)*PaperHeight+5+pDC->GetDeviceCaps(PHYSICALOFFSETY)*100/ViewZoom;
  		ViewX=15+pDC->GetDeviceCaps(PHYSICALOFFSETX)*100/ViewZoom;
-@@ -576,17 +902,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +911,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -4533,7 +4745,7 @@ index fc832eb..7ab0378 100644
  				}
  				else
  				{
-@@ -624,19 +951,24 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,19 +960,24 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -4559,7 +4771,7 @@ index fc832eb..7ab0378 100644
  			int RelativeHeight=(PaperHeight)*ViewZoom/100;
  			int RelativeStart=-(ViewY%PaperHeight)*ViewZoom/100;
  
-@@ -725,8 +1057,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -725,8 +1066,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		}
  
  
@@ -4575,7 +4787,7 @@ index fc832eb..7ab0378 100644
  			if ((ds->absolute_Y<-1000) && (ds->absolute_Y>-1200))
  			{
  				if (NumRullerGuidelines<13) RullerGuidelines[NumRullerGuidelines++]=NumDocumentElements-i-1;
-@@ -753,6 +1092,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +1101,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -4585,7 +4797,7 @@ index fc832eb..7ab0378 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -761,7 +1103,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -761,7 +1112,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					if (ds->Type==1)
  						((CExpression*)(ds->Object))->PaintExpression(&bitmapDC,ViewZoom,RelativeX,RelativeY,&TheClientRect);
@@ -4594,7 +4806,7 @@ index fc832eb..7ab0378 100644
  						((CDrawing*)(ds->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,ds->absolute_X,ds->absolute_Y,&TheClientRect);
  				}
  
-@@ -785,6 +1127,8 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -785,6 +1136,8 @@ void CMathomirView::OnDraw(CDC* pDC)
  			}
  		}
  
@@ -4603,7 +4815,7 @@ index fc832eb..7ab0378 100644
  		if ((prevNumSelectedObjects!=NumSelectedObjects) && ((prevNumSelectedObjects<3) || (NumSelectedObjects<3)))
  		{
  			if ((UseToolbar) && (Toolbox) &&(Toolbox->Toolbar)) {Toolbox->Toolbar->ConfigureToolbar();}
-@@ -795,13 +1139,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -795,13 +1148,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			tmpDrawing->PaintDrawing(&bitmapDC,ViewZoom,(MovingStartX/10-ViewX)*ViewZoom/100,(MovingStartY/10-ViewY)*ViewZoom/100,-1,-1);
  		}
@@ -4620,7 +4832,7 @@ index fc832eb..7ab0378 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1122,11 +1468,13 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1122,11 +1477,13 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					lasttillen=tillen;
  					bitmapDC.SelectClipRgn(NULL);
@@ -4634,7 +4846,7 @@ index fc832eb..7ab0378 100644
  				}
  
  				int RelativeX=TillenRelativeX+(ds->absolute_X-vX)*Tillens.Zoom/100;
-@@ -1198,6 +1546,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1198,6 +1555,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			if (myrgn) 
  			{
  				bitmapDC.SelectClipRgn(NULL);
@@ -4642,7 +4854,7 @@ index fc832eb..7ab0378 100644
  				delete myrgn;
  			}
  
-@@ -1229,6 +1578,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1229,6 +1587,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				CRgn myrgn;
  				myrgn.CreateRectRgn(RegionX,RegionY,RegionX+RegionW,RegionY+RegionH);
  				bitmapDC.SelectClipRgn(&myrgn);
@@ -4650,7 +4862,7 @@ index fc832eb..7ab0378 100644
  
  
  				ds=TheDocument;
-@@ -1264,6 +1614,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1264,6 +1623,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  					}
  				}
  				bitmapDC.SelectClipRgn(NULL);
@@ -4658,7 +4870,7 @@ index fc832eb..7ab0378 100644
  			}
  
  
-@@ -1279,6 +1630,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1279,6 +1639,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_MASKPEN);
  			int xx=PreopenDrawingToolboxX-ToolboxSize;
  			int yy=PreopenDrawingToolboxY-ToolboxSize;
@@ -4666,7 +4878,7 @@ index fc832eb..7ab0378 100644
  			CPen pen1;
  			CBrush brush1;
  			brush1.CreateSolidBrush(RGB(240,240,255));
-@@ -1290,9 +1642,10 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1290,9 +1651,10 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.MoveTo(xx+2*ToolboxSize/3+3,yy);bitmapDC.LineTo(xx+2*ToolboxSize/3+3,yy+ToolboxSize+5);
  			bitmapDC.MoveTo(xx,yy+ToolboxSize/3+1);bitmapDC.LineTo(xx+ToolboxSize+5,yy+ToolboxSize/3+1);
  			bitmapDC.MoveTo(xx,yy+2*ToolboxSize/3+3);bitmapDC.LineTo(xx+ToolboxSize+5,yy+2*ToolboxSize/3+3);
@@ -4678,7 +4890,7 @@ index fc832eb..7ab0378 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1702,68 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1711,68 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -4747,7 +4959,7 @@ index fc832eb..7ab0378 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1855,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1864,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -4756,7 +4968,7 @@ index fc832eb..7ab0378 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +2202,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +2211,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -4785,7 +4997,7 @@ index fc832eb..7ab0378 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2051,7 +2480,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -2051,7 +2489,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  		//ds->absolute_Y=AbsoluteY;
  		//ds->Type=1; //expression
  		ds->Object=(CObject*)new CExpression(NULL,NULL,DefaultFontSize);
@@ -4794,7 +5006,7 @@ index fc832eb..7ab0378 100644
  		{
  			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
  			//((CExpression*)(ds->Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -2169,12 +2598,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2607,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -4810,7 +5022,7 @@ index fc832eb..7ab0378 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2612,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2621,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -4822,7 +5034,7 @@ index fc832eb..7ab0378 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2626,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2635,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -4835,7 +5047,7 @@ index fc832eb..7ab0378 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2238,6 +2672,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2238,6 +2681,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  
  void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  {
@@ -4843,7 +5055,7 @@ index fc832eb..7ab0378 100644
  	PaintDrawingHotspot(1);
  	SelectedTab=0;
  	if (Tillens.Show) {Tillens.Show=0;InvalidateRect(NULL,1);}
-@@ -2300,7 +2735,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+@@ -2300,7 +2744,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  		ViewX=nPos;
  		if (ViewX<0) ViewX=0;
  		InvalidateRect(NULL,0);
@@ -4852,7 +5064,7 @@ index fc832eb..7ab0378 100644
  	}
  	if (nSBCode==SB_THUMBTRACK)
  	{
-@@ -2722,7 +3157,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
+@@ -2722,7 +3166,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
  		if ((IsDrawingMode<10) || (IsDrawingMode>13)) //not for rasters (linear and logaritmic)
  		if ((IsDrawingMode<18) || (IsDrawingMode>26)) //not for section line, Okay, ?, !, X and diagonals
  		{
@@ -4861,7 +5073,7 @@ index fc832eb..7ab0378 100644
  			
  			int w=SelectedLineWidth*ViewZoom/100;
  			int dot_shape=1;
-@@ -2812,6 +3247,75 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +3256,75 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -4937,7 +5149,7 @@ index fc832eb..7ab0378 100644
  
  	try
  	{
-@@ -3338,6 +3842,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3851,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -4945,7 +5157,7 @@ index fc832eb..7ab0378 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +3942,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +3951,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -4958,7 +5170,7 @@ index fc832eb..7ab0378 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +4064,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +4073,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
@@ -4966,7 +5178,7 @@ index fc832eb..7ab0378 100644
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +4117,52 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +4126,52 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -5047,7 +5259,7 @@ index fc832eb..7ab0378 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4103,6 +4629,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4103,6 +4638,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  	if (MouseWheelDelta>=120)
  	{
@@ -5055,7 +5267,7 @@ index fc832eb..7ab0378 100644
  		MouseWheelDelta=0;
  		//zoom increasing
  
-@@ -4127,6 +4654,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4127,6 +4663,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  	}
  	if (MouseWheelDelta<=-120)
  	{
@@ -5063,7 +5275,7 @@ index fc832eb..7ab0378 100644
  		MouseWheelDelta=0;
  
  		if (ViewZoom>=480) ViewZoom=400;
-@@ -4169,31 +4697,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4706,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -5096,7 +5308,7 @@ index fc832eb..7ab0378 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4201,6 +4705,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4201,6 +4714,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  void CMathomirView::OnZoom40()
  {
@@ -5104,7 +5316,7 @@ index fc832eb..7ab0378 100644
  	ViewZoom=40;
  	RepaintTheView(1);
  
-@@ -4208,6 +4713,7 @@ void CMathomirView::OnZoom40()
+@@ -4208,6 +4722,7 @@ void CMathomirView::OnZoom40()
  
  void CMathomirView::OnZoom60()
  {
@@ -5112,7 +5324,7 @@ index fc832eb..7ab0378 100644
  	ViewZoom=60;
  	RepaintTheView(1);
  }
-@@ -4326,7 +4832,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4326,7 +4841,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  	//prevViewZoom=ViewZoom;
  
  
@@ -5122,7 +5334,7 @@ index fc832eb..7ab0378 100644
  	SetScrollRange(SB_VERT,0,ViewMaxY,0);
  	SetScrollPos(SB_HORZ,ViewX,1);
  	SetScrollPos(SB_VERT,ViewY,1);
-@@ -4341,24 +4848,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4341,24 +4857,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  
  void CMathomirView::OnZoom80()
  {
@@ -5151,7 +5363,7 @@ index fc832eb..7ab0378 100644
  	ViewZoom=240;
  	RepaintTheView(1);
  }
-@@ -4373,6 +4884,7 @@ UINT prevChar;
+@@ -4373,6 +4893,7 @@ UINT prevChar;
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -5159,10 +5371,11 @@ index fc832eb..7ab0378 100644
  	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
  	//initial keyboard testing (determining key codes when the shift key is used)
  	//if (keystringmode==2) {keystring3[keystringcnt++]=nChar;return;}
-@@ -4457,6 +4969,18 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +4978,19 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
++    if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){SurpressCharMessage=1;if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();return;}
 +    if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
 +	if (MouseMovingActive && nChar==VK_ESCAPE) { EndGripMove(true); SurpressCharMessage=1; return; }
 +	if (MouseSizingActive && nChar==VK_ESCAPE) { EndMouseSizing(true); SurpressCharMessage=1; return; }
@@ -5178,7 +5391,7 @@ index fc832eb..7ab0378 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +4996,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +5006,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -5186,7 +5399,7 @@ index fc832eb..7ab0378 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5168,7 +5691,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5168,7 +5701,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  						short l,a=0,b;
  						//TheDocument[NumDocumentElements-1].Type=1;
  						TheDocument[NumDocumentElements-1].Object=(CObject*)(new CExpression(NULL,NULL,DefaultFontSize));
@@ -5195,7 +5408,7 @@ index fc832eb..7ab0378 100644
  						{
  							((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSize=RootObjectFontSize;
  							//((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -5360,7 +5883,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +5893,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -5204,7 +5417,7 @@ index fc832eb..7ab0378 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +5937,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +5947,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -5221,7 +5434,7 @@ index fc832eb..7ab0378 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5976,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +5986,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -5250,7 +5463,7 @@ index fc832eb..7ab0378 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +6067,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +6077,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -5259,7 +5472,7 @@ index fc832eb..7ab0378 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6178,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6188,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -5311,7 +5524,7 @@ index fc832eb..7ab0378 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5793,7 +6296,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5793,7 +6306,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  							fcolor=Toolbox->GetUniformFormattingColor();
  						}
  						int inserting_position=tmp->m_Selection-1;
@@ -5322,7 +5535,7 @@ index fc832eb..7ab0378 100644
  						{
  							QuickTypeUsed=2;
  							LastQuickTypeObject=ds;
-@@ -5836,7 +6341,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6351,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -5331,7 +5544,7 @@ index fc832eb..7ab0378 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6623,23 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6633,23 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -5355,7 +5568,7 @@ index fc832eb..7ab0378 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +7080,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +7090,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -5390,7 +5603,7 @@ index fc832eb..7ab0378 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +8101,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +8111,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -5405,7 +5618,7 @@ index fc832eb..7ab0378 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8636,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8646,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -5433,7 +5646,7 @@ index fc832eb..7ab0378 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +9089,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +9099,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -5444,7 +5657,7 @@ index fc832eb..7ab0378 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9936,1005 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +9946,1009 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -5699,6 +5912,10 @@ index fc832eb..7ab0378 100644
 +    dialog.Add(ID_SMART_HATCH_DOWN,"Shading > Smart hatch downward","shader shading closed boundaries outlines automatic trim holes nested polygons circle");
 +    dialog.Add(ID_SMART_HATCH_UP,"Shading > Smart hatch upward","shader shading closed boundaries outlines automatic trim holes nested polygons circle");
 +    dialog.Add(ID_POLYGON_CONSTRUCTOR,"Geometry > Polygon constructor...","polygon regular vertices coordinates points pentagon hexagon concave labels constructor");
++    dialog.Add(ID_SMOOTH_SELECTED,"Draw > Smooth selected freehand curves","smooth smoothing freehand pen curve wobble jitter intelligent corners");
++    dialog.Add(ID_APPROXIMATE_EXPRESSION,"Calculus > Approximate expression (Ctrl+Shift+Enter)","approximate decimal numeric numerical evaluate e pi");
++    dialog.Add(ID_EXECUTE_EXPRESSION,"Calculus > Execute expression (Ctrl+Enter)","execute calculate evaluate derivative equals result inline");
++    dialog.Add(ID_SYMBOLIC_DERIVATIVE,"Calculus > Symbolic derivative finder...","differentiate derivative calculus symbolic slope chain product quotient higher order");
 +    dialog.Add(ID_PIECEWISE_GRAPH,"Graph > Piecewise function grapher...","piecewise pieces intervals open closed endpoints domain jumps step graph");
 +    dialog.Add(ID_INSERT_UNIT_CIRCLE,"Insert > Unit circle maker","unit circle angle start end arc radians degrees trig triangle coordinates palette");
 +    dialog.Add(ID_INSERT_TABLE,"Insert > Configure table","table grid rows columns cells spreadsheet borders alignment text math palette");
@@ -6450,7 +6667,7 @@ index fc832eb..7ab0378 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10947,138 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +10961,138 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -6589,7 +6806,7 @@ index fc832eb..7ab0378 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +11095,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +11109,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -6597,7 +6814,7 @@ index fc832eb..7ab0378 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11773,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11787,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -6633,7 +6850,7 @@ index fc832eb..7ab0378 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11807,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11821,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -6641,7 +6858,7 @@ index fc832eb..7ab0378 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +11922,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +11936,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -6649,7 +6866,7 @@ index fc832eb..7ab0378 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12328,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12342,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -6657,7 +6874,7 @@ index fc832eb..7ab0378 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12629,607 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12643,719 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -6849,6 +7066,118 @@ index fc832eb..7ab0378 100644
 +    RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
 +    // PasteDrawing consumes a clipboard container and inserts its children.
 +    ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
++}
++
++
++
++void CMathomirView::OnExecuteExpression(){ExecuteExpression(false);}
++void CMathomirView::OnApproximateExpression(){ExecuteExpression(true);}
++void CMathomirView::ExecuteExpression(bool approximate)
++{
++    if(ViewOnlyMode)return;tDocumentStruct *object=NULL;
++    if(KeyboardEntryBaseObject && KeyboardEntryBaseObject->Type==1)object=KeyboardEntryBaseObject;
++    if(!object)for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==1 && TheDocument[i].MovingDotState==3){if(object){AfxMessageBox("Select one math object to execute.");return;}object=TheDocument+i;}
++    if(!object && prevTouchedObject && prevTouchedObject->Type==1)object=prevTouchedObject;
++    if(!object){AfxMessageBox("Type in a math object or select one, then press Ctrl+Enter to append = result.");return;}
++    CExpression *source=(CExpression*)object->Object;CExpression left(NULL,NULL,source->m_FontSize);left.CopyExpression(source,0);
++    for(int i=0;i<left.m_NumElements;i++)if(left.m_pElementList[i].Type==2 && (left.m_pElementList[i].pElementObject->Data1[0]=='=' || left.m_pElementList[i].pElementObject->Data1[0]==(char)0xBB)){while(left.m_NumElements>i)left.DeleteElement(i);break;}
++    SymbolicDerivative::Result derivative;std::string error;CExpression answer(NULL,NULL,source->m_FontSize);
++    if(approximate){
++        try{SymbolicDerivative::Parser parser;SymbolicDerivative::Expr parsed=parser.Parse(NativeSymbolic::Formula(&left));extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);
++            if(!SymbolicDerivative::Finite(value)){AfxMessageBox("This expression has no finite real approximation, or contains a variable without a value.");return;}
++            if(value==0 || (fabs(value)>=1e-100 && fabs(value)<=1e100))answer.GenerateASCIINumber(0,1,value,112);
++            else {int exponent=(int)floor(log10(fabs(value)));double mantissa=value/pow(10.,exponent);if(exponent<-300){mantissa=value/pow(10.,exponent+300);mantissa/=1e-300;}
++                std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+SymbolicDerivative::Xml(SymbolicDerivative::Make('*',SymbolicDerivative::N(mantissa),SymbolicDerivative::Raw('^',SymbolicDerivative::N(10),SymbolicDerivative::N(exponent))))+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);}
++        }catch(const std::exception &e){AfxMessageBox(e.what());return;}
++    }else if(NativeSymbolic::ReadDerivative(&left,derivative,error)){
++        std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+SymbolicDerivative::Xml(derivative.derivative)+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);
++    }else{
++        if(!error.empty()){AfxMessageBox(error.c_str());return;}
++        answer.CopyExpression(&left,0);int changes=0;for(int step=0;step<80;step++){if(!answer.Compute(0,answer.m_NumElements-1,0))break;changes++;}
++        if(!changes){AfxMessageBox("No supported calculation was found. For a derivative, use d(f)/d(x), d/dx followed by its argument, or the Symbolic derivative finder.");return;}
++    }
++    int index=(int)(object-TheDocument);OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
++    UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&left,0);
++    while(source->m_NumElements>0 && source->m_pElementList[source->m_NumElements-1].Type==0)source->DeleteElement(source->m_NumElements-1);
++    source->InsertEmptyElement(source->m_NumElements,2,approximate?(char)0xBB:'=');
++    for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)source->InsertElement(answer.m_pElementList+i,source->m_NumElements);
++    CDC *dc=GetDC();short length,above,below;source->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
++    object->Length=length*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
++}
++
++extern int FreehandSmoothingLevel;
++void CMathomirView::OnFreehandSmoothing(UINT command){FreehandSmoothingLevel=command-ID_SMOOTH_OFF;theApp.WriteProfileInt("Drawing","FreehandSmoothing",FreehandSmoothingLevel);}
++void CMathomirView::OnUpdateFreehandSmoothing(CCmdUI *ui){ui->SetRadio(ui->m_nID==ID_SMOOTH_OFF+FreehandSmoothingLevel);}
++void CMathomirView::OnSmoothSelected()
++{
++    if(ViewOnlyMode)return;bool found=false;
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].MovingDotState==3){CDrawing *d=(CDrawing*)TheDocument[i].Object;if(d && (d->OriginalForm==3 || (d->OriginalForm==0 && d->NumItems>=5 && !d->IsSpecialDrawing)) && d->NumItems>1)found=true;}
++    if(!found){AfxMessageBox("Select one or more freehand curves, then choose Smooth selected freehand curves.");return;}
++    UndoSave("smooth freehand curves");
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].MovingDotState==3){CDrawing *d=(CDrawing*)TheDocument[i].Object;
++        if(d && d->SmoothFreehand(FreehandSmoothingLevel?FreehandSmoothingLevel:2,ViewZoom)){int x,y,w,h;d->AdjustCoordinates(&x,&y,&w,&h);TheDocument[i].absolute_X+=x;TheDocument[i].absolute_Y+=y;TheDocument[i].Length=w;TheDocument[i].Above=0;TheDocument[i].Below=h;}
++    }GetDocument()->SetModifiedFlag();RepaintTheView(1);
++}
++
++class CDerivativePreview : public CStatic
++{
++public:
++    CExpression expression;bool ready;
++    CDerivativePreview():expression(NULL,NULL,100),ready(false){}
++    void Set(const std::string &xml){expression.Delete();ready=!xml.empty();if(ready){std::vector<char> data(xml.begin(),xml.end());data.push_back(0);expression.XML_input(&data[0]);}if(m_hWnd)Invalidate();}
++protected:
++    afx_msg void OnPaint(){CPaintDC dc(this);CRect rect;GetClientRect(&rect);dc.FillSolidRect(rect,RGB(255,255,255));
++        if(!ready){dc.SetBkMode(TRANSPARENT);dc.SetTextColor(RGB(100,100,100));dc.DrawText("Find a derivative to see the typeset result.",rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE);return;}
++        short width,above,below,zoom=150;expression.CalculateSize(&dc,zoom,&width,&above,&below);
++        while(zoom>55 && (width>rect.Width()-16 || above+below>rect.Height()-10)){zoom-=5;expression.CalculateSize(&dc,zoom,&width,&above,&below);}
++        expression.PaintExpression(&dc,zoom,max(8,(rect.Width()-width)/2),max(5,(rect.Height()-above-below)/2)+above,&rect);
++    }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CDerivativePreview,CStatic)
++    ON_WM_PAINT()
++END_MESSAGE_MAP()
++class CSymbolicDerivativeDialog : public CDialog
++{
++public:
++    SymbolicDerivative::Result result;CDerivativePreview preview;bool ready,initializing,includeOriginal;std::string xml;
++    CSymbolicDerivativeDialog():CDialog(IDD_SYMBOLIC_DERIVATIVE,theApp.m_pMainWnd),ready(false),initializing(true),includeOriginal(true){}
++    CString Text(int id){CString s;GetDlgItemText(id,s);s.TrimLeft();s.TrimRight();return s;}
++    void InvalidateResult(){ready=false;GetDlgItem(IDOK)->EnableWindow(FALSE);SetDlgItemText(1305,"");SetDlgItemText(1314,"");preview.Set("");::SetDlgItemTextW(m_hWnd,1309,L"Press Find derivative after changing the formula, variable, or order.");}
++    void ShowPreview(){includeOriginal=IsDlgButtonChecked(1306)==BST_CHECKED;xml=includeOriginal?SymbolicDerivative::Equation(result):"<ex fh=\"100\">"+SymbolicDerivative::Xml(result.derivative)+"</ex>";preview.Set(xml);}
++    bool Find(){std::string error;int order=((CComboBox*)GetDlgItem(1302))->GetCurSel()+1;
++        if(!result.Find((LPCSTR)Text(1300),(LPCSTR)Text(1301),order,error)){InvalidateResult();SetDlgItemText(1309,error.c_str());return false;}
++        ready=true;GetDlgItem(IDOK)->EnableWindow(TRUE);SetDlgItemText(1305,SymbolicDerivative::Text(result.derivative).c_str());ShowPreview();
++        std::string explanation="Rules used:\r\n";for(std::set<std::string>::const_iterator i=result.rules.begin();i!=result.rules.end();++i)explanation+=*i+"\r\n";
++        explanation+="\r\nDomain and interpretation:\r\n";for(std::set<std::string>::const_iterator i=result.notes.begin();i!=result.notes.end();++i)explanation+=*i+"\r\n";
++        SetDlgItemText(1314,explanation.c_str());Evaluate();return true;
++    }
++    void Evaluate(){if(!ready)return;std::string error;double x,value;SymbolicDerivative::Parser p;
++        try{SymbolicDerivative::Expr e=p.Parse((LPCSTR)Text(1307));x=SymbolicDerivative::Value(e,"",0);if(!SymbolicDerivative::Finite(x))throw std::runtime_error("Enter a finite constant, such as 1, 1/2, or pi/3.");}
++        catch(const std::exception &e){SetDlgItemText(1309,e.what());return;}
++        if(!result.At(x,value,error)){SetDlgItemText(1309,error.c_str());return;}
++        std::wstring notation=L"Derivative order "+MathDisplay::Number(result.order)+L" at "+std::wstring(result.variable.begin(),result.variable.end())+L" = "+MathDisplay::Number(x)+L": "+MathDisplay::Number(value);
++        ::SetDlgItemTextW(m_hWnd,1309,notation.c_str());
++    }
++    virtual BOOL OnInitDialog(){CDialog::OnInitDialog();CreateUnicodeReadout(this,1309);preview.SubclassDlgItem(1304,this);((CEdit*)GetDlgItem(1300))->LimitText(512);((CEdit*)GetDlgItem(1301))->LimitText(1);
++        SetDlgItemText(1300,"x^3+2x");SetDlgItemText(1301,"x");SetDlgItemText(1307,"1");CComboBox *order=(CComboBox*)GetDlgItem(1302);const char *orders[]={"First derivative","Second derivative","Third derivative","Fourth derivative","Fifth derivative"};for(int i=0;i<5;i++)order->AddString(orders[i]);order->SetCurSel(0);CheckDlgButton(1306,BST_CHECKED);initializing=false;Find();return TRUE;}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);
++        if(initializing)return CDialog::OnCommand(wp,lp);
++        if(id==1303){Find();return TRUE;}if(id==1308){if(ready)Evaluate();else Find();return TRUE;}
++        if(id==1306){if(ready)ShowPreview();return TRUE;}
++        if(id>=1310&&id<=1313){const char *samples[]={"x^3+2x","sin(3x)+ln(x^2+1)","(x^2+1)/(x+1)","x^x"};SetDlgItemText(1300,samples[id-1310]);SetDlgItemText(1301,"x");((CComboBox*)GetDlgItem(1302))->SetCurSel(0);Find();return TRUE;}
++        if(((id==1300||id==1301)&&notification==EN_CHANGE)||(id==1302&&notification==CBN_SELCHANGE)){InvalidateResult();return TRUE;}
++        if(id==1307&&notification==EN_CHANGE){::SetDlgItemTextW(m_hWnd,1309,L"Press Evaluate to check the new point.");return TRUE;}
++        return CDialog::OnCommand(wp,lp);
++    }
++    virtual void OnOK(){if(!ready && !Find())return;ShowPreview();CDialog::OnOK();}
++};
++void CMathomirView::OnSymbolicDerivative()
++{
++    if(ViewOnlyMode)return;OnChar(27,1,0);CSymbolicDerivativeDialog dialog;if(dialog.DoModal()!=IDOK)return;
++    RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
++    ClipboardExpression=new CExpression(NULL,NULL,100);std::vector<char> data(dialog.xml.begin(),dialog.xml.end());data.push_back(0);ClipboardExpression->XML_input(&data[0]);
++    IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
 +}
 +
 +class CUnitCircleDialog:public CDialog
@@ -7266,7 +7595,7 @@ index fc832eb..7ab0378 100644
 +    MouseMode=0;SetFocus();RepaintTheView();
 +}
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..f0dbbba 100644
+index 94dd0e4..211c326 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -44,6 +44,11 @@ protected:
@@ -7289,7 +7618,7 @@ index 94dd0e4..f0dbbba 100644
  	int PopupCloses(int UserParam, int ExitCode);
  	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
  	afx_msg void OnSelectionsFrame();
-@@ -119,6 +125,50 @@ public:
+@@ -119,6 +125,57 @@ public:
  	afx_msg void OnOutputimageSize80();
  	afx_msg void OnOutputimageForcehighquality();
  	afx_msg void OnOutputimageForcehalftone();
@@ -7300,6 +7629,13 @@ index 94dd0e4..f0dbbba 100644
 +    void OnBackgroundColor(UINT command);
 +    void OnFineHatching(UINT command);
 +    void OnPiecewiseGraph();
++    void OnSymbolicDerivative();
++    void OnExecuteExpression();
++    void OnApproximateExpression();
++    void ExecuteExpression(bool approximate);
++    void OnFreehandSmoothing(UINT command);
++    void OnUpdateFreehandSmoothing(CCmdUI *ui);
++    void OnSmoothSelected();
 +    void OnPolygonConstructor();
 +    void OnGeometryShape(UINT command);
 +    void OnUnitCircle();
@@ -7340,6 +7676,67 @@ index 94dd0e4..f0dbbba 100644
  	afx_msg void OnFontsizeVerylarge();
  	afx_msg void OnFontsizeLarge();
  	afx_msg void OnFontsizeNormal();
+diff --git a/Mathomir/NativeSymbolic.h b/Mathomir/NativeSymbolic.h
+new file mode 100644
+index 0000000..2eb13b8
+--- /dev/null
++++ b/Mathomir/NativeSymbolic.h
+@@ -0,0 +1,55 @@
++#pragma once
++#include "SymbolicDerivative.h"
++#include "Expression.h"
++
++namespace NativeSymbolic {
++inline bool Empty(CExpression *e){if(!e)return true;for(int i=0;i<e->m_NumElements;i++)if(e->m_pElementList[i].Type>0)return false;return true;}
++inline std::string Formula(CExpression *e,int start=0,int end=-1,int depth=0){
++    if(!e||depth>40)throw std::runtime_error("The expression is too deeply nested.");if(end<0)end=e->m_NumElements;
++    std::string result;bool previous=false;
++    for(int i=start;i<end;i++){
++        tElementStruct *ts=e->m_pElementList+i;if(ts->Type==0)continue;CElement *element=ts->pElementObject;if(!element)throw std::runtime_error("Incomplete expression.");
++        CExpression *a=(CExpression*)element->Expression1,*b=(CExpression*)element->Expression2;std::string term;bool operand=true;
++        if(ts->Type==1){if(a||b)throw std::runtime_error("Use plain-letter variables without subscripts in the derivative finder.");term=element->Data1;if((element->Data2[0]&0xE0)==0x60){if(term=="p")term="pi";else throw std::runtime_error("Use plain-letter variables in the derivative finder.");}}
++        else if(ts->Type==2){char op=element->Data1[0];if(op==(char)0xD7)op='*';if(op!='+'&&op!='-'&&op!='*'&&op!='/')throw std::runtime_error("This operator is not supported by direct execution.");term=std::string(1,op);operand=false;}
++        else if(ts->Type==3||ts->Type==4)term="("+Formula(a,0,-1,depth+1)+")"+(ts->Type==3?"^":"/")+"("+Formula(b,0,-1,depth+1)+")";
++        else if(ts->Type==5){char shape=a?a->m_ParentheseShape:0;std::string name=shape=='|'?"abs":shape=='f'?"floor":shape=='c'?"ceil":"";term=name+"("+Formula(a,0,-1,depth+1)+")";}
++        else if(ts->Type==6){std::string name=element->Data1;if(name=="tg")name="tan";if(name=="arctg")name="atan";if(name=="sh")name="sinh";if(name=="ch")name="cosh";if(name=="th")name="tanh";
++            if(name=="log"&&!Empty(b))term="(ln("+Formula(a,0,-1,depth+1)+")/ln("+Formula(b,0,-1,depth+1)+"))";
++            else{if(!SymbolicDerivative::Known(name)&&name!="arcsin"&&name!="arccos"&&name!="arctan")throw std::runtime_error("Unsupported function: "+name+". Use the derivative finder for supported formulas.");term=name+"("+Formula(a,0,-1,depth+1)+")";if(!Empty(b))term="("+term+")^("+Formula(b,0,-1,depth+1)+")";}
++        }
++        else if(ts->Type==8)term=Empty(b)?"sqrt("+Formula(a,0,-1,depth+1)+")":"("+Formula(a,0,-1,depth+1)+")^(1/("+Formula(b,0,-1,depth+1)+"))";
++        else throw std::runtime_error("This expression type is not supported by direct execution.");
++        if(operand&&previous)result+="*";result+=term;previous=operand;if(result.size()>8192)throw std::runtime_error("The expression is too large.");
++    }if(result.empty())throw std::runtime_error("Fill in the expression before executing it.");return result;
++}
++inline bool Differentiate(CExpression *input,CExpression *variable,SymbolicDerivative::Result &r,std::string &error,int order=1){try{return r.Find(Formula(input),Formula(variable),order,error);}catch(const std::exception &e){error=e.what();return false;}}
++inline bool ReadDerivative(CExpression *input,SymbolicDerivative::Result &r,std::string &error){
++    try{
++        int position=0;while(position<input->m_NumElements&&input->m_pElementList[position].Type==0)position++;
++        if(position>=input->m_NumElements||input->m_pElementList[position].Type!=4)return false;
++        CElement *fraction=input->m_pElementList[position].pElementObject;CExpression *top=(CExpression*)fraction->Expression1,*bottom=(CExpression*)fraction->Expression2;
++        if(!top||!bottom||top->m_NumElements<1||bottom->m_NumElements<1)return false;
++        CElement *numerator=top->m_pElementList[0].pElementObject,*denominator=bottom->m_pElementList[0].pElementObject;if(!numerator||!denominator)return false;
++        bool nd=(top->m_pElementList[0].Type==6&&numerator->IsDifferential(1))||(top->m_NumElements==1&&top->m_pElementList[0].Type==1&&strcmp(numerator->Data1,"d")==0);
++        bool dd=(bottom->m_pElementList[0].Type==6&&denominator->IsDifferential(1))||(bottom->m_pElementList[0].Type==1&&strcmp(denominator->Data1,"d")==0);
++        if(!nd||!dd)return false;
++        CExpression *argument=top->m_pElementList[0].Type==6?(CExpression*)numerator->Expression1:NULL;
++        CExpression *variable=bottom->m_pElementList[0].Type==6?(CExpression*)denominator->Expression1:NULL;
++        int order=1;CExpression *power=(CExpression*)numerator->Expression2;
++        if(!Empty(power)){double number;int precision;if(!power->IsPureNumber(0,power->m_NumElements,&number,&precision)||number<1||number>5||number!=floor(number))throw std::runtime_error("Choose derivative order 1 through 5.");order=(int)number;}
++        std::string name;
++        if(variable && variable->m_NumElements==1 && variable->m_pElementList[0].Type==3){CElement *p=variable->m_pElementList[0].pElementObject;name=Formula((CExpression*)p->Expression1);}else if(variable)name=Formula(variable);else name=Formula(bottom,1);
++        if(Empty(argument)){
++            CExpression *combined=variable?variable:bottom;int first=variable?0:1;
++            if(combined && combined->m_NumElements>first+1 && combined->m_pElementList[first].Type==1){
++                CElement *letter=combined->m_pElementList[first].pElementObject;
++                if(letter && strlen(letter->Data1)==1)return r.Find(Formula(combined,first+1),letter->Data1,order,error);
++            }
++        }
++        if(!Empty(argument))return r.Find(Formula(argument),name,order,error);
++        // d/dx followed by a parenthesized function is the common typed operator.
++        return r.Find(Formula(input,position+1),name,order,error);
++    }catch(const std::exception &e){error=e.what();return false;}
++}
++}
 diff --git a/Mathomir/PiAxis.h b/Mathomir/PiAxis.h
 new file mode 100644
 index 0000000..3bd012b
@@ -7637,10 +8034,10 @@ index 7166815..1a552c8 100644
  					dc->FillSolidRect(Options[i].X+TSize/8+1-lrg,Options[i].Y+1+TSize_1p20-lrg,TSize/8+2*lrg,TSize/8+2*lrg,clr);
  					if (Options[i].IsChecked&0x01) 
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..51859c6 100644
+index 05446cf..cd3301f 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,121 @@
+@@ -174,3 +174,130 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -7762,6 +8159,15 @@ index 05446cf..51859c6 100644
 +
 +#define ID_POLYGON_CONSTRUCTOR 33088
 +#define IDD_POLYGON_CONSTRUCTOR 185
++#define ID_SYMBOLIC_DERIVATIVE 33089
++#define IDD_SYMBOLIC_DERIVATIVE 186
++#define ID_SMOOTH_OFF 33090
++#define ID_SMOOTH_LIGHT 33091
++#define ID_SMOOTH_STANDARD 33092
++#define ID_SMOOTH_STRONG 33093
++#define ID_SMOOTH_SELECTED 33094
++#define ID_EXECUTE_EXPRESSION 33095
++#define ID_APPROXIMATE_EXPRESSION 33096
 diff --git a/Mathomir/ScalarFunctions.h b/Mathomir/ScalarFunctions.h
 new file mode 100644
 index 0000000..f6c90d6
@@ -7904,8 +8310,244 @@ index 0000000..e7d2db1
 +    }
 +};
 +}
+diff --git a/Mathomir/SmartStroke.h b/Mathomir/SmartStroke.h
+new file mode 100644
+index 0000000..bebbe21
+--- /dev/null
++++ b/Mathomir/SmartStroke.h
+@@ -0,0 +1,53 @@
++#pragma once
++#include <vector>
++#include <cmath>
++#include <algorithm>
++#include <utility>
++
++namespace SmartStroke {
++struct Point {double x,y;Point(double a=0,double b=0):x(a),y(b){}};
++inline double Distance(Point a,Point b){return std::sqrt((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y));}
++inline Point Mix(Point a,Point b,double t){return Point(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t);}
++inline double SegmentDistance(Point p,Point a,Point b){double dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;if(l==0)return Distance(p,a);double t=((p.x-a.x)*dx+(p.y-a.y)*dy)/l;t=t<0?0:t>1?1:t;return Distance(p,Mix(a,b,t));}
++inline std::vector<Point> Reduce(const std::vector<Point> &p,double tolerance){
++    if(p.size()<3)return p;std::vector<char> keep(p.size(),0);keep[0]=keep[p.size()-1]=1;
++    std::vector<std::pair<size_t,size_t> > work;work.push_back(std::make_pair(0,p.size()-1));
++    while(!work.empty()){size_t a=work.back().first,b=work.back().second;work.pop_back();double greatest=tolerance;size_t index=a;
++        for(size_t i=a+1;i<b;i++){double d=SegmentDistance(p[i],p[a],p[b]);if(d>greatest){greatest=d;index=i;}}
++        if(index!=a){keep[index]=1;work.push_back(std::make_pair(a,index));work.push_back(std::make_pair(index,b));}
++    }
++    std::vector<Point> out;for(size_t i=0;i<p.size();i++)if(keep[i])out.push_back(p[i]);return out;
++}
++// Work in screen pixels. Arc-length sampling avoids depending on mouse-event
++// frequency. Hard turns split the filter, while each move has a strict bound.
++inline std::vector<Point> Smooth(const std::vector<Point> &input,int strength){
++    if(strength<=0||input.size()<3||input.size()>12000)return input;
++    std::vector<Point> p;for(size_t i=0;i<input.size();i++)if(p.empty()||Distance(p.back(),input[i])>.001)p.push_back(input[i]);
++    if(p.size()<3)return input;std::vector<double> arc(p.size(),0);for(size_t i=1;i<p.size();i++)arc[i]=arc[i-1]+Distance(p[i-1],p[i]);
++    if(arc.back()<4||arc.back()>20000)return input;
++    std::vector<double> turn(p.size(),1);const double look=8;
++    for(size_t i=1;i+1<p.size();i++){size_t l=i-1,r=i+1;while(l>0&&arc[i]-arc[l]<look)l--;while(r+1<p.size()&&arc[r]-arc[i]<look)r++;
++        double ax=p[i].x-p[l].x,ay=p[i].y-p[l].y,bx=p[r].x-p[i].x,by=p[r].y-p[i].y;
++        double lengths=std::sqrt((ax*ax+ay*ay)*(bx*bx+by*by));if(lengths>1)turn[i]=(ax*bx+ay*by)/lengths;
++    }
++    std::vector<size_t> pins;pins.push_back(0);
++    for(size_t i=1;i+1<p.size();i++)if(turn[i]<.35){bool peak=true;for(size_t j=i;j>0&&arc[i]-arc[j-1]<5;j--)if(turn[j-1]<turn[i])peak=false;for(size_t j=i+1;j<p.size()&&arc[j]-arc[i]<5;j++)if(turn[j]<=turn[i])peak=false;if(peak)pins.push_back(i);}
++    pins.push_back(p.size()-1);std::vector<Point> output;
++    double bound=strength==1?.8:strength==2?1.6:2.5;int radius=strength==1?2:strength==2?3:4;
++    for(size_t part=1;part<pins.size();part++){
++        size_t first=pins[part-1],last=pins[part];double length=arc[last]-arc[first];int count=(int)std::ceil(length/1.5);if(count<1)count=1;
++        if(count>6000)return input;std::vector<Point> anchor;size_t cursor=first;
++        for(int n=0;n<=count;n++){double target=arc[first]+length*n/count;while(cursor+1<last&&arc[cursor+1]<target)cursor++;double segment=arc[cursor+1]-arc[cursor];anchor.push_back(Mix(p[cursor],p[cursor+1],segment>0?(target-arc[cursor])/segment:0));}
++        anchor.front()=p[first];anchor.back()=p[last];std::vector<Point> current=anchor;
++        for(int pass=0;pass<3;pass++){std::vector<Point> next=current;
++            for(size_t i=1;i+1<current.size();i++){Point average;double weight=0;
++                for(int offset=-radius;offset<=radius;offset++){int at=(int)i+offset;if(at<0||at>=(int)current.size())continue;double w=radius+1-std::abs(offset);average.x+=current[at].x*w;average.y+=current[at].y*w;weight+=w;}
++                average.x/=weight;average.y/=weight;double d=Distance(average,anchor[i]);if(d>bound)average=Mix(anchor[i],average,bound/d);next[i]=average;
++            }current.swap(next);
++        }
++        current=Reduce(current,.12);if(!output.empty())current.erase(current.begin());output.insert(output.end(),current.begin(),current.end());
++        if(output.size()>12000)return input;
++    }
++    output.front()=input.front();output.back()=input.back();return output;
++}
++}
+diff --git a/Mathomir/SymbolicDerivative.h b/Mathomir/SymbolicDerivative.h
+new file mode 100644
+index 0000000..1cc31a5
+--- /dev/null
++++ b/Mathomir/SymbolicDerivative.h
+@@ -0,0 +1,171 @@
++#pragma once
++#include <string>
++#include <vector>
++#include <set>
++#include <memory>
++#include <cmath>
++#include <cstdlib>
++#include <cstdio>
++#include <cctype>
++#include <limits>
++#include <stdexcept>
++
++// A bounded, real-valued expression tree. Symbolic work is independent of the
++// numeric graph sampler and never estimates a derivative by finite differences.
++namespace SymbolicDerivative {
++struct Node;
++typedef std::shared_ptr<Node> Expr;
++struct Node { char op; double number; std::string name; Expr a,b;
++    Node(char o,double n=0,Expr l=Expr(),Expr r=Expr()):op(o),number(n),a(l),b(r){} };
++inline bool Finite(double n){return n==n && std::fabs(n)<std::numeric_limits<double>::infinity();}
++inline double NaN(){return std::numeric_limits<double>::quiet_NaN();}
++inline std::string Number(double n){char b[64];std::sprintf(b,"%.15g",n);return b;}
++inline Expr N(double n){return Expr(new Node('n',n));}
++inline Expr Name(const std::string &s){Expr n(new Node('v'));n->name=s;return n;}
++inline Expr F(const std::string &s,Expr a){Expr n(new Node('f',0,a));n->name=s;return n;}
++inline bool Is(Expr n,double x){return n && n->op=='n' && n->number==x;}
++inline bool Same(Expr a,Expr b){if(a==b)return true;if(!a||!b||a->op!=b->op||a->number!=b->number||a->name!=b->name)return false;return Same(a->a,b->a)&&Same(a->b,b->b);}
++inline Expr Make(char op,Expr a,Expr b=Expr()){
++    if(op=='~'){if(Is(a,0))return a;if(a->op=='n')return N(-a->number);if(a->op=='~')return a->a;return Expr(new Node(op,0,a));}
++    if(a->op=='n' && b && b->op=='n'){
++        double x=a->number,y=b->number,z=NaN();
++        if(op=='+')z=x+y;if(op=='-')z=x-y;if(op=='*')z=x*y;
++        // Keep non-integral rational constants exact in displayed mathematics.
++        if(op=='/' && y!=0 && std::floor(x/y)==x/y)z=x/y;
++        if(op=='^')z=std::pow(x,y);if(Finite(z))return N(z);
++    }
++    if(op=='+'){if(Is(a,0))return b;if(Is(b,0))return a;if(Same(a,b))return Make('*',N(2),a);if(b->op=='~')return Make('-',a,b->a);}
++    if(op=='-'){if(Is(b,0))return a;if(Is(a,0))return Make('~',b);if(Same(a,b))return N(0);if(b->op=='~')return Make('+',a,b->a);}
++    if(op=='*'){
++        if(Is(a,0)||Is(b,0))return N(0);if(Is(a,1))return b;if(Is(b,1))return a;
++        if(Is(a,-1))return Make('~',b);if(Is(b,-1))return Make('~',a);
++        if(a->op=='~')return Make('~',Make('*',a->a,b));if(b->op=='~')return Make('~',Make('*',a,b->a));
++        if(b->op=='n' && a->op!='n')return Make('*',b,a);
++        if(a->op=='n' && b->op=='*' && b->a->op=='n')return Make('*',N(a->number*b->a->number),b->b);
++        if(Same(a,b))return Make('^',a,N(2));
++    }
++    if(op=='/'){if(Is(b,1))return a;if(Is(a,0)&&!Is(b,0))return N(0);}
++    if(op=='^'){if(Is(b,0))return N(1);if(Is(b,1))return a;if(Is(a,1))return N(1);}
++    return Expr(new Node(op,0,a,b));
++}
++inline Expr Raw(char op,Expr a,Expr b=Expr()){return Expr(new Node(op,0,a,b));}
++inline Expr Simplify(Expr a){if(!a || a->op=='n'||a->op=='v')return a;if(a->op=='f')return F(a->name,Simplify(a->a));return Make(a->op,Simplify(a->a),Simplify(a->b));}
++inline bool Known(const std::string &s){return s=="sin"||s=="cos"||s=="tan"||s=="cot"||s=="sec"||s=="csc"||s=="asin"||s=="acos"||s=="atan"||s=="sinh"||s=="cosh"||s=="tanh"||s=="ln"||s=="log"||s=="exp"||s=="sqrt"||s=="cbrt"||s=="abs"||s=="floor"||s=="ceil"||s=="round"||s=="trunc"||s=="sgn"||s=="fract"||s=="sinc";}
++class Parser {
++    std::string text;size_t pos;int depth,count;
++    void Space(){while(pos<text.size()&&std::isspace((unsigned char)text[pos]))pos++;}
++    bool Take(char c){Space();if(pos<text.size()&&text[pos]==c){pos++;return true;}return false;}
++    Expr Sum(){Expr a=Product();while(true){if(Take('+'))a=Raw('+',a,Product());else if(Take('-'))a=Raw('-',a,Product());else return a;}}
++    Expr Product(){Expr a=Unary();while(true){if(Take('*'))a=Raw('*',a,Unary());else if(Take('/'))a=Raw('/',a,Unary());else{Space();if(pos<text.size()&&(text[pos]=='('||std::isalpha((unsigned char)text[pos])))a=Raw('*',a,Unary());else return a;}}}
++    Expr Unary(){if(++depth>40)throw std::runtime_error("Too many nested operations.");Expr a;if(Take('+'))a=Unary();else if(Take('-'))a=Raw('~',Unary());else a=Power();depth--;return a;}
++    Expr Power(){Expr a=Atom();if(Take('^'))a=Raw('^',a,Unary());return a;}
++    Expr Atom(){
++        if(++count>300)throw std::runtime_error("The formula is too complex. Split it into smaller expressions.");
++        Space();if(Take('(')){Expr a=Sum();if(!Take(')'))throw std::runtime_error("Missing closing parenthesis.");return a;}
++        if(pos>=text.size())throw std::runtime_error("Expected a number, variable, or function.");
++        if(std::isdigit((unsigned char)text[pos])||text[pos]=='.'){char *end=NULL;double n=std::strtod(text.c_str()+pos,&end);if(end==text.c_str()+pos||!Finite(n))throw std::runtime_error("Invalid or oversized number.");pos=(size_t)(end-text.c_str());return N(n);}
++        size_t start=pos;while(pos<text.size()&&std::isalpha((unsigned char)text[pos]))pos++;
++        if(start==pos)throw std::runtime_error("Unexpected character at position "+Number((double)pos+1)+".");
++        std::string s=text.substr(start,pos-start);
++        if(s=="arcsin")s="asin";if(s=="arccos")s="acos";if(s=="arctan")s="atan";if(s=="ceiling")s="ceil";if(s=="sign")s="sgn";
++        if(Known(s)){if(!Take('('))throw std::runtime_error("Functions need parentheses, for example sin(x).");Expr a=Sum();if(!Take(')'))throw std::runtime_error("Missing function closing parenthesis.");return F(s,a);}
++        if(s.size()>1 && s!="pi")throw std::runtime_error("Use single-letter parameters, or a supported function. Write x*y explicitly.");
++        return Name(s);
++    }
++public:
++    Expr Parse(const std::string &s){if(s.empty()||s.size()>512)throw std::runtime_error("Enter a formula of at most 512 characters.");text=s;pos=0;depth=count=0;Expr a=Sum();Space();if(pos!=text.size())throw std::runtime_error("Unexpected character at position "+Number((double)pos+1)+".");return a;}
++};
++inline bool Depends(Expr a,const std::string &variable){return a&&(a->op=='v'?a->name==variable:Depends(a->a,variable)||Depends(a->b,variable));}
++inline double Value(Expr a,const std::string &variable,double x,bool radians=true){
++    if(!a)return NaN();if(a->op=='n')return a->number;if(a->op=='v'){if(a->name==variable)return x;if(a->name=="pi")return 3.14159265358979323846;if(a->name=="e")return 2.71828182845904523536;return NaN();}
++    double u=Value(a->a,variable,x,radians),v=a->b?Value(a->b,variable,x,radians):0;if(!Finite(u)||(a->b&&!Finite(v)))return NaN();
++    if(a->op=='+')return u+v;if(a->op=='-')return u-v;if(a->op=='*')return u*v;if(a->op=='/')return v==0?NaN():u/v;if(a->op=='~')return -u;if(a->op=='^')return u==0&&v==0?NaN():std::pow(u,v);
++    const std::string &s=a->name;double inverseFactor=radians?1:180./3.14159265358979323846;
++    if(!radians&&(s=="sin"||s=="cos"||s=="tan"||s=="cot"||s=="sec"||s=="csc"))u*=3.14159265358979323846/180.;
++    if(s=="sin")return std::sin(u);if(s=="cos")return std::cos(u);if(s=="tan")return std::fabs(std::cos(u))<1e-14?NaN():std::tan(u);
++    if(s=="cot")return std::fabs(std::sin(u))<1e-14?NaN():1/std::tan(u);if(s=="sec")return std::fabs(std::cos(u))<1e-14?NaN():1/std::cos(u);if(s=="csc")return std::fabs(std::sin(u))<1e-14?NaN():1/std::sin(u);
++    if(s=="asin")return std::asin(u)*inverseFactor;if(s=="acos")return std::acos(u)*inverseFactor;if(s=="atan")return std::atan(u)*inverseFactor;
++    if(s=="sinh")return std::sinh(u);if(s=="cosh")return std::cosh(u);if(s=="tanh")return std::tanh(u);
++    if(s=="ln")return std::log(u);if(s=="log")return std::log10(u);if(s=="exp")return std::exp(u);if(s=="sqrt")return std::sqrt(u);if(s=="cbrt")return u<0?-std::pow(-u,1./3):std::pow(u,1./3);if(s=="abs")return std::fabs(u);
++    if(s=="floor")return std::floor(u);if(s=="ceil")return std::ceil(u);if(s=="trunc")return u<0?std::ceil(u):std::floor(u);if(s=="round")return u<0?std::ceil(u-.5):std::floor(u+.5);if(s=="fract")return u-std::floor(u);if(s=="sgn")return u>0?1:u<0?-1:0;
++    if(s=="sinc")return u==0?1:std::sin(u)/u;return NaN();
++}
++inline int Size(Expr a){if(!a)return 0;return 1+Size(a->a)+Size(a->b);}
++struct Guard {Expr expression;std::string kind;Guard(Expr e,const std::string &k):expression(e),kind(k){}};
++struct Result {
++    Expr original,derivative;std::string variable;int order;std::set<std::string> rules,notes;std::vector<Guard> guards;
++    int visits;
++    Result():order(1),visits(0){}
++    void Rule(const std::string &s){rules.insert(s);}
++    Expr Differentiate(Expr a){
++        if(++visits>12000)throw std::runtime_error("The derivative is too large. Try a lower order or a shorter formula.");
++        if(!Depends(a,variable)){Rule("Constant rule: constants and other variables have derivative 0.");return N(0);}
++        if(a->op=='v')return N(1);
++        Expr u=a->a,v=a->b;
++        if(a->op=='~')return Make('~',Differentiate(u));
++        if(a->op=='+'||a->op=='-'){Rule("Sum rule: differentiate each term, retaining its sign.");return Make(a->op,Differentiate(u),Differentiate(v));}
++        if(a->op=='*'){Rule("Product rule: (uv)' = u'v + uv'.");return Make('+',Make('*',Differentiate(u),v),Make('*',u,Differentiate(v)));}
++        if(a->op=='/'){Rule("Quotient rule: (u/v)' = (u'v - uv')/v^2.");return Make('/',Make('-',Make('*',Differentiate(u),v),Make('*',u,Differentiate(v))),Make('^',v,N(2)));}
++        if(a->op=='^'){
++            if(!Depends(v,variable)){Rule("Power and chain rules: (u^n)' = n*u^(n-1)*u'.");return Make('*',Make('*',v,Make('^',u,Make('-',v,N(1)))),Differentiate(u));}
++            if(!Depends(u,variable)){Rule("Exponential rule: (a^u)' = a^u*ln(a)*u'.");notes.insert("Variable exponents use the real logarithm: the base must be positive.");guards.push_back(Guard(u,"positive"));Expr log= u->op=='v'&&u->name=="e"?N(1):F("ln",u);return Make('*',Make('*',a,log),Differentiate(v));}
++            Rule("General power rule: (u^v)' = u^v*(v'*ln(u) + v*u'/u).");notes.insert("Variable exponents use the real logarithm: the base must be positive.");guards.push_back(Guard(u,"positive"));return Make('*',a,Make('+',Make('*',Differentiate(v),F("ln",u)),Make('/',Make('*',v,Differentiate(u)),u)));
++        }
++        if(a->op!='f')throw std::runtime_error("Unsupported expression.");
++        Rule("Chain rule: multiply the outer derivative by the derivative of its argument.");Expr inner=Differentiate(u),outer;const std::string &s=a->name;
++        if(s=="sin")outer=F("cos",u);else if(s=="cos")outer=Make('~',F("sin",u));
++        else if(s=="tan")outer=Make('/',N(1),Make('^',F("cos",u),N(2)));
++        else if(s=="cot")outer=Make('~',Make('/',N(1),Make('^',F("sin",u),N(2))));
++        else if(s=="sec")outer=Make('*',F("sec",u),F("tan",u));else if(s=="csc")outer=Make('~',Make('*',F("csc",u),F("cot",u)));
++        else if(s=="asin"||s=="acos"){outer=Make('/',N(1),F("sqrt",Make('-',N(1),Make('^',u,N(2)))));if(s=="acos")outer=Make('~',outer);}
++        else if(s=="atan")outer=Make('/',N(1),Make('+',N(1),Make('^',u,N(2))));
++        else if(s=="sinh")outer=F("cosh",u);else if(s=="cosh")outer=F("sinh",u);else if(s=="tanh")outer=Make('/',N(1),Make('^',F("cosh",u),N(2)));
++        else if(s=="ln")outer=Make('/',N(1),u);else if(s=="log")outer=Make('/',N(1),Make('*',u,F("ln",N(10))));
++        else if(s=="exp")outer=a;else if(s=="sqrt")outer=Make('/',N(1),Make('*',N(2),a));
++        else if(s=="cbrt")outer=Make('/',N(1),Make('*',N(3),Make('^',a,N(2))));
++        else if(s=="abs"){outer=Make('/',u,a);guards.push_back(Guard(u,"zero"));notes.insert("Absolute-value formula applies when its argument is nonzero. Check zero arguments separately for corners or removable cases.");}
++        else if(s=="sinc"){outer=Make('/',Make('-',Make('*',u,F("cos",u)),F("sin",u)),Make('^',u,N(2)));guards.push_back(Guard(u,"zero"));notes.insert("The displayed sinc formula excludes a zero argument. sinc itself is smooth there; a separate limit gives its first outer derivative as 0.");}
++        else {outer=N(s=="fract"?1:0);guards.push_back(Guard(u,s));notes.insert("Step-function formulas apply between thresholds. Integer/half-integer thresholds and sign changes need a separate local boundary check.");}
++        return Make('*',outer,inner);
++    }
++    bool Find(const std::string &input,const std::string &var,int n,std::string &error){
++        try{if(var.size()!=1||!std::isalpha((unsigned char)var[0])||var=="e")throw std::runtime_error("Choose one letter as the variable, other than the constant e.");if(n<1||n>5)throw std::runtime_error("Choose derivative order 1 through 5.");
++            variable=var;order=n;rules.clear();notes.clear();guards.clear();visits=0;Parser p;original=p.Parse(input);derivative=Simplify(original);
++            for(int i=0;i<n;i++){derivative=Differentiate(derivative);if(Size(derivative)>3000)throw std::runtime_error("The derivative is too large. Try a lower order or a shorter formula.");}
++            notes.insert("Trigonometric derivatives use radians. The original domain restrictions remain in force, even after simplification.");return true;
++        }catch(const std::exception &e){error=e.what();original.reset();derivative.reset();return false;}
++    }
++    bool At(double x,double &answer,std::string &error)const{
++        if(!Finite(Value(original,variable,x))){error="The original formula is undefined here, or a parameter needs a value.";return false;}
++        for(size_t i=0;i<guards.size();i++){
++            double u=Value(guards[i].expression,variable,x);const std::string &s=guards[i].kind;
++            if(!Finite(u)){error="A parameter needs a value.";return false;}
++            if(s=="positive"&&u<=0){error="This real power rule requires a positive base.";return false;}
++            bool boundary=(s=="zero"||s=="sgn")?u==0:s=="round"?std::fabs(u-std::floor(u)-.5)<1e-12:(s=="trunc"?u!=0&&u==std::floor(u):(s=="floor"||s=="ceil"||s=="fract")&&u==std::floor(u));
++            if(boundary){error="The formula needs a separate boundary/limit check at this point.";return false;}
++        }
++        answer=Value(derivative,variable,x);if(!Finite(answer)){error="The derivative formula is undefined here; check the domain or a limiting case.";return false;}return true;
++    }
++};
++inline int Precedence(Expr a){return a->op=='+'||a->op=='-'?1:a->op=='*'||a->op=='/'?2:a->op=='~'?3:a->op=='^'?4:5;}
++inline std::string Text(Expr a,int parent=0){
++    std::string s;if(a->op=='n')s=Number(a->number);else if(a->op=='v')s=a->name;else if(a->op=='f')s=a->name+"("+Text(a->a)+")";else if(a->op=='~')s="-"+Text(a->a,3);else{int level=Precedence(a);s=Text(a->a,a->op=='^'?level+1:level)+std::string(1,a->op)+Text(a->b,a->op=='-'||a->op=='/'?level+1:level);}
++    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="("+s+")";return s;
++}
++inline std::string Xml(Expr a,int parent=0){
++    std::string s;if(a->op=='n'){s=(a->number<0?"<opr s=\"-\" />":"")+std::string("<var t=\"")+Number(std::fabs(a->number))+"\" f=\"00\" />";}
++    else if(a->op=='v')s=a->name=="pi"?"<var t=\"p\" f=\"60\" />":"<var t=\""+a->name+"\" f=\"00\" />";
++    else if(a->op=='~')s="<opr s=\"-\" />"+Xml(a->a,3);
++    else if(a->op=='/'||a->op=='^'){std::string tag=a->op=='/'?"fra":"elm tp=\"3\"",close=a->op=='/'?"fra":"elm";s="<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(a->a,a->op=='^'?5:0)+"</ex><ex>"+Xml(a->b)+"</ex></"+close+">";}
++    else if(a->op=='f'){
++        if(a->name=="sqrt")s="<elm tp=\"8\" E1=\"\"><ex>"+Xml(a->a)+"</ex></elm>";
++        else if(a->name=="abs"||a->name=="floor"||a->name=="ceil")s="<elm tp=\"5\" E1=\"\"><ex br=\"1\" shp=\""+(a->name=="abs"?std::string("|"):a->name=="floor"?std::string("f"):std::string("c"))+"\">"+Xml(a->a)+"</ex></elm>";
++        else {std::string name=a->name=="asin"?"arcsin":a->name=="acos"?"arccos":a->name=="atan"?"arctan":a->name;s="<fun t=\""+name+"\" f=\"20\" E1=\"\"><ex br=\"1\">"+Xml(a->a)+"</ex></fun>";}
++    }else s=Xml(a->a,Precedence(a))+"<opr s=\""+(a->op=='*'?std::string("\xD7"):std::string(1,a->op))+"\" />"+Xml(a->b,a->op=='-'?2:Precedence(a));
++    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="<elm tp=\"5\" E1=\"\"><ex br=\"1\">"+s+"</ex></elm>";return s;
++}
++inline std::string Equation(const Result &r){std::string top="<fun t=\"d\" f=\"20\"";if(r.order>1)top+=" E2=\"\"";top+=" E1=\"\"><ex>"+Xml(r.original)+"</ex>";if(r.order>1)top+="<ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex>";top+="</fun>";
++    std::string bottom="<fun t=\"d\" f=\"20\" E1=\"\"><ex><var t=\""+r.variable+"\" f=\"00\" />";if(r.order>1)bottom="<fun t=\"d\" f=\"20\" E1=\"\"><ex><elm tp=\"3\" E1=\"\" E2=\"\"><ex><var t=\""+r.variable+"\" f=\"00\" /></ex><ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex></elm>";bottom+="</ex></fun>";
++    return "<ex fh=\"100\"><fra E1=\"\" E2=\"\"><ex>"+top+"</ex><ex>"+bottom+"</ex></fra><opr s=\"=\" />"+Xml(r.derivative)+"</ex>";
++}
++}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..8568462 100644
+index b9c3f38..b568c75 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -7946,7 +8588,7 @@ index b9c3f38..8568462 100644
  		ToolboxNumMembers++;
  
  		AddSubmember(6,1);   //sin
-@@ -693,12 +707,29 @@ CToolbox::CToolbox(int IsSubtoolbox)
+@@ -693,12 +707,30 @@ CToolbox::CToolbox(int IsSubtoolbox)
  		AddDrawingSubmember(26,30,30); //diagonals / / / ...
  		AddDrawingSubmember(50,20,20); //drawing box
  		AddDrawingSubmember(51,20,20); //function ploter
@@ -7964,6 +8606,7 @@ index b9c3f38..8568462 100644
 +        for(int ray=68;ray<=71;ray++)AddDrawingSubmember(ray,30,20);
 +        AddDrawingSubmember(85,30,20);AddDrawingSubmember(86,30,20);
 +        AddDrawingSubmember(87,30,20);AddDrawingSubmember(88,30,20); //four semi-infinite rays
++        AddDrawingSubmember(91,30,20); //symbolic derivative finder
  
  
  		ToolboxNumMembers++;
@@ -7976,7 +8619,7 @@ index b9c3f38..8568462 100644
  		memset((void*)&ToolboxFontFormating,0,(size_t)sizeof(ToolboxFontFormating));
  		AddFontFormating(0,0,0,0); //sans-serif
  		AddFontFormating(0,0,1,0); //sans-serif, italic
-@@ -753,6 +784,7 @@ CToolbox::CToolbox(int IsSubtoolbox)
+@@ -753,6 +785,7 @@ CToolbox::CToolbox(int IsSubtoolbox)
  	if (IsSubtoolbox==0)
  	{
  		LoadSettings(NULL);
@@ -7984,17 +8627,18 @@ index b9c3f38..8568462 100644
  		//init symbolic calculator (to be called only once)
  		ToolboxMembers[0].Submembers[0]->InitCalculator();
  
-@@ -862,7 +894,41 @@ int CToolbox::AddDrawingSubmember(int form, int Cx, int Cy)
+@@ -862,7 +895,42 @@ int CToolbox::AddDrawingSubmember(int form, int Cx, int Cy)
  {
  	int member=ToolboxNumMembers;
  	ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers]=(CExpression*)new CDrawing();
 -	((CDrawing*)ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers])->InsertEmptyElement(form,Cx,Cy);
 +	CDrawing *icon=(CDrawing*)ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers];
-+    if(form>=60 && form<=90)
++    if(form>=60 && form<=91)
 +    {
 +        icon->m_Color=0;icon->OriginalForm=(char)form;
 +        auto line=[&](double x1,double y1,double x2,double y2,int width=1){int index=icon->NumItems;icon->InsertItemAt(index);tDrawingItem *item=icon->Items+index;item->Type=1;item->pSubdrawing=NULL;item->LineWidth=width*DRWZOOM;item->X1=(int)(x1*DRWZOOM);item->Y1=(int)(y1*DRWZOOM);item->X2=(int)(x2*DRWZOOM);item->Y2=(int)(y2*DRWZOOM);};
-+        if(form==90){line(6,2,23,0);line(23,0,29,12);line(29,12,18,20);line(18,20,1,13);line(1,13,6,2);line(14,6,14,14);line(10,10,18,10);}
++        if(form==91){line(0,10,12,10);line(3,5,3,1);line(3,1,9,1);line(9,1,9,8);line(9,8,3,8);line(3,13,3,19);line(3,19,9,19);line(9,19,9,13);line(16,16,29,4);line(23,4,29,4);line(29,4,29,10);}
++        else if(form==90){line(6,2,23,0);line(23,0,29,12);line(29,12,18,20);line(18,20,1,13);line(1,13,6,2);line(14,6,14,14);line(10,10,18,10);}
 +        else if(form==89){
 +            line(0,18,30,18);line(15,0,15,20);
 +            line(2,15,10,6,2);line(20,14,29,5,2);
@@ -8027,7 +8671,7 @@ index b9c3f38..8568462 100644
  	ToolboxMembers[member].Above[ToolboxMembers[member].NumSubmembers]=-1; //indicates that this is drawing
  	ToolboxMembers[member].NumSubmembers++;
  	return 0;
-@@ -1948,6 +2014,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1948,6 +2016,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
  					{
  						yes=1;
  						if (parent->m_IsVertical) parent->m_IsVertical=0; else parent->m_IsVertical=1;
@@ -8035,7 +8679,7 @@ index b9c3f38..8568462 100644
  					}
  					if (icon==19)
  					{
-@@ -2159,76 +2226,15 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2159,76 +2228,15 @@ void CToolbox::PaintColorbox(CDC * dc)
  
  	int t3=ToolboxSize/3;
  	int tmpy=max(0,ToolboxSize-60)/16;
@@ -8121,7 +8765,7 @@ index b9c3f38..8568462 100644
  
  	//painting the line sizes
  	len=ToolboxSize/6;
-@@ -2290,8 +2296,11 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2290,8 +2298,11 @@ void CToolbox::PaintColorbox(CDC * dc)
  	if (m_SelectedColor==0) this->ShowHelptext("black color","","Alt+B","",6070);
  	if (m_SelectedColor==1) this->ShowHelptext("red color","","Alt+R","",6071);
  	if (m_SelectedColor==2) this->ShowHelptext("green color","","Alt+G","",6072);
@@ -8135,7 +8779,7 @@ index b9c3f38..8568462 100644
  
  	if ((m_SelectedColor>=10) && (m_SelectedColor<=19)) this->ShowHelptext("line width","","","",6080);
  	if (m_SelectedColor==20) this->ShowHelptext("node edit","","Ctrl","",6090);
-@@ -3516,6 +3525,7 @@ int prevKeyboardElement=-1;
+@@ -3516,6 +3527,7 @@ int prevKeyboardElement=-1;
  int prevToolbarItem=-1;
  void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -8143,7 +8787,7 @@ index b9c3f38..8568462 100644
  	try
  	{
  	
-@@ -3642,7 +3652,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3642,7 +3654,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			else
  				m_IsArrowSelected=0;
  			m_SelectedElement=-1;
@@ -8152,7 +8796,7 @@ index b9c3f38..8568462 100644
  
  			if ((ClipboardExpression==NULL) && (ClipboardDrawing==NULL))
  				if (m_FontModeElement!=prevFontElement)
-@@ -3659,7 +3669,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3659,7 +3671,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (m_FontModeElement!=-1)
  			{
  				m_FontModeElement=-1;
@@ -8161,7 +8805,7 @@ index b9c3f38..8568462 100644
  			}
  
  			point.y-=ToolboxSize/2; //subsctract the header size
-@@ -3679,13 +3689,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3679,13 +3691,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				if (Xres+Yres>=-ToolboxSize/5-3)
  				{
  					//the mouse is pointing at subtoolbox opening arrow
@@ -8177,7 +8821,7 @@ index b9c3f38..8568462 100644
  					m_IsArrowSelected=0;
  				}
  				
-@@ -3709,8 +3719,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3709,8 +3721,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				//color box
  				if (y<ToolboxSize/3) //selecting color
  				{
@@ -8188,7 +8832,7 @@ index b9c3f38..8568462 100644
  				}
  				else if (y<2*ToolboxSize/3) //selecting line width
  				{
-@@ -3724,7 +3734,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3724,7 +3736,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				}
  				else
  					m_SelectedColor=-1;
@@ -8197,7 +8841,7 @@ index b9c3f38..8568462 100644
  			}
  			else
  			{
-@@ -3747,7 +3757,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3747,7 +3759,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  					else if (point.x<2*ToolboxSize/3) m_SelectedTextControl=3;
  					else m_SelectedTextControl=4;
  				}
@@ -8206,7 +8850,7 @@ index b9c3f38..8568462 100644
  			}
  
  		}
-@@ -3771,13 +3781,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3771,13 +3783,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (Xres+Yres<=ToolboxSize/5-1)
  			{
  				//the mouse is pointing at subtoolbox opening arrow
@@ -8222,7 +8866,7 @@ index b9c3f38..8568462 100644
  				m_IsArrowSelected=0;
  			}
  			
-@@ -3793,7 +3803,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3793,7 +3805,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			theApp.m_pMainWnd->SetActiveWindow();
  			element=m_SelectedElement=font_element;
  			m_IsArrowSelected=0;
@@ -8231,7 +8875,7 @@ index b9c3f38..8568462 100644
  		}
  	}
  	else if (m_IsSubtoolbox==-2)
-@@ -3804,7 +3814,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3804,7 +3816,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		m_IsArrowSelected=0;
  		if ((row==4) && (point.x>ToolboxSize*5)) m_IsArrowSelected=1;
  		font_element=m_SelectedElement=row*100+key;
@@ -8240,7 +8884,7 @@ index b9c3f38..8568462 100644
  	}
  	else if (m_IsSubtoolbox==-1)
  	{
-@@ -3818,7 +3828,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3818,7 +3830,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			//the mouse is pointing at the toolbox element
  			if (point.x>2*ToolboxSize+delta_center) m_IsArrowSelected=1; else m_IsArrowSelected=0;
  			m_SelectedElement=font_element;
@@ -8249,7 +8893,7 @@ index b9c3f38..8568462 100644
  		}
  	}
  	else if (m_IsContextMenu)
-@@ -3902,7 +3912,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3902,7 +3914,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				m_KeyboardElement=i;
  				element=i;
  				//ToolboxKeyboardElements.Key[i]->SelectExpression(1);
@@ -8258,7 +8902,7 @@ index b9c3f38..8568462 100644
  				break;
  			}
  		}
-@@ -3911,17 +3921,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3911,17 +3923,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		{
  			element=255;
  			if (AlternateVirtualKeyboard!=3) AlternateVirtualKeyboard=2;
@@ -8279,7 +8923,7 @@ index b9c3f38..8568462 100644
  		}
  	}
  	else if (m_IsToolbar)
-@@ -3979,7 +3989,7 @@ finish_toolbox_mousemove:
+@@ -3979,7 +3991,7 @@ finish_toolbox_mousemove:
  			(prevToolboxElement!=element))
  		{
  			m_SelectedElement=element;
@@ -8288,7 +8932,7 @@ index b9c3f38..8568462 100644
  		}
  		prevToolboxElement=element;
  
-@@ -3988,7 +3998,7 @@ finish_toolbox_mousemove:
+@@ -3988,7 +4000,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) m_FontModeElement=-1;
@@ -8297,7 +8941,7 @@ index b9c3f38..8568462 100644
  
  		}
  
-@@ -4005,14 +4015,14 @@ finish_toolbox_mousemove:
+@@ -4005,14 +4017,14 @@ finish_toolbox_mousemove:
  
  		if (prevSelectedTextControl>0)
  		{
@@ -8314,7 +8958,7 @@ index b9c3f38..8568462 100644
  		}
  		prevSelectedColor=m_SelectedColor;
  	}
-@@ -4036,7 +4046,7 @@ finish_toolbox_mousemove:
+@@ -4036,7 +4048,7 @@ finish_toolbox_mousemove:
  				(m_IsSubtoolbox==-4))
  			{
  				m_SelectedElement=element;
@@ -8323,7 +8967,7 @@ index b9c3f38..8568462 100644
  			}
  		}
  		prevSubtoolboxElement=element;
-@@ -4047,7 +4057,7 @@ finish_toolbox_mousemove:
+@@ -4047,7 +4059,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) {m_SelectedElement=-1;}
@@ -8332,7 +8976,7 @@ index b9c3f38..8568462 100644
  		}
  		
  		prevFontElement=font_element;
-@@ -4069,7 +4079,7 @@ finish_toolbox_mousemove:
+@@ -4069,7 +4081,7 @@ finish_toolbox_mousemove:
  		{
  
  			if (element==-1) {m_KeyboardElement=-1;}
@@ -8341,10 +8985,20 @@ index b9c3f38..8568462 100644
  		}
  		prevKeyboardElement=element;
  	}
-@@ -4103,6 +4113,16 @@ finish_toolbox_mousemove:
+@@ -4093,7 +4105,7 @@ finish_toolbox_mousemove:
+ 			if (ToolboxMembers[help_element].Above[help_subelement]==-1)
+ 			{
+ 				CDrawing *drw=(CDrawing*)ToolboxMembers[help_element].Submembers[help_subelement];
+-				if (drw->OriginalForm==3) {text="Freehand";langid=6008;}
++				if (drw->OriginalForm==3) {text="Freehand curve\r\nSmart smoothing: Draw menu (Off / Light / Standard / Strong)";langid=0;}
+ 				if (drw->OriginalForm==1) {text="Rectangle";langid=6009;}
+ 				if (drw->OriginalForm==2) {text="Line";langid=6010;}
+ 				if (drw->OriginalForm==4) {text="Ellipse";langid=6011;}
+@@ -4103,6 +4115,17 @@ finish_toolbox_mousemove:
  				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
  				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
  				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
++                    if(drw->OriginalForm==91){text="Symbolic derivative finder\r\nRules, higher derivatives and editable results";langid=0;}
 +                    if(drw->OriginalForm==90){text="Polygon constructor\r\nRegular presets and custom coordinates";langid=0;}
 +                    if(drw->OriginalForm==89){text="Piecewise function grapher\r\nIntervals and open/closed endpoints";langid=0;}
 +                    if(drw->OriginalForm>=72 && drw->OriginalForm<=84){text=(char*)GeometryShapeNames[drw->OriginalForm-72];langid=0;}
@@ -8358,7 +9012,7 @@ index b9c3f38..8568462 100644
  			}
  			else
  			{
-@@ -4135,6 +4155,7 @@ finish_toolbox_mousemove:
+@@ -4135,6 +4158,7 @@ finish_toolbox_mousemove:
  			strcat(buff,ToolboxKeycodes[i].name);
  			if (key&0x400) {strcpy(buff,"\'");strcat(buff,ToolboxKeycodes[i].name);strcat(buff,"\'");}
  		}
@@ -8366,7 +9020,7 @@ index b9c3f38..8568462 100644
  		this->ShowHelptext(text,command,buff,easycast,langid);
  
  		}
-@@ -5658,8 +5679,8 @@ int CToolbox::LoadSettings(char * filename)
+@@ -5658,8 +5682,8 @@ int CToolbox::LoadSettings(char * filename)
  		fread(&ForceHighQualityImage,sizeof(int),1,fil);
  		fread(&ForceHalftoneImage,sizeof(int),1,fil);
  		fread(&DefaultFontSize,sizeof(int),1,fil);
@@ -8377,7 +9031,7 @@ index b9c3f38..8568462 100644
  		fread(&MovingDotSize,sizeof(int),1,fil);
  		fread(&MovingDotPermanent,sizeof(int),1,fil);
  		fread(&GRID,sizeof(int),1,fil);
-@@ -5853,6 +5874,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5853,6 +5877,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  unsigned int DoublestrokesTimer;
  CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  {
@@ -8477,7 +9131,7 @@ index b9c3f38..8568462 100644
  	//first we check for double-strokes
  	int l2=*len;
  	if (l2<1) return NULL;
-@@ -5896,7 +6010,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+@@ -5896,7 +6013,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  			char *keycode=&ToolboxMembers[i].Keycodes[j][0];
  
  			int l=(int)strlen(keycode);
@@ -8486,23 +9140,23 @@ index b9c3f38..8568462 100644
  
  			if (memcmp(keystrokes+l2-l,keycode,l)==0)
  			{
-@@ -6063,6 +6177,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6063,6 +6180,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
 +    if(ToolboxMembers[member].Above[submember]==-1)
 +    {
 +        int form=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;
-+        if(form>=60 && form<=90)
++        if(form>=60 && form<=91)
 +        {
-+            UINT command=form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
++            UINT command=form==91?ID_SYMBOLIC_DERIVATIVE:form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
 +            theApp.m_pMainWnd->SendMessage(WM_COMMAND,command,0); return;
 +        }
 +    }
  	if (ToolboxMembers[member].Above[submember]==-1) //drawing element
  	{
  		if (ToolboxMembers[member].userdef_mask&(1<<submember))
-@@ -6078,6 +6201,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6078,6 +6204,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  		else
  		{
  			IsDrawingMode=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;

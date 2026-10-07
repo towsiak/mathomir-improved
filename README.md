@@ -97,3 +97,13 @@ value, round, trunc, sgn, fract, cbrt, exp and sinc. The functions work in
 native calculations, ordinary graphs, and piecewise formulas/value checks.
 `fract(x) = x - floor(x)`; `round` breaks ties away from zero; `trunc` rounds
 toward zero. `sinc(x) = sin(x)/x` uses radians, with `sinc(0) = 1`.
+
+## Symbolic derivative finder and smart freehand curves
+
+Open **Calculus > Symbolic derivative finder**, or the d/d icon at the end of the drawing palette. Enter a formula, choose its variable and derivative order (1–5), then find the derivative. The typeset preview and result can be placed as editable native math, with or without the original formula. Numerical checks accept constants such as `1/2` and `pi/3`. Other letters are constant parameters; a numeric check requires their values. Product, quotient, chain, power, exponential, trig/inverse trig, hyperbolic and log rules are supported. Trig uses radians. Original domain restrictions survive simplification. Absolute value, step thresholds and removable sinc cases show explicit boundary/limit notes rather than inventing a value there.
+
+New freehand curves use **standard smart smoothing** by default. **Draw > Smart freehand smoothing** selects Off, Light, Standard or Strong; the preference is remembered. Smoothing reduces small wiggles, keeps endpoints and sharp corners, limits displacement, and leaves geometry/graphs alone during automatic drawing. **Draw > Smooth selected freehand curves** also works on saved freehand strokes and connected older polylines; Undo restores the original. Curves stay native editable line segments.
+
+Portable checks: `tools/symbolic-derivative-check.cpp` and `tools/smart-stroke-check.cpp`, built with C++11 plus address/undefined-behavior sanitizers. Windows UI checks exercise the actual derivative palette button, higher orders, numeric/domain checks, native placement/reopening, smoothing levels, saved strokes and Undo.
+
+Direct operations: while editing a math object (or after selecting it), **Ctrl+Enter** appends an editable `= result`. A native derivative such as `d(x^2+sin(x)+ln(x))/d(x)` is evaluated with the new symbolic rules. Typed `d/dx` followed by a parenthesized argument is recognized too. **Ctrl+Shift+Enter** appends a numerical approximation with the native approximate-equality symbol, for example `e^(pi)-e` gives approximately `20.4224108043`. Approximation honors the document's RAD/DEG setting. Executing again updates the existing result rather than adding another equals sign; Undo restores the prior expression. Both commands are in the Calculus menu and feature search.

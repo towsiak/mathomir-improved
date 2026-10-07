@@ -321,3 +321,15 @@ fract(x)=x-floor(x) lies in [0,1), including for negative inputs. The frac
 shortcut still inserts a fraction. sinc(x)=sin(x)/x always uses radians, with
 sinc(0)=1. Real cube roots support negative numbers. Floor/ceiling preserve
 symbolic brackets. Step curves omit false connectors across finite jumps.
+
+SYMBOLIC DERIVATIVES AND SMART FREEHAND CURVES
+Calculus > Symbolic derivative finder; also the final d/d icon in the drawing palette.
+Variable selector, orders 1-5, typeset preview, editable result placement, numeric checks and rule/domain notes.
+Draw > Smart freehand smoothing: Off / Light / Standard (default) / Strong.
+Endpoints and deliberate corners stay fixed; smoothing strength limits how far the stroke may move.
+Smooth selected freehand curves supports saved strokes and Undo.
+
+DIRECT EXECUTION AND APPROXIMATION
+Ctrl+Enter: append = result, including native symbolic derivatives.
+Ctrl+Shift+Enter: append an approximate decimal value; honors RAD/DEG.
+Re-execution replaces the previous result; both operations support Undo.

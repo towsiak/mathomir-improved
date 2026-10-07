@@ -97,6 +97,8 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern bool GetKeyboardState(byte[] state);
   [DllImport("user32.dll")] static extern bool SetKeyboardState(byte[] state);
   public static void ShiftKey(IntPtr hwnd,int key) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share selection key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[16]=128;SetKeyboardState(state);try{UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)key,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Selection arrow did not respond");}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
+  public static void ExecuteKey(IntPtr hwnd,bool approximate) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share execution key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[17]=128;state[16]=(byte)(approximate?128:0);SetKeyboardState(state);try{UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)13,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Execute key did not respond");SendMessageTimeout(hwnd,258,(IntPtr)13,IntPtr.Zero,2,3000,out result);}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
+
   [StructLayout(LayoutKind.Sequential)] struct Point {public int X,Y;}
   [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr hwnd,ref Point point);
   [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
@@ -1160,6 +1162,101 @@ try {
     }
   }
   Write-Output 'Native function graphs passed: all ten negative-input curves evaluate and paint, and floor steps have no false connector.'
+
+  # Open the derivative finder from its actual final drawing-palette button.
+  $derivativeFixture=Join-Path (Split-Path $exe) 'symbolic-derivative-created-smoke.mom'
+  '<?xml version="1.0"?><mathomir><o t="1" X="50" Y="50"><ex><var t="baseline" f="00" /></ex></o></mathomir>'|Set-Content $derivativeFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$derivativeFixture)
+  Start-Sleep -Milliseconds 500
+  $toolbox=[MathomirUiProbe]::CaptionChild($main,'Toolbox');$toolRect=[MathomirUiProbe]::WindowRect($toolbox);$toolSize=$toolRect.Right-$toolRect.Left
+  $client=[MathomirUiProbe]::ClientRect($main)
+  $itemHeight=[int][Math]::Floor(($client.Bottom-[Math]::Floor($toolSize/2)-$toolSize-7)/8)
+  $itemHeight=[Math]::Max([Math]::Floor($toolSize/3),[Math]::Min([Math]::Floor(2*$toolSize/3),$itemHeight))
+  if($itemHeight -lt $toolSize/2){$itemHeight+=[Math]::Floor([Math]::Floor($toolSize/3)/8)}
+  $itemHeight=$itemHeight -band 0xFFFE
+  $arrowX=$toolSize-3;$arrowY=[Math]::Floor($toolSize/2)+7*$itemHeight-3
+  [MathomirUiProbe]::Mouse($toolbox,512,0,$arrowX,$arrowY);[MathomirUiProbe]::Mouse($toolbox,513,1,$arrowX,$arrowY);[MathomirUiProbe]::Mouse($toolbox,514,0,$arrowX,$arrowY)
+  Start-Sleep -Milliseconds 100
+  $palette=[MathomirUiProbe]::Window($appProcess.Id,'Subtoolbox');if($palette -eq [IntPtr]::Zero){throw 'Derivative drawing palette did not open.'}
+  $dx=[int](15*$toolSize/2+$toolSize/4);$dy=[int]($toolSize/3)
+  [MathomirUiProbe]::Mouse($palette,512,0,$dx,$dy)
+  [MathomirUiProbe]::PostMessage($palette,513,[IntPtr]1,[IntPtr](($dy -shl 16) -bor $dx))|Out-Null
+  [MathomirUiProbe]::PostMessage($palette,514,[IntPtr]0,[IntPtr](($dy -shl 16) -bor $dx))|Out-Null
+  $derivativeDialog=[IntPtr]::Zero
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$derivativeDialog=[MathomirUiProbe]::Window($appProcess.Id,'Symbolic derivative finder');if($derivativeDialog -ne [IntPtr]::Zero){break}}
+  if($derivativeDialog -eq [IntPtr]::Zero){throw 'Derivative finder did not open from its palette button.'}
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($derivativeDialog,1305)) -ne '3*x^2+2'){throw 'Polynomial derivative was not simplified symbolically.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1307),'2');[MathomirUiProbe]::Send($derivativeDialog,273,1308)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($derivativeDialog,1309)) -notmatch ': 14$'){throw 'Derivative point check did not give 14.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1300),'x^4');[MathomirUiProbe]::Send([MathomirUiProbe]::Child($derivativeDialog,1302),334,1)|Out-Null;[MathomirUiProbe]::Send($derivativeDialog,273,1303)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($derivativeDialog,1309)) -notmatch ': 48$'){throw 'Second derivative point check did not give 48.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1300),'sin(');[MathomirUiProbe]::Send($derivativeDialog,273,1303)|Out-Null
+  if([MathomirUiProbe]::IsWindowEnabled([MathomirUiProbe]::Child($derivativeDialog,1))){throw 'Invalid derivative formula left Place enabled.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1300),'abs(x)');[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1307),'0');[MathomirUiProbe]::Send([MathomirUiProbe]::Child($derivativeDialog,1302),334,0)|Out-Null;[MathomirUiProbe]::Send($derivativeDialog,273,1303)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($derivativeDialog,1309)) -notmatch 'boundary'){throw 'Absolute-value corner got an invented derivative value.'}
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1300),'x^3+2x');[MathomirUiProbe]::Send($derivativeDialog,273,1303)|Out-Null
+  [MathomirUiProbe]::PostMessage($derivativeDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+  for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($derivativeDialog)){break}}
+  [MathomirUiProbe]::Mouse($view,512,0,250,150);[MathomirUiProbe]::Mouse($view,513,1,250,150);[MathomirUiProbe]::Mouse($view,514,0,250,150);[MathomirUiProbe]::Send($view,258,27)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$derivativeSaved=Get-Content $derivativeFixture -Raw
+  if(!$derivativeSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]//fra | /mathomir/*[last()]/*[self::ex or self::expr]//elm[@tp="4"]')){throw 'Derivative result did not place editable native derivative notation.'}
+  $derivativeXml=$derivativeSaved.SelectSingleNode('/mathomir/*[last()]').OuterXml
+
+  # Smooth a saved polyline, preserve endpoints, and verify Undo byte-for-byte.
+  $strokeFixture=Join-Path (Split-Path $exe) 'smart-freehand-smoothing-smoke.mom'
+  $pairs=for($i=0;$i -le 200;$i++){$sx=$i*32;$sy=[int](32*(20+10*[Math]::Sin($i/40.0)+$(if($i%2){.75}else{-.75})));"$sx,$sy"}
+  ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw free="1" d="32|'+($pairs -join ';')+'" /></o></mathomir>')|Set-Content $strokeFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$strokeFixture);Start-Sleep -Milliseconds 500
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$rawStroke=Get-Content $strokeFixture -Raw;$rawObject=$rawStroke.SelectSingleNode('/mathomir/*[1]');$rawXml=$rawObject.OuterXml;$rawPoints=@(ShaderPoints $rawObject)
+  [MathomirUiProbe]::Send($main,273,33092)|Out-Null;[MathomirUiProbe]::Send($main,273,33007)|Out-Null;[MathomirUiProbe]::Send($main,273,33094)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$smoothStroke=Get-Content $strokeFixture -Raw;$smoothObject=$smoothStroke.SelectSingleNode('/mathomir/*[1]');$smoothPoints=@(ShaderPoints $smoothObject)
+  if($smoothObject.OuterXml -eq $rawXml){throw 'Smooth selected curves left the saved stroke unchanged.'}
+  foreach($end in @(0,-1)){if([Math]::Abs($smoothPoints[$end].x-$rawPoints[$end].x) -gt .04 -or [Math]::Abs($smoothPoints[$end].y-$rawPoints[$end].y) -gt .04){throw 'Smoothing moved a stroke endpoint.'}}
+  if(!$smoothObject.SelectSingleNode('./dw[@free="1"] | ./draw[@free="1"]')){throw 'Saved freehand identity was lost.'}
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$undoStroke=Get-Content $strokeFixture -Raw;if($undoStroke.SelectSingleNode('/mathomir/*[1]').OuterXml -ne $rawXml){throw 'Undo did not restore the original stroke.'}
+  [MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,33092)|Out-Null;[MathomirUiProbe]::Send($main,273,33047)|Out-Null
+  [MathomirUiProbe]::Mouse($view,512,0,420,200);[MathomirUiProbe]::Mouse($view,513,1,420,200)
+  for($i=1;$i -le 20;$i++){Start-Sleep -Milliseconds 70;$sy=[int](200+20*[Math]::Sin($i*3.141592653589793/20));[MathomirUiProbe]::Mouse($view,512,1,(420+6*$i),$sy)}
+  [MathomirUiProbe]::Mouse($view,514,0,540,200);[MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$autoStroke=Get-Content $strokeFixture -Raw
+  if(@($autoStroke.SelectNodes('/mathomir/*')).Count -lt 2 -or !$autoStroke.SelectSingleNode('/mathomir/*[last()]/dw[@free="1"] | /mathomir/*[last()]/draw[@free="1"]')){throw 'Automatic smart smoothing failed to create a native saved curve.'}
+  [MathomirUiProbe]::OpenFile($main,$derivativeFixture);Start-Sleep -Milliseconds 500
+  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$reopenedDerivative=Get-Content $derivativeFixture -Raw
+  if($reopenedDerivative.SelectSingleNode('/mathomir/*[last()]').OuterXml -ne $derivativeXml){throw 'Editable derivative changed after reopening.'}
+  Write-Output 'Symbolic derivative finder passed: actual palette button, simplified polynomial, second derivative, numeric check, invalid input, boundary notes and native placed/reopened math.'
+  Write-Output 'Smart freehand smoothing passed: saved-stroke smoothing, fixed endpoints, native identity, exact Undo, and automatically smoothed mouse-drawn curves.'
+
+  # Direct execution uses the actual Ctrl+Enter shortcut and retains = output.
+  $inlineFixture=Join-Path (Split-Path $exe) 'inline-derivative-smoke.mom'
+  $formula='<elm tp="3" E1="" E2=""><ex><var t="x" f="00" /></ex><ex><var t="2" f="00" /></ex></elm><opr s="+" /><fun t="sin" f="20" E1=""><ex><var t="x" f="00" /></ex></fun><opr s="+" /><fun t="ln" f="20" E1=""><ex><var t="x" f="00" /></ex></fun>'
+  $nativeD='<fra E1="" E2=""><ex><fun t="d" f="20" E1=""><ex>'+ $formula +'</ex></fun></ex><ex><fun t="d" f="20" E1=""><ex><var t="x" f="00" /></ex></fun></ex></fra>'
+  ('<?xml version="1.0"?><mathomir><o t="1" X="100" Y="100"><ex>'+ $nativeD +'</ex></o></mathomir>')|Set-Content $inlineFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$inlineFixture);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,33007)|Out-Null
+  [MathomirUiProbe]::ExecuteKey($view,$false);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$inlineSaved=Get-Content $inlineFixture -Raw
+  $inlineRoot=$inlineSaved.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]')
+  if(@($inlineRoot.SelectNodes('./opr[@s="="] | ./elm[@tp="2"][@stp="="]')).Count -ne 1){throw 'Direct derivative execution did not append exactly one equals sign.'}
+  if(!$inlineRoot.SelectSingleNode('./fun[@t="cos"] | ./elm[@tp="6"][@tx="cos"]')){Write-Output $inlineRoot.OuterXml;throw 'Direct derivative lost the cosine term.'}
+  if(@($inlineRoot.SelectNodes('./fra | ./elm[@tp="4"]')).Count -lt 2){throw 'Direct derivative lost original notation or the 1/x term.'}
+  $inlineFirst=$inlineRoot.OuterXml
+  [MathomirUiProbe]::Send($main,273,33007)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$false);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$inlineAgain=Get-Content $inlineFixture -Raw
+  if($inlineAgain.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]').OuterXml -ne $inlineFirst){throw 'Executing again duplicated or changed the correct derivative result.'}
+  $approxFixture=Join-Path (Split-Path $exe) 'direct-approximation-smoke.mom'
+  '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="100"><ex><elm tp="3" E1="" E2=""><ex><var t="e" f="00" /></ex><ex><var t="p" f="60" /></ex></elm><opr s="-" /><var t="e" f="00" /></ex></o></mathomir>'|Set-Content $approxFixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$approxFixture);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,33007)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$true);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$approxSaved=Get-Content $approxFixture -Raw;$approxRoot=$approxSaved.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]')
+  $approxText=($approxRoot.SelectNodes('./var | ./elm[@tp="1"]')|ForEach-Object {if($_.HasAttribute('t')){$_.t}else{$_.tx}}) -join '|'
+  if($approxText -notmatch '20\.422410804'){Write-Output $approxRoot.OuterXml;throw 'e^pi-e did not get its correct decimal approximation.'}
+  if(@($approxRoot.SelectNodes('./opr | ./elm[@tp="2"]')).Count -lt 2){throw 'Approximation lost its comparison symbol or original subtraction.'}
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [xml]$approxUndo=Get-Content $approxFixture -Raw
+  if(($approxUndo.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]').OuterXml) -match '20\.422410804'){throw 'Undo did not remove the appended approximation.'}
+  Write-Output 'Direct operations passed: Ctrl+Enter derivative with original = result, no duplicate result on re-execution, Ctrl+Shift+Enter e^pi-e approximation, and Undo.'
 
   $marginFixture=Join-Path (Split-Path $exe) 'piecewise-created-smoke.mom'
   '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content -LiteralPath $marginFixture -Encoding ascii
