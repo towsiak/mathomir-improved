@@ -596,8 +596,8 @@ try {
     [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
     [xml]$typedSaved=Get-Content $typedFixture -Raw;$typedRoot=$typedSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
     if($typedError){Write-Output ('Typed expression diagnostic '+$typedCase.input+': '+$typedRoot.OuterXml);$typedFailures+=$typedCase.input;continue}
-    if($typedCase.approx){if($typedRoot.OuterXml -notmatch '20\.422410804'){Write-Output $typedRoot.OuterXml;throw 'Typed e^(pi)-e was not approximated.'}}
-    else{if(!$typedRoot.SelectSingleNode('./opr[@s="="] | ./elm[@tp="2"][@stp="="]') -or !$typedRoot.SelectSingleNode('.//fun[@t="cos"] | .//elm[@tp="6"][@tx="cos"]')){Write-Output $typedRoot.OuterXml;throw 'Typed d/dx formula did not produce an inline derivative.'}}
+    if($typedCase.approx){if($typedRoot.OuterXml -notmatch '20\.422410804'){Write-Output $typedRoot.OuterXml;$typedFailures+=$typedCase.input;continue}}
+    else{if(!$typedRoot.SelectSingleNode('./opr[@s="="] | ./elm[@tp="2"][@stp="="]') -or !$typedRoot.SelectSingleNode('.//fun[@t="cos"] | .//elm[@tp="6"][@tx="cos"]')){Write-Output $typedRoot.OuterXml;$typedFailures+=$typedCase.input;continue}}
   }
   if($typedFailures.Count){throw ('Literal keyboard failures: '+($typedFailures -join '; '))}
   Write-Output 'Literal keyboard input passed: e^(pi)-e and d/dx(x^2+sin(x)+ln(x)) execute directly while editing.'
