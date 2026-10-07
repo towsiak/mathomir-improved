@@ -1132,28 +1132,23 @@ try {
   $expected+= -[Math]::Pow(1.37,(1.0/3))
   $expected+= [Math]::Exp(-1.37)
   $expected+= ([Math]::Sin(-1.37)/(-1.37))
-  $colors=@(0,0x0000CC00,0x000000CC,0x00C00000,0x000080D0,0x00A03080,0x00808000,0x00909090)
-  foreach($batch in @(0,8)){
+  for($index=0;$index -lt 11;$index++){
+    $name=if($index -eq 10){'floor'}else{$functionNames[$index]}
     $axes=@(-3,3,-3,6)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
-    $slots=@();$count=[Math]::Min(8,10-$batch)
-    for($slot=0;$slot -lt $count;$slot++){
-      $name=$functionNames[$batch+$slot];$argument='<var t="x" f="00" />'
-      if($batch+$slot -lt 3){$shape=@('f','c','|')[$batch+$slot];$fn='<elm tp="5" E1=""><ex br="1" shp="'+$shape+'">'+$argument+'</ex></elm>'}
-      else{$fn='<fun t="'+$name+'" f="20" E1=""><ex br="1">'+$argument+'</ex></fun>'}
-      $offset=($slot*.4).ToString([Globalization.CultureInfo]::InvariantCulture)
-      $slots+='<subexp d="0,0;4000,1000"><ex fh="100">'+$fn+'<opr s="+" /><var t="'+$offset+'" f="00" /></ex></subexp>'
-    }
-    ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axes -join '')+($slots -join '')+'</o></mathomir>')|Set-Content $nativeFunctions -Encoding ascii
+    $argument='<var t="x" f="00" />'
+    if($index -lt 3 -or $index -eq 10){$shape=if($index -eq 10){'f'}else{@('f','c','|')[$index]};$fn='<elm tp="5" E1=""><ex br="1" shp="'+$shape+'">'+$argument+'</ex></elm>'}
+    else{$fn='<fun t="'+$name+'" f="20" E1=""><ex br="1">'+$argument+'</ex></fun>'}
+    if($index -eq 10){$fn+='<opr s="+" /><var t="3.4" f="00" />'}
+    $slot='<subexp d="0,0;4000,1000"><ex fh="100">'+$fn+'</ex></subexp>'
+    ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axes -join '')+$slot+'</o></mathomir>')|Set-Content $nativeFunctions -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$nativeFunctions)
     Start-Sleep -Milliseconds 1600
     [MathomirUiProbe]::Mouse($view,512,0,850,50)
     $area=[MathomirUiProbe]::PlotArea($view)
-    for($slot=0;$slot -lt $count;$slot++){
-      $value=$expected[$batch+$slot]+$slot*.4
-      $px=[int]($area[0]+(-1.37+3)/6*($area[2]-$area[0]));$py=[int]($area[3]-($value+3)/9*($area[3]-$area[1]))
-      if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,3,$colors[$slot])){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Native function $($functionNames[$batch+$slot]) did not plot its negative-input value."}
-    }
-    if($batch -eq 0){
+    $value=if($index -eq 10){1.4}else{$expected[$index]}
+    $px=[int]($area[0]+(-1.37+3)/6*($area[2]-$area[0]));$py=[int]($area[3]-($value+3)/9*($area[3]-$area[1]))
+    if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,3,0)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Native function $name did not plot its negative-input value."}
+    if($index -eq 0){
       $px=[int]($area[0]+4/6*($area[2]-$area[0]));$py=[int]($area[3]-3.5/9*($area[3]-$area[1]))
       if([MathomirUiProbe]::CurveColorNear($view,$px,$py,2,0)){throw 'Floor graph drew a false vertical connector across its jump.'}
     }
