@@ -1140,15 +1140,20 @@ try {
     if($index -lt 3 -or $index -eq 10){$shape=if($index -eq 10){'f'}else{@('f','c','|')[$index]};$fn='<elm tp="5" E1=""><ex br="1" shp="'+$shape+'">'+$argument+'</ex></elm>'}
     else{$fn='<fun t="'+$name+'" f="20" E1=""><ex br="1">'+$argument+'</ex></fun>'}
     if($index -eq 10){$fn+='<opr s="+" /><var t="3.4" f="00" />'}
+    if($index -eq 5){$fn+='<opr s="+" /><var t="1.25" f="00" />'}
     $slot='<subexp d="0,0;4000,1000"><ex fh="100">'+$fn+'</ex></subexp>'
     ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axes -join '')+$slot+'</o></mathomir>')|Set-Content $nativeFunctions -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$nativeFunctions)
     Start-Sleep -Milliseconds 1600
     [MathomirUiProbe]::Mouse($view,512,0,850,50)
     $area=[MathomirUiProbe]::PlotArea($view)
-    $value=if($index -eq 10){1.4}else{$expected[$index]}
+    $value=if($index -eq 10){1.4}elseif($index -eq 5){.25}else{$expected[$index]}
     $px=[int]($area[0]+(-1.37+3)/6*($area[2]-$area[0]));$py=[int]($area[3]-($value+3)/9*($area[3]-$area[1]))
     if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,3,0)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Native function $name did not plot its negative-input value."}
+    if($index -eq 5){
+      $pointX=[int](($area[0]+$area[2])/2);$pointY=[int]($area[3]-4.25/9*($area[3]-$area[1]))
+      if(![MathomirUiProbe]::CurveColorNear($view,$pointX+2,$pointY,1,0)){[MathomirUiProbe]::DumpRegion($view,$pointX,$pointY);throw 'Sign graph lost its isolated included point at zero.'}
+    }
     if($index -eq 0){
       $px=[int]($area[0]+4/6*($area[2]-$area[0]));$py=[int]($area[3]-3.5/9*($area[3]-$area[1]))
       if([MathomirUiProbe]::CurveColorNear($view,$px,$py,2,0)){throw 'Floor graph drew a false vertical connector across its jump.'}
@@ -1195,7 +1200,7 @@ try {
     for($row=1;$row -lt 8;$row++){[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1200+$row*5),'')}
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1200),$sample[0])
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1201),'')
-    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1202),'')
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($pieceDialog,1203),'')
     [MathomirUiProbe]::Send($pieceDialog,273,1187)|Out-Null
     $readout=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($pieceDialog,1188)).Replace([string][char]0x2212,'-')
     if(!$readout.Contains('f(0) = '+$sample[1])){throw "Function value check failed for $($sample[0]): $readout"}
