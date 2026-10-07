@@ -615,8 +615,8 @@ try {
   [MathomirUiProbe]::Mouse($view,514,0,118,($gripY+20))
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
   [xml]$moved=Get-Content -LiteralPath $fixture -Raw
-  $movedRoot=$moved.SelectSingleNode('/mathomir/o[1]')
-  if ($movedRoot.X -ne '130' -or $movedRoot.Y -ne '170') { throw 'Dragging the move grip did not move the object by the expected distance.' }
+  $movedRoot=$moved.SelectSingleNode('/mathomir/*[self::o or self::obj][1]')
+  if ($movedRoot.X -ne '130' -or $movedRoot.Y -ne '170') { Write-Output $moved.OuterXml; throw ("Dragging the move grip did not move the object by the expected distance. Saved position: $($movedRoot.X), $($movedRoot.Y)") }
   Write-Output ("Undo menu before command: "+[MathomirUiProbe]::MenuText($main,0xE12B))
   [MathomirUiProbe]::Send($main,273,0xE12B) | Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103) | Out-Null
