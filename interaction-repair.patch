@@ -7723,16 +7723,18 @@ index 94dd0e4..211c326 100644
  	afx_msg void OnFontsizeNormal();
 diff --git a/Mathomir/NativeSymbolic.h b/Mathomir/NativeSymbolic.h
 new file mode 100644
-index 0000000..0a84977
+index 0000000..e3da28a
 --- /dev/null
 +++ b/Mathomir/NativeSymbolic.h
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,99 @@
 +#pragma once
 +#include "SymbolicDerivative.h"
 +#include "Expression.h"
 +
 +namespace NativeSymbolic {
 +inline bool Empty(CExpression *e){if(!e)return true;for(int i=0;i<e->m_NumElements;i++)if(e->m_pElementList[i].Type>0)return false;return true;}
++inline bool Plain(CElement *e){return e && !e->Expression1 && !e->Expression2 && (e->Data2[0]&0xE0)!=0x60;}
++inline std::string FunctionName(std::string name){if(name=="tg")name="tan";if(name=="arctg")name="atan";if(name=="sh")name="sinh";if(name=="ch")name="cosh";if(name=="th")name="tanh";if(name=="arcsin")name="asin";if(name=="arccos")name="acos";if(name=="arctan")name="atan";if(name=="ceiling")name="ceil";if(name=="sign")name="sgn";return name;}
 +inline std::string Formula(CExpression *e,int start=0,int end=-1,int depth=0){
 +    if(!e||depth>40)throw std::runtime_error("The expression is too deeply nested.");if(end<0)end=e->m_NumElements;
 +    std::string result;bool previous=false;
@@ -7740,6 +7742,22 @@ index 0000000..0a84977
 +        tElementStruct *ts=e->m_pElementList+i;if(ts->Type==0)continue;CElement *element=ts->pElementObject;if(!element)throw std::runtime_error("Incomplete expression.");
 +        CExpression *a=(CExpression*)element->Expression1,*b=(CExpression*)element->Expression2;std::string term;bool operand=true;
 +        if(ts->Type==1 && !element->Data1[0] && Empty(a) && Empty(b))continue;
++        // Keyboard input can leave function names as individual letter elements.
++        if(ts->Type==1 && Plain(element)){
++            std::string letters;int next=i;
++            while(next<end && e->m_pElementList[next].Type==1 && letters.size()<16){
++                CElement *part=e->m_pElementList[next].pElementObject;if(!Plain(part)||!part->Data1[0])break;
++                bool alphabetic=true;for(const char *c=part->Data1;*c;c++)if(!std::isalpha((unsigned char)*c))alphabetic=false;
++                if(!alphabetic)break;letters+=part->Data1;next++;
++            }
++            std::string name=FunctionName(letters);
++            if(SymbolicDerivative::Known(name) && next<end && e->m_pElementList[next].Type==5){
++                CElement *group=e->m_pElementList[next].pElementObject;CExpression *argument=group?(CExpression*)group->Expression1:NULL;
++                if(argument && argument->m_ParentheseShape!='|' && argument->m_ParentheseShape!='f' && argument->m_ParentheseShape!='c'){
++                    if(previous)result+="*";result+=name+"("+Formula(argument,0,-1,depth+1)+")";previous=true;i=next;continue;
++                }
++            }
++        }
 +        if(ts->Type==1){if(element->Data1[0]=='p' && !element->Data1[1] && !a && !b && (element->Data2[0]&0xE0)!=0x60 && i+1<end && e->m_pElementList[i+1].Type==1){CElement *next=e->m_pElementList[i+1].pElementObject;if(next && strcmp(next->Data1,"i")==0 && !next->Expression1 && !next->Expression2 && (next->Data2[0]&0xE0)!=0x60){if(previous)result+="*";result+="pi";previous=true;i++;continue;}}if(a||b)throw std::runtime_error("Use plain-letter variables without subscripts in the derivative finder.");term=element->Data1;if((element->Data2[0]&0xE0)==0x60){if(term=="p")term="pi";else throw std::runtime_error("Use plain-letter variables in the derivative finder.");}}
 +        else if(ts->Type==2){char op=element->Data1[0];if(op==(char)0xD7)op='*';if(op!='+'&&op!='-'&&op!='*'&&op!='/')throw std::runtime_error("This operator is not supported by direct execution.");term=std::string(1,op);operand=false;}
 +        else if(ts->Type==3||ts->Type==4)term="("+Formula(a,0,-1,depth+1)+")"+(ts->Type==3?"^":"/")+"("+Formula(b,0,-1,depth+1)+")";
@@ -7757,7 +7775,30 @@ index 0000000..0a84977
 +inline bool ReadDerivative(CExpression *input,SymbolicDerivative::Result &r,std::string &error){
 +    try{
 +        int position=0;while(position<input->m_NumElements&&input->m_pElementList[position].Type==0)position++;
-+        if(position>=input->m_NumElements||input->m_pElementList[position].Type!=4)return false;
++        if(position>=input->m_NumElements)return false;
++        if(input->m_pElementList[position].Type==1){
++            std::vector<int> tokens;
++            for(int i=position;i<input->m_NumElements;i++){
++                tElementStruct *t=input->m_pElementList+i;CElement *e=t->pElementObject;
++                if(t->Type==0 || (t->Type==1 && e && !e->Data1[0] && Empty((CExpression*)e->Expression1) && Empty((CExpression*)e->Expression2)))continue;
++                tokens.push_back(i);
++            }
++            if(tokens.size()<3)return false;
++            tElementStruct *first=input->m_pElementList+tokens[0],*slash=input->m_pElementList+tokens[1],*den=input->m_pElementList+tokens[2];
++            if(!Plain(first->pElementObject)||strcmp(first->pElementObject->Data1,"d") || slash->Type!=2 || !slash->pElementObject || strcmp(slash->pElementObject->Data1,"/") || den->Type!=1 || !Plain(den->pElementObject))return false;
++            std::string denominator=den->pElementObject->Data1,name;size_t argumentIndex=0;
++            if(denominator=="d"){
++                if(tokens.size()<5)throw std::runtime_error("Use d/dx(expression) with a single-letter variable.");
++                tElementStruct *variable=input->m_pElementList+tokens[3];
++                if(variable->Type!=1 || !Plain(variable->pElementObject))throw std::runtime_error("Use a single-letter differentiation variable.");
++                name=variable->pElementObject->Data1;argumentIndex=4;
++            }else if(denominator.size()==2 && denominator[0]=='d'){name=denominator.substr(1);argumentIndex=3;}else return false;
++            if(name.size()!=1 || !std::isalpha((unsigned char)name[0]) || tokens.size()!=argumentIndex+1)throw std::runtime_error("Use d/dx(expression) with one parenthesized expression.");
++            tElementStruct *group=input->m_pElementList+tokens[argumentIndex];CExpression *argument=group->pElementObject?(CExpression*)group->pElementObject->Expression1:NULL;
++            if(group->Type!=5 || !argument || argument->m_ParentheseShape=='|' || argument->m_ParentheseShape=='f' || argument->m_ParentheseShape=='c')throw std::runtime_error("Put the expression to differentiate in parentheses.");
++            return r.Find(Formula(argument),name,1,error);
++        }
++        if(input->m_pElementList[position].Type!=4)return false;
 +        CElement *fraction=input->m_pElementList[position].pElementObject;CExpression *top=(CExpression*)fraction->Expression1,*bottom=(CExpression*)fraction->Expression2;
 +        if(!top||!bottom||top->m_NumElements<1||bottom->m_NumElements<1)return false;
 +        CElement *numerator=top->m_pElementList[0].pElementObject,*denominator=bottom->m_pElementList[0].pElementObject;if(!numerator||!denominator)return false;
