@@ -98,7 +98,7 @@ public static class MathomirUiProbe {
   [DllImport("user32.dll")] static extern bool GetKeyboardState(byte[] state);
   [DllImport("user32.dll")] static extern bool SetKeyboardState(byte[] state);
   public static void ShiftKey(IntPtr hwnd,int key) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share selection key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[16]=128;SetKeyboardState(state);try{UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)key,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Selection arrow did not respond");}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
-  public static void ExecuteKey(IntPtr hwnd,bool approximate) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share execution key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[17]=128;state[16]=(byte)(approximate?128:0);SetKeyboardState(state);try{UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)13,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Execute key did not respond");SendMessageTimeout(hwnd,258,(IntPtr)13,IntPtr.Zero,2,3000,out result);}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
+  public static void ExecuteKey(IntPtr hwnd,bool approximate) {uint pid;uint target=GetWindowThreadProcessId(hwnd,out pid);uint current=GetCurrentThreadId();if(!AttachThreadInput(current,target,true))throw new Exception("Could not share execution key state");byte[] old=new byte[256];GetKeyboardState(old);byte[] state=(byte[])old.Clone();state[17]=128;state[16]=(byte)(approximate?128:0);SetKeyboardState(state);try{UIntPtr result;if(SendMessageTimeout(hwnd,256,(IntPtr)13,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Execute key did not respond: "+AllText(Dialog((int)pid)));SendMessageTimeout(hwnd,258,(IntPtr)13,IntPtr.Zero,2,3000,out result);}finally{SetKeyboardState(old);AttachThreadInput(current,target,false);}}
 
   [StructLayout(LayoutKind.Sequential)] struct Point {public int X,Y;}
   [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr hwnd,ref Point point);
@@ -546,7 +546,8 @@ try {
   for($i=1;$i -le 20;$i++){Start-Sleep -Milliseconds 70;$sy=[int](200+20*[Math]::Sin($i*3.141592653589793/20));[MathomirUiProbe]::Mouse($view,512,1,(420+6*$i),$sy)}
   [MathomirUiProbe]::Mouse($view,514,0,540,200);[MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$autoStroke=Get-Content $strokeFixture -Raw
-  if(@($autoStroke.SelectNodes('/mathomir/*')).Count -lt 2 -or !$autoStroke.SelectSingleNode('/mathomir/*[last()]/dw[@free="1"] | /mathomir/*[last()]/draw[@free="1"]')){throw 'Automatic smart smoothing failed to create a native saved curve.'}
+  $autoStrokeFailed=(@($autoStroke.SelectNodes('/mathomir/*')).Count -lt 2 -or !$autoStroke.SelectSingleNode('/mathomir/*[last()]/dw[@free="1"] | /mathomir/*[last()]/draw[@free="1"]'))
+  if($autoStrokeFailed){Write-Output ('Automatic stroke diagnostic: '+$autoStroke.OuterXml)}
   [MathomirUiProbe]::OpenFile($main,$derivativeFixture);Start-Sleep -Milliseconds 500
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$reopenedDerivative=Get-Content $derivativeFixture -Raw
   if($reopenedDerivative.SelectSingleNode('/mathomir/*[last()]').OuterXml -ne $derivativeXml){throw 'Editable derivative changed after reopening.'}
@@ -594,6 +595,7 @@ try {
     else{if(!$typedRoot.SelectSingleNode('./opr[@s="="] | ./elm[@tp="2"][@stp="="]') -or !$typedRoot.SelectSingleNode('.//fun[@t="cos"] | .//elm[@tp="6"][@tx="cos"]')){Write-Output $typedRoot.OuterXml;throw 'Typed d/dx formula did not produce an inline derivative.'}}
   }
   Write-Output 'Literal keyboard input passed: e^(pi)-e and d/dx(x^2+sin(x)+ln(x)) execute directly while editing.'
+  if($autoStrokeFailed){throw 'Automatic smart smoothing failed to create a native saved curve.'}
 
 
   [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 500
