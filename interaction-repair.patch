@@ -9,7 +9,7 @@ index 0000000..2f73a4e
 +static const char *ImprovedColorNames[8]={"Black","Red","Green","Blue","Gray","Orange","Purple","Teal"};
 +inline unsigned int ImprovedColor(int index){return ImprovedColors[index>=0&&index<8?index:0];}
 diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
-index 944279c..5f94d0a 100644
+index 944279c..1eb1170 100644
 --- a/Mathomir/Drawing.cpp
 +++ b/Mathomir/Drawing.cpp
 @@ -19,6 +19,12 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -328,16 +328,23 @@ index 944279c..5f94d0a 100644
  			if ((IsSpecialDrawing) && (i==0))
  			{
  				sprintf(tmpstr,"spec=\"%d\" ",IsSpecialDrawing);
-@@ -2436,7 +2470,8 @@ char *CDrawing::XML_input(char * file)
+@@ -2436,7 +2470,7 @@ char *CDrawing::XML_input(char * file)
  				file=mf->XML_read_attribute(attribute,value,file,256);
  				if (file==NULL) return NULL;
  				int ttt=atoi(value);
 -				if (strcmp(attribute,"X1")==0) {di->X1=ttt*DRWZOOM/1000;}
-+	            if(strcmp(attribute,"free")==0 && ttt==1)OriginalForm=3;
 +			if (strcmp(attribute,"X1")==0) {di->X1=ttt*DRWZOOM/1000;}
  				if (strcmp(attribute,"Y1")==0) {di->Y1=ttt*DRWZOOM/1000;}
  				if (strcmp(attribute,"X2")==0) {di->X2=ttt*DRWZOOM/1000;}
  				if (strcmp(attribute,"Y2")==0) {di->Y2=ttt*DRWZOOM/1000;}
+@@ -2493,6 +2527,7 @@ char *CDrawing::XML_input(char * file)
+ 			file=mf->XML_read_attribute(attribute,value,file,256);
+ 			if (file==NULL) return NULL;
+ 			int ttt=atoi(value);
++            if(strcmp(attribute,"free")==0 && ttt==1)OriginalForm=3;
+ 			if ((strcmp(attribute,"t")==0) || (strcmp(attribute,"type")==0)) {int val=atoi(value);di->Type=val%10;if (val>=10) m_Color=val/10-1;}
+ 			if (strcmp(attribute,"X1")==0) {di->X1=ttt*DRWZOOM/1000; }
+ 			if (strcmp(attribute,"Y1")==0) {di->Y1=ttt*DRWZOOM/1000; }
 @@ -3307,6 +3342,15 @@ int CDrawing::SetLineWidth(int width)
  
  int CDrawing::ScaleForFactor(float factorx,float factory)
@@ -4307,7 +4314,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..5d33c45 100644
+index fc832eb..7d28f1e 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,26 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -7085,7 +7092,7 @@ index fc832eb..5d33c45 100644
 +    if(approximate){
 +        try{SymbolicDerivative::Parser parser;SymbolicDerivative::Expr parsed=parser.Parse(NativeSymbolic::Formula(&left));extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);
 +            if(!SymbolicDerivative::Finite(value)){AfxMessageBox("This expression has no finite real approximation, or contains a variable without a value.");return;}
-+            if(value==0 || (fabs(value)>=1e-100 && fabs(value)<=1e100))answer.GenerateASCIINumber(value,0,0,112,0);
++            if(value==0 || (fabs(value)>=1e-100 && fabs(value)<=1e100))answer.GenerateASCIINumber(value,0,value==0?1:0,112,0);
 +            else {int exponent=(int)floor(log10(fabs(value)));double mantissa=value/pow(10.,exponent);if(exponent<-300){mantissa=value/pow(10.,exponent+300);mantissa/=1e-300;}
 +                std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+SymbolicDerivative::Xml(SymbolicDerivative::Make('*',SymbolicDerivative::N(mantissa),SymbolicDerivative::Raw('^',SymbolicDerivative::N(10),SymbolicDerivative::N(exponent))))+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);}
 +        }catch(const std::exception &e){AfxMessageBox(e.what());return;}

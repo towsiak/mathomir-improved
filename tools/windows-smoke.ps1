@@ -528,11 +528,12 @@ try {
   # Smooth a saved polyline, preserve endpoints, and verify Undo byte-for-byte.
   $strokeFixture=Join-Path (Split-Path $exe) 'smart-freehand-smoothing-smoke.mom'
   $pairs=for($i=0;$i -le 200;$i++){$sx=$i*32;$sy=[int](32*(20+10*[Math]::Sin($i/40.0)+$(if($i%2){.75}else{-.75})));"$sx,$sy"}
-  ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw free="1" d="32|'+($pairs -join ';')+'" /></o></mathomir>')|Set-Content $strokeFixture -Encoding ascii
+  $strokeLines=for($i=0;$i -lt 200;$i+=20){'<dw '+$(if($i -eq 0){'free="1" '})+'d="32|'+($pairs[$i..($i+20)] -join ';')+'" />'}
+  ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100">'+($strokeLines -join '')+'</o></mathomir>')|Set-Content $strokeFixture -Encoding ascii
   [MathomirUiProbe]::OpenFile($main,$strokeFixture);Start-Sleep -Milliseconds 500
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$rawStroke=Get-Content $strokeFixture -Raw;$rawObject=$rawStroke.SelectSingleNode('/mathomir/*[1]');$rawXml=$rawObject.OuterXml;$rawPoints=@(ShaderPoints $rawObject)
-  [MathomirUiProbe]::Send($main,273,33092)|Out-Null;[MathomirUiProbe]::Send($main,273,33007)|Out-Null;[MathomirUiProbe]::Send($main,273,33094)|Out-Null
+  [MathomirUiProbe]::Send($main,273,33092)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::Send($main,273,33094)|Out-Null
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$smoothStroke=Get-Content $strokeFixture -Raw;$smoothObject=$smoothStroke.SelectSingleNode('/mathomir/*[1]');$smoothPoints=@(ShaderPoints $smoothObject)
   if($smoothObject.OuterXml -eq $rawXml){throw 'Smooth selected curves left the saved stroke unchanged.'}
@@ -557,7 +558,7 @@ try {
   $formula='<elm tp="3" E1="" E2=""><ex><var t="x" f="00" /></ex><ex><var t="2" f="00" /></ex></elm><opr s="+" /><fun t="sin" f="20" E1=""><ex><var t="x" f="00" /></ex></fun><opr s="+" /><fun t="ln" f="20" E1=""><ex><var t="x" f="00" /></ex></fun>'
   $nativeD='<fra E1="" E2=""><ex><fun t="d" f="20" E1=""><ex>'+ $formula +'</ex></fun></ex><ex><fun t="d" f="20" E1=""><ex><var t="x" f="00" /></ex></fun></ex></fra>'
   ('<?xml version="1.0"?><mathomir><o t="1" X="100" Y="100"><ex>'+ $nativeD +'</ex></o></mathomir>')|Set-Content $inlineFixture -Encoding ascii
-  [MathomirUiProbe]::OpenFile($main,$inlineFixture);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,33007)|Out-Null
+  [MathomirUiProbe]::OpenFile($main,$inlineFixture);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null
   [MathomirUiProbe]::ExecuteKey($view,$false);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$inlineSaved=Get-Content $inlineFixture -Raw
   $inlineRoot=$inlineSaved.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]')
@@ -565,12 +566,12 @@ try {
   if(!$inlineRoot.SelectSingleNode('./fun[@t="cos"] | ./elm[@tp="6"][@tx="cos"]')){Write-Output $inlineRoot.OuterXml;throw 'Direct derivative lost the cosine term.'}
   if(@($inlineRoot.SelectNodes('./fra | ./elm[@tp="4"]')).Count -lt 2){throw 'Direct derivative lost original notation or the 1/x term.'}
   $inlineFirst=$inlineRoot.OuterXml
-  [MathomirUiProbe]::Send($main,273,33007)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$false);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$false);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$inlineAgain=Get-Content $inlineFixture -Raw
   if($inlineAgain.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]').OuterXml -ne $inlineFirst){throw 'Executing again duplicated or changed the correct derivative result.'}
   $approxFixture=Join-Path (Split-Path $exe) 'direct-approximation-smoke.mom'
   '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="100"><ex><elm tp="3" E1="" E2=""><ex><var t="e" f="00" /></ex><ex><var t="p" f="60" /></ex></elm><opr s="-" /><var t="e" f="00" /></ex></o></mathomir>'|Set-Content $approxFixture -Encoding ascii
-  [MathomirUiProbe]::OpenFile($main,$approxFixture);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,33007)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$true);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+  [MathomirUiProbe]::OpenFile($main,$approxFixture);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$true);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
   [xml]$approxSaved=Get-Content $approxFixture -Raw;$approxRoot=$approxSaved.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]')
   $approxText=($approxRoot.SelectNodes('./var | ./elm[@tp="1"]')|ForEach-Object {if($_.HasAttribute('t')){$_.t}else{$_.tx}}) -join '|'
   if($approxText -notmatch '20\.422410804'){Write-Output $approxRoot.OuterXml;throw 'e^pi-e did not get its correct decimal approximation.'}
