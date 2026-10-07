@@ -592,7 +592,7 @@ try {
     [MathomirUiProbe]::Mouse($view,512,0,250,180);[MathomirUiProbe]::Mouse($view,513,1,250,180);[MathomirUiProbe]::Mouse($view,514,0,250,180)
     foreach($character in $typedCase.input.ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$character)|Out-Null}
     $typedError=$null
-    try{[MathomirUiProbe]::ExecuteKey($view,$typedCase.approx)}catch{$typedError=$_.Exception.Message;Write-Output ('Typed operation error '+$typedCase.input+': '+$typedError);$message=[MathomirUiProbe]::Dialog($appProcess.Id);if($message -ne [IntPtr]::Zero){[MathomirUiProbe]::PostMessage($message,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 200}}
+    try{[MathomirUiProbe]::ExecuteKey($view,$typedCase.approx)}catch{$typedError=$_.Exception.Message;Write-Output ('Typed operation error '+$typedCase.input+': '+$typedError);$message=[MathomirUiProbe]::Dialog($appProcess.Id);if($message -ne [IntPtr]::Zero){[MathomirUiProbe]::PostMessage($message,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 200};[MathomirUiProbe]::Send($view,258,13)|Out-Null}
     [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
     [xml]$typedSaved=Get-Content $typedFixture -Raw;$typedRoot=$typedSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
     if($typedError){Write-Output ('Typed expression diagnostic '+$typedCase.input+': '+$typedRoot.OuterXml);$typedFailures+=$typedCase.input;continue}

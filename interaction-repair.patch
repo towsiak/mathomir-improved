@@ -4314,7 +4314,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..7d28f1e 100644
+index fc832eb..21659cd 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,26 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -5382,7 +5382,7 @@ index fc832eb..7d28f1e 100644
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
-+    if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){SurpressCharMessage=1;if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();return;}
++    if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
 +    if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
 +	if (MouseMovingActive && nChar==VK_ESCAPE) { EndGripMove(true); SurpressCharMessage=1; return; }
 +	if (MouseSizingActive && nChar==VK_ESCAPE) { EndMouseSizing(true); SurpressCharMessage=1; return; }
