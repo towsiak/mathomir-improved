@@ -1133,6 +1133,7 @@ try {
   $expected+= [Math]::Exp(-1.37)
   $expected+= ([Math]::Sin(-1.37)/(-1.37))
   for($index=0;$index -lt 11;$index++){
+    $nativeFunctions=Join-Path (Split-Path $exe) ('native-function-'+$index+'-smoke.mom')
     $name=if($index -eq 10){'floor'}else{$functionNames[$index]}
     $axes=@(-3,3,-3,6)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
     $argument='<var t="x" f="00" />'
