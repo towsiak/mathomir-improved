@@ -11,6 +11,11 @@ The exact reported crash has not been reproduced. Mouse resizing and printer
 behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
+- Standard open and filled endpoints for floor, ceil, round, trunc, fract and
+  sgn, including shifted/reversed inputs and isolated included values. Markers
+  follow the actual composed function, respect piecewise exclusions and remain
+  visible across graph ranges. Halfway rounding follows ties away from zero.
+  Excluded piecewise step endpoints use their interior limit.
 - Element allocation type and parent are thread-local. The eight-curve regression
   exposed heap corruption when UI editing and background graph calculation shared
   these temporary allocation settings; independent thread context fixes the race.
