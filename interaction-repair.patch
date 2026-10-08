@@ -8460,10 +8460,10 @@ index 0000000..bebbe21
 +}
 diff --git a/Mathomir/SymbolicDerivative.h b/Mathomir/SymbolicDerivative.h
 new file mode 100644
-index 0000000..bcd9cdc
+index 0000000..f70504e
 --- /dev/null
 +++ b/Mathomir/SymbolicDerivative.h
-@@ -0,0 +1,234 @@
+@@ -0,0 +1,239 @@
 +#pragma once
 +#include <string>
 +#include <vector>
@@ -8680,8 +8680,13 @@ index 0000000..bcd9cdc
 +    std::string s;if(a->op=='n')s=Number(a->number);else if(a->op=='v')s=a->name;else if(a->op=='f')s=a->name+"("+Text(a->a)+")";else if(a->op=='~')s="-"+Text(a->a,2);else{int level=Precedence(a);s=Text(a->a,a->op=='^'?level+1:level)+std::string(1,a->op)+Text(a->b,a->op=='-'||a->op=='/'?level+1:level);}
 +    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="("+s+")";return s;
 +}
++inline std::string NativeNumber(double n){
++    std::string number=Number(fabs(n));size_t position=number.find_first_of("eE");if(position==std::string::npos)return "<var t=\""+number+"\" f=\"00\" />";
++    int exponent=atoi(number.c_str()+position+1);std::string power=(exponent<0?"<opr s=\"-\" />":"")+std::string("<var t=\"")+Number(fabs((double)exponent))+"\" f=\"00\" />";
++    return "<var t=\""+number.substr(0,position)+"\" f=\"00\" /><opr s=\"\xD7\" /><elm tp=\"3\" E1=\"\" E2=\"\"><ex><var t=\"10\" f=\"00\" /></ex><ex>"+power+"</ex></elm>";
++}
 +inline std::string Xml(Expr a,int parent=0){
-+    std::string s;if(a->op=='n'){s=(a->number<0?"<opr s=\"-\" />":"")+std::string("<var t=\"")+Number(std::fabs(a->number))+"\" f=\"00\" />";}
++    std::string s;if(a->op=='n'){s=(a->number<0?"<opr s=\"-\" />":"")+NativeNumber(a->number);}
 +    else if(a->op=='v')s=a->name=="pi"?"<var t=\"p\" f=\"60\" />":"<var t=\""+a->name+"\" f=\"00\" />";
 +    else if(a->op=='~')s="<opr s=\"-\" />"+Xml(a->a,2);
 +    else if(a->op=='/'||a->op=='^'){std::string tag=a->op=='/'?"fra":"elm tp=\"3\"",close=a->op=='/'?"fra":"elm";s="<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(a->a,a->op=='^'?5:0)+"</ex><ex>"+Xml(a->b)+"</ex></"+close+">";}
@@ -8689,7 +8694,7 @@ index 0000000..bcd9cdc
 +        if(a->name=="sqrt")s="<elm tp=\"8\" E1=\"\"><ex>"+Xml(a->a)+"</ex></elm>";
 +        else if(a->name=="abs"||a->name=="floor"||a->name=="ceil")s="<elm tp=\"5\" E1=\"\"><ex br=\"1\" shp=\""+(a->name=="abs"?std::string("|"):a->name=="floor"?std::string("f"):std::string("c"))+"\">"+Xml(a->a)+"</ex></elm>";
 +        else {std::string name=a->name=="asin"?"arcsin":a->name=="acos"?"arccos":a->name=="atan"?"arctan":a->name;s="<fun t=\""+name+"\" f=\"20\" E1=\"\"><ex br=\"1\">"+Xml(a->a)+"</ex></fun>";}
-+    }else {bool coefficient=a->op=='*' && a->a->op=='n' && (a->b->op=='v'||a->b->op=='f'||a->b->op=='^'||Precedence(a->b)==1);
++    }else {bool coefficient=a->op=='*' && a->a->op=='n' && (a->b->op=='v'||a->b->op=='f'||(a->b->op=='^'&&a->b->a->op!='n')||Precedence(a->b)==1);
 +        s=Xml(a->a,Precedence(a))+(coefficient?std::string():"<opr s=\""+(a->op=='*'?std::string("\xD7"):std::string(1,a->op))+"\" />")+Xml(a->b,a->op=='-'?2:Precedence(a));}
 +    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="<elm tp=\"5\" E1=\"\"><ex br=\"1\">"+s+"</ex></elm>";return s;
 +}
