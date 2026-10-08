@@ -102,7 +102,10 @@ function HoverHint($owner,$x,$y,$expected) {
  Check ($text -match $expected) "Incorrect tooltip at ($x,$y): expected $expected; got $text"
 }
 function OpenPalette($x,$y) {
- [FeatureUI]::Send($view,258,27)|Out-Null
+ # An open popup overlaps some main-palette arrows. Dismiss it by clicking blank paper.
+ [FeatureUI]::Mouse($view,512,0,850,500);[FeatureUI]::Mouse($view,513,1,850,500);[FeatureUI]::Mouse($view,514,0,850,500)
+ [FeatureUI]::Send($view,256,27)|Out-Null;[FeatureUI]::Send($view,258,27)|Out-Null
+ Write-Host "Opening palette at ($x,$y)"
  [FeatureUI]::Mouse($toolbox,512,0,$x,$y);[FeatureUI]::Mouse($toolbox,513,1,$x,$y);[FeatureUI]::Mouse($toolbox,514,0,$x,$y)
  Start-Sleep -Milliseconds 150
  $h=[FeatureUI]::Dialog($app.Id,'Subtoolbox');Check ($h -ne [IntPtr]::Zero) 'Palette did not open';return $h

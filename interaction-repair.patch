@@ -9365,7 +9365,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..b6e9339 100644
+index b9c3f38..171eaee 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -10050,7 +10050,7 @@ index b9c3f38..b6e9339 100644
  
  			if (memcmp(keystrokes+l2-l,keycode,l)==0)
  			{
-@@ -5943,102 +6075,24 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
+@@ -5943,102 +6075,43 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
  
  
  int prev_lang_code;
@@ -10163,14 +10163,33 @@ index b9c3f38..b6e9339 100644
 +    char translated[512]={};
 +    if(text && text[0]){if(language_code)CopyTranslatedString(translated,text,language_code,511);else strncpy_s(translated,sizeof(translated),text,_TRUNCATE);}
 +    std::wstring help=MathDisplay::HelpNotation(translated);
-+    if(help.empty() && command && command[0])help=MathDisplay::HelpNotation(command)+L" - insert this mathematical symbol or function.";
++    if(help.empty() && command && command[0]){
++        struct SymbolName{const char *command,*name;};
++        static const SymbolName names[]={
++            {"infty","Infinity"},{"inf","Infinity"},{"oplus","Circled plus / direct sum"},{"ominus","Circled minus"},{"otimes","Circled multiplication / tensor product"},
++            {"times","Multiplication"},{"cdot","Multiplication dot"},{"div","Division"},{"pm","Plus or minus"},{"mp","Minus or plus"},
++            {"eq","Equal to"},{"neq","Not equal to"},{"leq","Less than or equal to"},{"geq","Greater than or equal to"},{"approx","Approximately equal to"},
++            {"equiv","Equivalent or congruent"},{"propto","Proportional to"},{"subset","Proper subset"},{"supset","Proper superset"},
++            {"subseteq","Subset or equal"},{"supseteq","Superset or equal"},{"cup","Set union"},{"cap","Set intersection"},
++            {"in","Member of a set"},{"notin","Not a member of a set"},{"ni","Contains as a member"},{"emptyset","Empty set"},
++            {"forall","For all"},{"exists","There exists"},{"nexists","There does not exist"},{"neg","Logical negation"},
++            {"land","Logical AND"},{"lor","Logical OR"},{"wedge","Logical AND / wedge"},{"vee","Logical OR"},
++            {"rightarrow","Right arrow"},{"leftarrow","Left arrow"},{"leftrightarrow","Two-way arrow"},
++            {"Rightarrow","Implies"},{"Leftarrow","Is implied by"},{"Leftrightarrow","If and only if"},
++            {"parallel","Parallel to"},{"perp","Perpendicular to"},{"angle","Angle"},{"degree","Degree symbol"},
++            {"sqrt","Square root"},{"frac","Fraction"},{"sum","Summation"},{"prod","Product"},{"int","Integral"}
++        };
++        const char *title=command;
++        for(size_t i=0;i<sizeof(names)/sizeof(names[0]);i++)if(strcmp(command,names[i].command)==0){title=names[i].name;break;}
++        help=MathDisplay::HelpNotation(title)+L" - click to insert this mathematical symbol or function.";
++    }
 +    if(accelerator && accelerator[0]){if(!help.empty())help+=L"\n";help+=L"Shortcut: ";help+=MathDisplay::HelpNotation(accelerator);}
 +    if(easycast && easycast[0]){if(!help.empty())help+=L"\n";help+=L"Type: ";help+=MathDisplay::HelpNotation(easycast);}
 +    SetHoverHelp(help);
  }
  
  extern int CalcStructuralChecksumOnly;
-@@ -6063,6 +6117,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6063,6 +6136,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
@@ -10186,7 +10205,7 @@ index b9c3f38..b6e9339 100644
  	if (ToolboxMembers[member].Above[submember]==-1) //drawing element
  	{
  		if (ToolboxMembers[member].userdef_mask&(1<<submember))
-@@ -6078,6 +6141,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6078,6 +6160,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  		else
  		{
  			IsDrawingMode=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;
