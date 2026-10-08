@@ -1309,6 +1309,7 @@ try {
   Write-Output 'Native function graphs passed: all ten negative-input curves evaluate and paint, floor steps have no false connector, and all six step functions paint open/filled endpoints including negative round ties.'
 
   foreach($span in @(.001,3.2,12)){
+    $nativeFunctions=Join-Path (Split-Path $exe) ('native-floor-range-'+$span+'-smoke.mom')
     $axes=@(-$span,$span,-3,3)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
     $slot='<subexp d="0,0;4000,1000"><ex fh="100"><elm tp="5" E1=""><ex br="1" shp="f"><var t="x" f="00" /></ex></elm></ex></subexp>'
     ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axes -join '')+$slot+'</o></mathomir>')|Set-Content $nativeFunctions -Encoding ascii
