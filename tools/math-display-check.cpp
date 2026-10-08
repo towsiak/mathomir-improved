@@ -24,6 +24,22 @@ int main(){
  row.low=-1.25;row.high=.1;row.rightClosed=true;
  assert(row.DisplayInterval()==L"[\u22121.25, 0.1]");
  row.high=inf;assert(row.DisplayInterval()==L"[\u22121.25, +\u221e)");
+
+ // Display choices affect presentation only and do not merge interval bounds.
+ auto &o=MathDisplay::Options();o.mode=1;o.digits=2;o.trailingZeros=false;
+ assert(Number(1.236)==L"1.24");assert(Number(-1.236)==L"\u22121.24");
+ assert(Number(-.0001)==L"0");assert(Number(1e20)==L"1 \u00d7 10\u00b2\u2070");
+ o.trailingZeros=true;assert(Number(2.5)==L"2.50");assert(Number(-.0001)==L"0.00");
+ assert(MathDisplay::Count(4)==L"4");
+ assert(MathDisplay::ApproximationXml(2.5).find("t=\"2.50\"")!=std::string::npos);
+ assert(MathDisplay::ApproximationXml(-.0001).find("<opr s=\"-\"")==std::string::npos);
+ assert(Number(1e-9,true)!=L"0.00");
+ row.low=1.001;row.high=1.002;assert(row.DisplayInterval()==L"[1.001, 1.002]");
+ o.mode=2;o.digits=3;assert(Number(12.345)==L"12.3");assert(Number(.0012)==L"0.00120");
+ assert(Number(1)==L"1.00");assert(Number(0)==L"0.00");assert(Number(1000)==L"1.00 \u00d7 10\u00b3");
+ o.digits=5;assert(Number(1000)==L"1000.0");
+ o.trailingZeros=false;assert(Number(1)==L"1");
+ o=MathDisplay::Rounding();
  // Formatting must leave full-precision saved bounds and formulas untouched.
  const double exact=.12345678901234566;row.low=exact;
  const std::string saved=Piecewise::Number(row.low);row.DisplayInterval();

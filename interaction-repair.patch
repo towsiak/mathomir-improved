@@ -1422,8 +1422,59 @@ index 36238b0..5ad0c9a 100644
  	int PlotterReleaseVariablePositions(void *VarPos);
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
+diff --git a/Mathomir/FeatureHelp.h b/Mathomir/FeatureHelp.h
+new file mode 100644
+index 0000000..7eaf819
+--- /dev/null
++++ b/Mathomir/FeatureHelp.h
+@@ -0,0 +1,45 @@
++#pragma once
++#include "Resource.h"
++#include "MathDisplay.h"
++#include <map>
++#include <commctrl.h>
++
++class CFeatureTooltips {
++    HWND window,parent;std::map<UINT_PTR,std::wstring> texts;
++public:
++    CFeatureTooltips():window(NULL),parent(NULL){}
++    ~CFeatureTooltips(){if(::IsWindow(window))::DestroyWindow(window);}
++    void Create(HWND owner){if(::IsWindow(window))return;parent=owner;texts.clear();window=::CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,L"",WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,owner,NULL,AfxGetInstanceHandle(),NULL);
++        if(window){::SendMessage(window,TTM_SETMAXTIPWIDTH,0,420);::SendMessage(window,TTM_SETDELAYTIME,TTDT_INITIAL,500);::SendMessage(window,TTM_SETDELAYTIME,TTDT_AUTOPOP,15000);::SendMessage(window,TTM_SETDELAYTIME,TTDT_RESHOW,100);}}
++    HWND Handle()const{return window;}
++    void Add(HWND control,const std::wstring &text){if(!control||!::IsWindow(window))return;UINT_PTR key=(UINT_PTR)control;TOOLINFOW info={};info.cbSize=sizeof(info);info.hwnd=parent;info.uId=key;::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[key]=text;info.uFlags=TTF_IDISHWND|TTF_SUBCLASS;info.lpszText=(LPWSTR)texts[key].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);}
++    void Relay(MSG *message){if(::IsWindow(window))::SendMessage(window,TTM_RELAYEVENT,0,(LPARAM)message);}
++    void Hover(HWND owner,int key,const RECT &area,const char *help){Create(owner);std::wstring text=MathDisplay::HelpNotation(help?help:"");UINT_PTR id=1;TOOLINFOW info={};info.cbSize=sizeof(info);info.hwnd=owner;info.uId=id;
++        if(text.empty()){::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts.erase(id);return;}
++        if(texts[id]==text){info.rect=area;::SendMessageW(window,TTM_NEWTOOLRECTW,0,(LPARAM)&info);return;}
++        ::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[id]=text;info.uFlags=TTF_SUBCLASS;info.rect=area;info.lpszText=(LPWSTR)texts[id].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);
++    }
++};
++inline const char *FeatureControlHelp(int dialog,int id){
++    if(id==IDOK&&(dialog==IDD_NUMBER_FORMAT||dialog==IDD_ABOUTBOX))return "Close this dialog.";
++    if(id==32482)return "Display rounding changes numerical presentation; it does not change source values or exact symbolic results.";
++    if(id==32480)return "Choose automatic formatting, 0-8 decimal places, or 3-12 significant figures. Applies to numerical readouts and new approximations. Graphs, source values and exact mathematics retain full precision.";
++    if(id==32481)return "Keep trailing zeroes to show the selected precision, for example 2.50 rather than 2.5. Negative zero is suppressed.";
++    if(id==IDCANCEL)return "Close without placing or changing a page object. Display-rounding preferences apply immediately.";
++    if(id==IDOK)return dialog==IDD_FEATURE_SEARCH?"Run the selected feature.":dialog==IDD_ROTATE_EQUATION?"Apply the typed rotation angle.":"Place the prepared result, then click on the page. Invalid input must be corrected first.";
++    if(dialog==IDD_PIECEWISE){if(id>=1200&&id<1240){static const char *tips[]={"Formula for this piece. Use x, powers, fractions and functions such as sin(x), floor(x), sqrt(x) or ln(x). A blank row is unused.","Lower endpoint. Leave blank for negative infinity. Constants such as 1/2 and pi are accepted.","Include the lower endpoint: filled dot. Unchecked excludes it: open circle. Infinite endpoints never have dots.","Upper endpoint. Leave blank for positive infinity. The interval must not overlap another piece.","Include the upper endpoint: filled dot. Unchecked excludes it: open circle. Included endpoints must be defined."};return tips[(id-1200)%5];}
++        if(id>=1170&&id<=1173)return "Load an editable example; this replaces the current dialog rows.";
++        if(id==1180)return "Use radians in trigonometric formulas. Uncheck to use degrees. This is separate from pi-fraction axis labels.";
++        if(id>=1181&&id<=1184)return "Initial graph-window bound. Enter a finite constant. Minimum must be less than maximum; these bounds retain full precision.";
++        if(id==1185)return "Validate formulas, endpoints, overlapping intervals and graph bounds without placing a graph.";
++        if(id==1186)return "Value of x to evaluate. Accepts constants such as 0, 1/2 or pi/3.";
++        if(id==1187)return "Evaluate the applicable piece at x, respecting open/closed endpoints and gaps.";
++        if(id==1188)return "Definition checks and evaluated values. Display rounding changes numbers here, not the saved definition.";}
++    if(dialog==IDD_SYMBOLIC_DERIVATIVE){if(id==1300)return "Enter a symbolic formula. Supports products, quotients, chain rules and functions such as sin(x), exp(x), ln(x), sqrt(x) and x^x.";if(id==1301)return "Single differentiation variable. Other variables are treated as constant parameters.";if(id==1302)return "Choose the first through fifth derivative. Higher orders repeatedly differentiate the symbolic result.";if(id==1303)return "Compute and simplify the derivative symbolically, then show rules and domain notes.";if(id==1304)return "Typeset editable result. Exact coefficients and expressions are preserved.";if(id==1305)return "Formula syntax for the derivative, useful for copying or inspecting the expression.";if(id==1306)return "Include the original derivative operation and equals sign when placing the result.";if(id==1307)return "Evaluation point; constants such as 1/2 and pi/3 are accepted. Trigonometric derivatives use radians.";if(id==1308)return "Evaluate the current derivative at the typed point. Unsupported parameters or undefined points are explained.";if(id==1309)return "Numerical derivative value or validation message, using your display-rounding choice.";if(id>=1310&&id<=1313)return "Load and differentiate an editable example.";if(id==1314)return "Rules used and domain limitations. Differentiation does not restore excluded points.";}
++    if(dialog==IDD_STATISTICS_REGRESSION){if(id==1340)return "Paste up to 256 x,y pairs, one per line. Separate columns with commas, tabs, semicolons or spaces. An x,y header is optional; data are kept at full precision.";if(id==1341)return "Linear; polynomial degrees 2-6; exponential; logarithmic; or power fit. Exponential/power least squares fits ln(y); quality statistics use original y. Logarithmic/power require x > 0; exponential/power require y > 0.";if(id==1342)return "Calculate the selected least-squares fit, summaries, residuals and preview. Invalid or singular data produce an explanation.";if(id==1343)return "Replace the dialog data with an example for the selected model, then calculate it.";if(id==1344)return "Blue dots show data; the black curve is the fitted model. Residual mode shows observed minus predicted y with a zero line.";if(id==1345)return "Legend for the current scatter or residual preview.";if(id==1346)return "Column summaries, quartiles, sample/population SD, Pearson r, R-squared, SSE, RMSE and residual standard error. Residuals are observed minus predicted y. Undefined statistics are identified explicitly.";if(id==1347)return "Place or preview residuals instead of observed y. Original data remain saved for editing and refitting.";if(id==1348)return "Fit quality, prediction or validation message. R-squared is undefined for constant responses.";if(id==1349)return "Place the typeset fitted equation with an approximate-equals sign. Logarithmic and power fits show x > 0.";if(id==1350)return "Typeset fitted equation. Rounding controls numerical readouts; the fit itself retains full precision.";if(id==1351)return "Prediction x value, such as 2, 1/2 or pi. Predictions outside the data range are extrapolations.";if(id==1352)return "Evaluate the fitted model at the typed x. Logarithmic/power predictions require x > 0.";}
++    if(dialog==IDD_POLYGON_CONSTRUCTOR){static const char *tips[]={"Construct a regular polygon with equally spaced vertices.","Construct a polygon from typed vertices in boundary order. Concave outlines are allowed; crossings are rejected.","Choose a regular preset; the side count remains editable.","Whole-number side count from 3 to 64.","Interpret the size value as circumradius or side length.","Coordinate-space circumradius or side length; this determines area/perimeter, independently of page size.","Rotation in degrees around the polygon centre.","Reverse the regular polygon's winding direction.","Enter ordered vertices such as (0,0), (4,0), (4,3). Constants and concave outlines are supported.","", "Convert the regular polygon to editable custom coordinates.","Load a custom concave example.","Reverse vertex order without changing the outline.","Page drawing size, 40-1000 units. Resizing the page object does not change coordinate-space measurements.","Outline width, a whole number from 1 to 8.","Show vertex labels.","Show each vertex's coordinate pair.","Draw diagonals between nonadjacent vertices.","Area, perimeter and validation message. Rounding affects displayed measurements only.","Preview uses equal horizontal and vertical scales. Labels and markers update live.","Show interior-angle markers, including reflex angles in concave polygons.","Show numerical interior-angle values in degrees."};if(id>=1280&&id<=1301)return tips[id-1280];}
++    if(dialog==IDD_UNIT_CIRCLE){if(id==IDC_UNIT_START||id==IDC_UNIT_END)return "Angle measured from the positive x-axis, in the selected units. Negative angles and up to ten turns are allowed; radians accept pi/6.";if(id==IDC_UNIT_MODE)return "Degrees or radians for all angle entries, including extra points. Pi fractions may be entered in radians.";if(id==IDC_UNIT_DIRECTION)return "Choose clockwise or counterclockwise arc direction.";if(id==IDC_UNIT_RADIUS)return "Page radius from 60 to 600. The mathematical unit-circle coordinates remain unchanged when resized.";if(id==IDC_UNIT_LABELS)return "Show start/end and selected point angles.";if(id==IDC_UNIT_COORDINATES)return "Show point coordinates. Common angles keep exact fractions and radicals.";if(id==IDC_UNIT_COMMON)return "Add standard teaching angles and points around the circle.";if(id==IDC_UNIT_TRIANGLE)return "Draw the end-angle right triangle with horizontal and vertical components.";if(id==IDC_UNIT_POINTS)return "Mark start, end, common and extra point locations on the circle.";if(id==IDC_UNIT_POINT_ANGLES)return "Optional comma-separated angles, up to 32, in the selected units. Example: pi/6, pi/4, 2*pi/3.";}
++    if(dialog==IDD_TABLE_SETUP){if(id==IDC_TABLE_ROWS)return "Number of table rows, 1-20.";if(id==IDC_TABLE_COLUMNS)return "Number of table columns, 1-12; use at least two cells overall.";if(id==IDC_TABLE_FONT)return "Editable cell font size, 40-800 percent.";if(id==IDC_TABLE_BORDERS)return "All grid lines, outer border, header separator or no borders.";if(id==IDC_TABLE_ALIGN)return "Align each cell's content left, centre or right. Tab moves between editable cells.";}
++    if(dialog==IDD_ROTATE_EQUATION){if(id==IDC_ROTATION_ANGLE)return "Rotation in degrees: positive clockwise, negative counterclockwise. Decimals are accepted; 0 straightens the object.";if(id==IDC_ROTATION_MOUSE)return "Rotate by dragging the object handle. Hold Shift for 15-degree steps; Escape cancels.";}
++    return NULL;
++}
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..ac634c4 100644
+index 1ef18dd..cdc909f 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -2140,7 +2191,19 @@ index 1ef18dd..ac634c4 100644
 -				c=Ymax-(Ymax-Ymin)*(double)max(m_Y1,m_Y2)/(double)Ylen;
 -				d=Ymax-(Ymax-Ymin)*(double)min(m_Y1,m_Y2)/(double)Ylen;
 -				if (m_Y1==m_Y2) {c=Ymin-(Ymax-Ymin);d=Ymax+(Ymax-Ymin);}
--
++        if (TheState==102) // box zoom; tiny gestures zoom gently around the pointer
++        {
++            int width=max(1,(Base->Items)->X2/DRWZOOM-MX);
++            int height=max(1,(Base->Items+1)->Y2/DRWZOOM-MY);
++            double xmin,xmax,ymin,ymax; PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
++            bool click=abs(m_X2-m_X1)*ViewZoom/100<8 || abs(m_Y2-m_Y1)*ViewZoom/100<8;
++            double x1=(m_X1-MX)/(double)width,x2=(m_X2-MX)/(double)width;
++            double y1=1-m_Y1/(double)height,y2=1-m_Y2/(double)height;
++            if (click) { GraphZoom::Zoom(xmin,xmax,0.8,is_x_log,GraphZoom::Clamp(x1,0,1)); GraphZoom::Zoom(ymin,ymax,0.8,is_y_log,GraphZoom::Clamp(y1,0,1)); }
++            else { GraphZoom::Box(xmin,xmax,x1,x2,is_x_log); GraphZoom::Box(ymin,ymax,y1,y2,is_y_log); }
++            SetBounds(xmin,xmax,ymin,ymax); TheState=0; PlotFunction(1); return 0;
++        }
+ 
 -				Ymin=c;
 -				Ymax=d;
 -			}
@@ -2178,19 +2241,7 @@ index 1ef18dd..ac634c4 100644
 -			
 -
 -			return 0;
-+        if (TheState==102) // box zoom; tiny gestures zoom gently around the pointer
-+        {
-+            int width=max(1,(Base->Items)->X2/DRWZOOM-MX);
-+            int height=max(1,(Base->Items+1)->Y2/DRWZOOM-MY);
-+            double xmin,xmax,ymin,ymax; PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
-+            bool click=abs(m_X2-m_X1)*ViewZoom/100<8 || abs(m_Y2-m_Y1)*ViewZoom/100<8;
-+            double x1=(m_X1-MX)/(double)width,x2=(m_X2-MX)/(double)width;
-+            double y1=1-m_Y1/(double)height,y2=1-m_Y2/(double)height;
-+            if (click) { GraphZoom::Zoom(xmin,xmax,0.8,is_x_log,GraphZoom::Clamp(x1,0,1)); GraphZoom::Zoom(ymin,ymax,0.8,is_y_log,GraphZoom::Clamp(y1,0,1)); }
-+            else { GraphZoom::Box(xmin,xmax,x1,x2,is_x_log); GraphZoom::Box(ymin,ymax,y1,y2,is_y_log); }
-+            SetBounds(xmin,xmax,ymin,ymax); TheState=0; PlotFunction(1); return 0;
-+        }
- 
+-
 -		}
  		if (TheState==3) //moving the plot with mouse finished
  		{
@@ -2380,9 +2431,25 @@ index 1ef18dd..ac634c4 100644
  	return 1;
  }
  #pragma optimize("",on)
-@@ -1361,13 +1332,13 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1360,14 +1331,29 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+ 
  int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  {
++    extern void ShowFeatureCanvasHint(int key,const char *help);
++    struct HintScope{CFunctionPlotter *plot;bool active;HintScope(CFunctionPlotter *p,bool a):plot(p),active(a){}~HintScope(){if(!active)return;int state=plot->TheState;const char *help=NULL;
++        if(state==1)help="Zoom out around the current graph window.";
++        else if(state==2||state==100)help="Zoom in. Click for a gentle zoom, or drag a rectangle to choose the visible region.";
++        else if(state>=4&&state<=7)help="Click to edit this graph-window limit. Press Enter to apply; Escape cancels. Limits retain full precision.";
++        else if(state>=8&&state<=15)help="Click to edit this curve's expression. Use functions such as floor(x), ceil(x) and sin(x), or x=constant for a vertical line. Piecewise graphs use their table editor.";
++        else if(state==17)help="Switch horizontal-axis labels between decimal numbers and multiples of pi. This changes labels, independently of RAD/DEG calculation mode.";
++        else if(state==16)help="Toggle graph analysis: inspect numerical values and other analysis controls.";
++        else if(state==99)help="Automatically choose a vertical range that fits the plotted curves.";
++        else if(state==98)help="Switch axis scaling between linear and logarithmic. Logarithmic axes require positive values.";
++        else if(state==95||state==97)help="Drag along this axis to stretch its visible range. Editable end limits set an exact window.";
++        else if(state==0)help="Drag the graph interior to pan. Use + and - to zoom; drag the outer corner grip to enlarge the entire graph.";
++        if(help)ShowFeatureCanvasHint(100+state,help);
++    }} hintScope(this,X!=0x7FFFFFFF&&MouseMode==0&&!IsDrawingMode&&!KeyboardEntryObject);
++
  	if ((TheState>=104)) return 0; //if keyboard editing limits
 -	if ((MouseMode!=0) || (IsDrawingMode) ||(X==0x7FFFFFFF)) 
 -	{	
@@ -2397,7 +2464,7 @@ index 1ef18dd..ac634c4 100644
  		}
  		return 0;
  	}
-@@ -1377,10 +1348,16 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1377,10 +1363,16 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  	mx=(SpecialDrawingHover->absolute_X-ViewX)*ViewZoom/100;
  	my=(SpecialDrawingHover->absolute_Y-ViewY)*ViewZoom/100;
  
@@ -2416,7 +2483,7 @@ index 1ef18dd..ac634c4 100644
  	if (TheState==100)
  	{
  		//zoom in mode
-@@ -1400,7 +1377,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1400,7 +1392,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		}
  		return 0;
  	}
@@ -2425,7 +2492,7 @@ index 1ef18dd..ac634c4 100644
  	if (TheState==3)
  	{
  		//ploter view scrolling (mouse click and drag)
-@@ -1452,7 +1429,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1452,7 +1444,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  			(TheState!=4))
  		{
  			TheState=0;
@@ -2434,7 +2501,7 @@ index 1ef18dd..ac634c4 100644
  		}
  
  		TheState=4;
-@@ -1467,10 +1444,10 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1467,10 +1459,10 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		p[4].x=p[0].x-n1;		p[4].y=p[0].y+n3;
  		p[5].x=p[0].x-n1;		p[5].y=p[0].y+n2;
  		p[6].x=p[0].x-n2;		p[6].y=p[0].y+n2;
@@ -2447,7 +2514,7 @@ index 1ef18dd..ac634c4 100644
  		DeleteObject(brush);
  	}
  	else if ((abs(SpecialDrawingHover->Length-X)<MX/4) && (Y>SpecialDrawingHover->Below-MY))
-@@ -1487,7 +1464,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1487,7 +1479,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		p[2].x=p[0].x-n1;		p[2].y=p[0].y+n3;
  		p[3].x=p[0].x-n1;		p[3].y=p[0].y+n2;
  		p[4].x=p[0].x-n2;		p[4].y=p[0].y+n2;
@@ -2456,7 +2523,7 @@ index 1ef18dd..ac634c4 100644
  		HBRUSH brush=CreateSolidBrush(BLUE_COLOR);
  		DC->SelectObject(brush);
  
-@@ -1502,7 +1479,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1502,7 +1494,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  			(TheState!=6))
  		{
  			TheState=0;
@@ -2465,7 +2532,7 @@ index 1ef18dd..ac634c4 100644
  		}
  		TheState=6;
  		POINT p[7];
-@@ -1520,7 +1497,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1520,7 +1512,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		DC->SelectObject(GetPenFromPool(1,1));
  		HBRUSH brush=CreateSolidBrush(BLUE_COLOR);
  		DC->SelectObject(brush);
@@ -2474,7 +2541,7 @@ index 1ef18dd..ac634c4 100644
  		DeleteObject(brush);
  
  	}
-@@ -1538,7 +1515,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1538,7 +1530,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		p[2].x=p[0].x-n2;		p[2].y=p[0].y+n1;
  		p[3].x=p[0].x-n3;		p[3].y=p[0].y+n1;
  		p[4].x=p[0].x-n3;		p[4].y=p[0].y;
@@ -2483,7 +2550,7 @@ index 1ef18dd..ac634c4 100644
  		HBRUSH brush=CreateSolidBrush(BLUE_COLOR);
  		DC->SelectObject(brush);
  		DC->Polygon(p,5);
-@@ -1559,17 +1536,13 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1559,17 +1551,13 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  				if ((Y<ToolboxSize*30/ViewZoom) && (X>MX+ToolboxSize*66/ViewZoom) && (X<MX+ToolboxSize*100/ViewZoom))
  					new_mode=99;
  				if ((Y<ToolboxSize*30/ViewZoom) && (X>MX+ToolboxSize*100/ViewZoom) && (X<MX+ToolboxSize*133/ViewZoom))
@@ -2506,7 +2573,7 @@ index 1ef18dd..ac634c4 100644
  		if (TheState!=new_mode) {TheState=new_mode;return 1;}
  		return 0;
  	}
-@@ -1586,7 +1559,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1586,7 +1574,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		m_Y2=Y;
  		m_Y1=Y;
  		return 1;
@@ -2515,7 +2582,7 @@ index 1ef18dd..ac634c4 100644
  	}
  	else if ((Y>SpecialDrawingHover->Below-MY) && (X>MX))
  	{
-@@ -1595,14 +1568,14 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1595,14 +1583,14 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		m_X2=X;
  		m_X1=X;
  		return 1;
@@ -2533,7 +2600,7 @@ index 1ef18dd..ac634c4 100644
  			return 1;
  		}
  
-@@ -1611,23 +1584,173 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1611,23 +1599,173 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  	return 0;
  }
  
@@ -2713,7 +2780,7 @@ index 1ef18dd..ac634c4 100644
  		ViewZoom=::ViewZoom;
  	int Xlen;
  	int Ylen;
-@@ -1641,12 +1764,11 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1641,12 +1779,11 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		{
  			abort_request=1;
  			Sleep(10);
@@ -2730,7 +2797,7 @@ index 1ef18dd..ac634c4 100644
  			}
  			cnt++;
  		}
-@@ -1660,6 +1782,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1660,6 +1797,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		//reduce for size of 'borders' (coordinate system)
  		Xlen-=MX*ViewZoom/100;
  		Ylen-=MY*ViewZoom/100;
@@ -2738,7 +2805,7 @@ index 1ef18dd..ac634c4 100644
  
  		//delete the previous bitmap, if dimensions are different
  		if (Plot)
-@@ -1695,7 +1818,10 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1695,7 +1833,10 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  			sa.bInheritHandle=FALSE;
  			sa.lpSecurityDescriptor=NULL;
  			sa.nLength=sizeof(sa);
@@ -2750,7 +2817,7 @@ index 1ef18dd..ac634c4 100644
  			return 1;
  		}
  	}
-@@ -1711,36 +1837,55 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1711,36 +1852,55 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	tDocumentStruct *ds=TheDocument;
  	int i_cnt;
  	for (i_cnt=0;i_cnt<NumDocumentElements;i_cnt++,ds++)
@@ -2819,7 +2886,7 @@ index 1ef18dd..ac634c4 100644
  				any_found=1;
  			}
  		}
-@@ -1748,30 +1893,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1748,30 +1908,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	if (!any_found) return 0;
  
  	any_function_defined=1;
@@ -2859,7 +2926,7 @@ index 1ef18dd..ac634c4 100644
  				delete Func[kk];
  				Func[kk]=NULL;
  			}
-@@ -1780,32 +1927,51 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1780,32 +1942,51 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  
  	//create an arrays that will hold Y calculated values
@@ -2925,7 +2992,7 @@ index 1ef18dd..ac634c4 100644
  		  (GetKeyState(33)&0x8000) ||
  		  (GetKeyState(34)&0x8000) ||
  		  (GetKeyState(VK_LEFT)&0x8000) ||
-@@ -1818,7 +1984,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1818,7 +1999,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		}
  
  		//compute 'y' value in this point 'x'
@@ -2934,7 +3001,7 @@ index 1ef18dd..ac634c4 100644
  		{
  			if (abort_request) break;
  			if (Func[kk])
-@@ -1828,72 +1994,50 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1828,72 +2009,50 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  					X=((double)i+0)*f1+Xmin;
  				else
  					X=Xmin*pow(10.0,i*f2);
@@ -3037,7 +3104,7 @@ index 1ef18dd..ac634c4 100644
  
  			//compute scaling factors
  			double F1=(is_y_log==0)?((double)Ylen/(double)(Ymax-Ymin)):((double)Ylen/log10(Ymax/Ymin));
-@@ -1901,8 +2045,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1901,8 +2060,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  			//now we start drawing pre-calculated points into the plotter bitmap
  			if (!abort_request)
@@ -3048,7 +3115,7 @@ index 1ef18dd..ac634c4 100644
  					if (Func[kk])
  					{
  						double Y=(is_y_log==0)?((double)(*(YY[kk]+j)-Ymin)):(log10(*(YY[kk]+j))-log10(Ymin));
-@@ -1913,7 +2057,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1913,7 +2072,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  						double Y2=Y;
  						if (analyze)
  						{
@@ -3057,7 +3124,7 @@ index 1ef18dd..ac634c4 100644
  							if ((j>1) && (j<i-1))
  							{
  								double n,a,b,c,d;
-@@ -1924,14 +2068,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1924,14 +2083,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								d=*(YY[kk]+j+2);
  								if ((b>a) && (b>c)) special_point=1; //maximum
  								if ((b<a) && (b<c)) special_point=2; //minimum
@@ -3075,7 +3142,7 @@ index 1ef18dd..ac634c4 100644
  								if (Func[zz])
  								{
  									double a2,b2,c2;
-@@ -1970,11 +2114,40 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1970,11 +2129,40 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  						if (Y>16000) Y=16000;
  						if (Y<-16000) Y=-16000;
@@ -3118,7 +3185,7 @@ index 1ef18dd..ac634c4 100644
  							mDC.MoveTo(Xp,Ylen-(int)prevy[kk]);
  							mDC.LineTo(X,Ylen-(int)Y);
  
-@@ -1990,13 +2163,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1990,13 +2178,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								}
  								else //paint colored point
  									mDC.FillSolidRect(X-2,zed-2,4,4,RGB(255,0,(special_point==3)?255:0));
@@ -3134,7 +3201,7 @@ index 1ef18dd..ac634c4 100644
  								double Xd;
  								if (is_x_log==0)
  								{
-@@ -2015,7 +2188,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2015,7 +2203,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  								double Yd=*(YY[kk]+j);
  								double Ydd=fabs(*(YY[kk]+j-1)-Yd);
@@ -3143,7 +3210,7 @@ index 1ef18dd..ac634c4 100644
  								{
  									if (is_y_log==0)
  										ShowNumberWithPrecision(Yd,max(Ydd,1/F1/density),txt2);
-@@ -2026,31 +2199,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2026,31 +2214,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								mDC.SetBkMode(TRANSPARENT);
  								if (special_point==1) //maximum
  								{
@@ -3184,7 +3251,7 @@ index 1ef18dd..ac634c4 100644
  
  			if ((analyze) && (i==density*Xlen-1) && (!abort_request) && (PrintDC==NULL) && (Func[0]) && (is_x_log==0))
  			{
-@@ -2060,7 +2233,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2060,7 +2248,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  				for (int j=0;j<=i;j++)
  				if (!_isnan(*(YY[0]+j)))
  				{
@@ -3193,7 +3260,7 @@ index 1ef18dd..ac634c4 100644
  					if (j<i)
  						Integral+=(*(YY[0]+j)+*(YY[0]+j+1))*f1/2.0;
  					else
-@@ -2076,27 +2249,57 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2076,27 +2264,57 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  					mDC.SetTextColor(0);
  					char tt[64];strcpy(tt,"Int=");
  					ShowNumberWithPrecision(Integral,f1,tt);
@@ -3259,7 +3326,7 @@ index 1ef18dd..ac634c4 100644
  			Func[kk]->PlotterReleaseVariablePositions(VarPos[kk]);
  			delete Func[kk];
  		}
-@@ -2107,12 +2310,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2107,12 +2325,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	return 0;
  }
  
@@ -3313,7 +3380,7 @@ index 1ef18dd..ac634c4 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+5)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2129,7 +2372,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2129,7 +2387,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=5)
@@ -3322,7 +3389,7 @@ index 1ef18dd..ac634c4 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+4)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2146,7 +2389,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2146,7 +2404,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=8)
@@ -3331,7 +3398,7 @@ index 1ef18dd..ac634c4 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+7)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2163,7 +2406,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2163,7 +2421,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=7)
@@ -3340,7 +3407,7 @@ index 1ef18dd..ac634c4 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+6)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2193,12 +2436,15 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2193,12 +2451,15 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		if (*Ymax<=1e-100) *Ymax=1;
  		if (*Ymin<=1e-100) *Ymin=*Ymax/1e+10;
  	}
@@ -3356,7 +3423,7 @@ index 1ef18dd..ac634c4 100644
  	precision=fabs(precision);
  	if (precision<1e-100) precision=1e-100;
  
-@@ -2246,7 +2492,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
+@@ -2246,7 +2507,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
  	if (t[0]=='-') {isminus=1;memmove(t,t+1,strlen(t));}
  
  	//leading zeros
@@ -3776,10 +3843,10 @@ index f751ecf..a702205 100644
  	int text_len=(int)strlen(text);
 diff --git a/Mathomir/MathDisplay.h b/Mathomir/MathDisplay.h
 new file mode 100644
-index 0000000..0b7e258
+index 0000000..63c0087
 --- /dev/null
 +++ b/Mathomir/MathDisplay.h
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,86 @@
 +#pragma once
 +#include <string>
 +#include <cmath>
@@ -3789,6 +3856,7 @@ index 0000000..0b7e258
 +#include <locale>
 +#include <cstdlib>
 +#include <cctype>
++#include <algorithm>
 +
 +// Presentation only: formulas, editable numbers and saved data retain their
 +// original precision and syntax. Use wide text with Unicode Windows APIs.
@@ -3808,14 +3876,33 @@ index 0000000..0b7e258
 +    if(e!=std::string::npos)out+=L" \u00d7 10"+Superscript(std::atoi(text.c_str()+e+1));
 +    return out;
 +}
-+inline std::wstring Number(double value) {
-+    if(value!=value)return L"Undefined";
-+    if(value==std::numeric_limits<double>::infinity())return L"+\u221e";
-+    if(value==-std::numeric_limits<double>::infinity())return L"\u2212\u221e";
-+    if(value==0)return L"0"; // Suppress negative zero, without hiding small values.
-+    std::ostringstream text;text.imbue(std::locale::classic());text<<std::setprecision(12)<<value;
-+    return NumericText(text.str());
++struct Rounding {int mode,digits;bool trailingZeros;Rounding():mode(0),digits(12),trailingZeros(false){}};
++inline Rounding &Options(){static Rounding settings;return settings;}
++inline std::string AsciiNumber(double value,bool protectSmall=false){
++    if(!std::isfinite(value))return value!=value?"undefined":value<0?"-inf":"inf";
++    const Rounding &s=Options();int digits=(std::max)(0,(std::min)(s.mode==1?8:12,s.digits));
++    std::ostringstream out;out.imbue(std::locale::classic());
++    if(s.mode==1){if(std::fabs(value)>=1e12)out<<std::scientific;else out<<std::fixed;out<<std::setprecision(digits)<<value;}
++    else out<<std::setprecision(s.mode==2?(std::max)(1,digits):12)<<value;
++    std::string text=out.str();if(protectSmall&&value!=0&&std::strtod(text.c_str(),0)==0){std::ostringstream tiny;tiny.imbue(std::locale::classic());tiny<<std::setprecision(s.mode==2?(std::max)(1,digits):3)<<value;text=tiny.str();}
++    if(std::strtod(text.c_str(),0)==0&&!text.empty()&&text[0]=='-')text.erase(0,1);
++    size_t exponent=text.find_first_of("eE"),end=exponent==std::string::npos?text.size():exponent;size_t dot=text.find('.');
++    if(!s.trailingZeros&&dot<end){while(end>dot+1&&text[end-1]=='0'){text.erase(end-1,1);end--;}if(end==dot+1)text.erase(dot,1);}
++    if(s.mode==2&&s.trailingZeros){exponent=text.find_first_of("eE");end=exponent==std::string::npos?text.size():exponent;bool begun=false;int significant=0;for(size_t i=0;i<end;i++)if(std::isdigit((unsigned char)text[i])){if(text[i]!='0'||begun){begun=true;significant++;}}if(!begun)significant=1;if(significant<digits){if(text.find('.')>=end){text.insert(end,".");end++;}text.insert(end,digits-significant,'0');}}
++    return text;
 +}
++
++// Typeset rounded approximations without losing requested trailing zeroes.
++inline std::string ApproximationXml(double value){
++    std::string n=AsciiNumber(value),sign;if(!n.empty()&&n[0]=='-'){sign="<opr s=\"-\" />";n.erase(0,1);}
++    size_t e=n.find_first_of("eE");std::string mantissa=e==std::string::npos?n:n.substr(0,e);
++    std::string xml=sign+"<var t=\""+mantissa+"\" f=\"00\" />";
++    if(e!=std::string::npos){int exponent=std::atoi(n.c_str()+e+1);xml+="<opr s=\"\xD7\" /><elm tp=\"3\" E1=\"\" E2=\"\"><ex><var t=\"10\" f=\"00\" /></ex><ex>";if(exponent<0)xml+="<opr s=\"-\" />";xml+="<var t=\""+std::to_string(std::abs(exponent))+"\" f=\"00\" /></ex></elm>";}
++    return xml;
++}
++
++inline std::wstring Number(double value,bool protectSmall=false){return NumericText(AsciiNumber(value,protectSmall));}
++inline std::wstring Count(double value){std::ostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(12)<<value;return NumericText(out.str());}
 +inline std::wstring AxisLabel(std::string text) {
 +    if(text.compare(0,4,"Int=")==0)return L"Integral \u2248 "+AxisLabel(text.substr(4));
 +    // Legacy axes use engineering prefixes and +e12/-e15 suffixes.
@@ -3847,7 +3934,7 @@ index 0000000..0b7e258
 +}
 +}
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..5b4ca1b 100644
+index bdcebb4..eee7a80 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -4022,7 +4109,7 @@ index bdcebb4..5b4ca1b 100644
              MENUITEM SEPARATOR
              POPUP "Imaginary unit"
              BEGIN
-@@ -410,12 +475,58 @@ BEGIN
+@@ -410,12 +475,60 @@ BEGIN
              MENUITEM "Load settings...",            ID_SAVEOPTIONS_LOAD
          END
      END
@@ -4042,11 +4129,13 @@ index bdcebb4..5b4ca1b 100644
 +        MENUITEM "Symbolic derivative finder...", ID_SYMBOLIC_DERIVATIVE
 +        MENUITEM "Execute expression\tCtrl+Enter", ID_EXECUTE_EXPRESSION
 +        MENUITEM "Approximate expression\tCtrl+Shift+Enter", ID_APPROXIMATE_EXPRESSION
++        MENUITEM "Number rounding...", ID_NUMBER_FORMAT
 +    END
 +    POPUP "&Graph"
 +    BEGIN
 +        MENUITEM "Piecewise function grapher...", ID_PIECEWISE_GRAPH
 +        MENUITEM "Statistics and regression...", ID_STATISTICS_REGRESSION
++        MENUITEM "Number rounding...", ID_NUMBER_FORMAT
 +    END
 +    POPUP "&Geometry"
 +    BEGIN
@@ -4081,7 +4170,7 @@ index bdcebb4..5b4ca1b 100644
  END
  
  
-@@ -425,8 +536,8 @@ END
+@@ -425,8 +538,8 @@ END
  //
  
  VS_VERSION_INFO VERSIONINFO
@@ -4092,7 +4181,7 @@ index bdcebb4..5b4ca1b 100644
   FILEFLAGSMASK 0x3fL
  #ifdef _DEBUG
   FILEFLAGS 0x1L
-@@ -441,12 +552,12 @@ BEGIN
+@@ -441,12 +554,12 @@ BEGIN
      BEGIN
          BLOCK "040904e4"
          BEGIN
@@ -4109,7 +4198,7 @@ index bdcebb4..5b4ca1b 100644
          END
      END
      BLOCK "VarFileInfo"
-@@ -607,3 +718,239 @@ LANGUAGE 9, 1
+@@ -607,3 +720,248 @@ LANGUAGE 9, 1
  /////////////////////////////////////////////////////////////////////////////
  #endif    // not APSTUDIO_INVOKED
  
@@ -4349,6 +4438,15 @@ index bdcebb4..5b4ca1b 100644
 +    DEFPUSHBUTTON "Place graph",IDOK,464,334,74,16
 +    PUSHBUTTON "Cancel",IDCANCEL,544,334,68,16
 +END
++
++IDD_NUMBER_FORMAT DIALOGEX 0,0,310,65
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Number rounding"
++FONT 9,"Segoe UI"
++BEGIN
++    LTEXT "Choose how numerical results are displayed. Source values, graph calculations and exact symbolic results retain full precision.",-1,10,8,290,28
++    DEFPUSHBUTTON "Close",IDOK,245,43,55,16
++END
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
 index 15ec728..5de9bd2 100644
 --- a/Mathomir/MathomirDoc.cpp
@@ -4573,10 +4671,10 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..c7e1f78 100644
+index fc832eb..72876de 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -19,17 +19,26 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  
  *********************************************************************************************************/
  
@@ -4588,6 +4686,7 @@ index fc832eb..c7e1f78 100644
 +#include "PolygonConstructor.h"
 +#include "MathDisplay.h"
  #include "Mathomir.h"
++#include "FeatureHelp.h"
  
  #include "MathomirDoc.h"
  #include "MathomirView.h"
@@ -4603,7 +4702,7 @@ index fc832eb..c7e1f78 100644
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -132,6 +141,224 @@ unsigned int LongClickStartTime;
+@@ -132,6 +142,278 @@ unsigned int LongClickStartTime;
  CPoint LongClickPosition;
  CExpression *LongClickObject;
  tDocumentStruct *prevTouchedObject=NULL;
@@ -4623,6 +4722,60 @@ index fc832eb..c7e1f78 100644
 +    ::SendMessage(replacement,WM_SETFONT,(WPARAM)font,TRUE);
 +    ::SetWindowPos(replacement,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
 +}
++
++static void LoadDisplayRounding()
++{
++    static bool loaded=false;if(loaded)return;loaded=true;auto &s=MathDisplay::Options();
++    s.mode=theApp.GetProfileInt("Display","NumberMode",0);s.digits=theApp.GetProfileInt("Display","NumberDigits",12);
++    s.trailingZeros=theApp.GetProfileInt("Display","TrailingZeroes",0)!=0;
++    if(s.mode<0||s.mode>2)s.mode=0;s.digits=s.mode==1?max(0,min(8,s.digits)):max(3,min(12,s.digits));
++}
++// All feature dialogs use one hover-help and number-formatting implementation.
++class CFeatureDialog : public CDialog
++{
++    int resource;CFeatureTooltips tips;bool footer;
++    void RegisterHelp(){tips.Create(m_hWnd);for(HWND child=::GetWindow(m_hWnd,GW_CHILD);child;child=::GetWindow(child,GW_HWNDNEXT)){
++        int id=::GetDlgCtrlID(child);const char *help=FeatureControlHelp(resource,id);std::wstring text;
++        if(help&&*help)text=MathDisplay::HelpNotation(help);
++        else {wchar_t caption[1024]={},kind[80]={};::GetWindowTextW(child,caption,1024);::GetClassNameW(child,kind,80);text=caption;
++            for(size_t p=text.find(L'&');p!=std::wstring::npos;p=text.find(L'&'))text.erase(p,1);
++            if(text.empty())text=wcscmp(kind,L"Edit")==0?L"Enter or edit this value. Inputs retain full precision.":wcscmp(kind,L"ComboBox")==0?L"Choose an option from the list.":wcscmp(kind,L"ListBox")==0?L"Select a feature; Enter runs it. Search narrows the list.":L"Preview or explanation for this feature.";
++        }tips.Add(child,text);
++    }}
++    void AddRounding(){
++        CRect client,window,unit(0,0,4,8);GetClientRect(&client);GetWindowRect(&window);MapDialogRect(&unit);int ux=unit.Width(),uy=unit.Height();
++        int row=uy+8,extra=row+12;SetWindowPos(NULL,0,0,window.Width(),window.Height()+extra,SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE);
++        HFONT font=(HFONT)SendMessage(WM_GETFONT);int x=10,y=client.bottom+4;
++        HWND label=::CreateWindowExW(0,L"STATIC",L"Display rounding:",WS_CHILD|WS_VISIBLE,x,y+4,12*ux,row,m_hWnd,(HMENU)32482,AfxGetInstanceHandle(),NULL);
++        HWND combo=::CreateWindowExW(0,L"COMBOBOX",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST|WS_VSCROLL,x+13*ux,y,28*ux,240,m_hWnd,(HMENU)32480,AfxGetInstanceHandle(),NULL);
++        HWND zeros=::CreateWindowExW(0,L"BUTTON",L"Keep trailing zeroes",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_AUTOCHECKBOX,x+43*ux,y+2,min(22*ux,client.Width()-20-43*ux),row,m_hWnd,(HMENU)32481,AfxGetInstanceHandle(),NULL);
++        ::SendMessage(label,WM_SETFONT,(WPARAM)font,TRUE);::SendMessage(combo,WM_SETFONT,(WPARAM)font,TRUE);::SendMessage(zeros,WM_SETFONT,(WPARAM)font,TRUE);
++        ::SendMessageW(combo,CB_ADDSTRING,0,(LPARAM)L"Automatic (12 significant figures)");
++        for(int i=0;i<=8;i++){std::wstring t=L"Decimal places: "+std::to_wstring(i);::SendMessageW(combo,CB_ADDSTRING,0,(LPARAM)t.c_str());}
++        for(int i=3;i<=12;i++){std::wstring t=L"Significant figures: "+std::to_wstring(i);::SendMessageW(combo,CB_ADDSTRING,0,(LPARAM)t.c_str());}
++        auto &s=MathDisplay::Options();::SendMessage(combo,CB_SETCURSEL,s.mode==1?s.digits+1:s.mode==2?s.digits+7:0,0);::SendMessage(zeros,BM_SETCHECK,s.trailingZeros?BST_CHECKED:BST_UNCHECKED,0);
++    }
++public:
++    CFeatureDialog(UINT id,CWnd *owner=NULL):CDialog(id,owner),resource(id),footer(id==IDD_PIECEWISE||id==IDD_SYMBOLIC_DERIVATIVE||id==IDD_STATISTICS_REGRESSION||id==IDD_POLYGON_CONSTRUCTOR||id==IDD_UNIT_CIRCLE||id==IDD_NUMBER_FORMAT){LoadDisplayRounding();}
++    virtual BOOL OnInitDialog(){BOOL result=CDialog::OnInitDialog();if(footer)AddRounding();PostMessage(WM_APP+71);return result;}
++    virtual BOOL PreTranslateMessage(MSG *message){tips.Relay(message);return CDialog::PreTranslateMessage(message);}
++    virtual LRESULT WindowProc(UINT message,WPARAM wp,LPARAM lp){if(message==WM_APP+71){RegisterHelp();return 0;}return CDialog::WindowProc(message,wp,lp);}
++    virtual void OnRoundingChanged(){}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(footer&&((id==32480&&HIWORD(wp)==CBN_SELCHANGE)||id==32481)){
++        int selection=(int)::SendMessage(::GetDlgItem(m_hWnd,32480),CB_GETCURSEL,0,0);auto &s=MathDisplay::Options();s.mode=selection==0?0:selection<=9?1:2;s.digits=s.mode==0?12:s.mode==1?selection-1:selection-7;
++        s.trailingZeros=IsDlgButtonChecked(32481)==BST_CHECKED;theApp.WriteProfileInt("Display","NumberMode",s.mode);theApp.WriteProfileInt("Display","NumberDigits",s.digits);theApp.WriteProfileInt("Display","TrailingZeroes",s.trailingZeros);OnRoundingChanged();return TRUE;
++    }return CDialog::OnCommand(wp,lp);}
++};
++class CNumberFormatDialog : public CFeatureDialog
++{public:CNumberFormatDialog():CFeatureDialog(IDD_NUMBER_FORMAT,theApp.m_pMainWnd){}};
++static CFeatureTooltips CanvasHints;static unsigned long CanvasHintVersion=0;
++void ShowFeatureCanvasHint(int key,const char *help)
++{
++    if(!pMainView||!pMainView->GetSafeHwnd())return;CPoint p;::GetCursorPos(&p);pMainView->ScreenToClient(&p);CRect area(p.x-12,p.y-12,p.x+13,p.y+13);
++    CanvasHints.Hover(pMainView->GetSafeHwnd(),key,area,help);CanvasHintVersion++;
++}
++struct CCanvasHintScope {unsigned long version;CCanvasHintScope():version(CanvasHintVersion){}~CCanvasHintScope(){if(version==CanvasHintVersion)ShowFeatureCanvasHint(0,NULL);}};
++
 +static CStringW FunctionHelpText;
 +static CPoint FunctionHelpPoint;
 +static DWORD FunctionHelpSince=0;
@@ -4828,7 +4981,7 @@ index fc832eb..c7e1f78 100644
  char IsWindowOutOfFocus;
  
  #define NUM_SPECIAL_KEYS 21
-@@ -157,6 +384,10 @@ struct
+@@ -157,6 +439,10 @@ struct
  
  
  
@@ -4839,7 +4992,7 @@ index fc832eb..c7e1f78 100644
  CExpression *TheKeyboardClipboard;
  
  IMPLEMENT_DYNCREATE(CMathomirView, CView)
-@@ -167,6 +398,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -167,6 +453,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -4849,7 +5002,7 @@ index fc832eb..c7e1f78 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +447,46 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +502,47 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
@@ -4868,6 +5021,7 @@ index fc832eb..c7e1f78 100644
 +    ON_COMMAND(ID_PIECEWISE_GRAPH,OnPiecewiseGraph)
 +    ON_COMMAND(ID_SYMBOLIC_DERIVATIVE,OnSymbolicDerivative)
 +    ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
++    ON_COMMAND(ID_NUMBER_FORMAT,OnNumberFormat)
 +    ON_COMMAND(ID_EXECUTE_EXPRESSION,OnExecuteExpression)
 +    ON_COMMAND(ID_APPROXIMATE_EXPRESSION,OnApproximateExpression)
 +    ON_COMMAND_RANGE(ID_SMOOTH_OFF,ID_SMOOTH_STRONG,OnFreehandSmoothing)
@@ -4896,15 +5050,17 @@ index fc832eb..c7e1f78 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -292,6 +566,7 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -291,7 +621,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+ 
  CMathomirView::CMathomirView()
  {
++    LoadDisplayRounding();
  	// TODO: add construction code here
 +	AutoFitPageWidth=true;
  	m_PopupMenuObject=NULL;
  	pMainView=this;
  	pMainViewBase=(CView*)this;
-@@ -392,6 +667,7 @@ int CMathomirView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+@@ -392,6 +724,7 @@ int CMathomirView::OnCreate(LPCREATESTRUCT lpCreateStruct)
  	if (CView::OnCreate(lpCreateStruct) == -1)
  		return -1;
  
@@ -4912,7 +5068,7 @@ index fc832eb..c7e1f78 100644
  	SetTimer(1,10,NULL); //this is for cursor and copy-paste
  	return 0;
  }
-@@ -489,8 +765,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
+@@ -489,8 +822,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
  int NumRullerGuidelines=0;
  
  
@@ -4974,7 +5130,7 @@ index fc832eb..c7e1f78 100644
  	tDocumentStruct *ds=TheDocument;
  	int SelectedElement;
  	NumRullerGuidelines=0;
-@@ -509,6 +837,14 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -509,6 +894,14 @@ void CMathomirView::OnDraw(CDC* pDC)
  
  		ClientArea.right=pDC->GetDeviceCaps(PHYSICALWIDTH);
  		ClientArea.bottom=pDC->GetDeviceCaps(PHYSICALHEIGHT);
@@ -4989,7 +5145,7 @@ index fc832eb..c7e1f78 100644
  		ViewZoom=(short)(100*ClientArea.bottom/PaperHeight);
  		ViewY=(PagePrinted-1)*PaperHeight+5+pDC->GetDeviceCaps(PHYSICALOFFSETY)*100/ViewZoom;
  		ViewX=15+pDC->GetDeviceCaps(PHYSICALOFFSETX)*100/ViewZoom;
-@@ -576,17 +912,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +969,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -5012,7 +5168,7 @@ index fc832eb..c7e1f78 100644
  				}
  				else
  				{
-@@ -624,19 +961,24 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,19 +1018,24 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -5038,7 +5194,7 @@ index fc832eb..c7e1f78 100644
  			int RelativeHeight=(PaperHeight)*ViewZoom/100;
  			int RelativeStart=-(ViewY%PaperHeight)*ViewZoom/100;
  
-@@ -725,8 +1067,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -725,8 +1124,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		}
  
  
@@ -5054,7 +5210,7 @@ index fc832eb..c7e1f78 100644
  			if ((ds->absolute_Y<-1000) && (ds->absolute_Y>-1200))
  			{
  				if (NumRullerGuidelines<13) RullerGuidelines[NumRullerGuidelines++]=NumDocumentElements-i-1;
-@@ -753,6 +1102,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +1159,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -5064,7 +5220,7 @@ index fc832eb..c7e1f78 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -761,7 +1113,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -761,7 +1170,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					if (ds->Type==1)
  						((CExpression*)(ds->Object))->PaintExpression(&bitmapDC,ViewZoom,RelativeX,RelativeY,&TheClientRect);
@@ -5073,7 +5229,7 @@ index fc832eb..c7e1f78 100644
  						((CDrawing*)(ds->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,ds->absolute_X,ds->absolute_Y,&TheClientRect);
  				}
  
-@@ -785,6 +1137,8 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -785,6 +1194,8 @@ void CMathomirView::OnDraw(CDC* pDC)
  			}
  		}
  
@@ -5082,7 +5238,7 @@ index fc832eb..c7e1f78 100644
  		if ((prevNumSelectedObjects!=NumSelectedObjects) && ((prevNumSelectedObjects<3) || (NumSelectedObjects<3)))
  		{
  			if ((UseToolbar) && (Toolbox) &&(Toolbox->Toolbar)) {Toolbox->Toolbar->ConfigureToolbar();}
-@@ -795,13 +1149,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -795,13 +1206,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			tmpDrawing->PaintDrawing(&bitmapDC,ViewZoom,(MovingStartX/10-ViewX)*ViewZoom/100,(MovingStartY/10-ViewY)*ViewZoom/100,-1,-1);
  		}
@@ -5099,7 +5255,7 @@ index fc832eb..c7e1f78 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1122,11 +1478,13 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1122,11 +1535,13 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					lasttillen=tillen;
  					bitmapDC.SelectClipRgn(NULL);
@@ -5113,7 +5269,7 @@ index fc832eb..c7e1f78 100644
  				}
  
  				int RelativeX=TillenRelativeX+(ds->absolute_X-vX)*Tillens.Zoom/100;
-@@ -1198,6 +1556,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1198,6 +1613,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			if (myrgn) 
  			{
  				bitmapDC.SelectClipRgn(NULL);
@@ -5121,7 +5277,7 @@ index fc832eb..c7e1f78 100644
  				delete myrgn;
  			}
  
-@@ -1229,6 +1588,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1229,6 +1645,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				CRgn myrgn;
  				myrgn.CreateRectRgn(RegionX,RegionY,RegionX+RegionW,RegionY+RegionH);
  				bitmapDC.SelectClipRgn(&myrgn);
@@ -5129,7 +5285,7 @@ index fc832eb..c7e1f78 100644
  
  
  				ds=TheDocument;
-@@ -1264,6 +1624,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1264,6 +1681,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  					}
  				}
  				bitmapDC.SelectClipRgn(NULL);
@@ -5137,7 +5293,7 @@ index fc832eb..c7e1f78 100644
  			}
  
  
-@@ -1279,6 +1640,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1279,6 +1697,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_MASKPEN);
  			int xx=PreopenDrawingToolboxX-ToolboxSize;
  			int yy=PreopenDrawingToolboxY-ToolboxSize;
@@ -5145,7 +5301,7 @@ index fc832eb..c7e1f78 100644
  			CPen pen1;
  			CBrush brush1;
  			brush1.CreateSolidBrush(RGB(240,240,255));
-@@ -1290,9 +1652,10 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1290,9 +1709,10 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.MoveTo(xx+2*ToolboxSize/3+3,yy);bitmapDC.LineTo(xx+2*ToolboxSize/3+3,yy+ToolboxSize+5);
  			bitmapDC.MoveTo(xx,yy+ToolboxSize/3+1);bitmapDC.LineTo(xx+ToolboxSize+5,yy+ToolboxSize/3+1);
  			bitmapDC.MoveTo(xx,yy+2*ToolboxSize/3+3);bitmapDC.LineTo(xx+ToolboxSize+5,yy+2*ToolboxSize/3+3);
@@ -5157,7 +5313,7 @@ index fc832eb..c7e1f78 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1712,68 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1769,68 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -5226,7 +5382,7 @@ index fc832eb..c7e1f78 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1865,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +1922,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -5235,7 +5391,7 @@ index fc832eb..c7e1f78 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +2212,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +2269,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -5264,7 +5420,7 @@ index fc832eb..c7e1f78 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2051,7 +2490,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -2051,7 +2547,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  		//ds->absolute_Y=AbsoluteY;
  		//ds->Type=1; //expression
  		ds->Object=(CObject*)new CExpression(NULL,NULL,DefaultFontSize);
@@ -5273,7 +5429,7 @@ index fc832eb..c7e1f78 100644
  		{
  			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
  			//((CExpression*)(ds->Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -2169,12 +2608,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2665,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -5289,7 +5445,7 @@ index fc832eb..c7e1f78 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2622,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2679,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -5301,7 +5457,7 @@ index fc832eb..c7e1f78 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2636,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2693,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -5314,7 +5470,7 @@ index fc832eb..c7e1f78 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2238,6 +2682,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2238,6 +2739,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  
  void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  {
@@ -5322,7 +5478,7 @@ index fc832eb..c7e1f78 100644
  	PaintDrawingHotspot(1);
  	SelectedTab=0;
  	if (Tillens.Show) {Tillens.Show=0;InvalidateRect(NULL,1);}
-@@ -2300,7 +2745,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+@@ -2300,7 +2802,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  		ViewX=nPos;
  		if (ViewX<0) ViewX=0;
  		InvalidateRect(NULL,0);
@@ -5331,7 +5487,7 @@ index fc832eb..c7e1f78 100644
  	}
  	if (nSBCode==SB_THUMBTRACK)
  	{
-@@ -2722,7 +3167,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
+@@ -2722,7 +3224,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
  		if ((IsDrawingMode<10) || (IsDrawingMode>13)) //not for rasters (linear and logaritmic)
  		if ((IsDrawingMode<18) || (IsDrawingMode>26)) //not for section line, Okay, ?, !, X and diagonals
  		{
@@ -5340,10 +5496,11 @@ index fc832eb..c7e1f78 100644
  			
  			int w=SelectedLineWidth*ViewZoom/100;
  			int dot_shape=1;
-@@ -2812,6 +3257,75 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +3314,76 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
++    CCanvasHintScope canvasHintScope;
 +    if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive)
 +    {
 +        tDocumentStruct *hover=ResizeHandleDocument();
@@ -5392,18 +5549,18 @@ index fc832eb..c7e1f78 100644
 +    if (moveHover && !IsDrawingMode && !ViewOnlyMode)
 +    {
 +        CPoint deleteGrip=DeleteGripPoint(moveHover);
-+        if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
++        if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){ShowFeatureCanvasHint(1,"Delete this object. Ctrl+Z restores it.");SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
 +        CPoint grip=MoveGripPoint(moveHover);
 +        CPoint lower=LowerMoveGripPoint(moveHover);
 +        if ((abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9) || (abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9))
-+        { SetCursor(::LoadCursor(NULL,IDC_SIZEALL)); return; }
++        { ShowFeatureCanvasHint(2,"Move this object by dragging. Escape cancels the move.");SetCursor(::LoadCursor(NULL,IDC_SIZEALL)); return; }
 +    }
 +    tDocumentStruct *sizingObject=ResizeHandleDocument();
 +    if (sizingObject && !IsDrawingMode && !ViewOnlyMode)
 +    {
 +        CPoint handle=ResizeHandlePoint(sizingObject);
 +        if (abs(point.x-handle.x)<=9 && abs(point.y-handle.y)<=9)
-+        { SetCursor(::LoadCursor(NULL,IDC_SIZENWSE)); return; }
++        { ShowFeatureCanvasHint(3,"Resize or enlarge this object by dragging the corner. Graphs redraw at the new size. Escape cancels.");SetCursor(::LoadCursor(NULL,IDC_SIZENWSE)); return; }
 +    }
 +
 +	tDocumentStruct *rotationObject=RotationHandleDocument();
@@ -5411,12 +5568,12 @@ index fc832eb..c7e1f78 100644
 +	{
 +		CPoint handle=RotationHandlePoint(rotationObject);
 +		int dx=point.x-handle.x,dy=point.y-handle.y;
-+		if (dx*dx+dy*dy<=121) { SetCursor(::LoadCursor(NULL,IDC_HAND)); return; }
++		if (dx*dx+dy*dy<=121) { ShowFeatureCanvasHint(4,"Rotate by dragging. Hold Shift for 15-degree steps; Escape cancels.");SetCursor(::LoadCursor(NULL,IDC_HAND)); return; }
 +	}
  
  	try
  	{
-@@ -3338,6 +3852,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3910,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -5424,7 +5581,7 @@ index fc832eb..c7e1f78 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +3952,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +4010,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -5437,7 +5594,7 @@ index fc832eb..c7e1f78 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +4074,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +4132,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
@@ -5445,7 +5602,7 @@ index fc832eb..c7e1f78 100644
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +4127,52 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +4185,52 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -5526,7 +5683,7 @@ index fc832eb..c7e1f78 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4103,6 +4639,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4103,6 +4697,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  	if (MouseWheelDelta>=120)
  	{
@@ -5534,7 +5691,7 @@ index fc832eb..c7e1f78 100644
  		MouseWheelDelta=0;
  		//zoom increasing
  
-@@ -4127,6 +4664,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4127,6 +4722,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  	}
  	if (MouseWheelDelta<=-120)
  	{
@@ -5542,7 +5699,7 @@ index fc832eb..c7e1f78 100644
  		MouseWheelDelta=0;
  
  		if (ViewZoom>=480) ViewZoom=400;
-@@ -4169,31 +4707,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4765,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -5575,7 +5732,7 @@ index fc832eb..c7e1f78 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4201,6 +4715,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4201,6 +4773,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  void CMathomirView::OnZoom40()
  {
@@ -5583,7 +5740,7 @@ index fc832eb..c7e1f78 100644
  	ViewZoom=40;
  	RepaintTheView(1);
  
-@@ -4208,6 +4723,7 @@ void CMathomirView::OnZoom40()
+@@ -4208,6 +4781,7 @@ void CMathomirView::OnZoom40()
  
  void CMathomirView::OnZoom60()
  {
@@ -5591,7 +5748,7 @@ index fc832eb..c7e1f78 100644
  	ViewZoom=60;
  	RepaintTheView(1);
  }
-@@ -4326,7 +4842,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4326,7 +4900,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  	//prevViewZoom=ViewZoom;
  
  
@@ -5601,7 +5758,7 @@ index fc832eb..c7e1f78 100644
  	SetScrollRange(SB_VERT,0,ViewMaxY,0);
  	SetScrollPos(SB_HORZ,ViewX,1);
  	SetScrollPos(SB_VERT,ViewY,1);
-@@ -4341,24 +4858,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4341,24 +4916,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  
  void CMathomirView::OnZoom80()
  {
@@ -5630,7 +5787,7 @@ index fc832eb..c7e1f78 100644
  	ViewZoom=240;
  	RepaintTheView(1);
  }
-@@ -4373,6 +4894,7 @@ UINT prevChar;
+@@ -4373,6 +4952,7 @@ UINT prevChar;
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -5638,7 +5795,7 @@ index fc832eb..c7e1f78 100644
  	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
  	//initial keyboard testing (determining key codes when the shift key is used)
  	//if (keystringmode==2) {keystring3[keystringcnt++]=nChar;return;}
-@@ -4457,6 +4979,19 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +5037,19 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -5658,7 +5815,7 @@ index fc832eb..c7e1f78 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +5007,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +5065,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -5666,7 +5823,7 @@ index fc832eb..c7e1f78 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5168,7 +5702,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5168,7 +5760,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  						short l,a=0,b;
  						//TheDocument[NumDocumentElements-1].Type=1;
  						TheDocument[NumDocumentElements-1].Object=(CObject*)(new CExpression(NULL,NULL,DefaultFontSize));
@@ -5675,7 +5832,7 @@ index fc832eb..c7e1f78 100644
  						{
  							((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSize=RootObjectFontSize;
  							//((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -5360,7 +5894,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +5952,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -5684,7 +5841,7 @@ index fc832eb..c7e1f78 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +5948,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +6006,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -5701,7 +5858,7 @@ index fc832eb..c7e1f78 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +5987,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +6045,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -5730,7 +5887,7 @@ index fc832eb..c7e1f78 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +6078,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +6136,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -5739,7 +5896,7 @@ index fc832eb..c7e1f78 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6189,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6247,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -5791,7 +5948,7 @@ index fc832eb..c7e1f78 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5793,7 +6307,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5793,7 +6365,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  							fcolor=Toolbox->GetUniformFormattingColor();
  						}
  						int inserting_position=tmp->m_Selection-1;
@@ -5802,7 +5959,7 @@ index fc832eb..c7e1f78 100644
  						{
  							QuickTypeUsed=2;
  							LastQuickTypeObject=ds;
-@@ -5836,7 +6352,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6410,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -5811,7 +5968,7 @@ index fc832eb..c7e1f78 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6634,23 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6692,23 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -5835,7 +5992,7 @@ index fc832eb..c7e1f78 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +7091,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +7149,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -5870,7 +6027,7 @@ index fc832eb..c7e1f78 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +8112,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +8170,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -5885,7 +6042,7 @@ index fc832eb..c7e1f78 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8647,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8705,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -5913,7 +6070,7 @@ index fc832eb..c7e1f78 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +9100,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +9158,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -5924,7 +6081,7 @@ index fc832eb..c7e1f78 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +9947,1010 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +10005,1022 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -5982,14 +6139,14 @@ index fc832eb..c7e1f78 100644
 +    ON_WM_LBUTTONUP()
 +END_MESSAGE_MAP()
 +
-+class CFeatureSearchDialog : public CDialog
++class CFeatureSearchDialog : public CFeatureDialog
 +{
 +public:
 +    std::vector<CFeatureSearchEntry> entries;
 +    CMathomirView *inlineView;
 +    UINT command;
 +    int drawingMode;
-+    CFeatureSearchDialog() : CDialog(IDD_FEATURE_SEARCH,theApp.m_pMainWnd),inlineView(NULL),command(0),drawingMode(-1) {}
++    CFeatureSearchDialog() : CFeatureDialog(IDD_FEATURE_SEARCH,theApp.m_pMainWnd),inlineView(NULL),command(0),drawingMode(-1) {}
 +    void Add(UINT id,const char *label,const char *aliases="",int tool=-1)
 +    {
 +        if (id==ID_FEATURE_SEARCH) return;
@@ -6061,7 +6218,7 @@ index fc832eb..c7e1f78 100644
 +    }
 +    virtual BOOL OnInitDialog()
 +    {
-+        CDialog::OnInitDialog();
++        CFeatureDialog::OnInitDialog();
 +        results.SubclassDlgItem(IDC_FEATURE_RESULTS,this);
 +        ((CEdit*)GetDlgItem(IDC_FEATURE_QUERY))->LimitText(128);
 +        Filter();
@@ -6114,7 +6271,7 @@ index fc832eb..c7e1f78 100644
 +            if (results.GetCount()) results.SetCurSel(max(0,min(results.GetCount()-1,row)));
 +            return TRUE;
 +        }
-+        return CDialog::PreTranslateMessage(message);
++        return CFeatureDialog::PreTranslateMessage(message);
 +    }
 +    virtual void OnOK()
 +    {
@@ -6125,9 +6282,9 @@ index fc832eb..c7e1f78 100644
 +        if (index>=entries.size()) return;
 +        command=entries[index].command; drawingMode=entries[index].drawingMode;
 +        if (inlineView) { inlineView->SetFocus(); ShowWindow(SW_HIDE); inlineView->RunFeatureCommand(command,drawingMode); }
-+        else CDialog::OnOK();
++        else CFeatureDialog::OnOK();
 +    }
-+    virtual void OnCancel() { if (inlineView) { inlineView->SetFocus(); ShowWindow(SW_HIDE); } else CDialog::OnCancel(); }
++    virtual void OnCancel() { if (inlineView) { inlineView->SetFocus(); ShowWindow(SW_HIDE); } else CFeatureDialog::OnCancel(); }
 +    DECLARE_MESSAGE_MAP()
 +};
 +BEGIN_MESSAGE_MAP(CFeatureSearchDialog,CDialog)
@@ -6182,6 +6339,7 @@ index fc832eb..c7e1f78 100644
 +    dialog.Add(ID_SMOOTH_SELECTED,"Draw > Smooth selected freehand curves","smooth smoothing freehand pen curve wobble jitter intelligent corners");
 +    dialog.Add(ID_APPROXIMATE_EXPRESSION,"Calculus > Approximate expression (Ctrl+Shift+Enter)","approximate decimal numeric numerical evaluate e pi");
 +    dialog.Add(ID_EXECUTE_EXPRESSION,"Calculus > Execute expression (Ctrl+Enter)","execute calculate evaluate derivative equals result inline");
++    dialog.Add(ID_NUMBER_FORMAT,"Display > Number rounding...","rounding round decimals significant figures precision trailing zeros approximation display");
 +    dialog.Add(ID_STATISTICS_REGRESSION,"Statistics > Statistics and regression...","statistics regression linear quadratic cubic polynomial exponential logarithmic power scatter data residual mean median standard deviation correlation");
 +    dialog.Add(ID_SYMBOLIC_DERIVATIVE,"Calculus > Symbolic derivative finder...","differentiate derivative calculus symbolic slope chain product quotient higher order");
 +    dialog.Add(ID_PIECEWISE_GRAPH,"Graph > Piecewise function grapher...","piecewise pieces intervals open closed endpoints domain jumps step graph");
@@ -6232,10 +6390,10 @@ index fc832eb..c7e1f78 100644
 +
 +    SetFocus();
 +}
-+class CImprovedAboutDialog : public CDialog
++class CImprovedAboutDialog : public CFeatureDialog
 +{
 +public:
-+    CImprovedAboutDialog() : CDialog(IDD_ABOUTBOX) {}
++    CImprovedAboutDialog() : CFeatureDialog(IDD_ABOUTBOX) {}
 +    afx_msg void OriginalSite() { ShellExecute(m_hWnd,"open","http://gorupec.awardspace.com/mathomir.html",NULL,NULL,SW_SHOWNORMAL); }
 +    afx_msg void OriginalAuthor() { ShellExecute(m_hWnd,"open","mailto:danijel.gorupec@gmail.com",NULL,NULL,SW_SHOWNORMAL); }
 +    afx_msg void Repository() { ShellExecute(m_hWnd,"open","https://github.com/towsiak/mathomir-improved",NULL,NULL,SW_SHOWNORMAL); }
@@ -6270,6 +6428,7 @@ index fc832eb..c7e1f78 100644
 +{
 +public:
 +    CMathomirView *view;
++    CFeatureTooltips tips;
 +    CQuickSearchEdit search;
 +    CStatic label;
 +    CButton fontButton, rotateButton, modeButton,colorButton,fitButton,selectButton,backgroundButton;
@@ -6296,6 +6455,16 @@ index fc832eb..c7e1f78 100644
 +            colorButton.Create("Colors",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_PUSHBUTTON,CRect(0,0,1,1),this,1116);
 +            backgroundButton.Create("Background",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_PUSHBUTTON,CRect(0,0,1,1),this,1119);
 +            modeButton.Create("RAD",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_PUSHBUTTON,CRect(0,0,1,1),this,1115);
++            tips.Create(m_hWnd);
++            tips.Add(search.m_hWnd,L"Search tools and commands (Ctrl+K). Type keywords; Enter runs the first matching feature. Escape closes the results.");
++            tips.Add(label.m_hWnd,L"Search all available features by name or keyword.");
++            tips.Add(selectButton.m_hWnd,L"Select all page objects. Delete removes the selection; Ctrl+Z undoes changes.");
++            tips.Add(fitButton.m_hWnd,L"Fit the page width to the available canvas. This adjusts zoom for easier editing.");
++            tips.Add(fontButton.m_hWnd,L"Change fonts for math and text objects throughout the page.");
++            tips.Add(rotateButton.m_hWnd,L"Rotate a selected object by dragging its rotation grip. Hold Shift for 15-degree steps; Escape cancels.");
++            tips.Add(colorButton.m_hWnd,L"Choose the foreground colour for math, text or drawing lines.");
++            tips.Add(backgroundButton.m_hWnd,L"Choose a background colour behind typed math or text, or clear the background.");
++            tips.Add(modeButton.m_hWnd,L"Switch numerical trigonometric calculations between radians and degrees. The graph's separate \\u03c0 button switches x-axis labels to multiples of \\u03c0.");
 +            CFont *font=CFont::FromHandle((HFONT)GetStockObject(DEFAULT_GUI_FONT));
 +            label.SetFont(font); search.SetFont(font); fontButton.SetFont(font); rotateButton.SetFont(font); modeButton.SetFont(font); colorButton.SetFont(font); fitButton.SetFont(font); selectButton.SetFont(font);backgroundButton.SetFont(font);
 +        }
@@ -6740,21 +6909,21 @@ index fc832eb..c7e1f78 100644
 +    RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
 +}
 +
-+class CEquationRotationDialog : public CDialog
++class CEquationRotationDialog : public CFeatureDialog
 +{
 +public:
 +    double angle;
-+    CEquationRotationDialog(double initial) : CDialog(IDD_ROTATE_EQUATION,theApp.m_pMainWnd),angle(initial) {}
++    CEquationRotationDialog(double initial) : CFeatureDialog(IDD_ROTATE_EQUATION,theApp.m_pMainWnd),angle(initial) {}
 +    virtual BOOL OnCommand(WPARAM wParam,LPARAM lParam)
 +    {
 +        if (LOWORD(wParam)==IDC_ROTATION_MOUSE) { EndDialog(IDC_ROTATION_MOUSE); return TRUE; }
-+        return CDialog::OnCommand(wParam,lParam);
++        return CFeatureDialog::OnCommand(wParam,lParam);
 +    }
 +protected:
 +    virtual BOOL OnInitDialog()
 +    {
-+        CDialog::OnInitDialog();
-+        CString value; value.Format("%.3f",angle);
++        CFeatureDialog::OnInitDialog();
++        CString value; value.Format("%.17g",angle);
 +        SetDlgItemText(IDC_ROTATION_ANGLE,value);
 +        CEdit *entry=(CEdit*)GetDlgItem(IDC_ROTATION_ANGLE);
 +        entry->LimitText(64); entry->SetSel(0,-1); entry->SetFocus();
@@ -6773,7 +6942,7 @@ index fc832eb..c7e1f78 100644
 +            GetDlgItem(IDC_ROTATION_ANGLE)->SetFocus(); return;
 +        }
 +        angle=fmod(entered,360.0);
-+        CDialog::OnOK();
++        CFeatureDialog::OnOK();
 +    }
 +};
 +
@@ -6935,7 +7104,7 @@ index fc832eb..c7e1f78 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +10963,138 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +11033,138 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -7074,7 +7243,7 @@ index fc832eb..c7e1f78 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +11111,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +11181,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -7082,7 +7251,7 @@ index fc832eb..c7e1f78 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11789,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11859,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -7118,7 +7287,7 @@ index fc832eb..c7e1f78 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11823,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11893,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -7126,7 +7295,7 @@ index fc832eb..c7e1f78 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +11938,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +12008,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -7134,7 +7303,7 @@ index fc832eb..c7e1f78 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12344,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12414,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -7142,7 +7311,7 @@ index fc832eb..c7e1f78 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12645,790 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12715,793 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -7214,11 +7383,12 @@ index fc832eb..c7e1f78 100644
 +    }
 +    return _finite(degrees) && fabs(degrees)<=3600;
 +}
-+class CPiecewiseDialog : public CDialog
++class CPiecewiseDialog : public CFeatureDialog
 +{
 +public:
 +    std::vector<Piecewise::Row> rows;bool radians;double xmin,xmax,ymin,ymax;
-+    CPiecewiseDialog():CDialog(IDD_PIECEWISE,theApp.m_pMainWnd),radians(true),xmin(-5),xmax(5),ymin(-3),ymax(6){}
++    virtual void OnRoundingChanged(){OnCommand(1187,0);}
++    CPiecewiseDialog():CFeatureDialog(IDD_PIECEWISE,theApp.m_pMainWnd),radians(true),xmin(-5),xmax(5),ymin(-3),ymax(6){}
 +    void Example(int which)
 +    {
 +        rows.clear();
@@ -7243,7 +7413,7 @@ index fc832eb..c7e1f78 100644
 +    }
 +    virtual BOOL OnInitDialog()
 +    {
-+        CDialog::OnInitDialog();CreateUnicodeReadout(this,1188);
++        CFeatureDialog::OnInitDialog();CreateUnicodeReadout(this,1188);
 +        for(int i=0;i<8;i++)((CEdit*)GetDlgItem(1200+i*5))->LimitText(160);
 +        CheckDlgButton(1180,radians?BST_CHECKED:BST_UNCHECKED);
 +        SetDlgItemText(1181,Piecewise::Number(xmin).c_str());SetDlgItemText(1182,Piecewise::Number(xmax).c_str());
@@ -7276,15 +7446,15 @@ index fc832eb..c7e1f78 100644
 +            if(!Piecewise::Bound((LPCSTR)text,true,x,error) || !Piecewise::Finite(x)){SetDlgItemText(1188,"Enter a finite x value, such as 0, 1/2, or pi/3.");return TRUE;}
 +            std::wstring status=L"f("+MathDisplay::Number(x)+L") is undefined: x is outside all included intervals.";
 +            for(size_t i=0;i<rows.size();i++)if(rows[i].Contains(x)){
-+                double y=rows[i].program.Value(x,radians);status=L"Piece "+MathDisplay::Number((double)i+1)+L": ";
++                double y=rows[i].program.Value(x,radians);status=L"Piece "+MathDisplay::Count((double)i+1)+L": ";
 +                if(Piecewise::Finite(y))status+=L"f("+MathDisplay::Number(x)+L") = "+MathDisplay::Number(y)+L".  x \u2208 "+rows[i].DisplayInterval()+L".";
 +                else status+=L"the formula is undefined at this x.";break;
 +            }
 +            ::SetDlgItemTextW(m_hWnd,1188,status.c_str());return TRUE;
 +        }
-+        return CDialog::OnCommand(wp,lp);
++        return CFeatureDialog::OnCommand(wp,lp);
 +    }
-+    virtual void OnOK(){if(Read())CDialog::OnOK();}
++    virtual void OnOK(){if(Read())CFeatureDialog::OnOK();}
 +};
 +extern bool FineBoldHatching;
 +extern bool SmartHatching;
@@ -7353,9 +7523,7 @@ index fc832eb..c7e1f78 100644
 +    if(approximate){
 +        try{SymbolicDerivative::Parser parser;SymbolicDerivative::Expr parsed=parser.Parse(NativeSymbolic::Formula(&left));extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);
 +            if(!SymbolicDerivative::Finite(value)){AfxMessageBox("This expression has no finite real approximation, or contains a variable without a value.");return;}
-+            if(value==0 || (fabs(value)>=1e-100 && fabs(value)<=1e100))answer.GenerateASCIINumber(value,0,value==0?1:0,112,0);
-+            else {int exponent=(int)floor(log10(fabs(value)));double mantissa=value/pow(10.,exponent);if(exponent<-300){mantissa=value/pow(10.,exponent+300);mantissa/=1e-300;}
-+                std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+SymbolicDerivative::Xml(SymbolicDerivative::Make('*',SymbolicDerivative::N(mantissa),SymbolicDerivative::Raw('^',SymbolicDerivative::N(10),SymbolicDerivative::N(exponent))))+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);}
++            std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+MathDisplay::ApproximationXml(value)+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);
 +        }catch(const std::exception &e){AfxMessageBox(e.what());return;}
 +    }else if(NativeSymbolic::ReadDerivative(&left,derivative,error)){
 +        std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+SymbolicDerivative::Xml(derivative.derivative)+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);
@@ -7405,11 +7573,12 @@ index fc832eb..c7e1f78 100644
 +BEGIN_MESSAGE_MAP(CDerivativePreview,CStatic)
 +    ON_WM_PAINT()
 +END_MESSAGE_MAP()
-+class CSymbolicDerivativeDialog : public CDialog
++class CSymbolicDerivativeDialog : public CFeatureDialog
 +{
 +public:
 +    SymbolicDerivative::Result result;CDerivativePreview preview;bool ready,initializing,includeOriginal;std::string xml;
-+    CSymbolicDerivativeDialog():CDialog(IDD_SYMBOLIC_DERIVATIVE,theApp.m_pMainWnd),ready(false),initializing(true),includeOriginal(true){}
++    virtual void OnRoundingChanged(){Evaluate();}
++    CSymbolicDerivativeDialog():CFeatureDialog(IDD_SYMBOLIC_DERIVATIVE,theApp.m_pMainWnd),ready(false),initializing(true),includeOriginal(true){}
 +    CString Text(int id){CString s;GetDlgItemText(id,s);s.TrimLeft();s.TrimRight();return s;}
 +    void InvalidateResult(){ready=false;GetDlgItem(IDOK)->EnableWindow(FALSE);SetDlgItemText(1305,"");SetDlgItemText(1314,"");preview.Set("");::SetDlgItemTextW(m_hWnd,1309,L"Press Find derivative after changing the formula, variable, or order.");}
 +    void ShowPreview(){includeOriginal=IsDlgButtonChecked(1306)==BST_CHECKED;xml=includeOriginal?SymbolicDerivative::Equation(result):"<ex fh=\"100\">"+SymbolicDerivative::Xml(result.derivative)+"</ex>";preview.Set(xml);}
@@ -7424,22 +7593,23 @@ index fc832eb..c7e1f78 100644
 +        try{SymbolicDerivative::Expr e=p.Parse((LPCSTR)Text(1307));x=SymbolicDerivative::Value(e,"",0);if(!SymbolicDerivative::Finite(x))throw std::runtime_error("Enter a finite constant, such as 1, 1/2, or pi/3.");}
 +        catch(const std::exception &e){SetDlgItemText(1309,e.what());return;}
 +        if(!result.At(x,value,error)){SetDlgItemText(1309,error.c_str());return;}
-+        std::wstring notation=L"Derivative order "+MathDisplay::Number(result.order)+L" at "+std::wstring(result.variable.begin(),result.variable.end())+L" = "+MathDisplay::Number(x)+L": "+MathDisplay::Number(value);
++        std::wstring notation=L"Derivative order "+MathDisplay::Count(result.order)+L" at "+std::wstring(result.variable.begin(),result.variable.end())+L" = "+MathDisplay::Number(x)+L": "+MathDisplay::Number(value);
 +        ::SetDlgItemTextW(m_hWnd,1309,notation.c_str());
 +    }
-+    virtual BOOL OnInitDialog(){CDialog::OnInitDialog();CreateUnicodeReadout(this,1309);preview.SubclassDlgItem(1304,this);((CEdit*)GetDlgItem(1300))->LimitText(512);((CEdit*)GetDlgItem(1301))->LimitText(1);
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();CreateUnicodeReadout(this,1309);preview.SubclassDlgItem(1304,this);((CEdit*)GetDlgItem(1300))->LimitText(512);((CEdit*)GetDlgItem(1301))->LimitText(1);
 +        SetDlgItemText(1300,"x^3+2x");SetDlgItemText(1301,"x");SetDlgItemText(1307,"1");CComboBox *order=(CComboBox*)GetDlgItem(1302);const char *orders[]={"First derivative","Second derivative","Third derivative","Fourth derivative","Fifth derivative"};for(int i=0;i<5;i++)order->AddString(orders[i]);order->SetCurSel(0);CheckDlgButton(1306,BST_CHECKED);initializing=false;Find();return TRUE;}
 +    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);
-+        if(initializing)return CDialog::OnCommand(wp,lp);
++        if(initializing)return CFeatureDialog::OnCommand(wp,lp);
 +        if(id==1303){Find();return TRUE;}if(id==1308){if(ready)Evaluate();else Find();return TRUE;}
 +        if(id==1306){if(ready)ShowPreview();return TRUE;}
 +        if(id>=1310&&id<=1313){const char *samples[]={"x^3+2x","sin(3x)+ln(x^2+1)","(x^2+1)/(x+1)","x^x"};SetDlgItemText(1300,samples[id-1310]);SetDlgItemText(1301,"x");((CComboBox*)GetDlgItem(1302))->SetCurSel(0);Find();return TRUE;}
 +        if(((id==1300||id==1301)&&notification==EN_CHANGE)||(id==1302&&notification==CBN_SELCHANGE)){InvalidateResult();return TRUE;}
 +        if(id==1307&&notification==EN_CHANGE){::SetDlgItemTextW(m_hWnd,1309,L"Press Evaluate to check the new point.");return TRUE;}
-+        return CDialog::OnCommand(wp,lp);
++        return CFeatureDialog::OnCommand(wp,lp);
 +    }
-+    virtual void OnOK(){if(!ready && !Find())return;ShowPreview();CDialog::OnOK();}
++    virtual void OnOK(){if(!ready && !Find())return;ShowPreview();CFeatureDialog::OnOK();}
 +};
++void CMathomirView::OnNumberFormat(){CNumberFormatDialog dialog;dialog.DoModal();RepaintTheView();}
 +void CMathomirView::OnSymbolicDerivative()
 +{
 +    if(ViewOnlyMode)return;OnChar(27,1,0);CSymbolicDerivativeDialog dialog;if(dialog.DoModal()!=IDOK)return;
@@ -7474,33 +7644,34 @@ index fc832eb..c7e1f78 100644
 +BEGIN_MESSAGE_MAP(CStatisticsPreview,CStatic)
 +    ON_WM_PAINT()
 +END_MESSAGE_MAP()
-+class CStatisticsDialog : public CDialog
++class CStatisticsDialog : public CFeatureDialog
 +{
 +public:
 +    Statistics::Result result;CStatisticsPreview preview;CDerivativePreview equation;std::vector<Statistics::Point> initial;int model;bool ready,initializing,residual,graph;
-+    CStatisticsDialog():CDialog(IDD_STATISTICS_REGRESSION,theApp.m_pMainWnd),model(1),ready(false),initializing(true),residual(false),graph(true){}
++    virtual void OnRoundingChanged(){if(ready){::SetDlgItemTextW(m_hWnd,1346,Statistics::Report(result).c_str());OnCommand(1352,0);}}
++    CStatisticsDialog():CFeatureDialog(IDD_STATISTICS_REGRESSION,theApp.m_pMainWnd),model(1),ready(false),initializing(true),residual(false),graph(true){}
 +    static std::string Input(const std::vector<Statistics::Point>& points){std::string text;for(const auto &p:points)text+=Piecewise::Number(p.x)+", "+Piecewise::Number(p.y)+"\r\n";return text;}
 +    std::string EquationXml()const{return "<ex fh=\"100\"><var t=\"y\" f=\"00\" /><opr s=\"\xBB\" />"+SymbolicDerivative::Xml(result.Expression(false))+(model>=8?"<opr s=\",\" /><var t=\"x\" f=\"00\" /><opr s=\">\" /><var t=\"0\" f=\"00\" />":"")+"</ex>";}
 +    void InvalidateResult(){ready=false;GetDlgItem(IDOK)->EnableWindow(FALSE);GetDlgItem(1349)->EnableWindow(FALSE);preview.Set(result,false,residual);equation.Set("");::SetDlgItemTextW(m_hWnd,1346,L"");::SetDlgItemTextW(m_hWnd,1348,L"Press Calculate after changing the data or regression model.");}
 +    bool Calculate(){CString text;GetDlgItemText(1340,text);std::vector<Statistics::Point> data;std::string error;model=((CComboBox*)GetDlgItem(1341))->GetCurSel()+1;residual=IsDlgButtonChecked(1347)==BST_CHECKED;
 +        if(!Statistics::Parse((LPCSTR)text,data,error)){InvalidateResult();SetDlgItemText(1348,error.c_str());return false;}
-+        if(!Statistics::Fit(data,model,result,error)){InvalidateResult();std::vector<double>x,y;for(auto p:data){x.push_back(p.x);y.push_back(p.y);}std::wstring summary=L"n = "+MathDisplay::Number((double)data.size())+L" pairs\r\n"+Statistics::SummaryText(L"x",Statistics::Summarize(x))+Statistics::SummaryText(L"y",Statistics::Summarize(y));::SetDlgItemTextW(m_hWnd,1346,summary.c_str());SetDlgItemText(1348,error.c_str());return false;}
++        if(!Statistics::Fit(data,model,result,error)){InvalidateResult();std::vector<double>x,y;for(auto p:data){x.push_back(p.x);y.push_back(p.y);}std::wstring summary=L"n = "+MathDisplay::Count((double)data.size())+L" pairs\r\n"+Statistics::SummaryText(L"x",Statistics::Summarize(x))+Statistics::SummaryText(L"y",Statistics::Summarize(y));::SetDlgItemTextW(m_hWnd,1346,summary.c_str());SetDlgItemText(1348,error.c_str());return false;}
 +        ready=true;GetDlgItem(IDOK)->EnableWindow(TRUE);GetDlgItem(1349)->EnableWindow(TRUE);preview.Set(result,true,residual);equation.Set(EquationXml());std::wstring report=Statistics::Report(result);::SetDlgItemTextW(m_hWnd,1346,report.c_str());
 +        std::wstring status=L"Fit ready. R\u00b2 = "+(result.r2Defined?MathDisplay::Number(result.r2):L"Undefined for constant y")+L"; RMSE = "+MathDisplay::Number(result.rmse);::SetDlgItemTextW(m_hWnd,1348,status.c_str());SetDlgItemText(1345,residual?"Residual plot: blue dots, black zero line.":"Scatterplot: blue data points, black fitted curve.");return true;
 +    }
 +    void Example(){int selected=((CComboBox*)GetDlgItem(1341))->GetCurSel()+1;std::vector<Statistics::Point> points;for(int i=1;i<=8;i++){double x=i,y=selected==7?2*exp(.3*x):selected==8?2+3*log(x):selected==9?2*pow(x,1.5):selected==1?2*x+1:1+x+.5*x*x;points.push_back(Statistics::Point(x,y));}SetDlgItemText(1340,Input(points).c_str());Calculate();}
-+    virtual BOOL OnInitDialog(){CDialog::OnInitDialog();preview.SubclassDlgItem(1344,this);equation.SubclassDlgItem(1350,this);CreateUnicodeReadout(this,1348);
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1344,this);equation.SubclassDlgItem(1350,this);CreateUnicodeReadout(this,1348);
 +        HWND old=::GetDlgItem(m_hWnd,1346);RECT rect;::GetWindowRect(old,&rect);ScreenToClient(&rect);HFONT font=(HFONT)::SendMessage(old,WM_GETFONT,0,0);DWORD style=(DWORD)::GetWindowLong(old,GWL_STYLE),ex=(DWORD)::GetWindowLong(old,GWL_EXSTYLE);
 +        HWND readout=::CreateWindowExW(ex,L"EDIT",L"",style,rect.left,rect.top,rect.right-rect.left,rect.bottom-rect.top,m_hWnd,(HMENU)1346,AfxGetInstanceHandle(),NULL);if(readout){::DestroyWindow(old);::SendMessage(readout,WM_SETFONT,(WPARAM)font,TRUE);::SendMessage(readout,EM_SETLIMITTEXT,100000,0);}
 +        ::SetDlgItemTextA(m_hWnd,1351,"0");int tabs[]={70,150,230,330};::SendDlgItemMessage(m_hWnd,1346,EM_SETTABSTOPS,4,(LPARAM)tabs);((CEdit*)GetDlgItem(1340))->LimitText(24000);CComboBox *models=(CComboBox*)GetDlgItem(1341);for(int m=1;m<=9;m++)models->AddString(Statistics::ModelName(m));models->SetCurSel(model-1);CheckDlgButton(1347,residual?BST_CHECKED:BST_UNCHECKED);initializing=false;if(initial.empty())Example();else{SetDlgItemText(1340,Input(initial).c_str());Calculate();}return TRUE;
 +    }
-+    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);if(initializing)return CDialog::OnCommand(wp,lp);
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);if(initializing)return CFeatureDialog::OnCommand(wp,lp);
 +        if(id==1352){if(!ready&&!Calculate())return TRUE;CString text;GetDlgItemText(1351,text);text.Trim();double x;std::string error;if(!Piecewise::Bound((LPCSTR)text,true,x,error)||!Statistics::Finite(x)){SetDlgItemText(1348,"Enter a finite x value, such as 2, 1/2 or pi.");return TRUE;}double y=result.Predict(x);std::wstring value=std::isfinite(y)?L"Predicted y at x = "+MathDisplay::Number(x)+L": "+MathDisplay::Number(y):L"The fitted model is undefined here or out of range. Logarithmic and power models require x > 0.";::SetDlgItemTextW(m_hWnd,1348,value.c_str());return TRUE;}
 +        if(id==1342){Calculate();return TRUE;}if(id==1343){Example();return TRUE;}if(id==1349){if(Calculate()){graph=false;EndDialog(IDOK);}return TRUE;}
 +        if(id==1347){residual=IsDlgButtonChecked(1347)==BST_CHECKED;if(ready){preview.Set(result,true,residual);SetDlgItemText(1345,residual?"Residual plot: blue dots, black zero line.":"Scatterplot: blue data points, black fitted curve.");}return TRUE;}
-+        if((id==1340&&notification==EN_CHANGE)||(id==1341&&notification==CBN_SELCHANGE)){InvalidateResult();return TRUE;}return CDialog::OnCommand(wp,lp);
++        if((id==1340&&notification==EN_CHANGE)||(id==1341&&notification==CBN_SELCHANGE)){InvalidateResult();return TRUE;}return CFeatureDialog::OnCommand(wp,lp);
 +    }
-+    virtual void OnOK(){if(Calculate()){graph=true;CDialog::OnOK();}}
++    virtual void OnOK(){if(Calculate()){graph=true;CFeatureDialog::OnOK();}}
 +};
 +static CDrawing *FindStatisticsGraph(CDrawing *drawing,int depth=0){if(!drawing||depth>32)return NULL;if(drawing->IsSpecialDrawing==51&&drawing->SpecialData&&!((CFunctionPlotter*)drawing->SpecialData)->scatterPoints.empty())return drawing;for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0){CDrawing *found=FindStatisticsGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1);if(found)return found;}return NULL;}
 +void CMathomirView::OnStatisticsRegression()
@@ -7519,14 +7690,14 @@ index fc832eb..c7e1f78 100644
 +    RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
 +}
 +
-+class CUnitCircleDialog:public CDialog
++class CUnitCircleDialog:public CFeatureDialog
 +{
 +public:
 +    double start,end;int radius;bool radians,clockwise,labels,coordinates,common,triangle,points;std::vector<double> pointAngles;
-+    CUnitCircleDialog():CDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),radians(false),clockwise(false),labels(true),coordinates(true),common(false),triangle(true),points(true){}
++    CUnitCircleDialog():CFeatureDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),radians(false),clockwise(false),labels(true),coordinates(true),common(false),triangle(true),points(true){}
 +    virtual BOOL OnInitDialog()
 +    {
-+        CDialog::OnInitDialog();SetDlgItemText(IDC_UNIT_START,"0");SetDlgItemText(IDC_UNIT_END,"90");SetDlgItemInt(IDC_UNIT_RADIUS,radius);
++        CFeatureDialog::OnInitDialog();SetDlgItemText(IDC_UNIT_START,"0");SetDlgItemText(IDC_UNIT_END,"90");SetDlgItemInt(IDC_UNIT_RADIUS,radius);
 +        CComboBox *unit=(CComboBox*)GetDlgItem(IDC_UNIT_MODE);unit->AddString("Degrees");unit->AddString("Radians (pi/3, 2*pi/3, or decimal)");unit->SetCurSel(0);
 +        CComboBox *direction=(CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION);direction->AddString("Counterclockwise");direction->AddString("Clockwise");direction->SetCurSel(0);
 +        CheckDlgButton(IDC_UNIT_POINTS,BST_CHECKED);CheckDlgButton(IDC_UNIT_LABELS,BST_CHECKED);CheckDlgButton(IDC_UNIT_COORDINATES,BST_CHECKED);CheckDlgButton(IDC_UNIT_TRIANGLE,BST_CHECKED);return TRUE;
@@ -7553,7 +7724,7 @@ index fc832eb..c7e1f78 100644
 +        points=IsDlgButtonChecked(IDC_UNIT_POINTS)==BST_CHECKED;
 +        clockwise=((CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION))->GetCurSel()==1;
 +        labels=IsDlgButtonChecked(IDC_UNIT_LABELS)==BST_CHECKED;coordinates=IsDlgButtonChecked(IDC_UNIT_COORDINATES)==BST_CHECKED;
-+        common=IsDlgButtonChecked(IDC_UNIT_COMMON)==BST_CHECKED;triangle=IsDlgButtonChecked(IDC_UNIT_TRIANGLE)==BST_CHECKED;CDialog::OnOK();
++        common=IsDlgButtonChecked(IDC_UNIT_COMMON)==BST_CHECKED;triangle=IsDlgButtonChecked(IDC_UNIT_TRIANGLE)==BST_CHECKED;CFeatureDialog::OnOK();
 +    }
 +};
 +static int UnitAppend(CExpression *expression,int type,char symbol)
@@ -7563,10 +7734,10 @@ index fc832eb..c7e1f78 100644
 +    expression->InsertEmptyElement(position,type,symbol);
 +    return position;
 +}
-+static void UnitNumber(CExpression *expression,double value)
++static void UnitNumber(CExpression *expression,double value,bool exact=false)
 +{
 +    int position=UnitAppend(expression,1,'0');
-+    CString number;number.Format("%.3f",value);number.TrimRight('0');number.TrimRight('.');
++    CString number(MathDisplay::AsciiNumber(value).c_str());if(exact)number.Format("%.17g",value);
 +    strncpy(expression->m_pElementList[position].pElementObject->Data1,number,23);
 +    expression->m_pElementList[position].pElementObject->Data1[23]=0;
 +}
@@ -7596,8 +7767,8 @@ index fc832eb..c7e1f78 100644
 +    if(!numerator){label->InsertEmptyElement(0,1,'0');return;}
 +    if(numerator<0){label->InsertEmptyElement(0,2,'-');numerator=-numerator;}
 +    CExpression *n=label;
-+    if(denominator>1){int p=label->m_NumElements;p=UnitAppend(label,4,0);n=(CExpression*)label->m_pElementList[p].pElementObject->Expression1;CExpression *d=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;n->DeleteElement(0);d->DeleteElement(0);UnitNumber(d,denominator);}
-+    if(numerator!=1)UnitNumber(n,numerator);
++    if(denominator>1){int p=label->m_NumElements;p=UnitAppend(label,4,0);n=(CExpression*)label->m_pElementList[p].pElementObject->Expression1;CExpression *d=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;n->DeleteElement(0);d->DeleteElement(0);UnitNumber(d,denominator,true);}
++    if(numerator!=1)UnitNumber(n,numerator,true);
 +    int p=n->m_NumElements;p=UnitAppend(n,1,'p');n->m_pElementList[p].pElementObject->Data2[0]=0x60;
 +}
 +static void UnitPoint(CDrawing *drawing,double x,double y)
@@ -7629,7 +7800,7 @@ index fc832eb..c7e1f78 100644
 +            if(coordinates){if(!text.empty())text+=" ";text+="("+Piecewise::Number(shape.points[i].x)+","+Piecewise::Number(shape.points[i].y)+")";}
 +            if(!text.empty()){CSize extent=dc.GetTextExtent(text.c_str());int x=p.x<rect.Width()/2?p.x-extent.cx-6:p.x+6;int y=p.y<rect.Height()/2?p.y-extent.cy-5:p.y+5;dc.TextOut(max(3,min(x,rect.Width()-extent.cx-3)),max(3,min(y,rect.Height()-extent.cy-3)),text.c_str());}
 +        }
-+        if(angles && angleValues)for(size_t i=0;i<points.size();i++){PolygonConstructor::Point p=PolygonConstructor::AngleLabel(shape,i,span*scale);CString text;text.Format("%.1f%c",PolygonConstructor::InteriorAngle(shape,i)*180/3.14159265358979323846,(char)0xB0);CSize extent=dc.GetTextExtent(text);dc.TextOut((int)(ox+p.x-extent.cx/2),(int)(oy+p.y-extent.cy/2),text);}
++        if(angles && angleValues)for(size_t i=0;i<points.size();i++){PolygonConstructor::Point p=PolygonConstructor::AngleLabel(shape,i,span*scale);std::wstring text=MathDisplay::Number(PolygonConstructor::InteriorAngle(shape,i)*180/3.14159265358979323846)+L"\u00b0";SIZE extent={};::GetTextExtentPoint32W(dc.m_hDC,text.c_str(),(int)text.size(),&extent);::TextOutW(dc.m_hDC,(int)(ox+p.x-extent.cx/2),(int)(oy+p.y-extent.cy/2),text.c_str(),(int)text.size());}
 +        dc.SelectObject(oldFont);dc.SelectObject(oldBrush);dc.SelectObject(old);
 +    }
 +    DECLARE_MESSAGE_MAP()
@@ -7638,11 +7809,12 @@ index fc832eb..c7e1f78 100644
 +    ON_WM_PAINT()
 +END_MESSAGE_MAP()
 +
-+class CPolygonDialog : public CDialog
++class CPolygonDialog : public CFeatureDialog
 +{
 +public:
 +    PolygonConstructor::Shape shape;CPolygonPreview preview;bool labels,coordinates,diagonals,angles,angleValues,initialized,refreshing;double size;int lineWidth;
-+    CPolygonDialog():CDialog(IDD_POLYGON_CONSTRUCTOR,theApp.m_pMainWnd),labels(true),coordinates(false),diagonals(false),angles(true),angleValues(false),initialized(false),refreshing(false),size(300),lineWidth(2){}
++    virtual void OnRoundingChanged(){Refresh();}
++    CPolygonDialog():CFeatureDialog(IDD_POLYGON_CONSTRUCTOR,theApp.m_pMainWnd),labels(true),coordinates(false),diagonals(false),angles(true),angleValues(false),initialized(false),refreshing(false),size(300),lineWidth(2){}
 +    CString Text(int id){CString s;GetDlgItemText(id,s);return s;}
 +    void Refresh(){
 +        if(!initialized || refreshing)return;refreshing=true;
@@ -7666,12 +7838,12 @@ index fc832eb..c7e1f78 100644
 +        labels=IsDlgButtonChecked(1295)==BST_CHECKED;coordinates=IsDlgButtonChecked(1296)==BST_CHECKED;diagonals=IsDlgButtonChecked(1297)==BST_CHECKED;
 +        angles=IsDlgButtonChecked(1300)==BST_CHECKED;angleValues=IsDlgButtonChecked(1301)==BST_CHECKED;GetDlgItem(1301)->EnableWindow(angles);
 +        preview.labels=labels;preview.coordinates=coordinates;preview.diagonals=diagonals;preview.angles=angles;preview.angleValues=angleValues;
-+        if(valid){shape=proposed;size=chosenSize;lineWidth=(int)chosenWidth;preview.shape=shape;std::wstring status=MathDisplay::Number((double)shape.points.size())+L" vertices \u00b7 "+(shape.convex?L"Convex":L"Concave")+L" \u00b7 Area: "+MathDisplay::Number(shape.area)+L" square units \u00b7 Perimeter: "+MathDisplay::Number(shape.perimeter)+L" units\r\nPreview uses equal scales. Page size changes the drawing, not these coordinate measurements.";::SetDlgItemTextW(m_hWnd,1298,status.c_str());}
++        if(valid){shape=proposed;size=chosenSize;lineWidth=(int)chosenWidth;preview.shape=shape;std::wstring status=MathDisplay::Count((double)shape.points.size())+L" vertices \u00b7 "+(shape.convex?L"Convex":L"Concave")+L" \u00b7 Area: "+MathDisplay::Number(shape.area)+L" square units \u00b7 Perimeter: "+MathDisplay::Number(shape.perimeter)+L" units\r\nPreview uses equal scales. Page size changes the drawing, not these coordinate measurements.";::SetDlgItemTextW(m_hWnd,1298,status.c_str());}
 +        else{preview.shape=PolygonConstructor::Shape();preview.error=error.c_str();SetDlgItemText(1298,error.c_str());}
 +        GetDlgItem(IDOK)->EnableWindow(valid);preview.Invalidate();refreshing=false;
 +    }
 +    virtual BOOL OnInitDialog(){
-+        CDialog::OnInitDialog();CreateUnicodeReadout(this,1298);CheckRadioButton(1280,1281,1280);
++        CFeatureDialog::OnInitDialog();CreateUnicodeReadout(this,1298);CheckRadioButton(1280,1281,1280);
 +        const char *names[]={"Equilateral triangle","Square","Pentagon","Hexagon","Heptagon","Octagon","Nonagon","Decagon","Dodecagon"};CComboBox *presets=(CComboBox*)GetDlgItem(1282);for(int i=0;i<9;i++)presets->AddString(names[i]);presets->SetCurSel(2);
 +        CComboBox *measure=(CComboBox*)GetDlgItem(1284);measure->AddString("Circumradius");measure->AddString("Side length");measure->SetCurSel(0);
 +        SetDlgItemText(1283,"5");SetDlgItemText(1285,"3");SetDlgItemText(1286,"90");SetDlgItemText(1288,"(0,0)\r\n(4,0)\r\n(4,3)\r\n(2,1.5)\r\n(0,3)");
@@ -7680,14 +7852,14 @@ index fc832eb..c7e1f78 100644
 +    }
 +    virtual BOOL OnCommand(WPARAM wparam,LPARAM lparam){
 +        int id=LOWORD(wparam),code=HIWORD(wparam);
-+        if(id==IDOK){Refresh();if(GetDlgItem(IDOK)->IsWindowEnabled())CDialog::OnOK();return TRUE;}
-+        if(!initialized || refreshing)return CDialog::OnCommand(wparam,lparam);
++        if(id==IDOK){Refresh();if(GetDlgItem(IDOK)->IsWindowEnabled())CFeatureDialog::OnOK();return TRUE;}
++        if(!initialized || refreshing)return CFeatureDialog::OnCommand(wparam,lparam);
 +        if(id==1282 && code==CBN_SELCHANGE){const int counts[]={3,4,5,6,7,8,9,10,12};int selected=((CComboBox*)GetDlgItem(1282))->GetCurSel();if(selected>=0 && selected<9)SetDlgItemInt(1283,counts[selected]);Refresh();return TRUE;}
 +        if(id==1290){Refresh();if(GetDlgItem(IDOK)->IsWindowEnabled()){SetDlgItemText(1288,PolygonConstructor::Coordinates(shape).c_str());CheckRadioButton(1280,1281,1281);Refresh();}return TRUE;}
 +        if(id==1291){SetDlgItemText(1288,"(0,0)\r\n(4,0)\r\n(4,1)\r\n(1,1)\r\n(1,3)\r\n(0,3)");Refresh();return TRUE;}
 +        if(id==1292){PolygonConstructor::Shape s;std::string e;if(PolygonConstructor::Parse((const char*)Text(1288),s,e)){std::reverse(s.points.begin(),s.points.end());SetDlgItemText(1288,PolygonConstructor::Coordinates(s).c_str());}Refresh();return TRUE;}
 +        if(((id>=1280 && id<=1297) || id==1300 || id==1301) && (code==BN_CLICKED || code==EN_CHANGE || code==CBN_SELCHANGE)){Refresh();return TRUE;}
-+        return CDialog::OnCommand(wparam,lparam);
++        return CFeatureDialog::OnCommand(wparam,lparam);
 +    }
 +};
 +
@@ -7702,7 +7874,7 @@ index fc832eb..c7e1f78 100644
 +    double centerX=(dialog.shape.xmax-dialog.shape.xmin)*PolygonConstructor::PageScale(dialog.shape,dialog.size)/2,centerY=(dialog.shape.ymax-dialog.shape.ymin)*PolygonConstructor::PageScale(dialog.shape,dialog.size)/2;
 +    if(dialog.angles)for(size_t i=0;i<page.size();i++)PolygonConstructor::AngleMarker(dialog.shape,i,dialog.size,[&](double x1,double y1,double x2,double y2){IntervalLine(drawing,x1,y1,x2,y2);});
 +    if(dialog.angles && dialog.angleValues)for(size_t i=0;i<page.size();i++){
-+        CString text;text.Format("%.1f%c",PolygonConstructor::InteriorAngle(dialog.shape,i)*180/3.14159265358979323846,(char)0xB0);CExpression label(NULL,NULL,70);label.m_StartAsText=1;for(int j=0;j<text.GetLength();j++)label.InsertEmptyElement(label.m_NumElements,1,text[j]);PolygonConstructor::Point p=PolygonConstructor::AngleLabel(dialog.shape,i,dialog.size);drawing->CopyExpressionIntoSubgroup(&label,(int)(p.x-text.GetLength()*2),(int)(p.y-5),0,0);
++        CString text;text=MathDisplay::AsciiNumber(PolygonConstructor::InteriorAngle(dialog.shape,i)*180/3.14159265358979323846).c_str();text+=(char)0xB0;CExpression label(NULL,NULL,70);label.m_StartAsText=1;for(int j=0;j<text.GetLength();j++)label.InsertEmptyElement(label.m_NumElements,1,text[j]);PolygonConstructor::Point p=PolygonConstructor::AngleLabel(dialog.shape,i,dialog.size);drawing->CopyExpressionIntoSubgroup(&label,(int)(p.x-text.GetLength()*2),(int)(p.y-5),0,0);
 +    }
 +    for(size_t i=0;i<page.size();i++)if(dialog.labels || dialog.coordinates){
 +        std::string text=dialog.labels?PolygonConstructor::VertexName(i):"";
@@ -7832,14 +8004,14 @@ index fc832eb..c7e1f78 100644
 +    ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;
 +    IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
 +}
-+class CTableSetupDialog : public CDialog
++class CTableSetupDialog : public CFeatureDialog
 +{
 +public:
 +    int rows,columns,font,borders,alignment;
-+    CTableSetupDialog():CDialog(IDD_TABLE_SETUP,theApp.m_pMainWnd),rows(4),columns(3),font(100),borders(0),alignment(0){}
++    CTableSetupDialog():CFeatureDialog(IDD_TABLE_SETUP,theApp.m_pMainWnd),rows(4),columns(3),font(100),borders(0),alignment(0){}
 +    virtual BOOL OnInitDialog()
 +    {
-+        CDialog::OnInitDialog();
++        CFeatureDialog::OnInitDialog();
 +        SetDlgItemInt(IDC_TABLE_ROWS,rows); SetDlgItemInt(IDC_TABLE_COLUMNS,columns); SetDlgItemInt(IDC_TABLE_FONT,font);
 +        CComboBox *border=(CComboBox*)GetDlgItem(IDC_TABLE_BORDERS);
 +        border->AddString("All grid lines");border->AddString("Outer border");border->AddString("Header separator");border->AddString("No borders");border->SetCurSel(0);
@@ -7854,7 +8026,7 @@ index fc832eb..c7e1f78 100644
 +        if(!validRows || !validColumns || !validFont || rows<1 || rows>20 || columns<1 || columns>12 || rows*columns<2 || font<40 || font>800)
 +        {AfxMessageBox("Choose 1-20 rows, 1-12 columns, at least two cells, and a font size from 40% to 800%.");return;}
 +        borders=((CComboBox*)GetDlgItem(IDC_TABLE_BORDERS))->GetCurSel();alignment=((CComboBox*)GetDlgItem(IDC_TABLE_ALIGN))->GetCurSel();
-+        CDialog::OnOK();
++        CFeatureDialog::OnOK();
 +    }
 +};
 +void CMathomirView::OnInsertTable()
@@ -7934,7 +8106,7 @@ index fc832eb..c7e1f78 100644
 +    MouseMode=0;SetFocus();RepaintTheView();
 +}
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..d2cf233 100644
+index 94dd0e4..a7c34eb 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -44,6 +44,11 @@ protected:
@@ -7957,7 +8129,7 @@ index 94dd0e4..d2cf233 100644
  	int PopupCloses(int UserParam, int ExitCode);
  	//afx_msg int OnMouseActivate(CWnd* pDesktopWnd, UINT nHitTest, UINT message);
  	afx_msg void OnSelectionsFrame();
-@@ -119,6 +125,58 @@ public:
+@@ -119,6 +125,59 @@ public:
  	afx_msg void OnOutputimageSize80();
  	afx_msg void OnOutputimageForcehighquality();
  	afx_msg void OnOutputimageForcehalftone();
@@ -7970,6 +8142,7 @@ index 94dd0e4..d2cf233 100644
 +    void OnPiecewiseGraph();
 +    void OnSymbolicDerivative();
 +    void OnStatisticsRegression();
++    void OnNumberFormat();
 +    void OnExecuteExpression();
 +    void OnApproximateExpression();
 +    void ExecuteExpression(bool approximate);
@@ -8163,10 +8336,10 @@ index 0000000..3bd012b
 +}
 diff --git a/Mathomir/Piecewise.h b/Mathomir/Piecewise.h
 new file mode 100644
-index 0000000..0eeb1c2
+index 0000000..b327ee5
 --- /dev/null
 +++ b/Mathomir/Piecewise.h
-@@ -0,0 +1,108 @@
+@@ -0,0 +1,109 @@
 +#pragma once
 +#include <string>
 +#include "MathDisplay.h"
@@ -8243,7 +8416,8 @@ index 0000000..0eeb1c2
 +    Row():low(-std::numeric_limits<double>::infinity()),high(std::numeric_limits<double>::infinity()),leftClosed(false),rightClosed(false){}
 +    bool Contains(double x)const{return (x>low || (leftClosed && x==low)) && (x<high || (rightClosed && x==high));}
 +    std::wstring DisplayInterval()const {
-+        return std::wstring(leftClosed && Finite(low)?L"[":L"(")+MathDisplay::Number(low)+L", "+MathDisplay::Number(high)+(rightClosed && Finite(high)?L"]":L")");
++        std::wstring a=MathDisplay::Number(low,true),b=MathDisplay::Number(high,true);if(low<high&&a==b){a=MathDisplay::Count(low);b=MathDisplay::Count(high);if(a==b){a=MathDisplay::NumericText(Number(low));b=MathDisplay::NumericText(Number(high));}}
++        return std::wstring(leftClosed && Finite(low)?L"[":L"(")+a+L", "+b+(rightClosed && Finite(high)?L"]":L")");
 +    }
 +};
 +inline bool Bound(std::string s,bool lower,double &v,std::string &error){
@@ -8418,10 +8592,10 @@ index 7166815..1a552c8 100644
  					dc->FillSolidRect(Options[i].X+TSize/8+1-lrg,Options[i].Y+1+TSize_1p20-lrg,TSize/8+2*lrg,TSize/8+2*lrg,clr);
  					if (Options[i].IsChecked&0x01) 
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..c601945 100644
+index 05446cf..c9b1ad9 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,133 @@
+@@ -174,3 +174,136 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -8555,6 +8729,9 @@ index 05446cf..c601945 100644
 +
 +#define ID_STATISTICS_REGRESSION 33097
 +#define IDD_STATISTICS_REGRESSION 187
++
++#define ID_NUMBER_FORMAT 33098
++#define IDD_NUMBER_FORMAT 188
 diff --git a/Mathomir/ScalarFunctions.h b/Mathomir/ScalarFunctions.h
 new file mode 100644
 index 0000000..22b17e5
@@ -8768,7 +8945,7 @@ index 0000000..bebbe21
 +}
 diff --git a/Mathomir/Statistics.h b/Mathomir/Statistics.h
 new file mode 100644
-index 0000000..4cabdf8
+index 0000000..2bfe6d7
 --- /dev/null
 +++ b/Mathomir/Statistics.h
 @@ -0,0 +1,77 @@
@@ -8844,7 +9021,7 @@ index 0000000..4cabdf8
 +    r.rmse=std::sqrt(r.sse/n);r.r2Defined=yy>0;if(r.r2Defined)r.r2=1-r.sse/yy;r.correlationDefined=xx>0&&yy>0;if(r.correlationDefined)r.correlation=(std::max)(-1.,(std::min)(1.,xy/std::sqrt(xx*yy)));r.residualSEDefined=n>k;if(r.residualSEDefined)r.residualSE=std::sqrt(r.sse/(n-k));result=r;return true;
 +}
 +inline std::wstring SummaryText(const wchar_t* name,const Summary& s){using MathDisplay::Number;return std::wstring(name)+L": mean = "+Number(s.mean)+L"; median = "+Number(s.median)+L"; sample SD = "+(s.sampleDefined?Number(s.sampleSD):L"Undefined (n = 1)")+L"\r\n    min = "+Number(s.minimum)+L"; Q\u2081 = "+Number(s.q1)+L"; Q\u2083 = "+Number(s.q3)+L"; max = "+Number(s.maximum)+L"; IQR = "+Number(s.q3-s.q1)+L"\r\n    sum = "+Number(s.sum)+L"; population SD = "+Number(s.populationSD)+L"\r\n";}
-+inline std::wstring Report(const Result& r){using MathDisplay::Number;std::wstring text=L"n = "+Number((double)r.data.size())+L" pairs\r\n"+SummaryText(L"x",r.x)+SummaryText(L"y",r.y)+L"\r\nR\u00b2 = "+(r.r2Defined?Number(r.r2):L"Undefined (constant y)")+L"; RMSE = "+Number(r.rmse)+L"; SSE = "+Number(r.sse)+L"\r\nPearson r = "+(r.correlationDefined?Number(r.correlation):L"Undefined (constant column)")+L"; residual standard error = "+(r.residualSEDefined?Number(r.residualSE):L"Undefined (no residual degrees of freedom)")+L"\r\nQ\u2081 and Q\u2083 use the median of each half, excluding an odd middle value.\r\n";
++inline std::wstring Report(const Result& r){using MathDisplay::Number;std::wstring text=L"n = "+MathDisplay::Count((double)r.data.size())+L" pairs\r\n"+SummaryText(L"x",r.x)+SummaryText(L"y",r.y)+L"\r\nR\u00b2 = "+(r.r2Defined?Number(r.r2):L"Undefined (constant y)")+L"; RMSE = "+Number(r.rmse)+L"; SSE = "+Number(r.sse)+L"\r\nPearson r = "+(r.correlationDefined?Number(r.correlation):L"Undefined (constant column)")+L"; residual standard error = "+(r.residualSEDefined?Number(r.residualSE):L"Undefined (no residual degrees of freedom)")+L"\r\nQ\u2081 and Q\u2083 use the median of each half, excluding an odd middle value.\r\n";
 +    if(r.model==7||r.model==9)text+=L"Exponential/power fits minimize errors in ln y; R\u00b2 and RMSE above use y.\r\n";
 +    text+=L"\r\nx\tObserved y\tPredicted y\tResidual (y \u2212 predicted)\r\n";for(size_t i=0;i<r.data.size();i++)text+=Number(r.data[i].x)+L"\t"+Number(r.data[i].y)+L"\t"+Number(r.predicted[i])+L"\t"+Number(r.residuals[i])+L"\r\n";return text;
 +}
@@ -9095,7 +9272,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..6baec18 100644
+index b9c3f38..76a8ec6 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -9544,7 +9721,7 @@ index b9c3f38..6baec18 100644
  				if (drw->OriginalForm==1) {text="Rectangle";langid=6009;}
  				if (drw->OriginalForm==2) {text="Line";langid=6010;}
  				if (drw->OriginalForm==4) {text="Ellipse";langid=6011;}
-@@ -4103,6 +4117,18 @@ finish_toolbox_mousemove:
+@@ -4103,6 +4117,25 @@ finish_toolbox_mousemove:
  				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
  				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
  				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
@@ -9553,9 +9730,16 @@ index b9c3f38..6baec18 100644
 +                    if(drw->OriginalForm==90){text="Polygon constructor\r\nRegular presets and custom coordinates";langid=0;}
 +                    if(drw->OriginalForm==89){text="Piecewise function grapher\r\nIntervals and open/closed endpoints";langid=0;}
 +                    if(drw->OriginalForm>=72 && drw->OriginalForm<=84){text=(char*)GeometryShapeNames[drw->OriginalForm-72];langid=0;}
-+                    if(drw->OriginalForm==85 || drw->OriginalForm==86){text="Fine bold hatch\r\nUse both directions for crosshatch";langid=0;}
-+                    if(drw->OriginalForm==87 || drw->OriginalForm==88){text="Smart hatch\r\nTrims to outlines or one side of a line";langid=0;}
-+                    if(drw->OriginalForm==60){text="Configure table";langid=0;}
++                    if(drw->OriginalForm==85 || drw->OriginalForm==86){text="Fine bold hatch\r\nDrag to shade; combine directions for crosshatch";langid=0;}
++                    if(drw->OriginalForm==87 || drw->OriginalForm==88){text="Smart hatch\r\nStart inside an outline or on one side of a line; drag to shade";langid=0;}
++                    if(drw->OriginalForm==60){text="Table constructor\r\nRows, columns, borders and alignment";langid=0;}
++                    if(drw->OriginalForm==65){text="Unit circle\r\nAngles, exact coordinates and extra points";langid=0;}
++                    if(drw->OriginalForm==66){text="45-45-90 triangle\r\nEqual legs; hypotenuse sqrt(2) times a leg";langid=0;}
++                    if(drw->OriginalForm==67){text="30-60-90 triangle\r\nSide ratios 1 : sqrt(3) : 2";langid=0;}
++                    if(drw->OriginalForm==68){text="Ray to the right\r\nOpen circle: endpoint excluded (x > a)";langid=0;}
++                    if(drw->OriginalForm==69){text="Ray to the right\r\nFilled dot: endpoint included (x >= a)";langid=0;}
++                    if(drw->OriginalForm==70){text="Ray to the left\r\nOpen circle: endpoint excluded (x < a)";langid=0;}
++                    if(drw->OriginalForm==71){text="Ray to the left\r\nFilled dot: endpoint included (x <= a)";langid=0;}
 +                    if(drw->OriginalForm==61){text="Interval (a,b)";langid=0;}
 +                    if(drw->OriginalForm==62){text="Interval [a,b]";langid=0;}
 +                    if(drw->OriginalForm==63){text="Interval (a,b]";langid=0;}
@@ -9563,7 +9747,7 @@ index b9c3f38..6baec18 100644
  			}
  			else
  			{
-@@ -4135,6 +4161,7 @@ finish_toolbox_mousemove:
+@@ -4135,6 +4168,7 @@ finish_toolbox_mousemove:
  			strcat(buff,ToolboxKeycodes[i].name);
  			if (key&0x400) {strcpy(buff,"\'");strcat(buff,ToolboxKeycodes[i].name);strcat(buff,"\'");}
  		}
@@ -9571,7 +9755,7 @@ index b9c3f38..6baec18 100644
  		this->ShowHelptext(text,command,buff,easycast,langid);
  
  		}
-@@ -5658,8 +5685,8 @@ int CToolbox::LoadSettings(char * filename)
+@@ -5658,8 +5692,8 @@ int CToolbox::LoadSettings(char * filename)
  		fread(&ForceHighQualityImage,sizeof(int),1,fil);
  		fread(&ForceHalftoneImage,sizeof(int),1,fil);
  		fread(&DefaultFontSize,sizeof(int),1,fil);
@@ -9582,7 +9766,7 @@ index b9c3f38..6baec18 100644
  		fread(&MovingDotSize,sizeof(int),1,fil);
  		fread(&MovingDotPermanent,sizeof(int),1,fil);
  		fread(&GRID,sizeof(int),1,fil);
-@@ -5853,6 +5880,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5853,6 +5887,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  unsigned int DoublestrokesTimer;
  CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  {
@@ -9682,7 +9866,7 @@ index b9c3f38..6baec18 100644
  	//first we check for double-strokes
  	int l2=*len;
  	if (l2<1) return NULL;
-@@ -5896,7 +6016,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+@@ -5896,7 +6023,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  			char *keycode=&ToolboxMembers[i].Keycodes[j][0];
  
  			int l=(int)strlen(keycode);
@@ -9691,7 +9875,7 @@ index b9c3f38..6baec18 100644
  
  			if (memcmp(keystrokes+l2-l,keycode,l)==0)
  			{
-@@ -6063,6 +6183,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6063,6 +6190,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
@@ -9707,7 +9891,7 @@ index b9c3f38..6baec18 100644
  	if (ToolboxMembers[member].Above[submember]==-1) //drawing element
  	{
  		if (ToolboxMembers[member].userdef_mask&(1<<submember))
-@@ -6078,6 +6207,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6078,6 +6214,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  		else
  		{
  			IsDrawingMode=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;

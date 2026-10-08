@@ -1,3 +1,15 @@
+Tooltips and number rounding update — 2026-10-08
+- Hover help on feature-dialog fields, buttons, previews and readouts; the quick
+  toolbar; graph controls; object move/resize/rotate/delete grips; and palettes.
+- Calculus or Graph > Number rounding: Automatic (12 significant figures),
+  0-8 decimal places, or 3-12 significant figures; optional trailing zeroes.
+  The same controls appear in numerical feature dialogs and update values live.
+- Preferences are remembered. Approximations, numerical derivative values,
+  piecewise evaluation, regression summaries/predictions, polygon measurements
+  and new geometry labels use the selected formatting. Negative zero is removed.
+- Exact symbolic results, editable inputs, saved data and fitted graph curves
+  retain their precision. Distinct interval endpoints remain distinguishable.
+
 Math-o-mir repair candidate 20 — 2026-10-04
 Base: https://github.com/mathomir/Mathomir_GIT
 Base commit: 0300c13e5108fb6112403b20f576d977db3309f9
