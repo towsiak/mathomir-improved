@@ -11,6 +11,19 @@ The exact reported crash has not been reproduced. Mouse resizing and printer
 behavior still need hands-on verification. Grip-move and Undo checks run here.
 
 Changes:
+- Numerical audit: nearby denominator roots retain separate identities; small
+  positive minima are no longer accepted as roots solely by absolute tolerance.
+- Step endpoint comparisons account for measured limit error and machine
+  precision, so small vertical scales and large vertical offsets retain markers.
+- Negative odd-root powers share real evaluation between piecewise graphs,
+  endpoint analysis and approximation/derivative evaluation. Large integral
+  rounding values use the common scalar implementation without adding 0.5.
+- Graph workers publish handles before starting, close handles on completion,
+  initialize their drawing lock once, and clear busy state only after acquiring
+  that lock. Cancellation/completion flags are atomic; forced thread killing
+  has been replaced by a bounded cooperative cancellation wait.
+- Recovery waits for active graphs inside drawing groups as well as top-level
+  graphs, and uses completion flags rather than waiting on released handles.
 - Standard open and filled endpoints for floor, ceil, round, trunc, fract and
   sgn, including shifted/reversed inputs and isolated included values. Markers
   follow the actual composed function, respect piecewise exclusions and remain

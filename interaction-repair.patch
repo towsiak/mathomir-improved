@@ -9,7 +9,7 @@ index 0000000..2f73a4e
 +static const char *ImprovedColorNames[8]={"Black","Red","Green","Blue","Gray","Orange","Purple","Teal"};
 +inline unsigned int ImprovedColor(int index){return ImprovedColors[index>=0&&index<8?index:0];}
 diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
-index 944279c..1eb1170 100644
+index 944279c..d47b4b0 100644
 --- a/Mathomir/Drawing.cpp
 +++ b/Mathomir/Drawing.cpp
 @@ -19,6 +19,12 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -25,6 +25,15 @@ index 944279c..1eb1170 100644
  #include ".\drawing.h"
  #include "Mathomir.h"
  #include "mainfrm.h"
+@@ -46,7 +52,7 @@ extern int NumSelectedObjects;
+ int SelectedLineWidth=2*DRWZOOM;
+ int SelectedLineColor=0;
+ int LastDrawingCreated;
+-extern char DrawingThreadUsed;
++extern volatile LONG DrawingThreadUsed;
+ 
+ 
+ 
 @@ -102,8 +108,33 @@ int Drawing_inside_create=0;
  //ItemForm = 1-Rectangle, 2-Circle
  int Drawing_start_x,Drawing_start_y;
@@ -407,17 +416,18 @@ index 944279c..1eb1170 100644
  		{
  			double rad=sqrt((double)(di->X1-centerX)*(double)(di->X1-centerX)+(double)(di->Y1-centerY)*(double)(di->Y1-centerY));
 diff --git a/Mathomir/Drawing.h b/Mathomir/Drawing.h
-index 2f39ec2..ead6326 100644
+index 2f39ec2..9db6e88 100644
 --- a/Mathomir/Drawing.h
 +++ b/Mathomir/Drawing.h
-@@ -1,5 +1,6 @@
+@@ -1,5 +1,7 @@
  #pragma once
  #include "expression.h"
 +#include "Piecewise.h"
++#include <atomic>
  
  //scalling factor that defines drawings inner precision
  #define DRWZOOM 32
-@@ -32,6 +33,7 @@ public:
+@@ -32,6 +34,7 @@ public:
  	CDrawing(void);
  	~CDrawing(void);
  	int StartCreatingItem(int ItemForm);
@@ -425,7 +435,7 @@ index 2f39ec2..ead6326 100644
  	int EndCreatingItem(int *X, int *Y, int absX=0x7FFFFFFF, int absY=0x7FFFFFFF);  //return X and Y coordinates of the upper left corner
  	int UpdateCreatingItem(int X, int Y, int absX, int absY);
  	int Delete(void);
-@@ -111,10 +113,15 @@ public:
+@@ -111,18 +114,23 @@ public:
  class CFunctionPlotter
  {
  public:
@@ -437,11 +447,21 @@ index 2f39ec2..ead6326 100644
  	CBitmap *Plot;
  	unsigned char is_y_log;
  	unsigned char is_x_log;
+-	unsigned char abort_request;
 +	unsigned char is_x_pi;
- 	unsigned char abort_request;
++	std::atomic<unsigned char> abort_request;
  	unsigned char show_no_scale;
  	unsigned char calc_y;
-@@ -137,6 +144,12 @@ public:
+ 	unsigned char analyze;
+ 	unsigned char any_function_defined;
+ 	int m_X1,m_Y1,m_X2,m_Y2;
+ 	DWORD ThreadID;
+-	HANDLE ThreadHandle;
++	std::atomic<HANDLE> ThreadHandle;
+ 	char TheState;
+ 	int MX,MY; //size of the gray areas
+ 
+@@ -137,6 +145,12 @@ public:
  	char *XML_input(char * file);
  
  	int PlotFunction(int reset_plot, CDC *PrintDC=NULL,short zoom=0);
@@ -1401,7 +1421,7 @@ index 36238b0..5ad0c9a 100644
  	int PlotterGetEquationInfo(CExpression **variable,int *position,int *starting_point,char *equation_type);
  	int SetColor(int color);
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..25e100e 100644
+index 1ef18dd..c51aae6 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -1441,7 +1461,7 @@ index 1ef18dd..25e100e 100644
  #include ".\drawing.h"
  #include "Mathomir.h"
  #include "mainfrm.h"
-@@ -31,6 +38,20 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+@@ -31,25 +38,39 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  #include "float.h"
  #include "toolbox.h"
  
@@ -1462,7 +1482,22 @@ index 1ef18dd..25e100e 100644
  extern CMathomirView *pMainView;
  extern tDocumentStruct *SpecialDrawingHover;
  extern int PrintRendering;
-@@ -49,7 +70,7 @@ DWORD WINAPI DrawingThread(LPVOID lpParameter)
+ extern CExpression* ClipboardExpression;
+ 
+-char DrawingThreadUsed;
+-CRITICAL_SECTION section;
+-int wwxx=0;
++volatile LONG DrawingThreadUsed;
++struct GraphWorkerSection {CRITICAL_SECTION section;GraphWorkerSection(){InitializeCriticalSection(&section);}};
++static CRITICAL_SECTION &GraphWorkerLock(){static GraphWorkerSection lock;return lock.section;}
+ 
+ DWORD WINAPI DrawingThread(LPVOID lpParameter)
+ {
+ 	int crit_sec=0;
+-	if (wwxx==0){wwxx=1;InitializeCriticalSection(&section);}
++	CRITICAL_SECTION &section=GraphWorkerLock();
+ 
+ 	//we are not entering if the window is scrolled (or otherwise painted)
  	//because some bug corrupts memory in multi-threading
  	CFunctionPlotter *Plotter=(CFunctionPlotter*)lpParameter;
  	int timer=0;
@@ -1480,7 +1515,32 @@ index 1ef18dd..25e100e 100644
  	{
  		Sleep(10);
  		if (Plotter->abort_request) goto PlotterThread_exit;
-@@ -112,8 +133,9 @@ int double_compare( const void *arg1, const void *arg2 )
+@@ -76,7 +97,7 @@ DWORD WINAPI DrawingThread(LPVOID lpParameter)
+ 	}
+ 
+ 	//we entered the critical section !
+-	DrawingThreadUsed++;
++	InterlockedIncrement(&DrawingThreadUsed);
+ 	crit_sec=1;
+ 	try
+ 	{
+@@ -88,9 +109,12 @@ DWORD WINAPI DrawingThread(LPVOID lpParameter)
+ 	}
+ 
+ PlotterThread_exit:
+-	Plotter->ThreadHandle=NULL;
+-	if (DrawingThreadUsed>0) DrawingThreadUsed--;
+-	if (crit_sec) LeaveCriticalSection(&section);
++    // A queued or pre-start cancellation never acquired the drawing lock and
++    // must not clear another graph worker's busy state.
++    if(crit_sec){InterlockedDecrement(&DrawingThreadUsed);LeaveCriticalSection(&section);}
++    HANDLE completedHandle=Plotter->ThreadHandle;
++    Plotter->ThreadHandle=NULL; // No access to Plotter after announcing completion.
++    if(completedHandle)CloseHandle(completedHandle);
+ 	ExitThread(0);
+ 	return 0;
+ }
+@@ -112,8 +136,9 @@ int double_compare( const void *arg1, const void *arg2 )
  CFunctionPlotter::CFunctionPlotter(CDrawing *BaseItem)
  {
  	Base=BaseItem;
@@ -1491,7 +1551,7 @@ index 1ef18dd..25e100e 100644
  	abort_request=0;
  	show_no_scale=0;
  	calc_y=0;
-@@ -143,8 +165,10 @@ int CFunctionPlotter::CopyFrom(CDrawing *Original)
+@@ -143,8 +168,10 @@ int CFunctionPlotter::CopyFrom(CDrawing *Original)
  	CFunctionPlotter *org=(CFunctionPlotter*)Original->SpecialData;
  	if (!org) return 0;
  
@@ -1502,7 +1562,7 @@ index 1ef18dd..25e100e 100644
  	show_no_scale=org->show_no_scale;
  	analyze=org->analyze;
  	any_function_defined=org->any_function_defined;
-@@ -167,6 +191,7 @@ int wwwxxx;
+@@ -167,6 +194,7 @@ int wwwxxx;
  CRITICAL_SECTION section2;
  int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int absY,RECT *ClipReg)
  {
@@ -1510,7 +1570,7 @@ index 1ef18dd..25e100e 100644
  	MX=(PrintRendering?50:max(50,2*ToolboxSize/5+20));
  	MY=MX/2;
  	const int LeftMargin=MX*zoom/100;
-@@ -184,9 +209,12 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -184,9 +212,12 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  	if (wwwxxx==0) {InitializeCriticalSection(&section2);wwwxxx=1;}
  	if (!TryEnterCriticalSection(&section2)) return 0;
  
@@ -1526,7 +1586,7 @@ index 1ef18dd..25e100e 100644
  
  	//if we are printing, then force function plotting
  	if ((Base->NumItems>=9) && (PrintRendering)) PlotFunction(1,DC);
-@@ -205,20 +233,20 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -205,20 +236,20 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  
  			if ((is_y_log==0) && (TheState==96))
  			{
@@ -1551,7 +1611,7 @@ index 1ef18dd..25e100e 100644
  				double Xmax2=Xmin+(Xmax-Xmin)/f;
  				int xsize=(int)((sz.cx-2)*((Xmax2-Xmin)/(Xmax-Xmin)));
  				DC->StretchBlt(X+LeftMargin,Y,sz.cx-2,sz.cy-1,&mDC,0,0,xsize,sz.cy-1,SRCCOPY);
-@@ -235,7 +263,8 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -235,7 +266,8 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  			CExpression *y0=(CExpression*)((Base->Items+6)->pSubdrawing);
  			CExpression *x0=(CExpression*)((Base->Items+4)->pSubdrawing);
  			if (y0->m_Alignment) is_y_log=1; else is_y_log=0;
@@ -1561,7 +1621,7 @@ index 1ef18dd..25e100e 100644
  
  			//start the plotting thread and create the bitmap
  			if (GetCurrentThreadId()!=ThreadID)
-@@ -246,7 +275,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -246,7 +278,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  		{
  			//check the bitmap size, does it fit? If not, we are recreating the plot bitmap image.
  			CSize sz=Plot->GetBitmapDimension();
@@ -1570,7 +1630,7 @@ index 1ef18dd..25e100e 100644
  			{
  				if (GetCurrentThreadId()!=ThreadID)
  					PlotFunction(1,NULL,zoom);
-@@ -270,7 +299,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -270,7 +302,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  				DC->BitBlt(	max(X+LeftMargin,X+LeftMargin+deltaX),
  							max(Y,Y+deltaY),
  							min(sz.cx-2,sz.cx-deltaX-2),min(sz.cy-1,sz.cy-deltaY-1),&mDC,max(0,-deltaX),max(0,-deltaY),SRCCOPY);
@@ -1579,7 +1639,7 @@ index 1ef18dd..25e100e 100644
  				if (((TheState==100) || (TheState==102)) && (sz.cx>150)) //zoom-ing in, print out the helper text
  				{
  					DC->SetTextAlign(TA_LEFT);
-@@ -279,7 +308,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -279,7 +311,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  					DC->SetBkMode(TRANSPARENT);
  					DC->SelectObject(GetFontFromPool(4,0,0,MX/3));
  					DC->TextOut(X+LeftMargin+30,Y+3,"Select the zoom-in area.",24);
@@ -1588,7 +1648,7 @@ index 1ef18dd..25e100e 100644
  
  				if ((any_function_defined==0) && (sz.cx>150) && (sz.cy>50)) //if no function is defined, print out the helper text
  				{
-@@ -318,11 +347,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -318,11 +350,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  		DC->LineTo(X+m_X1*ViewZoom/100,Y+m_Y2*ViewZoom/100);
  		DC->LineTo(X+m_X1*ViewZoom/100,Y+m_Y1*ViewZoom/100);
  	}
@@ -1602,7 +1662,7 @@ index 1ef18dd..25e100e 100644
  	{
  		const int tt=(ToolboxSize+28)/16;
  		const int hh=(ToolboxSize+28)/53;
-@@ -331,10 +359,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -331,10 +362,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  		const int xstep=ToolboxSize/3;
  		const int ystart=Y+ToolboxSize/6;
  
@@ -1615,7 +1675,7 @@ index 1ef18dd..25e100e 100644
  			DC->FillSolidRect(xstart-tt,ystart-hh,2*tt,2*hh,(TheState==2)?RGB(255,255,255):RGB(0,0,0));
  			DC->FillSolidRect(xstart-hh,ystart-tt,2*hh,2*tt,(TheState==2)?RGB(255,255,255):RGB(0,0,0));
  		}
-@@ -343,67 +371,57 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -343,67 +374,57 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  			if (!ClipboardExpression)
  			{
  				//the minus sign
@@ -1712,7 +1772,7 @@ index 1ef18dd..25e100e 100644
  		}
  	}
  
-@@ -492,10 +510,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -492,10 +513,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  						fsize=fsize*MX*zoom/5000;
  						DC->SelectObject(GetFontFromPool(0,0,0,fsize));
  						DC->SetTextAlign(TA_CENTER);
@@ -1726,7 +1786,7 @@ index 1ef18dd..25e100e 100644
  					}
  				}
  				first*=xstep;
-@@ -574,7 +592,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -574,7 +595,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  						fsize=fsize*MX*zoom/5000;
  						DC->SelectObject(GetFontFromPool(0,0,0,fsize));
  						DC->SetTextAlign(TA_RIGHT);
@@ -1735,7 +1795,7 @@ index 1ef18dd..25e100e 100644
  						last_y=(int)y;
  					}
  				}
-@@ -599,7 +617,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -599,7 +620,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  				int Xlenn=(Base->Items)->X2/DRWZOOM-MX;
  				double Xs=Xmin+(Xmax-Xmin)*((double)m_X1-MX)/(double)Xlenn;
  				double Xe=Xmin+(Xmax-Xmin)*((double)m_X2-MX)/(double)Xlenn;
@@ -1744,7 +1804,7 @@ index 1ef18dd..25e100e 100644
  				Xmx=Xmin+(Xmax-Xmin)/f;
  			}
  
-@@ -623,7 +641,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -623,7 +644,10 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  			}
  			if (xstep<1e-48) xstep=1e-48;
  
@@ -1756,7 +1816,7 @@ index 1ef18dd..25e100e 100644
  			int last_x=-1000;
  			while (first<Xmx)
  			{
-@@ -637,7 +658,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -637,7 +661,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  					DC->LineTo(X+x,Y+Ylen-BottomMargin);
  					if ((fabs(first)<fabs(first+xstep)) && (fabs(first)<fabs(first-xstep)))
  					{
@@ -1765,7 +1825,7 @@ index 1ef18dd..25e100e 100644
  						DC->MoveTo(X+x+1,Y);DC->LineTo(X+x+1,Y+Ylen-BottomMargin);
  						DC->MoveTo(X+x-1,Y);DC->LineTo(X+x-1,Y+Ylen-BottomMargin);
  					}
-@@ -654,12 +675,17 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -654,12 +678,17 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  						fsize=fsize*MX*zoom/5000;
  						DC->SelectObject(GetFontFromPool(0,0,0,fsize));
  						DC->SetTextAlign(TA_CENTER);
@@ -1788,7 +1848,7 @@ index 1ef18dd..25e100e 100644
  						last_x=x+cs.cx+LeftMargin/10;
  					}
  				}
-@@ -686,7 +712,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -686,7 +715,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  				int Ylenn=(Base->Items+1)->Y2/DRWZOOM-MY;
  				double Ys=Ymax-(Ymax-Ymin)*(double)m_Y1/(double)Ylenn;
  				double Ye=Ymax-(Ymax-Ymin)*(double)m_Y2/(double)Ylenn;
@@ -1797,7 +1857,7 @@ index 1ef18dd..25e100e 100644
  				Ymx=Ymin+(Ymax-Ymin)/f;
  			}
  
-@@ -697,7 +723,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -697,7 +726,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  				while (yspan>10.0*ystep) ystep*=10;
  				if (yspan<2.0*ystep) ystep/=5;
  				if (yspan<5.0*ystep) ystep/=2;
@@ -1806,7 +1866,7 @@ index 1ef18dd..25e100e 100644
  			}
  			else if (yspan<2.0)
  			{
-@@ -723,16 +749,16 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -723,16 +752,16 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  					DC->SetROP2(R2_MASKPEN);
  					DC->MoveTo(X+LeftMargin,Y+y);
  					DC->LineTo(X+Xlen,Y+y);
@@ -1826,7 +1886,7 @@ index 1ef18dd..25e100e 100644
  						char number[64];
  						number[0]=0;
  						ShowNumberWithPrecision(first,ystep/5.1,number);
-@@ -742,7 +768,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -742,7 +771,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  						fsize=fsize*MX*zoom/5000;
  						DC->SelectObject(GetFontFromPool(0,0,0,fsize));
  						DC->SetTextAlign(TA_RIGHT);
@@ -1835,7 +1895,7 @@ index 1ef18dd..25e100e 100644
  						last_y=y;
  					}
  				}
-@@ -757,7 +783,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -757,7 +786,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  		if ((Base->NumItems>=9) && (ThreadHandle==NULL))
  		{
  			CExpression *var;
@@ -1844,7 +1904,7 @@ index 1ef18dd..25e100e 100644
  			if (Base->NumItems>8+kk)
  			{
  				CExpression *func=(CExpression*)((Base->Items+8+kk)->pSubdrawing);
-@@ -775,14 +801,14 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -775,14 +804,14 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  								tmp->InsertElement(func->m_pElementList+i,tmp->m_NumElements);
  							short l,a,b;
  							tmp->CalculateSize(DC,zoom*3/4*MX/50,&l,&a,&b);
@@ -1861,7 +1921,7 @@ index 1ef18dd..25e100e 100644
  						tmp->PaintExpression(DC,zoom*3/4*MX/50,X+Xlen-l-3,Y+Ylen-b-2,ClipReg);
  
  						delete tmp;
-@@ -856,14 +882,11 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -856,14 +885,11 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  				pp[5].x=x0-20;pp[5].y=pp[0].y-10;
  				pp[6].x=pp[0].x;pp[6].y=pp[0].y;
  			}
@@ -1879,7 +1939,7 @@ index 1ef18dd..25e100e 100644
  				pp[0].x=x0-3;pp[0].y=y0;
  				pp[1].x=pp[0].x+l-2+6;pp[1].y=pp[0].y;
  				pp[2].x=pp[1].x+20;pp[2].y=pp[1].y-10;
-@@ -881,7 +904,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -881,7 +907,7 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  		else
  		{
  			int type=1;
@@ -1888,7 +1948,7 @@ index 1ef18dd..25e100e 100644
  				type=2;
  			TheState=0;
  
-@@ -890,6 +913,49 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -890,6 +916,49 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  				PlotFunction(type);
  		}
  	}
@@ -1938,7 +1998,7 @@ index 1ef18dd..25e100e 100644
  	LeaveCriticalSection(&section2);
  	return 1;
  }
-@@ -897,20 +963,33 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
+@@ -897,20 +966,33 @@ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int
  #pragma optimize("s",on)
  int CFunctionPlotter::MouseClick(int X, int Y)
  {
@@ -1975,7 +2035,7 @@ index 1ef18dd..25e100e 100644
  
  
  	if ((X==0x7FFFFFFF) && (Y==0x7FFFFFFF))
-@@ -921,12 +1000,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -921,12 +1003,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  			//Y ranging
  			double Xmax,Ymax,Xmin,Ymin;
  			this->PlotFunctionGetBondaries(&Xmin,&Xmax,&Ymin,&Ymax);
@@ -1990,7 +2050,7 @@ index 1ef18dd..25e100e 100644
  				Ymax=Ymin+(Ymax-Ymin)/f;
  			}
  			else
-@@ -934,13 +1013,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -934,13 +1016,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  				double Ys=Ylen-m_Y1;
  				Ys=Ymin*pow(10.0,log10(Ymax/Ymin)*Ys/Ylen);
  				double Ye=Ylen-m_Y2;
@@ -2007,7 +2067,7 @@ index 1ef18dd..25e100e 100644
  			return 0;
  
  		}
-@@ -949,12 +1027,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -949,12 +1030,12 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  			//X ranging
  			double Xmax,Ymax,Xmin,Ymin;
  			this->PlotFunctionGetBondaries(&Xmin,&Xmax,&Ymin,&Ymax);
@@ -2022,7 +2082,7 @@ index 1ef18dd..25e100e 100644
  				Xmax=Xmin+(Xmax-Xmin)/f;
  			}
  			else
-@@ -962,96 +1040,32 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -962,96 +1043,32 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  				double Xs=m_X1-MX;
  				Xs=Xmin*pow(10.0,log10(Xmax/Xmin)*Xs/Xlen);
  				double Xe=m_X2-MX;
@@ -2136,7 +2196,7 @@ index 1ef18dd..25e100e 100644
  			double Xmax,Ymax,Xmin,Ymin;
  			this->PlotFunctionGetBondaries(&Xmin,&Xmax,&Ymin,&Ymax);
  
-@@ -1085,14 +1099,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1085,14 +1102,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  				Ymin*=fy;
  			}
  
@@ -2152,7 +2212,7 @@ index 1ef18dd..25e100e 100644
  			this->PlotFunction(1);
  		}
  
-@@ -1113,7 +1120,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1113,7 +1123,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  			CExpression *tmp=(CExpression*)((Base->Items+TheState-100)->pSubdrawing);
  			CDC *DC=pMainView->GetDC();
  			tmp->CalculateSize(DC,ViewZoom,&l,&a,&b);
@@ -2161,7 +2221,7 @@ index 1ef18dd..25e100e 100644
  
  			int x0;
  			int y0;
-@@ -1143,13 +1150,10 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1143,13 +1153,10 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  				x0=LeftMargin+10;
  				y0=10;
  			}
@@ -2177,7 +2237,7 @@ index 1ef18dd..25e100e 100644
  			}
  			short isexpression;
  			char isparenthese;
-@@ -1169,6 +1173,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1169,6 +1176,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  	if (!ClipboardExpression)
  	{
  		int edit_at_position=TheState;
@@ -2185,7 +2245,7 @@ index 1ef18dd..25e100e 100644
  		if (edit_at_position==97)
  		{
  			//Y ranging
-@@ -1185,8 +1190,8 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1185,8 +1193,8 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  		{
  			//lin/log adjustments
  
@@ -2196,7 +2256,7 @@ index 1ef18dd..25e100e 100644
  			else if ((is_x_log==0) && (is_y_log))
  				is_x_log=1;
  			else if ((is_x_log) && (is_y_log))
-@@ -1197,22 +1202,31 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1197,22 +1205,31 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  			//nasty trick - the lin/log configuration is stored into m_Alignment
  			CExpression *y0=(CExpression*)((Base->Items+6)->pSubdrawing);
  			CExpression *x0=(CExpression*)((Base->Items+4)->pSubdrawing);
@@ -2232,7 +2292,7 @@ index 1ef18dd..25e100e 100644
  				TheState=3;
  			if (edit_at_position==2) {TheState=100;}
  			if (edit_at_position==100) {TheState=102;}
-@@ -1221,68 +1235,18 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1221,68 +1238,18 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  			m_Y2=m_Y1=-Y;
  			return 0;
  		}
@@ -2305,7 +2365,7 @@ index 1ef18dd..25e100e 100644
  		if (edit_at_position>=Base->NumItems) return 0;
  		if ((Base->Items+edit_at_position)->Type!=2) return 0;
  
-@@ -1352,7 +1316,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1352,7 +1319,7 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  			return 1;
  		}
  	}
@@ -2314,7 +2374,7 @@ index 1ef18dd..25e100e 100644
  	return 1;
  }
  #pragma optimize("",on)
-@@ -1361,13 +1325,13 @@ int CFunctionPlotter::MouseClick(int X, int Y)
+@@ -1361,13 +1328,13 @@ int CFunctionPlotter::MouseClick(int X, int Y)
  int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  {
  	if ((TheState>=104)) return 0; //if keyboard editing limits
@@ -2331,7 +2391,7 @@ index 1ef18dd..25e100e 100644
  		}
  		return 0;
  	}
-@@ -1377,10 +1341,16 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1377,10 +1344,16 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  	mx=(SpecialDrawingHover->absolute_X-ViewX)*ViewZoom/100;
  	my=(SpecialDrawingHover->absolute_Y-ViewY)*ViewZoom/100;
  
@@ -2350,7 +2410,7 @@ index 1ef18dd..25e100e 100644
  	if (TheState==100)
  	{
  		//zoom in mode
-@@ -1400,7 +1370,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1400,7 +1373,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		}
  		return 0;
  	}
@@ -2359,7 +2419,7 @@ index 1ef18dd..25e100e 100644
  	if (TheState==3)
  	{
  		//ploter view scrolling (mouse click and drag)
-@@ -1452,7 +1422,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1452,7 +1425,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  			(TheState!=4))
  		{
  			TheState=0;
@@ -2368,7 +2428,7 @@ index 1ef18dd..25e100e 100644
  		}
  
  		TheState=4;
-@@ -1467,10 +1437,10 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1467,10 +1440,10 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		p[4].x=p[0].x-n1;		p[4].y=p[0].y+n3;
  		p[5].x=p[0].x-n1;		p[5].y=p[0].y+n2;
  		p[6].x=p[0].x-n2;		p[6].y=p[0].y+n2;
@@ -2381,7 +2441,7 @@ index 1ef18dd..25e100e 100644
  		DeleteObject(brush);
  	}
  	else if ((abs(SpecialDrawingHover->Length-X)<MX/4) && (Y>SpecialDrawingHover->Below-MY))
-@@ -1487,7 +1457,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1487,7 +1460,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		p[2].x=p[0].x-n1;		p[2].y=p[0].y+n3;
  		p[3].x=p[0].x-n1;		p[3].y=p[0].y+n2;
  		p[4].x=p[0].x-n2;		p[4].y=p[0].y+n2;
@@ -2390,7 +2450,7 @@ index 1ef18dd..25e100e 100644
  		HBRUSH brush=CreateSolidBrush(BLUE_COLOR);
  		DC->SelectObject(brush);
  
-@@ -1502,7 +1472,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1502,7 +1475,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  			(TheState!=6))
  		{
  			TheState=0;
@@ -2399,7 +2459,7 @@ index 1ef18dd..25e100e 100644
  		}
  		TheState=6;
  		POINT p[7];
-@@ -1520,7 +1490,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1520,7 +1493,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		DC->SelectObject(GetPenFromPool(1,1));
  		HBRUSH brush=CreateSolidBrush(BLUE_COLOR);
  		DC->SelectObject(brush);
@@ -2408,7 +2468,7 @@ index 1ef18dd..25e100e 100644
  		DeleteObject(brush);
  
  	}
-@@ -1538,7 +1508,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1538,7 +1511,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		p[2].x=p[0].x-n2;		p[2].y=p[0].y+n1;
  		p[3].x=p[0].x-n3;		p[3].y=p[0].y+n1;
  		p[4].x=p[0].x-n3;		p[4].y=p[0].y;
@@ -2417,7 +2477,7 @@ index 1ef18dd..25e100e 100644
  		HBRUSH brush=CreateSolidBrush(BLUE_COLOR);
  		DC->SelectObject(brush);
  		DC->Polygon(p,5);
-@@ -1559,17 +1529,13 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1559,17 +1532,13 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  				if ((Y<ToolboxSize*30/ViewZoom) && (X>MX+ToolboxSize*66/ViewZoom) && (X<MX+ToolboxSize*100/ViewZoom))
  					new_mode=99;
  				if ((Y<ToolboxSize*30/ViewZoom) && (X>MX+ToolboxSize*100/ViewZoom) && (X<MX+ToolboxSize*133/ViewZoom))
@@ -2440,7 +2500,7 @@ index 1ef18dd..25e100e 100644
  		if (TheState!=new_mode) {TheState=new_mode;return 1;}
  		return 0;
  	}
-@@ -1586,7 +1552,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1586,7 +1555,7 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		m_Y2=Y;
  		m_Y1=Y;
  		return 1;
@@ -2449,7 +2509,7 @@ index 1ef18dd..25e100e 100644
  	}
  	else if ((Y>SpecialDrawingHover->Below-MY) && (X>MX))
  	{
-@@ -1595,14 +1561,14 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1595,14 +1564,14 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  		m_X2=X;
  		m_X1=X;
  		return 1;
@@ -2467,7 +2527,7 @@ index 1ef18dd..25e100e 100644
  			return 1;
  		}
  
-@@ -1611,23 +1577,160 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
+@@ -1611,23 +1580,160 @@ int CFunctionPlotter::MouseMove(CDC *DC,int X, int Y, UINT flags)
  	return 0;
  }
  
@@ -2577,7 +2637,7 @@ index 1ef18dd..25e100e 100644
 +    }
 +}
 +static void AnalyzeGraphDomain(CExpression *function,void *variables,const std::vector<CExpression*>& divisors,
-+    double low,double high,bool radians,std::vector<GraphDomainPoint>& points,unsigned char *abort)
++    double low,double high,bool radians,std::vector<GraphDomainPoint>& points,std::atomic<unsigned char> *abort)
 +{
 +    std::vector<double> roots;
 +    for(size_t i=0;i<divisors.size() && !*abort;i++)
@@ -2634,16 +2694,24 @@ index 1ef18dd..25e100e 100644
  		ViewZoom=::ViewZoom;
  	int Xlen;
  	int Ylen;
-@@ -1641,7 +1744,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1641,12 +1747,11 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		{
  			abort_request=1;
  			Sleep(10);
 -			if (cnt>200) 
 +			if (cnt>200)
  			{
- 				TerminateThread(ThreadHandle,0);
- 				if (DrawingThreadUsed>0) DrawingThreadUsed--;
-@@ -1660,6 +1763,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+-				TerminateThread(ThreadHandle,0);
+-				if (DrawingThreadUsed>0) DrawingThreadUsed--;
+-				ThreadHandle=NULL;
+-				break;
++                // Cooperative cancellation may still be finishing domain work.
++                // Killing it can strand the drawing lock and its selected bitmap.
++                return 1;
+ 			}
+ 			cnt++;
+ 		}
+@@ -1660,6 +1765,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		//reduce for size of 'borders' (coordinate system)
  		Xlen-=MX*ViewZoom/100;
  		Ylen-=MY*ViewZoom/100;
@@ -2651,7 +2719,19 @@ index 1ef18dd..25e100e 100644
  
  		//delete the previous bitmap, if dimensions are different
  		if (Plot)
-@@ -1711,36 +1815,55 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1695,7 +1801,10 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+ 			sa.bInheritHandle=FALSE;
+ 			sa.lpSecurityDescriptor=NULL;
+ 			sa.nLength=sizeof(sa);
+-			ThreadHandle=CreateThread(&sa,0,DrawingThread,(LPVOID)this,0,&(ThreadID));
++			// Publish the handle before the worker can finish, including when
++            // Windows pauses the UI thread immediately after CreateThread.
++            ThreadHandle=CreateThread(&sa,0,DrawingThread,(LPVOID)this,CREATE_SUSPENDED,&(ThreadID));
++            if(ThreadHandle)ResumeThread(ThreadHandle);
+ 			return 1;
+ 		}
+ 	}
+@@ -1711,36 +1820,55 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	tDocumentStruct *ds=TheDocument;
  	int i_cnt;
  	for (i_cnt=0;i_cnt<NumDocumentElements;i_cnt++,ds++)
@@ -2676,11 +2756,11 @@ index 1ef18dd..25e100e 100644
 -	Ylen=cs.cy;	
 +	Ylen=cs.cy;
 +    if (Xlen<2 || Ylen<2) return 0;
++
  
  
 -	
 -	CExpression *Func[4];
-+
 +	CExpression *Func[8];
 +    bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
 +    bool vertical[8]={false};double verticalX[8]={0};
@@ -2720,7 +2800,7 @@ index 1ef18dd..25e100e 100644
  				any_found=1;
  			}
  		}
-@@ -1748,30 +1871,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1748,30 +1876,32 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	if (!any_found) return 0;
  
  	any_function_defined=1;
@@ -2760,7 +2840,7 @@ index 1ef18dd..25e100e 100644
  				delete Func[kk];
  				Func[kk]=NULL;
  			}
-@@ -1780,32 +1905,51 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1780,32 +1910,51 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  
  	//create an arrays that will hold Y calculated values
@@ -2826,7 +2906,7 @@ index 1ef18dd..25e100e 100644
  		  (GetKeyState(33)&0x8000) ||
  		  (GetKeyState(34)&0x8000) ||
  		  (GetKeyState(VK_LEFT)&0x8000) ||
-@@ -1818,7 +1962,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1818,7 +1967,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  		}
  
  		//compute 'y' value in this point 'x'
@@ -2835,7 +2915,7 @@ index 1ef18dd..25e100e 100644
  		{
  			if (abort_request) break;
  			if (Func[kk])
-@@ -1828,72 +1972,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1828,72 +1977,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  					X=((double)i+0)*f1+Xmin;
  				else
  					X=Xmin*pow(10.0,i*f2);
@@ -2937,7 +3017,7 @@ index 1ef18dd..25e100e 100644
  
  			//compute scaling factors
  			double F1=(is_y_log==0)?((double)Ylen/(double)(Ymax-Ymin)):((double)Ylen/log10(Ymax/Ymin));
-@@ -1901,8 +2022,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1901,8 +2027,8 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  			//now we start drawing pre-calculated points into the plotter bitmap
  			if (!abort_request)
@@ -2948,7 +3028,7 @@ index 1ef18dd..25e100e 100644
  					if (Func[kk])
  					{
  						double Y=(is_y_log==0)?((double)(*(YY[kk]+j)-Ymin)):(log10(*(YY[kk]+j))-log10(Ymin));
-@@ -1913,7 +2034,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1913,7 +2039,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  						double Y2=Y;
  						if (analyze)
  						{
@@ -2957,7 +3037,7 @@ index 1ef18dd..25e100e 100644
  							if ((j>1) && (j<i-1))
  							{
  								double n,a,b,c,d;
-@@ -1924,14 +2045,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1924,14 +2050,14 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								d=*(YY[kk]+j+2);
  								if ((b>a) && (b>c)) special_point=1; //maximum
  								if ((b<a) && (b<c)) special_point=2; //minimum
@@ -2975,7 +3055,7 @@ index 1ef18dd..25e100e 100644
  								if (Func[zz])
  								{
  									double a2,b2,c2;
-@@ -1970,11 +2091,40 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1970,11 +2096,40 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  						if (Y>16000) Y=16000;
  						if (Y<-16000) Y=-16000;
@@ -3018,7 +3098,7 @@ index 1ef18dd..25e100e 100644
  							mDC.MoveTo(Xp,Ylen-(int)prevy[kk]);
  							mDC.LineTo(X,Ylen-(int)Y);
  
-@@ -1990,13 +2140,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -1990,13 +2145,13 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								}
  								else //paint colored point
  									mDC.FillSolidRect(X-2,zed-2,4,4,RGB(255,0,(special_point==3)?255:0));
@@ -3034,7 +3114,7 @@ index 1ef18dd..25e100e 100644
  								double Xd;
  								if (is_x_log==0)
  								{
-@@ -2015,7 +2165,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2015,7 +2170,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  
  								double Yd=*(YY[kk]+j);
  								double Ydd=fabs(*(YY[kk]+j-1)-Yd);
@@ -3043,7 +3123,7 @@ index 1ef18dd..25e100e 100644
  								{
  									if (is_y_log==0)
  										ShowNumberWithPrecision(Yd,max(Ydd,1/F1/density),txt2);
-@@ -2026,31 +2176,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2026,31 +2181,31 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  								mDC.SetBkMode(TRANSPARENT);
  								if (special_point==1) //maximum
  								{
@@ -3084,7 +3164,7 @@ index 1ef18dd..25e100e 100644
  
  			if ((analyze) && (i==density*Xlen-1) && (!abort_request) && (PrintDC==NULL) && (Func[0]) && (is_x_log==0))
  			{
-@@ -2060,7 +2210,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2060,7 +2215,7 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  				for (int j=0;j<=i;j++)
  				if (!_isnan(*(YY[0]+j)))
  				{
@@ -3093,7 +3173,7 @@ index 1ef18dd..25e100e 100644
  					if (j<i)
  						Integral+=(*(YY[0]+j)+*(YY[0]+j+1))*f1/2.0;
  					else
-@@ -2076,27 +2226,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2076,27 +2231,49 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  					mDC.SetTextColor(0);
  					char tt[64];strcpy(tt,"Int=");
  					ShowNumberWithPrecision(Integral,f1,tt);
@@ -3151,7 +3231,7 @@ index 1ef18dd..25e100e 100644
  			Func[kk]->PlotterReleaseVariablePositions(VarPos[kk]);
  			delete Func[kk];
  		}
-@@ -2107,12 +2279,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+@@ -2107,12 +2284,52 @@ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  	return 0;
  }
  
@@ -3205,7 +3285,7 @@ index 1ef18dd..25e100e 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+5)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2129,7 +2341,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2129,7 +2346,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=5)
@@ -3214,7 +3294,7 @@ index 1ef18dd..25e100e 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+4)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2146,7 +2358,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2146,7 +2363,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=8)
@@ -3223,7 +3303,7 @@ index 1ef18dd..25e100e 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+7)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2163,7 +2375,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2163,7 +2380,7 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		}
  	}
  	if (Base->NumItems>=7)
@@ -3232,7 +3312,7 @@ index 1ef18dd..25e100e 100644
  		int prec2;
  		CExpression *x=(CExpression*)((Base->Items+6)->pSubdrawing);
  		if (x->m_pElementList->Type)
-@@ -2193,12 +2405,15 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
+@@ -2193,12 +2410,15 @@ int CFunctionPlotter::PlotFunctionGetBondaries(double *Xmin, double *Xmax, doubl
  		if (*Ymax<=1e-100) *Ymax=1;
  		if (*Ymin<=1e-100) *Ymin=*Ymax/1e+10;
  	}
@@ -3248,7 +3328,7 @@ index 1ef18dd..25e100e 100644
  	precision=fabs(precision);
  	if (precision<1e-100) precision=1e-100;
  
-@@ -2246,7 +2461,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
+@@ -2246,7 +2466,7 @@ int CFunctionPlotter::ShowNumberWithPrecision(double number, double precision,ch
  	if (t[0]=='-') {isminus=1;memmove(t,t+1,strlen(t));}
  
  	//leading zeros
@@ -3327,10 +3407,10 @@ index 0000000..7dac989
 +}
 diff --git a/Mathomir/GraphDiscontinuities.h b/Mathomir/GraphDiscontinuities.h
 new file mode 100644
-index 0000000..eaa3757
+index 0000000..6d173ef
 --- /dev/null
 +++ b/Mathomir/GraphDiscontinuities.h
-@@ -0,0 +1,87 @@
+@@ -0,0 +1,92 @@
 +#pragma once
 +#include <cmath>
 +#include <vector>
@@ -3356,15 +3436,20 @@ index 0000000..eaa3757
 +    // Deduplicate at numerical precision, not at a fraction of the viewport.
 +    for (size_t i=0;i<roots.size();++i) {
 +        double scale=(std::max)(1.0,(std::max)(std::fabs(x),std::fabs(roots[i])));
-+        if(std::fabs(roots[i]-x)<=1e-10+64*std::numeric_limits<double>::epsilon()*scale)return;
++        if(std::fabs(roots[i]-x)<=64*std::numeric_limits<double>::epsilon()*scale)return;
 +    }
 +    if(roots.size()<128)roots.push_back(x);
 +}
 +template<class Evaluate> bool RootResidual(Evaluate evaluate,double x) {
 +    double scale=(std::max)(1.0,std::fabs(x)),h=(std::max)(1e-4,64*std::numeric_limits<double>::epsilon()*scale);
 +    double residual=evaluate(x),left=evaluate(x-h),right=evaluate(x+h);
-+    return Finite(residual)&&Finite(left)&&Finite(right) &&
-+        std::fabs(residual)<=1e-10*(1+std::fabs(left)+std::fabs(right));
++    if(!Finite(residual)||!Finite(left)||!Finite(right))return false;
++    if(residual==0)return true;
++    // Scale the acceptable residual to the change caused by roundoff in x.
++    // An absolute tolerance mistakes small, strictly positive minima for zeros.
++    double uncertainty=64*std::numeric_limits<double>::epsilon()*std::fabs(x)+64*std::numeric_limits<double>::denorm_min();
++    double slope=std::fabs(right-left)/(2*h),curvature=std::fabs(left-2*residual+right)/(h*h);
++    return std::fabs(residual)<=uncertainty*slope+uncertainty*uncertainty*curvature;
 +}
 +template<class Evaluate> void Roots(Evaluate evaluate,double low,double high,std::vector<double>& roots,int depth=0) {
 +    if(!Finite(low)||!Finite(high)||high<=low || roots.size()>=128)return;
@@ -3420,10 +3505,10 @@ index 0000000..eaa3757
 +}
 diff --git a/Mathomir/GraphStepEndpoints.h b/Mathomir/GraphStepEndpoints.h
 new file mode 100644
-index 0000000..a44cc29
+index 0000000..af26e92
 --- /dev/null
 +++ b/Mathomir/GraphStepEndpoints.h
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,94 @@
 +#pragma once
 +#include "SymbolicDerivative.h"
 +#include "GraphDiscontinuities.h"
@@ -3443,7 +3528,7 @@ index 0000000..a44cc29
 +        double a=Evaluate(e->a,x,radians,boundary),b=e->b?Evaluate(e->b,x,radians,boundary):0;
 +        if(!Finite(a)||(e->b&&!Finite(b)))return NaN();
 +        if(e->op=='+')return a+b;if(e->op=='-')return a-b;if(e->op=='*')return a*b;if(e->op=='/')return b==0?NaN():a/b;if(e->op=='~')return -a;
-+        if(e->op=='^')return a==0&&b==0?NaN():std::pow(a,b);
++        if(e->op=='^')return a==0&&b==0?NaN():ScalarFunctions::RealPower(a,b);
 +        if(boundary&&ScalarFunctions::Steps(e->name.c_str())){
 +            double offset=e->name=="round"?.5:0,nearest=std::floor(a-offset+.5)+offset;
 +            if(e->name=="sgn")nearest=0;
@@ -3455,18 +3540,18 @@ index 0000000..a44cc29
 +        for(size_t i=0;i<cuts.size();i++)if(std::fabs(cuts[i]-x)<=128*std::numeric_limits<double>::epsilon()*(1+(std::max)(std::fabs(x),std::fabs(cuts[i]))))return;
 +        if(cuts.size()<2048)cuts.push_back(x);
 +    }
-+    static void AddPoint(std::vector<Point>& points,double x,double y,bool closed){
++    static void AddPoint(std::vector<Point>& points,double x,double y,bool closed,double tolerance){
 +        if(!GraphDiscontinuities::Finite(y))return;
-+        for(size_t i=0;i<points.size();i++)if(points[i].x==x&&std::fabs(points[i].y-y)<=1e-8*(1+std::fabs(y))){if(closed)points[i].y=y;points[i].closed=points[i].closed||closed;return;}
++        for(size_t i=0;i<points.size();i++)if(points[i].x==x&&std::fabs(points[i].y-y)<=tolerance){if(closed)points[i].y=y;points[i].closed=points[i].closed||closed;return;}
 +        points.push_back(Point(x,y,closed));
 +    }
-+    bool Limit(double x,int side,double h,bool radians,double &value)const{
++    bool Limit(double x,int side,double h,bool radians,double &value,double *error=NULL)const{
 +        double previous=0;int agreements=0;
 +        for(int i=0;i<12;i++,h*=.1){
 +            double location=x+side*h;if(location==x)break;double current=Evaluate(formula,location,radians);
 +            if(!GraphDiscontinuities::Finite(current)){agreements=0;continue;}
 +            if(i>0&&std::fabs(current-previous)<=1e-8*(1+std::fabs(current)))agreements++;else agreements=0;
-+            previous=current;if(agreements>=2){value=current;return true;}
++            double difference=std::fabs(current-previous);previous=current;if(agreements>=2){value=current;if(error)*error=2*difference+4*std::numeric_limits<double>::epsilon()*std::fabs(current);return true;}
 +        }
 +        return false;
 +    }
@@ -3501,14 +3586,18 @@ index 0000000..a44cc29
 +        for(size_t i=0;i<cuts.size()&&!aborted();i++){
 +            double x=cuts[i],scale=(std::max)(1.,std::fabs(x));double h=(std::min)(scale*1e-3,(high-low)*1e-3);
 +            if(i>0)h=(std::min)(h,(x-cuts[i-1])*.2);if(i+1<cuts.size())h=(std::min)(h,(cuts[i+1]-x)*.2);
-+            if(h<=0)continue;double left=0,right=0,actual=Evaluate(formula,x,radians,true);
-+            bool l=x>low&&Limit(x,-1,h,radians,left),r=x<high&&Limit(x,1,h,radians,right),a=GraphDiscontinuities::Finite(actual)&&(x!=low||leftClosed)&&(x!=high||rightClosed);
-+            double tolerance=1e-7*(1+(std::max)(l?std::fabs(left):0,r?std::fabs(right):0));
++            if(h<=0)continue;double left=0,right=0,leftError=0,rightError=0,actual=Evaluate(formula,x,radians,true);
++            bool l=x>low&&Limit(x,-1,h,radians,left,&leftError),r=x<high&&Limit(x,1,h,radians,right,&rightError),a=GraphDiscontinuities::Finite(actual)&&(x!=low||leftClosed)&&(x!=high||rightClosed);
++            // Compare within the measured limit error and floating-point precision.
++            // A fixed relative-to-(1+y) threshold hides small steps or steps on
++            // top of a large vertical offset even when the viewport resolves them.
++            double magnitude=(std::max)((std::max)(l?std::fabs(left):0,r?std::fabs(right):0),a?std::fabs(actual):0);
++            double tolerance=(std::max)((std::max)(leftError,rightError),4*std::numeric_limits<double>::epsilon()*magnitude+4*std::numeric_limits<double>::denorm_min());
 +            bool discontinuous=(l&&r&&std::fabs(left-right)>tolerance)||(a&&((l&&std::fabs(left-actual)>tolerance)||(r&&std::fabs(right-actual)>tolerance)))||(!a&&(l||r))||(a&&(l!=r));
 +            if(!discontinuous)continue;
-+            if(l)AddPoint(points,x,left,a&&std::fabs(left-actual)<=tolerance);
-+            if(r)AddPoint(points,x,right,a&&std::fabs(right-actual)<=tolerance);
-+            if(a)AddPoint(points,x,actual,true);
++            if(l){bool closed=a&&std::fabs(left-actual)<=tolerance;AddPoint(points,x,closed?actual:left,closed,tolerance);}
++            if(r){bool closed=a&&std::fabs(right-actual)<=tolerance;AddPoint(points,x,closed?actual:right,closed,tolerance);}
++            if(a)AddPoint(points,x,actual,true,tolerance);
 +        }
 +        return points;
 +    }
@@ -4205,7 +4294,7 @@ index bdcebb4..891c207 100644
 +    PUSHBUTTON "Cancel",IDCANCEL,496,361,80,16
 +END
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
-index 15ec728..c0ba4b7 100644
+index 15ec728..5de9bd2 100644
 --- a/Mathomir/MathomirDoc.cpp
 +++ b/Mathomir/MathomirDoc.cpp
 @@ -29,6 +29,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4343,7 +4432,7 @@ index 15ec728..c0ba4b7 100644
  	}
  	else
  	{
-@@ -1233,7 +1246,62 @@ void FatalErrorHandling()
+@@ -1233,7 +1246,64 @@ void FatalErrorHandling()
  		FatalErrorActivated=1;
  		if (AutosaveOption==0)	pMainView->GetDocument()->SaveMOMFile("Autosave.mom",TheFileType);
  
@@ -4367,19 +4456,21 @@ index 15ec728..c0ba4b7 100644
 +    if (!CreateDirectoryA(folder,NULL) && GetLastError()!=ERROR_ALREADY_EXISTS) return CString();
 +    return folder;
 +}
++static bool HasActiveRecoveryGraph(CDrawing *drawing,int depth=0)
++{
++    if(!drawing || depth>32)return false;
++    if(drawing->IsSpecialDrawing==51 && drawing->SpecialData &&
++        ((CFunctionPlotter*)drawing->SpecialData)->ThreadHandle.load())return true;
++    for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0 &&
++        HasActiveRecoveryGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1))return true;
++    return false;
++}
 +bool CMathomirDoc::SaveRecovery()
 +{
-+    // A graph can update its bounds on its worker thread. Retry after it finishes.
-+    for (int i=0;i<NumDocumentElements;i++)
-+        if (TheDocument[i].Type==2)
-+        {
-+            CDrawing *drawing=(CDrawing*)TheDocument[i].Object;
-+            if (drawing->IsSpecialDrawing==51 && drawing->SpecialData)
-+            {
-+                CFunctionPlotter *plot=(CFunctionPlotter*)drawing->SpecialData;
-+                if (plot->ThreadHandle && WaitForSingleObject(plot->ThreadHandle,0)==WAIT_TIMEOUT) return false;
-+            }
-+        }
++    // Grouped graphs can update bounds too. The worker's completion flag covers
++    // its final document writes without waiting on a potentially closed handle.
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 &&
++        HasActiveRecoveryGraph((CDrawing*)TheDocument[i].Object))return false;
 +    CString folder=RecoveryFolder();
 +    if (folder.IsEmpty()) return false;
 +    SYSTEMTIME time; GetLocalTime(&time);
@@ -7942,7 +8033,7 @@ index 0000000..3bd012b
 +}
 diff --git a/Mathomir/Piecewise.h b/Mathomir/Piecewise.h
 new file mode 100644
-index 0000000..5cc6327
+index 0000000..0eeb1c2
 --- /dev/null
 +++ b/Mathomir/Piecewise.h
 @@ -0,0 +1,108 @@
@@ -7994,7 +8085,7 @@ index 0000000..5cc6327
 +        if(i<0)i=root;if(i<0)return std::numeric_limits<double>::quiet_NaN();const Node &n=nodes[i];
 +        if(n.op=='x')return x;if(n.op=='n')return n.number;
 +        double a=Value(x,radians,n.a),b=n.b>=0?Value(x,radians,n.b):0;
-+        if(n.op=='+')return a+b;if(n.op=='-')return a-b;if(n.op=='*')return a*b;if(n.op=='/')return b==0?std::numeric_limits<double>::quiet_NaN():a/b;if(n.op=='~')return -a;if(n.op=='^'){if(a>=0 || std::floor(b)==b)return std::pow(a,b);for(int q=3;q<=99;q+=2){double n=std::floor(b*q+.5);if(std::fabs(b*q-n)<1e-12)return (std::fmod(std::fabs(n),2.)>.5?-1:1)*std::pow(-a,b);}return std::numeric_limits<double>::quiet_NaN();}
++        if(n.op=='+')return a+b;if(n.op=='-')return a-b;if(n.op=='*')return a*b;if(n.op=='/')return b==0?std::numeric_limits<double>::quiet_NaN():a/b;if(n.op=='~')return -a;if(n.op=='^')return ScalarFunctions::RealPower(a,b);
 +        if(ScalarFunctions::Known(n.name.c_str()))return ScalarFunctions::Value(n.name.c_str(),a);
 +        if(n.name=="sqrt")return std::sqrt(a);if(n.name=="abs")return std::fabs(a);if(n.name=="exp")return std::exp(a);if(n.name=="ln")return std::log(a);if(n.name=="log")return std::log10(a);
 +        if(!radians)a*=3.14159265358979323846/180.;if(n.name=="sin")return std::sin(a);if(n.name=="cos")return std::cos(a);return std::fabs(std::cos(a))<1e-14?std::numeric_limits<double>::quiet_NaN():std::tan(a);
@@ -8333,10 +8424,10 @@ index 05446cf..cd3301f 100644
 +#define ID_APPROXIMATE_EXPRESSION 33096
 diff --git a/Mathomir/ScalarFunctions.h b/Mathomir/ScalarFunctions.h
 new file mode 100644
-index 0000000..f6c90d6
+index 0000000..22b17e5
 --- /dev/null
 +++ b/Mathomir/ScalarFunctions.h
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,58 @@
 +#pragma once
 +#include <cmath>
 +#include <cstring>
@@ -8356,6 +8447,16 @@ index 0000000..f6c90d6
 +    return std::strcmp(name,"floor")==0 || std::strcmp(name,"ceil")==0 ||
 +        std::strcmp(name,"round")==0 || std::strcmp(name,"trunc")==0 ||
 +        std::strcmp(name,"sgn")==0 || std::strcmp(name,"fract")==0;
++}
++// Real rational powers retain the odd-root convention used by the native
++// graph evaluator. The bound matches the piecewise parser's existing policy.
++inline double RealPower(double base,double exponent){
++    if(!std::isfinite(base)||!std::isfinite(exponent))return std::numeric_limits<double>::quiet_NaN();
++    if(base>=0 || std::floor(exponent)==exponent)return std::pow(base,exponent);
++    for(int q=3;q<=99;q+=2){double numerator=std::round(exponent*q);
++        if(std::fabs(exponent*q-numerator)<1e-12)return (std::fmod(std::fabs(numerator),2.)>.5?-1:1)*std::pow(-base,exponent);
++    }
++    return std::numeric_limits<double>::quiet_NaN();
 +}
 +inline const char *Description(const char *name) {
 +    if(std::strcmp(name,"floor")==0)return "Floor: greatest integer less than or equal to x. floor(-1.2) = -2.";
@@ -8534,7 +8635,7 @@ index 0000000..bebbe21
 +}
 diff --git a/Mathomir/SymbolicDerivative.h b/Mathomir/SymbolicDerivative.h
 new file mode 100644
-index 0000000..0e05c34
+index 0000000..b831672
 --- /dev/null
 +++ b/Mathomir/SymbolicDerivative.h
 @@ -0,0 +1,239 @@
@@ -8550,6 +8651,7 @@ index 0000000..0e05c34
 +#include <limits>
 +#include <stdexcept>
 +#include <algorithm>
++#include "ScalarFunctions.h"
 +
 +// A bounded, real-valued expression tree. Symbolic work is independent of the
 +// numeric graph sampler and never estimates a derivative by finite differences.
@@ -8681,7 +8783,7 @@ index 0000000..0e05c34
 +inline double Value(Expr a,const std::string &variable,double x,bool radians=true){
 +    if(!a)return NaN();if(a->op=='n')return a->number;if(a->op=='v'){if(a->name==variable)return x;if(a->name=="pi")return 3.14159265358979323846;if(a->name=="e")return 2.71828182845904523536;return NaN();}
 +    double u=Value(a->a,variable,x,radians),v=a->b?Value(a->b,variable,x,radians):0;if(!Finite(u)||(a->b&&!Finite(v)))return NaN();
-+    if(a->op=='+')return u+v;if(a->op=='-')return u-v;if(a->op=='*')return u*v;if(a->op=='/')return v==0?NaN():u/v;if(a->op=='~')return -u;if(a->op=='^')return u==0&&v==0?NaN():std::pow(u,v);
++    if(a->op=='+')return u+v;if(a->op=='-')return u-v;if(a->op=='*')return u*v;if(a->op=='/')return v==0?NaN():u/v;if(a->op=='~')return -u;if(a->op=='^')return u==0&&v==0?NaN():ScalarFunctions::RealPower(u,v);
 +    const std::string &s=a->name;double inverseFactor=radians?1:180./3.14159265358979323846;
 +    if(!radians&&(s=="sin"||s=="cos"||s=="tan"||s=="cot"||s=="sec"||s=="csc"))u*=3.14159265358979323846/180.;
 +    if(s=="sin")return std::sin(u);if(s=="cos")return std::cos(u);if(s=="tan")return std::fabs(std::cos(u))<1e-14?NaN():std::tan(u);
@@ -8689,8 +8791,7 @@ index 0000000..0e05c34
 +    if(s=="asin")return std::asin(u)*inverseFactor;if(s=="acos")return std::acos(u)*inverseFactor;if(s=="atan")return std::atan(u)*inverseFactor;
 +    if(s=="sinh")return std::sinh(u);if(s=="cosh")return std::cosh(u);if(s=="tanh")return std::tanh(u);
 +    if(s=="ln")return std::log(u);if(s=="log")return std::log10(u);if(s=="exp")return std::exp(u);if(s=="sqrt")return std::sqrt(u);if(s=="cbrt")return u<0?-std::pow(-u,1./3):std::pow(u,1./3);if(s=="abs")return std::fabs(u);
-+    if(s=="floor")return std::floor(u);if(s=="ceil")return std::ceil(u);if(s=="trunc")return u<0?std::ceil(u):std::floor(u);if(s=="round")return u<0?std::ceil(u-.5):std::floor(u+.5);if(s=="fract")return u-std::floor(u);if(s=="sgn")return u>0?1:u<0?-1:0;
-+    if(s=="sinc")return u==0?1:std::sin(u)/u;return NaN();
++    if(ScalarFunctions::Known(s.c_str()))return ScalarFunctions::Value(s.c_str(),u);return NaN();
 +}
 +inline int Size(Expr a){if(!a)return 0;return 1+Size(a->a)+Size(a->b);}
 +struct Guard {Expr expression;std::string kind;Guard(Expr e,const std::string &k):expression(e),kind(k){}};
