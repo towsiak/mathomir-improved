@@ -36,6 +36,30 @@ public static class FeatureUI {
  public static bool FooterFits(IntPtr d) {Rect c;GetClientRect(d,out c);int right=0;foreach(int id in new[]{32480,32481}){Rect r;GetWindowRect(Child(d,id),out r);Point p=new Point{x=r.right,y=r.bottom};ScreenToClient(d,ref p);if(p.x>c.right||p.y>c.bottom)return false;right=Math.Max(right,p.x);}return right>100;}
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetProp(IntPtr h,string name);
  public static long Tips(IntPtr owner){IntPtr registered=GetProp(owner,"MathomirFeatureTips");if(registered!=IntPtr.Zero)return Send(registered,1037,0);long count=0;EnumWindows((h,p)=>{var c=new StringBuilder(100);GetClassName(h,c,100);if(c.ToString()=="tooltips_class32"&&GetWindow(h,4)==owner)count+=Send(h,1037,0);return true;},IntPtr.Zero);return count;}
+ public static IntPtr CaptionChild(IntPtr parent,string caption){IntPtr result=IntPtr.Zero;EnumChildWindows(parent,(h,p)=>{if(Text(h)==caption){result=h;return false;}return true;},IntPtr.Zero);return result;}
+ public static Rect Bounds(IntPtr h){Rect r;GetWindowRect(h,out r);return r;}
+ public static Rect Client(IntPtr h){Rect r;GetClientRect(h,out r);return r;}
+ public static void Mouse(IntPtr h,uint message,int flags,int x,int y){Rect r;GetWindowRect(h,out r);SetCursorPos(r.left+x,r.top+y);Send(h,message,flags,(y<<16)|(x&65535));}
+ [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint rights,bool inherit,int pid);
+ [DllImport("kernel32.dll")] static extern IntPtr VirtualAllocEx(IntPtr p,IntPtr at,UIntPtr size,uint type,uint protection);
+ [DllImport("kernel32.dll")] static extern bool VirtualFreeEx(IntPtr p,IntPtr at,UIntPtr size,uint type);
+ [DllImport("kernel32.dll")] static extern bool WriteProcessMemory(IntPtr p,IntPtr at,byte[] data,UIntPtr size,out UIntPtr n);
+ [DllImport("kernel32.dll")] static extern bool ReadProcessMemory(IntPtr p,IntPtr at,byte[] data,UIntPtr size,out UIntPtr n);
+ [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+ public static string HintText(IntPtr owner,int pid){
+  IntPtr tip=GetProp(owner,"MathomirFeatureTips");if(tip==IntPtr.Zero)return "";
+  IntPtr process=OpenProcess(0x38,false,pid);if(process==IntPtr.Zero)throw new Exception("Cannot inspect tooltip process");
+  IntPtr mem=VirtualAllocEx(process,IntPtr.Zero,(UIntPtr)8256,0x3000,4);
+  try{if(mem==IntPtr.Zero)throw new Exception("Cannot allocate tooltip buffer");
+   // The application is Win32: TOOLINFOW version 2 is 44 bytes, regardless of test-process architecture.
+   var info=new byte[44];Array.Copy(BitConverter.GetBytes(44),0,info,0,4);Array.Copy(BitConverter.GetBytes(unchecked((int)owner.ToInt64())),0,info,8,4);
+   Array.Copy(BitConverter.GetBytes(1),0,info,12,4);Array.Copy(BitConverter.GetBytes(unchecked((int)(mem.ToInt64()+64))),0,info,36,4);
+   UIntPtr n;if(!WriteProcessMemory(process,mem,info,(UIntPtr)info.Length,out n))throw new Exception("Cannot write tooltip info");
+   Send(tip,1080,4096,unchecked((int)mem.ToInt64()));var text=new byte[8192];
+   if(!ReadProcessMemory(process,IntPtr.Add(mem,64),text,(UIntPtr)text.Length,out n))throw new Exception("Cannot read tooltip text");
+   return Encoding.Unicode.GetString(text).Split('\0')[0];
+  }finally{if(mem!=IntPtr.Zero)VirtualFreeEx(process,mem,UIntPtr.Zero,0x8000);CloseHandle(process);}
+ }
  public static int DirectChildren(IntPtr parent){int n=0;for(IntPtr h=GetWindow(parent,5);h!=IntPtr.Zero;h=GetWindow(h,2))n++;return n;}
  [DllImport("kernel32.dll")] static extern IntPtr GlobalAlloc(uint f,UIntPtr n);
  [DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr h);
@@ -67,10 +91,58 @@ function Help($d) {
  $tips=[FeatureUI]::Tips($d);$children=[FeatureUI]::DirectChildren($d);Write-Host "Tooltip tools: $tips; direct controls: $children";Check ($tips -ge $children) 'A dialog control has no tooltip registered'
  Check ([FeatureUI]::FooterFits($d)) 'Rounding footer extends beyond the dialog'
 }
+function HoverHint($owner,$x,$y,$expected) {
+ [FeatureUI]::Mouse($owner,512,0,$x,$y)
+ $shown=$false
+ for($attempt=0;$attempt -lt 30;$attempt++){Start-Sleep -Milliseconds 100;if([FeatureUI]::TipVisible($owner)){$shown=$true;break}}
+ $text=[FeatureUI]::HintText($owner,$app.Id)
+ Write-Host "Hover at ($x,$y): visible=$shown; $text"
+ Check $shown "Tooltip did not appear at ($x,$y)"
+ Check ($text -match $expected) "Incorrect tooltip at ($x,$y): expected $expected; got $text"
+}
+function OpenPalette($x,$y) {
+ [FeatureUI]::Send($view,258,27)|Out-Null
+ [FeatureUI]::Mouse($toolbox,512,0,$x,$y);[FeatureUI]::Mouse($toolbox,513,1,$x,$y);[FeatureUI]::Mouse($toolbox,514,0,$x,$y)
+ Start-Sleep -Milliseconds 150
+ $h=[FeatureUI]::Dialog($app.Id,'Subtoolbox');Check ($h -ne [IntPtr]::Zero) 'Palette did not open';return $h
+}
 try {
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle
  Check ($main -ne [IntPtr]::Zero) 'Application did not start'
  $bar=[FeatureUI]::Child($main,1110);Check (([FeatureUI]::Tips($main)+[FeatureUI]::Tips($bar)) -ge 9) 'Quick toolbar tooltip coverage missing'
+ $view=[FeatureUI]::Child($main,0xE900)
+ $toolbox=[FeatureUI]::CaptionChild($main,'Toolbox');Check ($toolbox -ne [IntPtr]::Zero) 'Main palette missing'
+ $r=[FeatureUI]::Bounds($toolbox);$toolSize=$r.right-$r.left;$client=[FeatureUI]::Client($main)
+ $itemHeight=[int][Math]::Floor(($client.bottom-[Math]::Floor($toolSize/2)-$toolSize-7)/8)
+ $itemHeight=[Math]::Max([Math]::Floor($toolSize/3),[Math]::Min([Math]::Floor(2*$toolSize/3),$itemHeight))
+ if($itemHeight -lt $toolSize/2){$itemHeight+=[Math]::Floor([Math]::Floor($toolSize/3)/8)}
+ $itemHeight=$itemHeight -band 0xFFFE;$subHeight=[int][Math]::Floor(2*$toolSize/3)
+ # Every main symbol/category button has native hover help.
+ foreach($row in 0..7){foreach($column in 0..1){if($row -eq 7 -and $column -eq 1){continue};HoverHint $toolbox ([int]($column*$toolSize/2+$toolSize/4)) ([int]($toolSize/2+$row*$itemHeight+$itemHeight/2)) '.'}}
+ $palette=OpenPalette ([int]($toolSize/2)-3) ([int]($toolSize/2)+5*$itemHeight-3)
+ $functions=@('floor','ceil','absolute','round','trunc','sign','fract','cube','exp','sinc')
+ foreach($index in 0..9){$slot=18+$index;HoverHint $palette ([int]([Math]::Floor($slot/2)*$toolSize/2+$toolSize/4)) ([int](($slot%2)*$subHeight+$subHeight/2)) $functions[$index]}
+ $palette=OpenPalette ($toolSize-3) ([int]($toolSize/2)+7*$itemHeight-3)
+ foreach($case in @(@(12,'Piecewise'),@(14,'Table'),@(19,'Unit circle'),@(26,'Fine bold'),@(28,'Smart hatch'),@(30,'derivative'),@(31,'Statistics'))){
+  $slot=$case[0];HoverHint $palette ([int]([Math]::Floor($slot/2)*$toolSize/2+$toolSize/4)) ([int](($slot%2)*$subHeight+$subHeight/2)) $case[1]
+ }
+ $palette=OpenPalette ([int]($toolSize/2)-3) ([int]($toolSize/2)+8*$itemHeight-3)
+ $shapes=@('Triangle','Right triangle','Square','Rectangle','Parallelogram','Trapezoid','Circle','Ellipse','Parallel lines','alternate angles','corresponding angles','co-interior angles','Obtuse triangle','Polygon constructor')
+ foreach($slot in 0..13){HoverHint $palette ([int]([Math]::Floor($slot/2)*$toolSize/2+$toolSize/4)) ([int](($slot%2)*$subHeight+$subHeight/2)) $shapes[$slot]}
+ [FeatureUI]::Send($view,258,27)|Out-Null
+ $fixture=Join-Path (Split-Path $exe) 'object-tooltip-smoke.mom'
+ '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="120"><ex><var t="x123456" f="00" /></ex></o><o t="1" X="100" Y="220"><ex stxt="1"><var t="Hover this text" f="00" /></ex></o><o t="2" X="100" Y="300"><dw d="32|0,0;6400,0;:,3200;0,:;:,0" /></o><o t="2" X="400" Y="300"><dw d="32|0,0;6400,3200" /></o></mathomir>'|Set-Content $fixture -Encoding ascii
+ [FeatureUI]::Open($main,$fixture);Start-Sleep -Milliseconds 350
+ [FeatureUI]::Send($view,276,4)|Out-Null
+ for($page=0;$page -lt 10;$page++){[FeatureUI]::Send($view,277,2)|Out-Null}
+ [FeatureUI]::Send($view,273,32775)|Out-Null
+ HoverHint $view 110 120 'Mathematical object'
+ HoverHint $view 110 220 'Text object'
+ HoverHint $view 200 350 'Drawing|diagram|Rectangle'
+ HoverHint $view 500 350 'Drawing|diagram|Line'
+ [FeatureUI]::Mouse($view,512,0,850,600);Start-Sleep -Milliseconds 200
+ Check ([FeatureUI]::Tips($view) -eq 0) 'Blank page retained stale object help'
+ Write-Host 'Actual object/palette hovers passed: main symbols, ten functions, constructors, shader tools, all geometry presets, page math/text, drawing interiors and lines.'
  $d=Dialog 33098 'Number rounding';Help $d
  [FeatureUI]::Hover($d,32480)
  $shown=$false;for($i=0;$i -lt 30;$i++){Start-Sleep -Milliseconds 100;if([FeatureUI]::TipVisible($d)){$shown=$true;break}}

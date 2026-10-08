@@ -1,3 +1,12 @@
+Object and palette tooltip correction — 2026-10-08
+- Floating hover help on placed math, text, diagrams, images, drawing boxes and graphs.
+- Floating help on all palette categories, symbols, shapes, constructor tools, colors,
+  line widths, fonts, keyboard keys and contextual toolbar buttons.
+- Custom palette descriptions now display, including piecewise, polygon, statistics,
+  derivative, geometry and smart/fine shader tools. Help clears on blank canvas.
+- Tool-specific graph/grip help takes priority; native Windows hover checks verify
+  displayed tooltip text as well as visibility.
+
 Tooltips and number rounding update — 2026-10-08
 - Hover help on feature-dialog fields, buttons, previews and readouts; the quick
   toolbar; graph controls; object move/resize/rotate/delete grips; and palettes.
