@@ -1424,10 +1424,10 @@ index 36238b0..5ad0c9a 100644
  	int SetColor(int color);
 diff --git a/Mathomir/FeatureHelp.h b/Mathomir/FeatureHelp.h
 new file mode 100644
-index 0000000..b106acb
+index 0000000..9135668
 --- /dev/null
 +++ b/Mathomir/FeatureHelp.h
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,54 @@
 +#pragma once
 +#include "Resource.h"
 +#include "MathDisplay.h"
@@ -1435,15 +1435,24 @@ index 0000000..b106acb
 +#include <commctrl.h>
 +
 +class CFeatureTooltips {
-+    HWND window,parent;std::map<UINT_PTR,std::wstring> texts;
++    HWND window,parent;std::map<UINT_PTR,std::wstring> texts;std::map<UINT_PTR,bool> disabledTools;
 +public:
 +    CFeatureTooltips():window(NULL),parent(NULL){}
 +    ~CFeatureTooltips(){if(::IsWindow(parent)&&::GetPropW(parent,L"MathomirFeatureTips")==window)::RemovePropW(parent,L"MathomirFeatureTips");if(::IsWindow(window))::DestroyWindow(window);}
-+    void Create(HWND owner){if(::IsWindow(window))return;parent=owner;texts.clear();window=::CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,L"",WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,owner,NULL,AfxGetInstanceHandle(),NULL);
++    void Create(HWND owner){if(::IsWindow(window))return;parent=owner;texts.clear();disabledTools.clear();window=::CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,L"",WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,owner,NULL,AfxGetInstanceHandle(),NULL);
 +        if(window){::SetPropW(parent,L"MathomirFeatureTips",window);::SendMessage(window,TTM_SETMAXTIPWIDTH,0,420);::SendMessage(window,TTM_SETDELAYTIME,TTDT_INITIAL,500);::SendMessage(window,TTM_SETDELAYTIME,TTDT_AUTOPOP,15000);::SendMessage(window,TTM_SETDELAYTIME,TTDT_RESHOW,100);}}
 +    HWND Handle()const{return window;}
-+    void Add(HWND control,const std::wstring &text){if(!control||!::IsWindow(window))return;UINT_PTR key=(UINT_PTR)control;TOOLINFOW info={};info.cbSize=TTTOOLINFOW_V2_SIZE;info.hwnd=parent;info.uId=key;::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[key]=text;info.uFlags=TTF_IDISHWND|TTF_SUBCLASS;info.lpszText=(LPWSTR)texts[key].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);}
-+    void Relay(MSG *message){if(::IsWindow(window))::SendMessage(window,TTM_RELAYEVENT,0,(LPARAM)message);}
++    void Add(HWND control,const std::wstring &text){
++        if(!::IsWindow(control)||!::IsWindow(window))return;UINT_PTR key=(UINT_PTR)control;TOOLINFOW info={};info.cbSize=TTTOOLINFOW_V2_SIZE;info.hwnd=parent;info.uId=key;::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[key]=text;
++        wchar_t kind[64]={};::GetClassNameW(control,kind,64);if(wcscmp(kind,L"Static")==0)::SetWindowLongPtr(control,GWL_STYLE,::GetWindowLongPtr(control,GWL_STYLE)|SS_NOTIFY);
++        bool disabled=!::IsWindowEnabled(control);disabledTools[key]=disabled;info.uFlags=TTF_SUBCLASS;
++        if(disabled){::GetWindowRect(control,&info.rect);::MapWindowPoints(NULL,parent,(LPPOINT)&info.rect,2);}else info.uFlags|=TTF_IDISHWND;
++        info.lpszText=(LPWSTR)texts[key].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);
++    }
++    void Relay(MSG *message){if(!::IsWindow(window))return;
++        if(message->message==WM_MOUSEMOVE)for(auto i=disabledTools.begin();i!=disabledTools.end();++i){HWND control=(HWND)i->first;if(::IsWindow(control)&&i->second==(::IsWindowEnabled(control)!=FALSE))Add(control,texts[i->first]);}
++        ::SendMessage(window,TTM_RELAYEVENT,0,(LPARAM)message);
++    }
 +    void Hover(HWND owner,int key,const RECT &area,const char *help){Create(owner);std::wstring text=MathDisplay::HelpNotation(help?help:"");UINT_PTR id=1;TOOLINFOW info={};info.cbSize=TTTOOLINFOW_V2_SIZE;info.hwnd=owner;info.uId=id;
 +        if(text.empty()){::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts.erase(id);return;}
 +        if(texts[id]==text){info.rect=area;::SendMessageW(window,TTM_NEWTOOLRECTW,0,(LPARAM)&info);return;}
@@ -1454,7 +1463,7 @@ index 0000000..b106acb
 +    if(id==IDOK&&(dialog==IDD_NUMBER_FORMAT||dialog==IDD_ABOUTBOX))return "Close this dialog.";
 +    if(id==32482)return "Display rounding changes numerical presentation; it does not change source values or exact symbolic results.";
 +    if(id==32480)return "Choose automatic formatting, 0-8 decimal places, or 3-12 significant figures. Applies to numerical readouts and new approximations. Graphs, source values and exact mathematics retain full precision.";
-+    if(id==32481)return "Keep trailing zeroes to show the selected precision, for example 2.50 rather than 2.5. Negative zero is suppressed.";
++    if(id==32481)return "Choose decimal places or significant figures, then keep trailing zeroes to show the selected precision, for example 2.50 rather than 2.5. Negative zero is suppressed.";
 +    if(id==IDCANCEL)return "Close without placing or changing a page object. Display-rounding preferences apply immediately.";
 +    if(id==IDOK)return dialog==IDD_FEATURE_SEARCH?"Run the selected feature.":dialog==IDD_ROTATE_EQUATION?"Apply the typed rotation angle.":"Place the prepared result, then click on the page. Invalid input must be corrected first.";
 +    if(dialog==IDD_PIECEWISE){if(id>=1200&&id<1240){static const char *tips[]={"Formula for this piece. Use x, powers, fractions and functions such as sin(x), floor(x), sqrt(x) or ln(x). A blank row is unused.","Lower endpoint. Leave blank for negative infinity. Constants such as 1/2 and pi are accepted.","Include the lower endpoint: filled dot. Unchecked excludes it: open circle. Infinite endpoints never have dots.","Upper endpoint. Leave blank for positive infinity. The interval must not overlap another piece.","Include the upper endpoint: filled dot. Unchecked excludes it: open circle. Included endpoints must be defined."};return tips[(id-1200)%5];}
@@ -4671,7 +4680,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..6eb0dd1 100644
+index fc832eb..d19cd08 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4753,17 +4762,17 @@ index fc832eb..6eb0dd1 100644
 +        ::SendMessageW(combo,CB_ADDSTRING,0,(LPARAM)L"Automatic (12 significant figures)");
 +        for(int i=0;i<=8;i++){std::wstring t=L"Decimal places: "+std::to_wstring(i);::SendMessageW(combo,CB_ADDSTRING,0,(LPARAM)t.c_str());}
 +        for(int i=3;i<=12;i++){std::wstring t=L"Significant figures: "+std::to_wstring(i);::SendMessageW(combo,CB_ADDSTRING,0,(LPARAM)t.c_str());}
-+        auto &s=MathDisplay::Options();::SendMessage(combo,CB_SETCURSEL,s.mode==1?s.digits+1:s.mode==2?s.digits+7:0,0);::SendMessage(zeros,BM_SETCHECK,s.trailingZeros?BST_CHECKED:BST_UNCHECKED,0);
++        auto &s=MathDisplay::Options();::SendMessage(combo,CB_SETCURSEL,s.mode==1?s.digits+1:s.mode==2?s.digits+7:0,0);::SendMessage(zeros,BM_SETCHECK,s.trailingZeros?BST_CHECKED:BST_UNCHECKED,0);::EnableWindow(zeros,s.mode!=0);
 +    }
 +public:
-+    CFeatureDialog(UINT id,CWnd *owner=NULL):CDialog(id,owner),resource(id),footer(id==IDD_PIECEWISE||id==IDD_SYMBOLIC_DERIVATIVE||id==IDD_STATISTICS_REGRESSION||id==IDD_POLYGON_CONSTRUCTOR||id==IDD_UNIT_CIRCLE||id==IDD_NUMBER_FORMAT){LoadDisplayRounding();}
-+    virtual BOOL OnInitDialog(){BOOL result=CDialog::OnInitDialog();if(footer)AddRounding();PostMessage(WM_APP+71);return result;}
++    CFeatureDialog(UINT id,CWnd *owner=NULL):CDialog(id,owner),resource(id),footer(id==IDD_PIECEWISE||id==IDD_SYMBOLIC_DERIVATIVE||id==IDD_STATISTICS_REGRESSION||id==IDD_POLYGON_CONSTRUCTOR||id==IDD_UNIT_CIRCLE||id==IDD_NUMBER_FORMAT){}
++    virtual BOOL OnInitDialog(){LoadDisplayRounding();BOOL result=CDialog::OnInitDialog();if(footer)AddRounding();PostMessage(WM_APP+71);return result;}
 +    virtual BOOL PreTranslateMessage(MSG *message){tips.Relay(message);return CDialog::PreTranslateMessage(message);}
 +    virtual LRESULT WindowProc(UINT message,WPARAM wp,LPARAM lp){if(message==WM_APP+71){RegisterHelp();return 0;}return CDialog::WindowProc(message,wp,lp);}
 +    virtual void OnRoundingChanged(){}
 +    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(footer&&((id==32480&&HIWORD(wp)==CBN_SELCHANGE)||id==32481)){
 +        int selection=(int)::SendMessage(::GetDlgItem(m_hWnd,32480),CB_GETCURSEL,0,0);auto &s=MathDisplay::Options();s.mode=selection==0?0:selection<=9?1:2;s.digits=s.mode==0?12:s.mode==1?selection-1:selection-7;
-+        s.trailingZeros=IsDlgButtonChecked(32481)==BST_CHECKED;theApp.WriteProfileInt("Display","NumberMode",s.mode);theApp.WriteProfileInt("Display","NumberDigits",s.digits);theApp.WriteProfileInt("Display","TrailingZeroes",s.trailingZeros);OnRoundingChanged();return TRUE;
++        ::EnableWindow(::GetDlgItem(m_hWnd,32481),s.mode!=0);s.trailingZeros=IsDlgButtonChecked(32481)==BST_CHECKED;theApp.WriteProfileInt("Display","NumberMode",s.mode);theApp.WriteProfileInt("Display","NumberDigits",s.digits);theApp.WriteProfileInt("Display","TrailingZeroes",s.trailingZeros);OnRoundingChanged();return TRUE;
 +    }return CDialog::OnCommand(wp,lp);}
 +};
 +class CNumberFormatDialog : public CFeatureDialog

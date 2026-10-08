@@ -31,7 +31,7 @@ public static class FeatureUI {
  [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
- public static void Hover(IntPtr owner,int id){SetForegroundWindow(owner);IntPtr h=Child(owner,id);Rect r;GetWindowRect(h,out r);SetCursorPos(r.left-10,r.top-10);SetCursorPos((r.left+r.right)/2,(r.top+r.bottom)/2);Send(h,512,0,(((r.bottom-r.top)/2)<<16)|((r.right-r.left)/2));}
+ public static void Hover(IntPtr owner,int id){SetForegroundWindow(owner);IntPtr h=Child(owner,id);Rect r;GetWindowRect(h,out r);SetCursorPos(r.left-10,r.top-10);SetCursorPos((r.left+r.right)/2,(r.top+r.bottom)/2);if(IsWindowEnabled(h))Send(h,512,0,(((r.bottom-r.top)/2)<<16)|((r.right-r.left)/2));else{Point p=new Point{x=(r.left+r.right)/2,y=(r.top+r.bottom)/2};ScreenToClient(owner,ref p);Send(owner,512,0,(p.y<<16)|p.x);}}
  public static bool TipVisible(IntPtr owner){IntPtr registered=GetProp(owner,"MathomirFeatureTips");if(registered!=IntPtr.Zero)return IsWindowVisible(registered);bool shown=false;EnumWindows((h,p)=>{var c=new StringBuilder(100);GetClassName(h,c,100);if(c.ToString()=="tooltips_class32"&&GetWindow(h,4)==owner&&IsWindowVisible(h))shown=true;return true;},IntPtr.Zero);return shown;}
  public static bool FooterFits(IntPtr d) {Rect c;GetClientRect(d,out c);int right=0;foreach(int id in new[]{32480,32481}){Rect r;GetWindowRect(Child(d,id),out r);Point p=new Point{x=r.right,y=r.bottom};ScreenToClient(d,ref p);if(p.x>c.right||p.y>c.bottom)return false;right=Math.Max(right,p.x);}return right>100;}
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetProp(IntPtr h,string name);
@@ -75,9 +75,18 @@ try {
  [FeatureUI]::Hover($d,32480)
  $shown=$false;for($i=0;$i -lt 30;$i++){Start-Sleep -Milliseconds 100;if([FeatureUI]::TipVisible($d)){$shown=$true;break}}
  Check $shown 'Hovering the rounding control did not show its tooltip'
+ Check (![FeatureUI]::IsWindowEnabled([FeatureUI]::Child($d,32481))) 'Auto mode should not offer zero padding'
+ [FeatureUI]::Hover($d,32481)
+ $shown=$false;for($i=0;$i -lt 30;$i++){Start-Sleep -Milliseconds 100;if([FeatureUI]::TipVisible($d)){$shown=$true;break}}
+ Check $shown 'Disabled rounding checkbox did not show its explanatory tooltip'
  Rounding $d 3 1
  [FeatureUI]::Send($d,273,1)|Out-Null
  $d=Dialog 33089 'Symbolic derivative finder';Help $d
+ [FeatureUI]::Set([FeatureUI]::Child($d,1300),'?')
+ Check (![FeatureUI]::IsWindowEnabled([FeatureUI]::Child($d,1))) 'Invalid derivative should disable placement'
+ [FeatureUI]::Hover($d,1)
+ $shown=$false;for($i=0;$i -lt 30;$i++){Start-Sleep -Milliseconds 100;if([FeatureUI]::TipVisible($d)){$shown=$true;break}}
+ Check $shown 'Dynamically disabled Place button did not show its explanatory tooltip'
  Check ([FeatureUI]::Send([FeatureUI]::Child($d,32480),327,0) -eq 3) 'Number format did not carry between dialogs'
  [FeatureUI]::Set([FeatureUI]::Child($d,1300),'x^2');[FeatureUI]::Set([FeatureUI]::Child($d,1307),'1/3');[FeatureUI]::Send($d,273,1303)|Out-Null
  $text=[FeatureUI]::Text([FeatureUI]::Child($d,1309));Check ($text.Contains('Derivative order 1 ') -and $text.EndsWith(': 0.67')) "Rounded derivative incorrect: $text"
