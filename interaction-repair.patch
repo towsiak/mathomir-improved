@@ -4573,7 +4573,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..f9e0709 100644
+index fc832eb..c7e1f78 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,26 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -7508,7 +7508,7 @@ index fc832eb..f9e0709 100644
 +    if(ViewOnlyMode)return;OnChar(27,1,0);CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object->MovingDotState==3)){existing=FindStatisticsGraph((CDrawing*)object->Object);if(existing)break;}}
 +    CStatisticsDialog dialog;if(existing){auto p=(CFunctionPlotter*)existing->SpecialData;dialog.model=p->statisticsModel;dialog.residual=p->scatterResidual;for(auto point:p->scatterPoints)dialog.initial.push_back(Statistics::Point(point.x,point.sourceY));}if(dialog.DoModal()!=IDOK)return;
 +    if(!dialog.graph){RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardExpression=new CExpression(NULL,NULL,100);std::string xml=dialog.EquationXml();std::vector<char>b(xml.begin(),xml.end());b.push_back(0);ClipboardExpression->XML_input(&b[0]);IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));return;}
-+    CDrawing *drawing=existing;if(!drawing){drawing=new CDrawing();int x,y;drawing->StartCreatingItem(51);drawing->UpdateCreatingItem(8000,6000,0,0);drawing->EndCreatingItem(&x,&y);}auto plotter=(CFunctionPlotter*)drawing->SpecialData;
++    CDrawing *drawing=existing;if(!drawing){drawing=new CDrawing();int x,y;drawing->StartCreatingItem(51);drawing->UpdateCreatingItem(4000,3200,0,0);drawing->EndCreatingItem(&x,&y);}auto plotter=(CFunctionPlotter*)drawing->SpecialData;
 +    if(!plotter||!plotter->StopForZoom()){if(!existing)delete drawing;AfxMessageBox("The graph is still working. Try again after it finishes.");return;}if(existing)UndoSave("edit regression");
 +    plotter->EnsureFunctionSlots();plotter->pieces.clear();plotter->scatterPoints=dialog.result.data;plotter->statisticsModel=dialog.model;plotter->scatterResidual=dialog.residual;plotter->is_x_pi=0;plotter->is_x_log=plotter->is_y_log=plotter->analyze=0;
 +    for(size_t i=0;i<plotter->scatterPoints.size();i++)if(dialog.residual)plotter->scatterPoints[i].y=dialog.result.residuals[i];
