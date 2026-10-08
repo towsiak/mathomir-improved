@@ -29,9 +29,20 @@ int main(){
     assert(!r.Find("x","e",1,e));assert(!r.Find("x","x",6,e));
     for(const char *s:{"0/x","0*ln(x)","ln(x)-ln(x)","abs(x)","floor(x)","sgn(x)","sqrt(x)","cbrt(x)"}){assert(r.Find(s,"x",1,e));assert(!r.At(0,value,e));}
     assert(r.Find("x/x","x",1,e));assert(!r.At(0,value,e));Check("x/x",2,0);
+    // Presentation regressions: exact reduced fractions, collected polynomials,
+    // coefficient placement, clean signs, and no dots between 3 and cos or 2 and x.
+    const char *polished[][2]={{"sin(3x)+ln(x^2+1)","3*cos(3*x)+2*x/(x^2+1)"},{"ln(2x)","1/x"},{"ln(x^3)","3/x"},{"sqrt(x^2+1)","x/sqrt(x^2+1)"},{"(x^2+1)/(x+1)","(x^2+2*x-1)/(x+1)^2"},{"x/(x+1)","1/(x+1)^2"},{"cos(2x)","-2*sin(2*x)"},{"1/(3x)","-1/(3*x^2)"}};
+    for(const auto &sample:polished){assert(r.Find(sample[0],"x",1,e));assert(Text(r.derivative)==sample[1]);}
+    assert(r.Find("sin(3x)+ln(x^2+1)","x",1,e));std::string polishedXml=Equation(r);
+    assert(polishedXml.find("<opr s=\"\xD7\" />")==std::string::npos);
+    assert(polishedXml.find("<var t=\"2\" f=\"00\" /><var t=\"x\" f=\"00\" />")!=std::string::npos);
+    assert(polishedXml.find("<fun t=\"d\" f=\"20\" E1=\"\"><ex br=\"1\">")!=std::string::npos);
+    assert(r.Find("ln(2x)","x",1,e));assert(!r.At(0,value,e));assert(!r.At(-1,value,e));
+    assert(r.Find("x/(x+1)","x",1,e));assert(!r.At(-1,value,e));
+    Check("sqrt(x^2+1)",2,2/std::sqrt(5.));Check("(x^2+1)/(x+1)",2,7./9);Check("1/(3x)",2,-1./12);
     // Independent numeric check across many ordinary smooth functions/points.
-    for(const char *s:{"sin(x^2)+exp(x)","(x^2+1)/(x+3)","ln(x)+sqrt(x)","x^(sin(x))","asin(x/2)","tanh(x^2)"}){
+    for(const char *s:{"sin(x^2)+exp(x)","(x^2+1)/(x+3)","ln(x)+sqrt(x)","x^(sin(x))","asin(x/2)","tanh(x^2)","ln(2x)","sqrt(x^2+1)","cos(2x)","sin(x)*sin(x)","(x+1)^3","1/(3x)"}){
         assert(r.Find(s,"x",1,e));for(int i=1;i<=20;i++){double x=i*.045,h=1e-5;double diff=(Value(r.original,"x",x+h)-Value(r.original,"x",x-h))/(2*h);assert(r.At(x,value,e));assert(std::fabs(value-diff)<1e-6*(1+std::fabs(value)));}
     }
-    std::cout<<"Symbolic derivative checks passed: rules, higher orders, parameters, domains, malformed input and 120 independent numeric comparisons.\n";
+    std::cout<<"Symbolic derivative checks passed: rules, higher orders, parameters, domains, malformed input and 240 independent numeric comparisons and polished native output.\n";
 }

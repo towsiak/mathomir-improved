@@ -333,3 +333,8 @@ DIRECT EXECUTION AND APPROXIMATION
 Ctrl+Enter: append = result, including native symbolic derivatives.
 Ctrl+Shift+Enter: append an approximate decimal value; honors RAD/DEG.
 Re-execution replaces the previous result; both operations support Undo.
+
+POLISHED DERIVATIVE PRESENTATION
+Chain-rule factors combine into single fractions, numerical coefficients reduce, and repeated factors cancel or collect into powers. Short polynomial numerators collect when this shortens the expression.
+Coefficients use standard mathematical adjacency (3cos(3x), 2x), negative products lose unnecessary parentheses, and the original derivative argument is explicitly bracketed.
+Results remain native editable math. Original domain restrictions and boundary checks remain in force.

@@ -3656,7 +3656,7 @@ index 0000000..0b7e258
 +}
 +}
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..1f1816c 100644
+index bdcebb4..891c207 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -4119,7 +4119,7 @@ index bdcebb4..1f1816c 100644
 +    LTEXT "Also: trig/inverse trig, hyperbolic functions, log (base 10), abs, cbrt and step functions. Trig uses radians.",-1,10,114,566,12
 +    LTEXT "Typeset preview",-1,10,132,566,12
 +    CONTROL "",1304,"Static",SS_NOTIFY | WS_BORDER,10,146,566,64
-+    LTEXT "Derivative formula (select and copy if needed)",-1,10,216,566,12
++    LTEXT "Copyable formula (input syntax)",-1,10,216,566,12
 +    EDITTEXT 1305,10,229,566,24,ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
 +    CONTROL "Include original function and derivative notation when placing",1306,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,258,350,14
 +    LTEXT "Check at",-1,372,260,38,12
@@ -7723,7 +7723,7 @@ index 94dd0e4..211c326 100644
  	afx_msg void OnFontsizeNormal();
 diff --git a/Mathomir/NativeSymbolic.h b/Mathomir/NativeSymbolic.h
 new file mode 100644
-index 0000000..e3da28a
+index 0000000..5c47a0d
 --- /dev/null
 +++ b/Mathomir/NativeSymbolic.h
 @@ -0,0 +1,99 @@
@@ -7802,7 +7802,7 @@ index 0000000..e3da28a
 +        CElement *fraction=input->m_pElementList[position].pElementObject;CExpression *top=(CExpression*)fraction->Expression1,*bottom=(CExpression*)fraction->Expression2;
 +        if(!top||!bottom||top->m_NumElements<1||bottom->m_NumElements<1)return false;
 +        CElement *numerator=top->m_pElementList[0].pElementObject,*denominator=bottom->m_pElementList[0].pElementObject;if(!numerator||!denominator)return false;
-+        bool nd=(top->m_pElementList[0].Type==6&&numerator->IsDifferential(1))||(top->m_NumElements==1&&top->m_pElementList[0].Type==1&&strcmp(numerator->Data1,"d")==0);
++        bool nd=(top->m_pElementList[0].Type==6&&numerator->IsDifferential())||(top->m_NumElements==1&&top->m_pElementList[0].Type==1&&strcmp(numerator->Data1,"d")==0);
 +        bool joined=bottom->m_pElementList[0].Type==1 && denominator->Data1[0]=='d' && strlen(denominator->Data1)==2 && std::isalpha((unsigned char)denominator->Data1[1]);
 +        bool dd=joined||(bottom->m_pElementList[0].Type==6&&denominator->IsDifferential(1))||(bottom->m_pElementList[0].Type==1&&strcmp(denominator->Data1,"d")==0);
 +        if(!nd||!dd)return false;
@@ -8460,10 +8460,10 @@ index 0000000..bebbe21
 +}
 diff --git a/Mathomir/SymbolicDerivative.h b/Mathomir/SymbolicDerivative.h
 new file mode 100644
-index 0000000..1cc31a5
+index 0000000..bcd9cdc
 --- /dev/null
 +++ b/Mathomir/SymbolicDerivative.h
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,234 @@
 +#pragma once
 +#include <string>
 +#include <vector>
@@ -8475,6 +8475,7 @@ index 0000000..1cc31a5
 +#include <cctype>
 +#include <limits>
 +#include <stdexcept>
++#include <algorithm>
 +
 +// A bounded, real-valued expression tree. Symbolic work is independent of the
 +// numeric graph sampler and never estimates a derivative by finite differences.
@@ -8491,6 +8492,7 @@ index 0000000..1cc31a5
 +inline Expr F(const std::string &s,Expr a){Expr n(new Node('f',0,a));n->name=s;return n;}
 +inline bool Is(Expr n,double x){return n && n->op=='n' && n->number==x;}
 +inline bool Same(Expr a,Expr b){if(a==b)return true;if(!a||!b||a->op!=b->op||a->number!=b->number||a->name!=b->name)return false;return Same(a->a,b->a)&&Same(a->b,b->b);}
++inline Expr ProductForm(Expr a,Expr b,bool divide);
 +inline Expr Make(char op,Expr a,Expr b=Expr()){
 +    if(op=='~'){if(Is(a,0))return a;if(a->op=='n')return N(-a->number);if(a->op=='~')return a->a;return Expr(new Node(op,0,a));}
 +    if(a->op=='n' && b && b->op=='n'){
@@ -8500,22 +8502,82 @@ index 0000000..1cc31a5
 +        if(op=='/' && y!=0 && std::floor(x/y)==x/y)z=x/y;
 +        if(op=='^')z=std::pow(x,y);if(Finite(z))return N(z);
 +    }
-+    if(op=='+'){if(Is(a,0))return b;if(Is(b,0))return a;if(Same(a,b))return Make('*',N(2),a);if(b->op=='~')return Make('-',a,b->a);}
-+    if(op=='-'){if(Is(b,0))return a;if(Is(a,0))return Make('~',b);if(Same(a,b))return N(0);if(b->op=='~')return Make('+',a,b->a);}
-+    if(op=='*'){
-+        if(Is(a,0)||Is(b,0))return N(0);if(Is(a,1))return b;if(Is(b,1))return a;
-+        if(Is(a,-1))return Make('~',b);if(Is(b,-1))return Make('~',a);
-+        if(a->op=='~')return Make('~',Make('*',a->a,b));if(b->op=='~')return Make('~',Make('*',a,b->a));
-+        if(b->op=='n' && a->op!='n')return Make('*',b,a);
-+        if(a->op=='n' && b->op=='*' && b->a->op=='n')return Make('*',N(a->number*b->a->number),b->b);
-+        if(Same(a,b))return Make('^',a,N(2));
-+    }
-+    if(op=='/'){if(Is(b,1))return a;if(Is(a,0)&&!Is(b,0))return N(0);}
++    if(op=='+'){if(Is(a,0))return b;if(Is(b,0))return a;if(Same(a,b))return Make('*',N(2),a);if(b->op=='~')return Make('-',a,b->a);if(b->op=='n'&&b->number<0)return Make('-',a,N(-b->number));}
++    if(op=='-'){if(Is(b,0))return a;if(Is(a,0))return Make('~',b);if(Same(a,b))return N(0);if(b->op=='~')return Make('+',a,b->a);if(b->op=='n'&&b->number<0)return Make('+',a,N(-b->number));}
++    if(op=='*')return ProductForm(a,b,false);
++    if(op=='/')return ProductForm(a,b,true);
 +    if(op=='^'){if(Is(b,0))return N(1);if(Is(b,1))return a;if(Is(a,1))return N(1);}
 +    return Expr(new Node(op,0,a,b));
 +}
 +inline Expr Raw(char op,Expr a,Expr b=Expr()){return Expr(new Node(op,0,a,b));}
-+inline Expr Simplify(Expr a){if(!a || a->op=='n'||a->op=='v')return a;if(a->op=='f')return F(a->name,Simplify(a->a));return Make(a->op,Simplify(a->a),Simplify(a->b));}
++// Collect fractions, coefficients and repeated factors without decimalizing
++// exact rational constants. The original AST remains available for domain checks.
++struct ProductParts {
++    double numerator,denominator;std::vector<Expr> top,bottom;
++    ProductParts():numerator(1),denominator(1){}
++    void Add(Expr e,bool below=false){
++        if(e->op=='*'){Add(e->a,below);Add(e->b,below);return;}
++        if(e->op=='/'){Add(e->a,below);Add(e->b,!below);return;}
++        if(e->op=='~'){numerator=-numerator;Add(e->a,below);return;}
++        double &coefficient=below?denominator:numerator;
++        if(e->op=='n' && Finite(coefficient*e->number)){coefficient*=e->number;return;}
++        (below?bottom:top).push_back(e);
++    }
++};
++inline Expr FactorBase(Expr e,double &power){power=1;if(e->op=='^'&&e->b->op=='n'&&e->b->number>=1&&e->b->number<=1000000&&floor(e->b->number)==e->b->number){power=e->b->number;return e->a;}return e;}
++inline int FactorRank(Expr e){double n;Expr base=FactorBase(e,n);return base->op=='n'?0:base->op=='v'?1:base->op=='f'?2:3;}
++inline Expr FactorList(std::vector<Expr> list,double coefficient){
++    std::vector<Expr> bases;std::vector<double> powers;
++    for(size_t i=0;i<list.size();i++){double power;Expr base=FactorBase(list[i],power);size_t j=0;while(j<bases.size()&&!Same(base,bases[j]))j++;if(j==bases.size()){bases.push_back(base);powers.push_back(power);}else powers[j]+=power;}
++    list.clear();for(size_t i=0;i<bases.size();i++)list.push_back(powers[i]==1?bases[i]:Make('^',bases[i],N(powers[i])));
++    std::stable_sort(list.begin(),list.end(),[](Expr a,Expr b){int ar=FactorRank(a),br=FactorRank(b);if(ar!=br)return ar<br;double n,m;Expr ab=FactorBase(a,n),bb=FactorBase(b,m);return ar==1?ab->name<bb->name:false;});
++    Expr result;if(coefficient!=1 || list.empty())result=N(coefficient);
++    for(size_t i=0;i<list.size();i++)result=result?Raw('*',result,list[i]):list[i];return result;
++}
++inline Expr ProductForm(Expr a,Expr b,bool divide){
++    ProductParts p;p.Add(a);p.Add(b,divide);
++    if(p.denominator==0)return Raw('/',FactorList(p.top,p.numerator),N(0));
++    if(p.numerator==0)return N(0);
++    bool negative=(p.numerator<0)!=(p.denominator<0);p.numerator=fabs(p.numerator);p.denominator=fabs(p.denominator);
++    if(p.numerator<=9007199254740991. && p.denominator<=9007199254740991. && floor(p.numerator)==p.numerator && floor(p.denominator)==p.denominator){
++        double n=p.numerator,d=p.denominator;while(d!=0){double r=fmod(n,d);n=d;d=r;}p.numerator/=n;p.denominator/=n;
++    }
++    // Cancel only identical factors or nonnegative integral powers of them.
++    for(size_t i=0;i<p.top.size();i++)for(size_t j=0;j<p.bottom.size();j++){
++        double n,d;Expr nb=FactorBase(p.top[i],n),db=FactorBase(p.bottom[j],d);if(!Same(nb,db)||Is(p.top[i],1)||Is(p.bottom[j],1))continue;
++        double common=(std::min)(n,d);n-=common;d-=common;p.top[i]=n==0?N(1):n==1?nb:Make('^',nb,N(n));p.bottom[j]=d==0?N(1):d==1?db:Make('^',db,N(d));
++    }
++    p.top.erase(std::remove_if(p.top.begin(),p.top.end(),[](Expr e){return Is(e,1);}),p.top.end());p.bottom.erase(std::remove_if(p.bottom.begin(),p.bottom.end(),[](Expr e){return Is(e,1);}),p.bottom.end());
++    Expr top=FactorList(p.top,p.numerator),bottom=FactorList(p.bottom,p.denominator),result=Is(bottom,1)?top:Raw('/',top,bottom);
++    return negative?Make('~',result):result;
++}
++// Short polynomials are collected in descending degree. This also cleans up
++// product/quotient-rule numerators without expanding general function products.
++struct Polynomial {std::string variable;std::vector<double> coefficients;Polynomial():coefficients(1,0){};};
++inline bool PolynomialOf(Expr e,Polynomial &p){
++    if(!e || e->op=='f')return false;
++    if(e->op=='n'){p.coefficients[0]=e->number;return Finite(e->number);}
++    if(e->op=='v'&&e->name.size()==1&&e->name!="e"){p.variable=e->name;p.coefficients.resize(2);p.coefficients[1]=1;return true;}
++    Polynomial a,b;if(!PolynomialOf(e->a,a))return false;
++    if(e->op=='~'){p=a;for(size_t i=0;i<p.coefficients.size();i++)p.coefficients[i]=-p.coefficients[i];return true;}
++    if(!e->b||!PolynomialOf(e->b,b)||(!a.variable.empty()&&!b.variable.empty()&&a.variable!=b.variable))return false;
++    p.variable=a.variable.empty()?b.variable:a.variable;
++    if(e->op=='+'||e->op=='-'){p.coefficients.resize((std::max)(a.coefficients.size(),b.coefficients.size()),0);for(size_t i=0;i<a.coefficients.size();i++)p.coefficients[i]+=a.coefficients[i];for(size_t i=0;i<b.coefficients.size();i++)p.coefficients[i]+=(e->op=='+'?1:-1)*b.coefficients[i];}
++    else if(e->op=='*'){if(a.coefficients.size()+b.coefficients.size()>66)return false;p.coefficients.assign(a.coefficients.size()+b.coefficients.size()-1,0);for(size_t i=0;i<a.coefficients.size();i++)for(size_t j=0;j<b.coefficients.size();j++)p.coefficients[i+j]+=a.coefficients[i]*b.coefficients[j];}
++    else if(e->op=='/'&&b.coefficients.size()==1&&b.coefficients[0]!=0){p=a;for(size_t i=0;i<p.coefficients.size();i++){double n=p.coefficients[i]/b.coefficients[0];if(floor(n)!=n)return false;p.coefficients[i]=n;}}
++    else if(e->op=='^'&&b.coefficients.size()==1&&b.coefficients[0]>=0&&b.coefficients[0]<=32&&floor(b.coefficients[0])==b.coefficients[0]){
++        int power=(int)b.coefficients[0];if((a.coefficients.size()-1)*power>64)return false;p.coefficients.assign(1,1);
++        for(int n=0;n<power;n++){std::vector<double> next(p.coefficients.size()+a.coefficients.size()-1,0);for(size_t i=0;i<p.coefficients.size();i++)for(size_t j=0;j<a.coefficients.size();j++)next[i+j]+=p.coefficients[i]*a.coefficients[j];p.coefficients.swap(next);}
++    }else return false;
++    for(size_t i=0;i<p.coefficients.size();i++)if(!Finite(p.coefficients[i]))return false;while(p.coefficients.size()>1&&p.coefficients.back()==0)p.coefficients.pop_back();return true;
++}
++inline int Size(Expr a);
++inline Expr CollectedPolynomial(Expr e){
++    Polynomial p;if(!PolynomialOf(e,p))return e;Expr result;
++    for(size_t degree=p.coefficients.size();degree-->0;){double c=p.coefficients[degree];if(c==0)continue;Expr term=degree?Make('^',Name(p.variable),N((double)degree)):N(1);term=Make('*',N(fabs(c)),term);result=result?Make(c<0?'-':'+',result,term):c<0?Make('~',term):term;}
++    if(!result)result=N(0);return Size(result)<=Size(e)?result:e;
++}
++inline Expr Simplify(Expr a){if(!a || a->op=='n'||a->op=='v')return a;if(a->op=='f')return F(a->name,Simplify(a->a));return CollectedPolynomial(Make(a->op,Simplify(a->a),Simplify(a->b)));}
 +inline bool Known(const std::string &s){return s=="sin"||s=="cos"||s=="tan"||s=="cot"||s=="sec"||s=="csc"||s=="asin"||s=="acos"||s=="atan"||s=="sinh"||s=="cosh"||s=="tanh"||s=="ln"||s=="log"||s=="exp"||s=="sqrt"||s=="cbrt"||s=="abs"||s=="floor"||s=="ceil"||s=="round"||s=="trunc"||s=="sgn"||s=="fract"||s=="sinc";}
 +class Parser {
 +    std::string text;size_t pos;int depth,count;
@@ -8597,7 +8659,7 @@ index 0000000..1cc31a5
 +    bool Find(const std::string &input,const std::string &var,int n,std::string &error){
 +        try{if(var.size()!=1||!std::isalpha((unsigned char)var[0])||var=="e")throw std::runtime_error("Choose one letter as the variable, other than the constant e.");if(n<1||n>5)throw std::runtime_error("Choose derivative order 1 through 5.");
 +            variable=var;order=n;rules.clear();notes.clear();guards.clear();visits=0;Parser p;original=p.Parse(input);derivative=Simplify(original);
-+            for(int i=0;i<n;i++){derivative=Differentiate(derivative);if(Size(derivative)>3000)throw std::runtime_error("The derivative is too large. Try a lower order or a shorter formula.");}
++            for(int i=0;i<n;i++){derivative=Simplify(Differentiate(derivative));if(Size(derivative)>3000)throw std::runtime_error("The derivative is too large. Try a lower order or a shorter formula.");}
 +            notes.insert("Trigonometric derivatives use radians. The original domain restrictions remain in force, even after simplification.");return true;
 +        }catch(const std::exception &e){error=e.what();original.reset();derivative.reset();return false;}
 +    }
@@ -8615,22 +8677,23 @@ index 0000000..1cc31a5
 +};
 +inline int Precedence(Expr a){return a->op=='+'||a->op=='-'?1:a->op=='*'||a->op=='/'?2:a->op=='~'?3:a->op=='^'?4:5;}
 +inline std::string Text(Expr a,int parent=0){
-+    std::string s;if(a->op=='n')s=Number(a->number);else if(a->op=='v')s=a->name;else if(a->op=='f')s=a->name+"("+Text(a->a)+")";else if(a->op=='~')s="-"+Text(a->a,3);else{int level=Precedence(a);s=Text(a->a,a->op=='^'?level+1:level)+std::string(1,a->op)+Text(a->b,a->op=='-'||a->op=='/'?level+1:level);}
++    std::string s;if(a->op=='n')s=Number(a->number);else if(a->op=='v')s=a->name;else if(a->op=='f')s=a->name+"("+Text(a->a)+")";else if(a->op=='~')s="-"+Text(a->a,2);else{int level=Precedence(a);s=Text(a->a,a->op=='^'?level+1:level)+std::string(1,a->op)+Text(a->b,a->op=='-'||a->op=='/'?level+1:level);}
 +    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="("+s+")";return s;
 +}
 +inline std::string Xml(Expr a,int parent=0){
 +    std::string s;if(a->op=='n'){s=(a->number<0?"<opr s=\"-\" />":"")+std::string("<var t=\"")+Number(std::fabs(a->number))+"\" f=\"00\" />";}
 +    else if(a->op=='v')s=a->name=="pi"?"<var t=\"p\" f=\"60\" />":"<var t=\""+a->name+"\" f=\"00\" />";
-+    else if(a->op=='~')s="<opr s=\"-\" />"+Xml(a->a,3);
++    else if(a->op=='~')s="<opr s=\"-\" />"+Xml(a->a,2);
 +    else if(a->op=='/'||a->op=='^'){std::string tag=a->op=='/'?"fra":"elm tp=\"3\"",close=a->op=='/'?"fra":"elm";s="<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(a->a,a->op=='^'?5:0)+"</ex><ex>"+Xml(a->b)+"</ex></"+close+">";}
 +    else if(a->op=='f'){
 +        if(a->name=="sqrt")s="<elm tp=\"8\" E1=\"\"><ex>"+Xml(a->a)+"</ex></elm>";
 +        else if(a->name=="abs"||a->name=="floor"||a->name=="ceil")s="<elm tp=\"5\" E1=\"\"><ex br=\"1\" shp=\""+(a->name=="abs"?std::string("|"):a->name=="floor"?std::string("f"):std::string("c"))+"\">"+Xml(a->a)+"</ex></elm>";
 +        else {std::string name=a->name=="asin"?"arcsin":a->name=="acos"?"arccos":a->name=="atan"?"arctan":a->name;s="<fun t=\""+name+"\" f=\"20\" E1=\"\"><ex br=\"1\">"+Xml(a->a)+"</ex></fun>";}
-+    }else s=Xml(a->a,Precedence(a))+"<opr s=\""+(a->op=='*'?std::string("\xD7"):std::string(1,a->op))+"\" />"+Xml(a->b,a->op=='-'?2:Precedence(a));
++    }else {bool coefficient=a->op=='*' && a->a->op=='n' && (a->b->op=='v'||a->b->op=='f'||a->b->op=='^'||Precedence(a->b)==1);
++        s=Xml(a->a,Precedence(a))+(coefficient?std::string():"<opr s=\""+(a->op=='*'?std::string("\xD7"):std::string(1,a->op))+"\" />")+Xml(a->b,a->op=='-'?2:Precedence(a));}
 +    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="<elm tp=\"5\" E1=\"\"><ex br=\"1\">"+s+"</ex></elm>";return s;
 +}
-+inline std::string Equation(const Result &r){std::string top="<fun t=\"d\" f=\"20\"";if(r.order>1)top+=" E2=\"\"";top+=" E1=\"\"><ex>"+Xml(r.original)+"</ex>";if(r.order>1)top+="<ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex>";top+="</fun>";
++inline std::string Equation(const Result &r){std::string top="<fun t=\"d\" f=\"20\"";if(r.order>1)top+=" E2=\"\"";top+=" E1=\"\"><ex br=\"1\">"+Xml(r.original)+"</ex>";if(r.order>1)top+="<ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex>";top+="</fun>";
 +    std::string bottom="<fun t=\"d\" f=\"20\" E1=\"\"><ex><var t=\""+r.variable+"\" f=\"00\" />";if(r.order>1)bottom="<fun t=\"d\" f=\"20\" E1=\"\"><ex><elm tp=\"3\" E1=\"\" E2=\"\"><ex><var t=\""+r.variable+"\" f=\"00\" /></ex><ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex></elm>";bottom+="</ex></fun>";
 +    return "<ex fh=\"100\"><fra E1=\"\" E2=\"\"><ex>"+top+"</ex><ex>"+bottom+"</ex></fra><opr s=\"=\" />"+Xml(r.derivative)+"</ex>";
 +}

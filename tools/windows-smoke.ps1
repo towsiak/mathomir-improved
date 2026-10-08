@@ -516,7 +516,8 @@ try {
   if([MathomirUiProbe]::IsWindowEnabled([MathomirUiProbe]::Child($derivativeDialog,1))){throw 'Invalid derivative formula left Place enabled.'}
   [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1300),'abs(x)');[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1307),'0');[MathomirUiProbe]::Send([MathomirUiProbe]::Child($derivativeDialog,1302),334,0)|Out-Null;[MathomirUiProbe]::Send($derivativeDialog,273,1303)|Out-Null
   if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($derivativeDialog,1309)) -notmatch 'boundary'){throw 'Absolute-value corner got an invented derivative value.'}
-  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1300),'x^3+2x');[MathomirUiProbe]::Send($derivativeDialog,273,1303)|Out-Null
+  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($derivativeDialog,1300),'sin(3x)+ln(x^2+1)');[MathomirUiProbe]::Send($derivativeDialog,273,1303)|Out-Null
+  if([MathomirUiProbe]::Text([MathomirUiProbe]::Child($derivativeDialog,1305)) -ne '3*cos(3*x)+2*x/(x^2+1)'){throw 'Chain-rule factors were not combined into a clean single fraction.'}
   [MathomirUiProbe]::PostMessage($derivativeDialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
   for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($derivativeDialog)){break}}
   [MathomirUiProbe]::Mouse($view,512,0,250,150);[MathomirUiProbe]::Mouse($view,513,1,250,150);[MathomirUiProbe]::Mouse($view,514,0,250,150);[MathomirUiProbe]::Send($view,258,27)|Out-Null
@@ -524,6 +525,12 @@ try {
   [xml]$derivativeSaved=Get-Content $derivativeFixture -Raw
   if(!$derivativeSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]//fra | /mathomir/*[last()]/*[self::ex or self::expr]//elm[@tp="4"]')){throw 'Derivative result did not place editable native derivative notation.'}
   $derivativeXml=$derivativeSaved.SelectSingleNode('/mathomir/*[last()]').OuterXml
+  $placedDerivative=$derivativeSaved.SelectSingleNode('/mathomir/*[last()]/*[self::ex or self::expr]')
+  $cleanFraction=$placedDerivative.SelectNodes('./fra | ./elm[@tp="4"]')[-1]
+  if(!$cleanFraction -or $cleanFraction.ChildNodes[0].SelectNodes('./var | ./elm[@tp="1"]').Count -ne 2){throw 'Polished derivative did not save the 2x numerator as native editable math.'}
+  if($placedDerivative.SelectNodes('.//opr[@s="' + [char]215 + '"] | .//elm[@tp="2"][@stp="' + [char]215 + '"]').Count -ne 0){throw 'Unnecessary multiplication dots remained in the polished derivative.'}
+  Write-Output 'Derivative presentation passed: chain-rule factors combine into 2x/(x^2+1), coefficients use adjacency, and native placement preserves the clean fraction.'
+
 
   # Smooth a saved polyline, preserve endpoints, and verify Undo byte-for-byte.
   $strokeFixture=Join-Path (Split-Path $exe) 'smart-freehand-smoothing-smoke.mom'
