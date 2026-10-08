@@ -9367,7 +9367,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..0fb5f38 100644
+index b9c3f38..a6132a7 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -10159,7 +10159,7 @@ index b9c3f38..0fb5f38 100644
 +    int key=m_IsSubtoolbox*100000+m_SelectedElement*100+m_FontModeElement*10+m_SelectedColor+m_SelectedTextControl;
 +    m_HoverTips.Hover(GetSafeHwnd(),key,area,IsWindowVisible()&&bounds.PtInRect(cursor)?help:std::wstring());
 +}
-+void CToolbox::ShowHelptext(char *text,char *command,char *accelerator,char *easycast,int language_code)
++void CToolbox::ShowHelptext(const char *text,const char *command,const char *accelerator,const char *easycast,int language_code)
 +{
 +    char translated[512]={};
 +    if(text && text[0]){if(language_code)CopyTranslatedString(translated,text,language_code,511);else strncpy_s(translated,sizeof(translated),text,_TRUNCATE);}
@@ -10196,7 +10196,7 @@ index b9c3f38..0fb5f38 100644
  			((CDrawing*)ToolboxMembers[member].Submembers[submember])->SelectDrawing(0);
  		}
 diff --git a/Mathomir/Toolbox.h b/Mathomir/Toolbox.h
-index 39c6fc0..c881249 100644
+index 39c6fc0..45b2692 100644
 --- a/Mathomir/Toolbox.h
 +++ b/Mathomir/Toolbox.h
 @@ -1,6 +1,10 @@
@@ -10221,3 +10221,12 @@ index 39c6fc0..c881249 100644
  	CToolbox *Subtoolbox;
  	CToolbox *ContextMenu;
  	CToolbox *Keyboard;
+@@ -90,7 +98,7 @@ public:
+ 	UINT GetMixedFormatting(char key,char is_greek);
+ 	CExpression *CheckForKeycodes(char *keystrokes,int *len);
+ 	CExpression *ReturnKeycode(int keycode_order, char **Keycode);
+-	void ShowHelptext(char *text,char *command,char *accelerator,char *easycast, int language_code);
++	void ShowHelptext(const char *text,const char *command,const char *accelerator,const char *easycast, int language_code);
+ 	void PickUpElementFromToolbox(int member, int submember);
+ 	int InsertIntoToolbox(void);
+ 	void ToolbarShowHelp(void);
