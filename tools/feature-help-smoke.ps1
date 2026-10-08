@@ -28,8 +28,14 @@ public static class FeatureUI {
  [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr h,ref Point p);
  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int left,top,right,bottom;}
  [StructLayout(LayoutKind.Sequential)] public struct Point {public int x,y;}
+ [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
+ [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+ [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+ public static void Hover(IntPtr owner,int id){SetForegroundWindow(owner);IntPtr h=Child(owner,id);Rect r;GetWindowRect(h,out r);SetCursorPos(r.left-10,r.top-10);SetCursorPos((r.left+r.right)/2,(r.top+r.bottom)/2);Send(h,512,0,(((r.bottom-r.top)/2)<<16)|((r.right-r.left)/2));}
+ public static bool TipVisible(IntPtr owner){IntPtr registered=GetProp(owner,"MathomirFeatureTips");if(registered!=IntPtr.Zero)return IsWindowVisible(registered);bool shown=false;EnumWindows((h,p)=>{var c=new StringBuilder(100);GetClassName(h,c,100);if(c.ToString()=="tooltips_class32"&&GetWindow(h,4)==owner&&IsWindowVisible(h))shown=true;return true;},IntPtr.Zero);return shown;}
  public static bool FooterFits(IntPtr d) {Rect c;GetClientRect(d,out c);int right=0;foreach(int id in new[]{32480,32481}){Rect r;GetWindowRect(Child(d,id),out r);Point p=new Point{x=r.right,y=r.bottom};ScreenToClient(d,ref p);if(p.x>c.right||p.y>c.bottom)return false;right=Math.Max(right,p.x);}return right>100;}
- public static long Tips(IntPtr owner){long count=0;EnumWindows((h,p)=>{var c=new StringBuilder(100);GetClassName(h,c,100);if(c.ToString()=="tooltips_class32"&&GetWindow(h,4)==owner)count+=Send(h,1037,0);return true;},IntPtr.Zero);return count;}
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr GetProp(IntPtr h,string name);
+ public static long Tips(IntPtr owner){IntPtr registered=GetProp(owner,"MathomirFeatureTips");if(registered!=IntPtr.Zero)return Send(registered,1037,0);long count=0;EnumWindows((h,p)=>{var c=new StringBuilder(100);GetClassName(h,c,100);if(c.ToString()=="tooltips_class32"&&GetWindow(h,4)==owner)count+=Send(h,1037,0);return true;},IntPtr.Zero);return count;}
  public static int DirectChildren(IntPtr parent){int n=0;for(IntPtr h=GetWindow(parent,5);h!=IntPtr.Zero;h=GetWindow(h,2))n++;return n;}
  [DllImport("kernel32.dll")] static extern IntPtr GlobalAlloc(uint f,UIntPtr n);
  [DllImport("kernel32.dll")] static extern IntPtr GlobalLock(IntPtr h);
@@ -58,14 +64,18 @@ function Rounding($d,$selection,$zeros) {
  [FeatureUI]::Send($d,273,32481)|Out-Null
 }
 function Help($d) {
- Check ([FeatureUI]::Tips($d) -ge [FeatureUI]::DirectChildren($d)) 'A dialog control has no tooltip registered'
+ $tips=[FeatureUI]::Tips($d);$children=[FeatureUI]::DirectChildren($d);Write-Host "Tooltip tools: $tips; direct controls: $children";Check ($tips -ge $children) 'A dialog control has no tooltip registered'
  Check ([FeatureUI]::FooterFits($d)) 'Rounding footer extends beyond the dialog'
 }
 try {
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle
  Check ($main -ne [IntPtr]::Zero) 'Application did not start'
- $bar=[FeatureUI]::Child($main,1110);Check ([FeatureUI]::Tips($main) -ge 9) 'Quick toolbar tooltip coverage missing'
- $d=Dialog 33098 'Number rounding';Help $d;Rounding $d 3 1
+ $bar=[FeatureUI]::Child($main,1110);Check (([FeatureUI]::Tips($main)+[FeatureUI]::Tips($bar)) -ge 9) 'Quick toolbar tooltip coverage missing'
+ $d=Dialog 33098 'Number rounding';Help $d
+ [FeatureUI]::Hover($d,32480)
+ $shown=$false;for($i=0;$i -lt 30;$i++){Start-Sleep -Milliseconds 100;if([FeatureUI]::TipVisible($d)){$shown=$true;break}}
+ Check $shown 'Hovering the rounding control did not show its tooltip'
+ Rounding $d 3 1
  [FeatureUI]::Send($d,273,1)|Out-Null
  $d=Dialog 33089 'Symbolic derivative finder';Help $d
  Check ([FeatureUI]::Send([FeatureUI]::Child($d,32480),327,0) -eq 3) 'Number format did not carry between dialogs'

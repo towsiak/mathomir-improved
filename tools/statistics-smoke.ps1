@@ -39,7 +39,7 @@ $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function Dialog {
  [StatsUI]::PostMessage($main,273,[IntPtr]33097,[IntPtr]::Zero)|Out-Null
- for($j=0;$j -lt 30;$j++){Start-Sleep -Milliseconds 100;$h=[StatsUI]::Dialog($app.Id);if($h -ne [IntPtr]::Zero){return $h}}
+ for($j=0;$j -lt 30;$j++){Start-Sleep -Milliseconds 100;$h=[StatsUI]::Dialog($app.Id);if($h -ne [IntPtr]::Zero -and [StatsUI]::IsWindowUnicode([StatsUI]::Child($h,1346)) -and [StatsUI]::Text([StatsUI]::Child($h,1346)).Length -gt 0){return $h}}
  throw 'Statistics dialog did not open'
 }
 try {

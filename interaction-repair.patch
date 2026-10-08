@@ -1424,7 +1424,7 @@ index 36238b0..5ad0c9a 100644
  	int SetColor(int color);
 diff --git a/Mathomir/FeatureHelp.h b/Mathomir/FeatureHelp.h
 new file mode 100644
-index 0000000..7eaf819
+index 0000000..b106acb
 --- /dev/null
 +++ b/Mathomir/FeatureHelp.h
 @@ -0,0 +1,45 @@
@@ -1438,13 +1438,13 @@ index 0000000..7eaf819
 +    HWND window,parent;std::map<UINT_PTR,std::wstring> texts;
 +public:
 +    CFeatureTooltips():window(NULL),parent(NULL){}
-+    ~CFeatureTooltips(){if(::IsWindow(window))::DestroyWindow(window);}
++    ~CFeatureTooltips(){if(::IsWindow(parent)&&::GetPropW(parent,L"MathomirFeatureTips")==window)::RemovePropW(parent,L"MathomirFeatureTips");if(::IsWindow(window))::DestroyWindow(window);}
 +    void Create(HWND owner){if(::IsWindow(window))return;parent=owner;texts.clear();window=::CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,L"",WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,owner,NULL,AfxGetInstanceHandle(),NULL);
-+        if(window){::SendMessage(window,TTM_SETMAXTIPWIDTH,0,420);::SendMessage(window,TTM_SETDELAYTIME,TTDT_INITIAL,500);::SendMessage(window,TTM_SETDELAYTIME,TTDT_AUTOPOP,15000);::SendMessage(window,TTM_SETDELAYTIME,TTDT_RESHOW,100);}}
++        if(window){::SetPropW(parent,L"MathomirFeatureTips",window);::SendMessage(window,TTM_SETMAXTIPWIDTH,0,420);::SendMessage(window,TTM_SETDELAYTIME,TTDT_INITIAL,500);::SendMessage(window,TTM_SETDELAYTIME,TTDT_AUTOPOP,15000);::SendMessage(window,TTM_SETDELAYTIME,TTDT_RESHOW,100);}}
 +    HWND Handle()const{return window;}
-+    void Add(HWND control,const std::wstring &text){if(!control||!::IsWindow(window))return;UINT_PTR key=(UINT_PTR)control;TOOLINFOW info={};info.cbSize=sizeof(info);info.hwnd=parent;info.uId=key;::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[key]=text;info.uFlags=TTF_IDISHWND|TTF_SUBCLASS;info.lpszText=(LPWSTR)texts[key].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);}
++    void Add(HWND control,const std::wstring &text){if(!control||!::IsWindow(window))return;UINT_PTR key=(UINT_PTR)control;TOOLINFOW info={};info.cbSize=TTTOOLINFOW_V2_SIZE;info.hwnd=parent;info.uId=key;::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[key]=text;info.uFlags=TTF_IDISHWND|TTF_SUBCLASS;info.lpszText=(LPWSTR)texts[key].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);}
 +    void Relay(MSG *message){if(::IsWindow(window))::SendMessage(window,TTM_RELAYEVENT,0,(LPARAM)message);}
-+    void Hover(HWND owner,int key,const RECT &area,const char *help){Create(owner);std::wstring text=MathDisplay::HelpNotation(help?help:"");UINT_PTR id=1;TOOLINFOW info={};info.cbSize=sizeof(info);info.hwnd=owner;info.uId=id;
++    void Hover(HWND owner,int key,const RECT &area,const char *help){Create(owner);std::wstring text=MathDisplay::HelpNotation(help?help:"");UINT_PTR id=1;TOOLINFOW info={};info.cbSize=TTTOOLINFOW_V2_SIZE;info.hwnd=owner;info.uId=id;
 +        if(text.empty()){::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts.erase(id);return;}
 +        if(texts[id]==text){info.rect=area;::SendMessageW(window,TTM_NEWTOOLRECTW,0,(LPARAM)&info);return;}
 +        ::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[id]=text;info.uFlags=TTF_SUBCLASS;info.rect=area;info.lpszText=(LPWSTR)texts[id].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);
@@ -1474,7 +1474,7 @@ index 0000000..7eaf819
 +    return NULL;
 +}
 diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
-index 1ef18dd..cdc909f 100644
+index 1ef18dd..cd912f5 100644
 --- a/Mathomir/FunctionPlotter.cpp
 +++ b/Mathomir/FunctionPlotter.cpp
 @@ -2,8 +2,8 @@
@@ -2048,7 +2048,7 @@ index 1ef18dd..cdc909f 100644
 +        }
 +        if(!scatterPoints.empty()){
 +            int sy=ly+rowHeight+4;DC->SelectObject(GetFontFromPool(4,0,0,max(8,10*zoom/100)));DC->SetTextAlign(TA_LEFT|TA_TOP);DC->SetTextColor(ImprovedColor(3));
-+            std::wstring text=(scatterResidual?L"Residuals: ":L"Data: ")+MathDisplay::Number((double)scatterPoints.size())+L" blue points";SIZE size;::GetTextExtentPoint32W(DC->GetSafeHdc(),text.c_str(),(int)text.size(),&size);if(sy+size.cy<Y+Ylen-BottomMargin-2){DC->FillSolidRect(origin,sy,min(size.cx+6,limit-origin),size.cy+4,RGB(255,255,255));::TextOutW(DC->GetSafeHdc(),origin+2,sy+2,text.c_str(),(int)text.size());}
++            std::wstring text=(scatterResidual?L"Residuals: ":L"Data: ")+MathDisplay::Count((double)scatterPoints.size())+L" blue points";SIZE size;::GetTextExtentPoint32W(DC->GetSafeHdc(),text.c_str(),(int)text.size(),&size);if(sy+size.cy<Y+Ylen-BottomMargin-2){DC->FillSolidRect(origin,sy,min(size.cx+6,limit-origin),size.cy+4,RGB(255,255,255));::TextOutW(DC->GetSafeHdc(),origin+2,sy+2,text.c_str(),(int)text.size());}
 +        }
 +        DC->RestoreDC(saved);
 +    }
@@ -4671,7 +4671,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..72876de 100644
+index fc832eb..6eb0dd1 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -6464,7 +6464,7 @@ index fc832eb..72876de 100644
 +            tips.Add(rotateButton.m_hWnd,L"Rotate a selected object by dragging its rotation grip. Hold Shift for 15-degree steps; Escape cancels.");
 +            tips.Add(colorButton.m_hWnd,L"Choose the foreground colour for math, text or drawing lines.");
 +            tips.Add(backgroundButton.m_hWnd,L"Choose a background colour behind typed math or text, or clear the background.");
-+            tips.Add(modeButton.m_hWnd,L"Switch numerical trigonometric calculations between radians and degrees. The graph's separate \\u03c0 button switches x-axis labels to multiples of \\u03c0.");
++            tips.Add(modeButton.m_hWnd,L"Switch numerical trigonometric calculations between radians and degrees. The graph's separate \u03c0 button switches x-axis labels to multiples of \u03c0.");
 +            CFont *font=CFont::FromHandle((HFONT)GetStockObject(DEFAULT_GUI_FONT));
 +            label.SetFont(font); search.SetFont(font); fontButton.SetFont(font); rotateButton.SetFont(font); modeButton.SetFont(font); colorButton.SetFont(font); fitButton.SetFont(font); selectButton.SetFont(font);backgroundButton.SetFont(font);
 +        }
@@ -7797,7 +7797,7 @@ index fc832eb..72876de 100644
 +        for(size_t i=0;i<points.size();i++){
 +            CPoint p=points[i];dc.Ellipse(p.x-3,p.y-3,p.x+4,p.y+4);
 +            std::string text=labels?PolygonConstructor::VertexName(i):"";
-+            if(coordinates){if(!text.empty())text+=" ";text+="("+Piecewise::Number(shape.points[i].x)+","+Piecewise::Number(shape.points[i].y)+")";}
++            if(coordinates){if(!text.empty())text+=" ";text+="("+MathDisplay::AsciiNumber(shape.points[i].x,true)+", "+MathDisplay::AsciiNumber(shape.points[i].y,true)+")";}
 +            if(!text.empty()){CSize extent=dc.GetTextExtent(text.c_str());int x=p.x<rect.Width()/2?p.x-extent.cx-6:p.x+6;int y=p.y<rect.Height()/2?p.y-extent.cy-5:p.y+5;dc.TextOut(max(3,min(x,rect.Width()-extent.cx-3)),max(3,min(y,rect.Height()-extent.cy-3)),text.c_str());}
 +        }
 +        if(angles && angleValues)for(size_t i=0;i<points.size();i++){PolygonConstructor::Point p=PolygonConstructor::AngleLabel(shape,i,span*scale);std::wstring text=MathDisplay::Number(PolygonConstructor::InteriorAngle(shape,i)*180/3.14159265358979323846)+L"\u00b0";SIZE extent={};::GetTextExtentPoint32W(dc.m_hDC,text.c_str(),(int)text.size(),&extent);::TextOutW(dc.m_hDC,(int)(ox+p.x-extent.cx/2),(int)(oy+p.y-extent.cy/2),text.c_str(),(int)text.size());}
@@ -7878,7 +7878,7 @@ index fc832eb..72876de 100644
 +    }
 +    for(size_t i=0;i<page.size();i++)if(dialog.labels || dialog.coordinates){
 +        std::string text=dialog.labels?PolygonConstructor::VertexName(i):"";
-+        if(dialog.coordinates){if(!text.empty())text+=" ";text+="("+Piecewise::Number(dialog.shape.points[i].x)+", "+Piecewise::Number(dialog.shape.points[i].y)+")";}
++        if(dialog.coordinates){if(!text.empty())text+=" ";text+="("+MathDisplay::AsciiNumber(dialog.shape.points[i].x,true)+", "+MathDisplay::AsciiNumber(dialog.shape.points[i].y,true)+")";}
 +        CExpression label(NULL,NULL,75);label.m_StartAsText=1;for(size_t j=0;j<text.size();j++)label.InsertEmptyElement(label.m_NumElements,1,text[j]);
 +        double x=page[i].x+(page[i].x<centerX?-12:8),y=page[i].y+(page[i].y<centerY?-17:10);if(page[i].x<centerX)x-=text.size()*4;
 +        drawing->CopyExpressionIntoSubgroup(&label,(int)x,(int)y,0,0);

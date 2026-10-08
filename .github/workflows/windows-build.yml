@@ -36,13 +36,15 @@ jobs:
         shell: pwsh
         run: ./tools/feature-help-smoke.ps1
       - name: Statistics UI checks
+        id: stats_ui
         shell: pwsh
         run: ./tools/statistics-smoke.ps1
       - name: Windows UI smoke checks
+        id: windows_ui
         shell: pwsh
         run: ./tools/windows-smoke.ps1
       - name: Diagnose memory errors after failed UI checks
-        if: failure()
+        if: failure() && (steps.stats_ui.conclusion == 'failure' || steps.windows_ui.conclusion == 'failure')
         shell: pwsh
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /t:Rebuild /m /p:Configuration=Release /p:Platform=Win32 /p:EnableASAN=true /p:DebugInformationFormat=ProgramDatabase /p:GenerateDebugInformation=true /v:minimal
