@@ -50,6 +50,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/statistics-smoke.ps1
           ./tools/windows-smoke.ps1
       - name: Package
         shell: pwsh

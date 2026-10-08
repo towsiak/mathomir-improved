@@ -4,6 +4,12 @@
 #include <iostream>
 static double Evaluate(const char *s,double x=0,bool radians=true){Piecewise::Formula p;std::string e;assert(p.Parse(s,e));return p.Value(x,radians);}
 int main(){
+ {std::vector<double> roots;GraphDiscontinuities::Roots([](double x){return x;},-5.2,6.3,roots);assert(roots.size()==1&&std::fabs(roots[0])<1e-20);}
+ {std::vector<double> roots;GraphDiscontinuities::Roots([](double x){return x*(x-1e-11);},-1e-10,1e-10,roots);assert(roots.size()==2);
+  roots.clear();GraphDiscontinuities::Roots([](double x){return x*x+1e-20;},-1,1,roots);assert(roots.empty());
+  roots.clear();GraphDiscontinuities::Roots([](double x){return std::sin(x);},3,4,roots);assert(roots.size()==1&&std::fabs(roots[0]-3.141592653589793)<1e-14);
+  roots.clear();GraphDiscontinuities::Roots([](double x){return std::sin(x)*std::sin(x);},3,4,roots);assert(roots.size()==1&&std::fabs(roots[0]-3.141592653589793)<1e-14);
+ }
  for(double span:{100.0,6000.0,1e9}) {
   std::vector<double> roots;
   GraphDiscontinuities::Roots([](double x){return (x+2)*(x-5);},-2-span*.45,-2+span*.55,roots);

@@ -64,7 +64,7 @@ try {
  [StatsUI]::Set([StatsUI]::Child($d,1340)," x, y `r`n1,3`r`n2,5`r`n3,7`r`n4,9");[StatsUI]::Send($d,273,1342)|Out-Null
  Check ([StatsUI]::IsWindowEnabled([StatsUI]::Child($d,1))) 'Pasted linear data failed'
  [StatsUI]::Set([StatsUI]::Child($d,1351),'2');[StatsUI]::Send($d,273,1352)|Out-Null
- Check ([StatsUI]::Text([StatsUI]::Child($d,1348)).EndsWith(': 5')) 'Prediction incorrect'
+ $prediction=[StatsUI]::Text([StatsUI]::Child($d,1348));Write-Host "Prediction readout: $prediction";Check ($prediction.EndsWith(': 5')) "Prediction incorrect: $prediction"
  [StatsUI]::Send($d,273,1)|Out-Null;[StatsUI]::Place($view);Start-Sleep -Seconds 2
  [StatsUI]::Send($main,273,0xE103)|Out-Null;Start-Sleep -Milliseconds 500
  [xml]$doc=Get-Content $file -Raw
@@ -79,5 +79,6 @@ try {
  [StatsUI]::Send($main,273,0xE103)|Out-Null;Start-Sleep -Milliseconds 500
  [xml]$doc=Get-Content $file -Raw
  Check ($doc.SelectNodes('//stats[@residual="1"]').Count -gt 0) 'Residual plot not saved'
+ [StatsUI]::Open($main,$file);Start-Sleep -Milliseconds 500
  Write-Host 'Statistics Windows checks passed: 9 models, Unicode summaries, domain rejection, prediction, scatter placement/save/reload and residual plot.'
 } finally {if(!$app.HasExited){Stop-Process -Id $app.Id -Force}}

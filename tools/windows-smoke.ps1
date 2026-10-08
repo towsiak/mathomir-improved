@@ -81,6 +81,7 @@ public static class MathomirUiProbe {
   public static bool CurveNear(IntPtr hwnd,int x,int y,int radius){IntPtr dc=GetDC(hwnd);try{for(int j=-radius;j<=radius;j++)for(int i=-radius;i<=radius;i++)if(GetPixel(dc,x+i,y+j)==0)return true;return false;}finally{ReleaseDC(hwnd,dc);}}
   public static void DumpRegion(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{StringBuilder text=new StringBuilder();text.Append("GRAPHPIXELS:");for(int j=-10;j<=10;j++)for(int i=-10;i<=10;i++){text.Append(GetPixel(dc,x+i,y+j).ToString("X6"));text.Append(',');}Console.WriteLine(text.ToString());}finally{ReleaseDC(hwnd,dc);}}
   public static bool OpenCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int cx=x+i,cy=y+j;uint c=GetPixel(dc,cx,cy);if((c&255)<192||((c>>8)&255)<192||((c>>16)&255)<192)continue;bool left=false,right=false,top=false,bottom=false;for(int r=3;r<=5;r++)for(int k=-2;k<=2;k++){left|=GetPixel(dc,cx-r,cy+k)==0;right|=GetPixel(dc,cx+r,cy+k)==0;top|=GetPixel(dc,cx+k,cy-r)==0;bottom|=GetPixel(dc,cx+k,cy+r)==0;}if(left&&right&&top&&bottom)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
+  public static bool FilledCircle(IntPtr hwnd,int x,int y){IntPtr dc=GetDC(hwnd);try{for(int j=-2;j<=2;j++)for(int i=-2;i<=2;i++){int count=0;for(int b=-2;b<=2;b++)for(int a=-2;a<=2;a++)if(GetPixel(dc,x+i+a,y+j+b)==0)count++;if(count>=23)return true;}return false;}finally{ReleaseDC(hwnd,dc);}}
   public static int SafeGuidePixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=70;y<180;y++)if(GetPixel(dc,51,y)==0xE0E0E0)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int PrintWarningPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=8;y<34;y++)for(int x=18;x<390;x++)if(GetPixel(dc,x,y)==0x1464AA)count++;return count;}finally{ReleaseDC(hwnd,dc);}}
   public static bool WhiteGraphGutter(IntPtr hwnd,int left,int bottom,int right){IntPtr dc=GetDC(hwnd);try{int gray=0,total=0;for(int y=bottom+3;y<bottom+20;y+=2)for(int x=left+10;x<right-10;x+=7){total++;uint c=GetPixel(dc,x,y);if(Math.Abs((int)(c&255)-224)<=2 && Math.Abs((int)((c>>8)&255)-224)<=2 && Math.Abs((int)((c>>16)&255)-224)<=2)gray++;}Console.WriteLine("Graph gutter pixels: gray="+gray+", total="+total);return total>0 && gray*100/total<15;}finally{ReleaseDC(hwnd,dc);}}
@@ -1281,6 +1282,21 @@ try {
     $value=if($index -eq 10){1.4}elseif($index -eq 5){.25}else{$expected[$index]}
     $px=[int]($area[0]+(-1.37+3)/6*($area[2]-$area[0]));$py=[int]($area[3]-($value+3)/9*($area[3]-$area[1]))
     if(![MathomirUiProbe]::CurveColorNear($view,$px,$py,3,0)){[MathomirUiProbe]::DumpRegion($view,$px,$py);throw "Native function $name did not plot its negative-input value."}
+    $markers=@()
+    switch($index){
+      0 {$markers=@(@(1,0,$false),@(1,1,$true),@(-1,-2,$false),@(-1,-1,$true))}
+      1 {$markers=@(@(1,2,$false),@(1,1,$true))}
+      3 {$markers=@(@(.5,0,$false),@(.5,1,$true),@(-.5,0,$false),@(-.5,-1,$true))}
+      4 {$markers=@(@(1,0,$false),@(1,1,$true),@(-1,0,$false),@(-1,-1,$true))}
+      5 {$markers=@(@(0,.25,$false),@(0,2.25,$false),@(0,1.25,$true))}
+      6 {$markers=@(@(1,1,$false),@(1,0,$true))}
+      10 {$markers=@(@(1,3.4,$false),@(1,4.4,$true))}
+    }
+    foreach($marker in $markers){
+      $mx=[int]($area[0]+($marker[0]+3)/6*($area[2]-$area[0]));$my=[int]($area[3]-($marker[1]+3)/9*($area[3]-$area[1]))
+      $present=if($marker[2]){[MathomirUiProbe]::FilledCircle($view,$mx,$my)}else{[MathomirUiProbe]::OpenCircle($view,$mx,$my)}
+      if(!$present){[MathomirUiProbe]::DumpRegion($view,$mx,$my);throw "Native $name endpoint missing at $($marker[0]),$($marker[1]); closed=$($marker[2])"}
+    }
     if($index -eq 5){
       $pointX=[int](($area[0]+$area[2])/2);$pointY=[int]($area[3]-4.25/9*($area[3]-$area[1]))
       if(![MathomirUiProbe]::CurveColorNear($view,$pointX+2,$pointY,1,0)){[MathomirUiProbe]::DumpRegion($view,$pointX,$pointY);throw 'Sign graph lost its isolated included point at zero.'}
@@ -1290,7 +1306,19 @@ try {
       if([MathomirUiProbe]::CurveColorNear($view,$px,$py,2,0)){throw 'Floor graph drew a false vertical connector across its jump.'}
     }
   }
-  Write-Output 'Native function graphs passed: all ten negative-input curves evaluate and paint, and floor steps have no false connector.'
+  Write-Output 'Native function graphs passed: all ten negative-input curves evaluate and paint, floor steps have no false connector, and all six step functions paint open/filled endpoints including negative round ties.'
+
+  foreach($span in @(.001,3.2,12)){
+    $axes=@(-$span,$span,-3,3)|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
+    $slot='<subexp d="0,0;4000,1000"><ex fh="100"><elm tp="5" E1=""><ex br="1" shp="f"><var t="x" f="00" /></ex></elm></ex></subexp>'
+    ('<?xml version="1.0"?><mathomir><o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($axes -join '')+$slot+'</o></mathomir>')|Set-Content $nativeFunctions -Encoding ascii
+    [MathomirUiProbe]::OpenFile($main,$nativeFunctions)
+    Start-Sleep -Milliseconds 1600
+    [MathomirUiProbe]::Mouse($view,512,0,850,50)
+    $area=[MathomirUiProbe]::PlotArea($view);$mx=[int](($area[0]+$area[2])/2);$my=[int](($area[1]+$area[3])/2)
+    if(![MathomirUiProbe]::FilledCircle($view,$mx,$my) -or ![MathomirUiProbe]::OpenCircle($view,$mx,[int]($area[3]-2/6*($area[3]-$area[1])))){throw "Floor endpoints vanished at graph range +/-$span"}
+  }
+  Write-Output 'Step endpoints passed: circles survive narrow and wider graph ranges with distinct visible steps.'
 
   $marginFixture=Join-Path (Split-Path $exe) 'piecewise-created-smoke.mom'
   '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content -LiteralPath $marginFixture -Encoding ascii

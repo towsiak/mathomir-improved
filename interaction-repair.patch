@@ -3847,7 +3847,7 @@ index 0000000..0b7e258
 +}
 +}
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..38a9619 100644
+index bdcebb4..5b4ca1b 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -4344,7 +4344,7 @@ index bdcebb4..38a9619 100644
 +    EDITTEXT 1346,196,187,416,113,ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | WS_VSCROLL | WS_HSCROLL
 +    CONTROL "Plot residuals instead of y",1347,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,279,174,14
 +    LTEXT "Blue dots: data. Black curve: fit.",-1,10,296,172,14
-+    CONTROL "",1348,"Static",SS_BLACKFRAME,10,311,602,17
++    LTEXT "",1348,10,311,602,17,WS_BORDER
 +    PUSHBUTTON "Place equation",1349,370,334,88,16
 +    DEFPUSHBUTTON "Place graph",IDOK,464,334,74,16
 +    PUSHBUTTON "Cancel",IDCANCEL,544,334,68,16
@@ -4573,7 +4573,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..5cd235b 100644
+index fc832eb..f9e0709 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,26 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -7512,7 +7512,7 @@ index fc832eb..5cd235b 100644
 +    if(!plotter||!plotter->StopForZoom()){if(!existing)delete drawing;AfxMessageBox("The graph is still working. Try again after it finishes.");return;}if(existing)UndoSave("edit regression");
 +    plotter->EnsureFunctionSlots();plotter->pieces.clear();plotter->scatterPoints=dialog.result.data;plotter->statisticsModel=dialog.model;plotter->scatterResidual=dialog.residual;plotter->is_x_pi=0;plotter->is_x_log=plotter->is_y_log=plotter->analyze=0;
 +    for(size_t i=0;i<plotter->scatterPoints.size();i++)if(dialog.residual)plotter->scatterPoints[i].y=dialog.result.residuals[i];
-+    for(int i=0;i<8;i++){auto expression=(CExpression*)drawing->Items[8+i].pSubdrawing;expression->Delete();if(i==0){std::string xml="<ex fh=\"100\">"+SymbolicDerivative::Xml(dialog.residual?SymbolicDerivative::N(0):dialog.result.Expression())+"</ex>";std::vector<char>b(xml.begin(),xml.end());b.push_back(0);expression->XML_input(&b[0]);}}
++    for(int i=0;i<8;i++){auto expression=(CExpression*)drawing->Items[8+i].pSubdrawing;expression->Delete();if(i==0){std::string xml="<ex fh=\"100\">"+SymbolicDerivative::Xml(dialog.residual?SymbolicDerivative::N(0):dialog.result.Expression(),0,17)+"</ex>";std::vector<char>b(xml.begin(),xml.end());b.push_back(0);expression->XML_input(&b[0]);}}
 +    double xmin=dialog.result.x.minimum,xmax=dialog.result.x.maximum,ymin=dialog.result.y.minimum,ymax=dialog.result.y.maximum;if(dialog.residual){ymin=*std::min_element(dialog.result.residuals.begin(),dialog.result.residuals.end());ymax=*std::max_element(dialog.result.residuals.begin(),dialog.result.residuals.end());ymin=min(ymin,0.);ymax=max(ymax,0.);}
 +    double xp=max((xmax-xmin)*.1,1e-9),yp=max((ymax-ymin)*.12,(ymax==ymin?max(1.,fabs(ymin)*.05):1e-12));xmin-=xp;xmax+=xp;ymin-=yp;ymax+=yp;plotter->SetBounds(xmin,xmax,ymin,ymax);
 +    if(existing){GetDocument()->SetModifiedFlag();plotter->TheState=0;plotter->PlotFunction(1);RepaintTheView(1);SetFocus();return;}
@@ -8768,7 +8768,7 @@ index 0000000..bebbe21
 +}
 diff --git a/Mathomir/Statistics.h b/Mathomir/Statistics.h
 new file mode 100644
-index 0000000..ff8c639
+index 0000000..4cabdf8
 --- /dev/null
 +++ b/Mathomir/Statistics.h
 @@ -0,0 +1,77 @@
@@ -8815,7 +8815,7 @@ index 0000000..ff8c639
 +                answer=N(0);for(size_t i=expanded.size();i-->0;)answer=Make('+',N(expanded[i]),Make('*',Name("x"),answer));return Simplify(answer);
 +            }
 +            double slope=beta[1]/scale,intercept=beta[0]-slope*center;
-+            if(model==7)return Make('*',N(std::exp(intercept)),F("exp",Make('*',N(slope),Name("x"))));
++            if(model==7){double amplitude=std::exp(intercept);return amplitude>0&&std::isfinite(amplitude)?Make('*',N(amplitude),F("exp",Make('*',N(slope),Name("x")))):F("exp",Make('+',N(intercept),Make('*',N(slope),Name("x"))));}
 +            if(model==9)return Make('*',N(std::exp(intercept)),domainSafe?F("exp",Make('*',N(slope),F("ln",Name("x")))):Make('^',Name("x"),N(slope)));
 +            return Make('+',N(intercept),Make('*',N(slope),variable));
 +        }
@@ -8851,7 +8851,7 @@ index 0000000..ff8c639
 +}
 diff --git a/Mathomir/SymbolicDerivative.h b/Mathomir/SymbolicDerivative.h
 new file mode 100644
-index 0000000..b831672
+index 0000000..97c9c69
 --- /dev/null
 +++ b/Mathomir/SymbolicDerivative.h
 @@ -0,0 +1,239 @@
@@ -9071,22 +9071,22 @@ index 0000000..b831672
 +    std::string s;if(a->op=='n')s=Number(a->number);else if(a->op=='v')s=a->name;else if(a->op=='f')s=a->name+"("+Text(a->a)+")";else if(a->op=='~')s="-"+Text(a->a,2);else{int level=Precedence(a);s=Text(a->a,a->op=='^'?level+1:level)+std::string(1,a->op)+Text(a->b,a->op=='-'||a->op=='/'?level+1:level);}
 +    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="("+s+")";return s;
 +}
-+inline std::string NativeNumber(double n){
-+    std::string number=Number(fabs(n));size_t position=number.find_first_of("eE");if(position==std::string::npos)return "<var t=\""+number+"\" f=\"00\" />";
++inline std::string NativeNumber(double n,int digits=15){
++    char buffer[64];std::sprintf(buffer,"%.*g",digits,fabs(n));std::string number=buffer;size_t position=number.find_first_of("eE");if(position==std::string::npos)return "<var t=\""+number+"\" f=\"00\" />";
 +    int exponent=atoi(number.c_str()+position+1);std::string power=(exponent<0?"<opr s=\"-\" />":"")+std::string("<var t=\"")+Number(fabs((double)exponent))+"\" f=\"00\" />";
 +    return "<var t=\""+number.substr(0,position)+"\" f=\"00\" /><opr s=\"\xD7\" /><elm tp=\"3\" E1=\"\" E2=\"\"><ex><var t=\"10\" f=\"00\" /></ex><ex>"+power+"</ex></elm>";
 +}
-+inline std::string Xml(Expr a,int parent=0){
-+    std::string s;if(a->op=='n'){s=(a->number<0?"<opr s=\"-\" />":"")+NativeNumber(a->number);}
++inline std::string Xml(Expr a,int parent=0,int digits=15){
++    std::string s;if(a->op=='n'){s=(a->number<0?"<opr s=\"-\" />":"")+NativeNumber(a->number,digits);}
 +    else if(a->op=='v')s=a->name=="pi"?"<var t=\"p\" f=\"60\" />":"<var t=\""+a->name+"\" f=\"00\" />";
-+    else if(a->op=='~')s="<opr s=\"-\" />"+Xml(a->a,2);
-+    else if(a->op=='/'||a->op=='^'){std::string tag=a->op=='/'?"fra":"elm tp=\"3\"",close=a->op=='/'?"fra":"elm";s="<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(a->a,a->op=='^'?5:0)+"</ex><ex>"+Xml(a->b)+"</ex></"+close+">";}
++    else if(a->op=='~')s="<opr s=\"-\" />"+Xml(a->a,2,digits);
++    else if(a->op=='/'||a->op=='^'){std::string tag=a->op=='/'?"fra":"elm tp=\"3\"",close=a->op=='/'?"fra":"elm";s="<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(a->a,a->op=='^'?5:0,digits)+"</ex><ex>"+Xml(a->b,0,digits)+"</ex></"+close+">";}
 +    else if(a->op=='f'){
-+        if(a->name=="sqrt")s="<elm tp=\"8\" E1=\"\"><ex>"+Xml(a->a)+"</ex></elm>";
-+        else if(a->name=="abs"||a->name=="floor"||a->name=="ceil")s="<elm tp=\"5\" E1=\"\"><ex br=\"1\" shp=\""+(a->name=="abs"?std::string("|"):a->name=="floor"?std::string("f"):std::string("c"))+"\">"+Xml(a->a)+"</ex></elm>";
-+        else {std::string name=a->name=="asin"?"arcsin":a->name=="acos"?"arccos":a->name=="atan"?"arctan":a->name;s="<fun t=\""+name+"\" f=\"20\" E1=\"\"><ex br=\"1\">"+Xml(a->a)+"</ex></fun>";}
++        if(a->name=="sqrt")s="<elm tp=\"8\" E1=\"\"><ex>"+Xml(a->a,0,digits)+"</ex></elm>";
++        else if(a->name=="abs"||a->name=="floor"||a->name=="ceil")s="<elm tp=\"5\" E1=\"\"><ex br=\"1\" shp=\""+(a->name=="abs"?std::string("|"):a->name=="floor"?std::string("f"):std::string("c"))+"\">"+Xml(a->a,0,digits)+"</ex></elm>";
++        else {std::string name=a->name=="asin"?"arcsin":a->name=="acos"?"arccos":a->name=="atan"?"arctan":a->name;s="<fun t=\""+name+"\" f=\"20\" E1=\"\"><ex br=\"1\">"+Xml(a->a,0,digits)+"</ex></fun>";}
 +    }else {bool coefficient=a->op=='*' && a->a->op=='n' && (a->b->op=='v'||a->b->op=='f'||(a->b->op=='^'&&a->b->a->op!='n')||Precedence(a->b)==1);
-+        s=Xml(a->a,Precedence(a))+(coefficient?std::string():"<opr s=\""+(a->op=='*'?std::string("\xD7"):std::string(1,a->op))+"\" />")+Xml(a->b,a->op=='-'?2:Precedence(a));}
++        s=Xml(a->a,Precedence(a),digits)+(coefficient?std::string():"<opr s=\""+(a->op=='*'?std::string("\xD7"):std::string(1,a->op))+"\" />")+Xml(a->b,a->op=='-'?2:Precedence(a),digits);}
 +    if(Precedence(a)<parent || (a->op=='n'&&parent>2&&(a->number<0||Number(a->number).find_first_of("eE")!=std::string::npos)))s="<elm tp=\"5\" E1=\"\"><ex br=\"1\">"+s+"</ex></elm>";return s;
 +}
 +inline std::string Equation(const Result &r){std::string top="<fun t=\"d\" f=\"20\"";if(r.order>1)top+=" E2=\"\"";top+=" E1=\"\"><ex br=\"1\">"+Xml(r.original)+"</ex>";if(r.order>1)top+="<ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex>";top+="</fun>";

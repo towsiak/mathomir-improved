@@ -22,6 +22,9 @@ int main(){
     Check("abs(x)",-2,-1);Check("floor(x)",1.2,0);Check("fract(x)",1.2,1);Check("round(x)",1.2,0);Check("trunc(x)",0,0);Check("sgn(x)",-2,0);
     Check("sinc(x)",.4,(.4*std::cos(.4)-std::sin(.4))/.16);Check("pi*x",2,3.141592653589793);
     Check("t^3+2t",2,14,1,"t");Check("x^(-2)",2,-.25);
+    Check("x^(2/3)",-8,-1./3);Check("x^(1/3)",-8,1./12);
+    Parser edge;assert(Value(edge.Parse("round(4503599627370497)"),"x",0)==4503599627370497.);assert(Value(edge.Parse("round(-4503599627370497)"),"x",0)==-4503599627370497.);
+    assert(std::fabs(Value(edge.Parse("(-8)^(1/3)"),"x",0)+2)<1e-12);
     Parser numeric;assert(std::fabs(Value(numeric.Parse("e^(pi)-e"),"",0)-20.4224108043202)<1e-11);assert(std::fabs(Value(numeric.Parse("sin(30)"),"",0,false)-.5)<1e-12);assert(std::fabs(Value(numeric.Parse("asin(0.5)"),"",0,false)-30)<1e-12);
     Result r;std::string e;double value;assert(r.Find("x^3+2x","x",1,e));assert(Text(r.derivative)=="3*x^2+2");
     assert(r.Find("a*x^2","x",2,e));assert(!r.At(2,value,e));assert(Text(r.derivative).find('a')!=std::string::npos);
