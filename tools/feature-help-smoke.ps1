@@ -25,6 +25,7 @@ public static class FeatureUI {
  [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h,uint which);
  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h,out Rect r);
  [DllImport("user32.dll")] static extern bool GetClientRect(IntPtr h,out Rect r);
+ [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr h,ref Point p);
  [DllImport("user32.dll")] static extern bool ScreenToClient(IntPtr h,ref Point p);
  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int left,top,right,bottom;}
  [StructLayout(LayoutKind.Sequential)] public struct Point {public int x,y;}
@@ -39,7 +40,7 @@ public static class FeatureUI {
  public static IntPtr CaptionChild(IntPtr parent,string caption){IntPtr result=IntPtr.Zero;EnumChildWindows(parent,(h,p)=>{if(Text(h)==caption){result=h;return false;}return true;},IntPtr.Zero);return result;}
  public static Rect Bounds(IntPtr h){Rect r;GetWindowRect(h,out r);return r;}
  public static Rect Client(IntPtr h){Rect r;GetClientRect(h,out r);return r;}
- public static void Mouse(IntPtr h,uint message,int flags,int x,int y){Rect r;GetWindowRect(h,out r);SetCursorPos(r.left+x,r.top+y);Send(h,message,flags,(y<<16)|(x&65535));}
+ public static void Mouse(IntPtr h,uint message,int flags,int x,int y){if(message==512&&flags==0){Point p=new Point{x=x,y=y};ClientToScreen(h,ref p);SetCursorPos(p.x,p.y);System.Threading.Thread.Sleep(50);}Send(h,message,flags,(y<<16)|(x&65535));}
  [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint rights,bool inherit,int pid);
  [DllImport("kernel32.dll")] static extern IntPtr VirtualAllocEx(IntPtr p,IntPtr at,UIntPtr size,uint type,uint protection);
  [DllImport("kernel32.dll")] static extern bool VirtualFreeEx(IntPtr p,IntPtr at,UIntPtr size,uint type);
@@ -131,13 +132,14 @@ try {
  foreach($slot in 0..13){HoverHint $palette ([int]([Math]::Floor($slot/2)*$toolSize/2+$toolSize/4)) ([int](($slot%2)*$subHeight+$subHeight/2)) $shapes[$slot]}
  [FeatureUI]::Send($view,258,27)|Out-Null
  $fixture=Join-Path (Split-Path $exe) 'object-tooltip-smoke.mom'
- '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="120"><ex><var t="x123456" f="00" /></ex></o><o t="1" X="100" Y="220"><ex stxt="1"><var t="Hover this text" f="00" /></ex></o><o t="2" X="100" Y="300"><dw d="32|0,0;6400,0;:,3200;0,:;:,0" /></o><o t="2" X="400" Y="300"><dw d="32|0,0;6400,3200" /></o></mathomir>'|Set-Content $fixture -Encoding ascii
+ '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="120"><ex><var t="x123456" f="00" /></ex></o><o t="1" X="100" Y="220"><ex stxt="1"><var t="Hover this text" f="00" /></ex></o><o t="1" X="400" Y="120"><ex><fun t="sin" f="20" E1=""><ex br="3"><var t="x" f="00" /></ex></fun></ex></o><o t="2" X="100" Y="300"><dw d="32|0,0;6400,0;:,3200;0,:;:,0" /></o><o t="2" X="400" Y="300"><dw d="32|0,0;6400,3200" /></o></mathomir>'|Set-Content $fixture -Encoding ascii
  [FeatureUI]::Open($main,$fixture);Start-Sleep -Milliseconds 350
  [FeatureUI]::Send($view,276,4)|Out-Null
  for($page=0;$page -lt 10;$page++){[FeatureUI]::Send($view,277,2)|Out-Null}
  [FeatureUI]::Send($view,273,32775)|Out-Null
  HoverHint $view 110 120 'Mathematical object'
  HoverHint $view 110 220 'Text object'
+ HoverHint $view 405 120 'sin'
  HoverHint $view 200 350 'Drawing|diagram|Rectangle'
  HoverHint $view 500 350 'Drawing|diagram|Line'
  [FeatureUI]::Mouse($view,512,0,850,600);Start-Sleep -Milliseconds 200

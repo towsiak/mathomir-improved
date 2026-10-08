@@ -4681,7 +4681,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..2d5755c 100644
+index fc832eb..0b5e9c1 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4712,7 +4712,7 @@ index fc832eb..2d5755c 100644
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -132,6 +142,350 @@ unsigned int LongClickStartTime;
+@@ -132,6 +142,364 @@ unsigned int LongClickStartTime;
  CPoint LongClickPosition;
  CExpression *LongClickObject;
  tDocumentStruct *prevTouchedObject=NULL;
@@ -4920,8 +4920,14 @@ index fc832eb..2d5755c 100644
 +{
 +    if(!expression)return L"Mathematical symbol - click to insert it.";
 +    if(expression->m_StartAsText)return L"Text object - click to insert editable text.";
-+    if(expression->m_NumElements==1){
-+        CElement *element=expression->m_pElementList->pElementObject;
++    int index=-1,count=0;
++    for(int i=0;i<expression->m_NumElements;i++){
++        tElementStruct *item=expression->m_pElementList+i;CElement *element=item->pElementObject;
++        if(item->Type<=0 || !element || (item->Type==1 && !element->Data1[0] && !element->Expression1 && !element->Expression2))continue;
++        index=i;count++;
++    }
++    if(count==1){
++        CElement *element=expression->m_pElementList[index].pElementObject;
 +        CStringW detailed=BasicElementHelp(element);if(!detailed.IsEmpty())return std::wstring((LPCWSTR)detailed);
 +        if(element && element->m_Type==2){
 +            unsigned char symbol=(unsigned char)element->Data1[0];
@@ -4938,6 +4944,14 @@ index fc832eb..2d5755c 100644
 +        }
 +        if(element && element->m_Type==5)return L"Brackets - group an expression; click inside to enter its contents.";
 +        if(element && element->m_Type==1 && element->Data1[0]){
++            if((element->Data2[0]&0xE0)==0x60){
++                unsigned char symbol=(unsigned char)element->Data1[0];
++                if(symbol==0xA5)return L"Infinity - an unbounded limit, rather than a finite number.";
++                if(symbol==0xB0)return L"Degree symbol - denotes an angle measured in degrees.";
++                const char *greek[]={"Alpha","Beta","Chi","Delta","Epsilon","Phi","Gamma","Eta","Iota","Theta variant","Kappa","Lambda","Mu","Nu","Omicron","Pi","Theta","Rho","Sigma","Tau","Upsilon","Final sigma","Omega","Xi","Psi","Zeta"};
++                if((symbol>='a'&&symbol<='z') || (symbol>='A'&&symbol<='Z'))return MathDisplay::HelpNotation(greek[(symbol|32)-'a'])+L" - insert this Greek mathematical symbol.";
++                return L"Mathematical constant or symbol - click to insert it.";
++            }
 +            CStringW symbol(element->Data1);return std::wstring((LPCWSTR)symbol)+L" - click to insert this character or mathematical symbol.";
 +        }
 +    }
@@ -5063,7 +5077,7 @@ index fc832eb..2d5755c 100644
  char IsWindowOutOfFocus;
  
  #define NUM_SPECIAL_KEYS 21
-@@ -157,6 +511,10 @@ struct
+@@ -157,6 +525,10 @@ struct
  
  
  
@@ -5074,7 +5088,7 @@ index fc832eb..2d5755c 100644
  CExpression *TheKeyboardClipboard;
  
  IMPLEMENT_DYNCREATE(CMathomirView, CView)
-@@ -167,6 +525,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -167,6 +539,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -5084,7 +5098,7 @@ index fc832eb..2d5755c 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +574,47 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +588,47 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
@@ -5132,7 +5146,7 @@ index fc832eb..2d5755c 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -291,7 +693,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -291,7 +707,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  
  CMathomirView::CMathomirView()
  {
@@ -5142,7 +5156,7 @@ index fc832eb..2d5755c 100644
  	m_PopupMenuObject=NULL;
  	pMainView=this;
  	pMainViewBase=(CView*)this;
-@@ -392,6 +796,7 @@ int CMathomirView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+@@ -392,6 +810,7 @@ int CMathomirView::OnCreate(LPCREATESTRUCT lpCreateStruct)
  	if (CView::OnCreate(lpCreateStruct) == -1)
  		return -1;
  
@@ -5150,7 +5164,7 @@ index fc832eb..2d5755c 100644
  	SetTimer(1,10,NULL); //this is for cursor and copy-paste
  	return 0;
  }
-@@ -489,8 +894,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
+@@ -489,8 +908,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
  int NumRullerGuidelines=0;
  
  
@@ -5212,7 +5226,7 @@ index fc832eb..2d5755c 100644
  	tDocumentStruct *ds=TheDocument;
  	int SelectedElement;
  	NumRullerGuidelines=0;
-@@ -509,6 +966,14 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -509,6 +980,14 @@ void CMathomirView::OnDraw(CDC* pDC)
  
  		ClientArea.right=pDC->GetDeviceCaps(PHYSICALWIDTH);
  		ClientArea.bottom=pDC->GetDeviceCaps(PHYSICALHEIGHT);
@@ -5227,7 +5241,7 @@ index fc832eb..2d5755c 100644
  		ViewZoom=(short)(100*ClientArea.bottom/PaperHeight);
  		ViewY=(PagePrinted-1)*PaperHeight+5+pDC->GetDeviceCaps(PHYSICALOFFSETY)*100/ViewZoom;
  		ViewX=15+pDC->GetDeviceCaps(PHYSICALOFFSETX)*100/ViewZoom;
-@@ -576,17 +1041,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +1055,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -5250,7 +5264,7 @@ index fc832eb..2d5755c 100644
  				}
  				else
  				{
-@@ -624,19 +1090,24 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,19 +1104,24 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -5276,7 +5290,7 @@ index fc832eb..2d5755c 100644
  			int RelativeHeight=(PaperHeight)*ViewZoom/100;
  			int RelativeStart=-(ViewY%PaperHeight)*ViewZoom/100;
  
-@@ -725,8 +1196,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -725,8 +1210,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		}
  
  
@@ -5292,7 +5306,7 @@ index fc832eb..2d5755c 100644
  			if ((ds->absolute_Y<-1000) && (ds->absolute_Y>-1200))
  			{
  				if (NumRullerGuidelines<13) RullerGuidelines[NumRullerGuidelines++]=NumDocumentElements-i-1;
-@@ -753,6 +1231,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +1245,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -5302,7 +5316,7 @@ index fc832eb..2d5755c 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -761,7 +1242,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -761,7 +1256,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					if (ds->Type==1)
  						((CExpression*)(ds->Object))->PaintExpression(&bitmapDC,ViewZoom,RelativeX,RelativeY,&TheClientRect);
@@ -5311,7 +5325,7 @@ index fc832eb..2d5755c 100644
  						((CDrawing*)(ds->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,ds->absolute_X,ds->absolute_Y,&TheClientRect);
  				}
  
-@@ -785,6 +1266,8 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -785,6 +1280,8 @@ void CMathomirView::OnDraw(CDC* pDC)
  			}
  		}
  
@@ -5320,7 +5334,7 @@ index fc832eb..2d5755c 100644
  		if ((prevNumSelectedObjects!=NumSelectedObjects) && ((prevNumSelectedObjects<3) || (NumSelectedObjects<3)))
  		{
  			if ((UseToolbar) && (Toolbox) &&(Toolbox->Toolbar)) {Toolbox->Toolbar->ConfigureToolbar();}
-@@ -795,13 +1278,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -795,13 +1292,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			tmpDrawing->PaintDrawing(&bitmapDC,ViewZoom,(MovingStartX/10-ViewX)*ViewZoom/100,(MovingStartY/10-ViewY)*ViewZoom/100,-1,-1);
  		}
@@ -5337,7 +5351,7 @@ index fc832eb..2d5755c 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1122,11 +1607,13 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1122,11 +1621,13 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					lasttillen=tillen;
  					bitmapDC.SelectClipRgn(NULL);
@@ -5351,7 +5365,7 @@ index fc832eb..2d5755c 100644
  				}
  
  				int RelativeX=TillenRelativeX+(ds->absolute_X-vX)*Tillens.Zoom/100;
-@@ -1198,6 +1685,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1198,6 +1699,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			if (myrgn) 
  			{
  				bitmapDC.SelectClipRgn(NULL);
@@ -5359,7 +5373,7 @@ index fc832eb..2d5755c 100644
  				delete myrgn;
  			}
  
-@@ -1229,6 +1717,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1229,6 +1731,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				CRgn myrgn;
  				myrgn.CreateRectRgn(RegionX,RegionY,RegionX+RegionW,RegionY+RegionH);
  				bitmapDC.SelectClipRgn(&myrgn);
@@ -5367,7 +5381,7 @@ index fc832eb..2d5755c 100644
  
  
  				ds=TheDocument;
-@@ -1264,6 +1753,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1264,6 +1767,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  					}
  				}
  				bitmapDC.SelectClipRgn(NULL);
@@ -5375,7 +5389,7 @@ index fc832eb..2d5755c 100644
  			}
  
  
-@@ -1279,6 +1769,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1279,6 +1783,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_MASKPEN);
  			int xx=PreopenDrawingToolboxX-ToolboxSize;
  			int yy=PreopenDrawingToolboxY-ToolboxSize;
@@ -5383,7 +5397,7 @@ index fc832eb..2d5755c 100644
  			CPen pen1;
  			CBrush brush1;
  			brush1.CreateSolidBrush(RGB(240,240,255));
-@@ -1290,9 +1781,10 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1290,9 +1795,10 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.MoveTo(xx+2*ToolboxSize/3+3,yy);bitmapDC.LineTo(xx+2*ToolboxSize/3+3,yy+ToolboxSize+5);
  			bitmapDC.MoveTo(xx,yy+ToolboxSize/3+1);bitmapDC.LineTo(xx+ToolboxSize+5,yy+ToolboxSize/3+1);
  			bitmapDC.MoveTo(xx,yy+2*ToolboxSize/3+3);bitmapDC.LineTo(xx+ToolboxSize+5,yy+2*ToolboxSize/3+3);
@@ -5395,7 +5409,7 @@ index fc832eb..2d5755c 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1841,68 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1855,68 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -5464,7 +5478,7 @@ index fc832eb..2d5755c 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +1994,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +2008,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -5473,7 +5487,7 @@ index fc832eb..2d5755c 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +2341,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1795,6 +2355,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -5502,7 +5516,7 @@ index fc832eb..2d5755c 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2051,7 +2619,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -2051,7 +2633,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  		//ds->absolute_Y=AbsoluteY;
  		//ds->Type=1; //expression
  		ds->Object=(CObject*)new CExpression(NULL,NULL,DefaultFontSize);
@@ -5511,7 +5525,7 @@ index fc832eb..2d5755c 100644
  		{
  			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
  			//((CExpression*)(ds->Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -2169,12 +2737,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2751,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -5527,7 +5541,7 @@ index fc832eb..2d5755c 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2751,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2765,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -5539,7 +5553,7 @@ index fc832eb..2d5755c 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2765,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2779,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -5552,7 +5566,7 @@ index fc832eb..2d5755c 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2238,6 +2811,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2238,6 +2825,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  
  void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  {
@@ -5560,7 +5574,7 @@ index fc832eb..2d5755c 100644
  	PaintDrawingHotspot(1);
  	SelectedTab=0;
  	if (Tillens.Show) {Tillens.Show=0;InvalidateRect(NULL,1);}
-@@ -2300,7 +2874,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+@@ -2300,7 +2888,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  		ViewX=nPos;
  		if (ViewX<0) ViewX=0;
  		InvalidateRect(NULL,0);
@@ -5569,7 +5583,7 @@ index fc832eb..2d5755c 100644
  	}
  	if (nSBCode==SB_THUMBTRACK)
  	{
-@@ -2722,7 +3296,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
+@@ -2722,7 +3310,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
  		if ((IsDrawingMode<10) || (IsDrawingMode>13)) //not for rasters (linear and logaritmic)
  		if ((IsDrawingMode<18) || (IsDrawingMode>26)) //not for section line, Okay, ?, !, X and diagonals
  		{
@@ -5578,7 +5592,7 @@ index fc832eb..2d5755c 100644
  			
  			int w=SelectedLineWidth*ViewZoom/100;
  			int dot_shape=1;
-@@ -2812,6 +3386,76 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +3400,76 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -5655,7 +5669,7 @@ index fc832eb..2d5755c 100644
  
  	try
  	{
-@@ -3338,6 +3982,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3338,6 +3996,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -5663,7 +5677,7 @@ index fc832eb..2d5755c 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +4082,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +4096,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -5676,7 +5690,7 @@ index fc832eb..2d5755c 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +4204,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +4218,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
@@ -5684,7 +5698,7 @@ index fc832eb..2d5755c 100644
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +4257,65 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +4271,65 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -5778,7 +5792,7 @@ index fc832eb..2d5755c 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4103,6 +4782,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4103,6 +4796,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  	if (MouseWheelDelta>=120)
  	{
@@ -5786,7 +5800,7 @@ index fc832eb..2d5755c 100644
  		MouseWheelDelta=0;
  		//zoom increasing
  
-@@ -4127,6 +4807,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4127,6 +4821,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  	}
  	if (MouseWheelDelta<=-120)
  	{
@@ -5794,7 +5808,7 @@ index fc832eb..2d5755c 100644
  		MouseWheelDelta=0;
  
  		if (ViewZoom>=480) ViewZoom=400;
-@@ -4169,31 +4850,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4864,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -5827,7 +5841,7 @@ index fc832eb..2d5755c 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4201,6 +4858,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4201,6 +4872,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  void CMathomirView::OnZoom40()
  {
@@ -5835,7 +5849,7 @@ index fc832eb..2d5755c 100644
  	ViewZoom=40;
  	RepaintTheView(1);
  
-@@ -4208,6 +4866,7 @@ void CMathomirView::OnZoom40()
+@@ -4208,6 +4880,7 @@ void CMathomirView::OnZoom40()
  
  void CMathomirView::OnZoom60()
  {
@@ -5843,7 +5857,7 @@ index fc832eb..2d5755c 100644
  	ViewZoom=60;
  	RepaintTheView(1);
  }
-@@ -4326,7 +4985,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4326,7 +4999,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  	//prevViewZoom=ViewZoom;
  
  
@@ -5853,7 +5867,7 @@ index fc832eb..2d5755c 100644
  	SetScrollRange(SB_VERT,0,ViewMaxY,0);
  	SetScrollPos(SB_HORZ,ViewX,1);
  	SetScrollPos(SB_VERT,ViewY,1);
-@@ -4341,24 +5001,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4341,24 +5015,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  
  void CMathomirView::OnZoom80()
  {
@@ -5882,7 +5896,7 @@ index fc832eb..2d5755c 100644
  	ViewZoom=240;
  	RepaintTheView(1);
  }
-@@ -4373,6 +5037,7 @@ UINT prevChar;
+@@ -4373,6 +5051,7 @@ UINT prevChar;
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -5890,7 +5904,7 @@ index fc832eb..2d5755c 100644
  	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
  	//initial keyboard testing (determining key codes when the shift key is used)
  	//if (keystringmode==2) {keystring3[keystringcnt++]=nChar;return;}
-@@ -4457,6 +5122,19 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +5136,19 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -5910,7 +5924,7 @@ index fc832eb..2d5755c 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +5150,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +5164,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -5918,7 +5932,7 @@ index fc832eb..2d5755c 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5168,7 +5845,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5168,7 +5859,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  						short l,a=0,b;
  						//TheDocument[NumDocumentElements-1].Type=1;
  						TheDocument[NumDocumentElements-1].Object=(CObject*)(new CExpression(NULL,NULL,DefaultFontSize));
@@ -5927,7 +5941,7 @@ index fc832eb..2d5755c 100644
  						{
  							((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSize=RootObjectFontSize;
  							//((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -5360,7 +6037,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +6051,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -5936,7 +5950,7 @@ index fc832eb..2d5755c 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +6091,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +6105,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -5953,7 +5967,7 @@ index fc832eb..2d5755c 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +6130,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +6144,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -5982,7 +5996,7 @@ index fc832eb..2d5755c 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +6221,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +6235,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -5991,7 +6005,7 @@ index fc832eb..2d5755c 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6332,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6346,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -6043,7 +6057,7 @@ index fc832eb..2d5755c 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5793,7 +6450,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5793,7 +6464,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  							fcolor=Toolbox->GetUniformFormattingColor();
  						}
  						int inserting_position=tmp->m_Selection-1;
@@ -6054,7 +6068,7 @@ index fc832eb..2d5755c 100644
  						{
  							QuickTypeUsed=2;
  							LastQuickTypeObject=ds;
-@@ -5836,7 +6495,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6509,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -6063,7 +6077,7 @@ index fc832eb..2d5755c 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6777,23 @@ unsigned int prevTimerTickTime;
+@@ -6118,6 +6791,19 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -6079,15 +6093,11 @@ index fc832eb..2d5755c 100644
 +        int phase=(GetTickCount()-SafePrintWarningSince)/250;
 +        if(phase!=SafePrintWarningPhase){SafePrintWarningPhase=phase;CRect banner(18,8,390,34);InvalidateRect(banner,FALSE);}
 +    }
-+	if (nIDEvent!=0xFFFF && !FunctionHelpVisible && !FunctionHelpText.IsEmpty() &&
-+        MouseMode==0 && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing && GetTickCount()-FunctionHelpSince>=450)
-+    {
-+        FunctionHelpVisible=true; InvalidateRect(NULL,FALSE);
-+    }
++    // Function references use the native canvas tooltip, shared with object help.
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +7234,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +7244,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -6122,7 +6132,7 @@ index fc832eb..2d5755c 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +8255,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +8265,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -6137,7 +6147,7 @@ index fc832eb..2d5755c 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8790,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -8112,23 +8800,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -6165,7 +6175,7 @@ index fc832eb..2d5755c 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +9243,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +9253,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -6176,7 +6186,7 @@ index fc832eb..2d5755c 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +10090,1022 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +10100,1010 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -6845,18 +6855,6 @@ index fc832eb..2d5755c 100644
 +
 +void CMathomirView::PaintRotationHandle(CDC *dc)
 +{
-+    if (FunctionHelpVisible && !FunctionHelpText.IsEmpty() && MouseMode==0 && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing)
-+    {
-+        int saved=dc->SaveDC(); dc->SelectObject(GetStockObject(DEFAULT_GUI_FONT));
-+        dc->SetTextAlign(TA_LEFT|TA_TOP); dc->SetTextColor(RGB(30,30,30)); dc->SetBkMode(TRANSPARENT);
-+        CRect box(0,0,390,0); ::DrawTextW(dc->GetSafeHdc(),FunctionHelpText,FunctionHelpText.GetLength(),&box,DT_CALCRECT|DT_WORDBREAK|DT_NOPREFIX);
-+        int w=box.Width()+16, h=box.Height()+16;
-+        int x=max(0,min(FunctionHelpPoint.x+18,TheClientRect.right-w));
-+        int y=max(0,min(FunctionHelpPoint.y+24,TheClientRect.bottom-h));
-+        box.SetRect(x,y,x+w,y+h); dc->FillSolidRect(box,RGB(255,255,225)); dc->Draw3dRect(box,RGB(110,110,110),RGB(110,110,110));
-+        box.DeflateRect(8,8); ::DrawTextW(dc->GetSafeHdc(),FunctionHelpText,FunctionHelpText.GetLength(),&box,DT_WORDBREAK|DT_NOPREFIX); dc->RestoreDC(saved);
-+    }
-+
 +    if (ViewOnlyMode || IsDrawingMode || FreePlacementGesture) return;
 +    tDocumentStruct *hover=ResizeHandleDocument();
 +    if(hover && !ViewOnlyMode && !IsDrawingMode && !PrintRendering)
@@ -7199,7 +7197,7 @@ index fc832eb..2d5755c 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +11118,138 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +11116,138 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -7338,7 +7336,7 @@ index fc832eb..2d5755c 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +11266,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +11264,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -7346,7 +7344,7 @@ index fc832eb..2d5755c 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11944,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11942,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -7382,7 +7380,7 @@ index fc832eb..2d5755c 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11978,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +11976,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -7390,7 +7388,7 @@ index fc832eb..2d5755c 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +12093,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +12091,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -7398,7 +7396,7 @@ index fc832eb..2d5755c 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12499,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12497,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -7406,7 +7404,7 @@ index fc832eb..2d5755c 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12800,793 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12798,793 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -9367,7 +9365,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..a6132a7 100644
+index b9c3f38..b6e9339 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -9896,13 +9894,14 @@ index b9c3f38..a6132a7 100644
  			}
  			else
  			{
-@@ -4135,16 +4158,31 @@ finish_toolbox_mousemove:
+@@ -4135,16 +4158,32 @@ finish_toolbox_mousemove:
  			strcat(buff,ToolboxKeycodes[i].name);
  			if (key&0x400) {strcpy(buff,"\'");strcat(buff,ToolboxKeycodes[i].name);strcat(buff,"\'");}
  		}
 -		this->ShowHelptext(text,command,buff,easycast,langid);
 +        if(ScalarFunctions::Known(command)){text=(char*)ScalarFunctions::Description(command);langid=0;}
-+        if(help_element>=0 && text[0]==0 && ToolboxMembers[help_element].Above[help_subelement]!=-1)
++        if(help_element>=0 && text[0]==0 && ToolboxMembers[help_element].Above[help_subelement]!=-1 &&
++            (command[0]==0 || ToolboxMembers[help_element].Submembers[help_subelement]->m_NumElements!=1 || ToolboxMembers[help_element].Submembers[help_subelement]->m_pElementList->Type>=3))
 +            SetHoverHelp(FeatureExpressionHelp(ToolboxMembers[help_element].Submembers[help_subelement]));
 +        // Preserve a descriptive expression label when only a shortcut or command is available.
 +        if(text[0] || m_PendingHelp.empty())this->ShowHelptext(text,command,buff,easycast,langid);
@@ -9931,7 +9930,7 @@ index b9c3f38..a6132a7 100644
  }
  
  #pragma optimize("s",on)
-@@ -5658,8 +5696,8 @@ int CToolbox::LoadSettings(char * filename)
+@@ -5658,8 +5697,8 @@ int CToolbox::LoadSettings(char * filename)
  		fread(&ForceHighQualityImage,sizeof(int),1,fil);
  		fread(&ForceHalftoneImage,sizeof(int),1,fil);
  		fread(&DefaultFontSize,sizeof(int),1,fil);
@@ -9942,7 +9941,7 @@ index b9c3f38..a6132a7 100644
  		fread(&MovingDotSize,sizeof(int),1,fil);
  		fread(&MovingDotPermanent,sizeof(int),1,fil);
  		fread(&GRID,sizeof(int),1,fil);
-@@ -5853,6 +5891,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5853,6 +5892,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  unsigned int DoublestrokesTimer;
  CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  {
@@ -10042,7 +10041,7 @@ index b9c3f38..a6132a7 100644
  	//first we check for double-strokes
  	int l2=*len;
  	if (l2<1) return NULL;
-@@ -5896,7 +6027,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+@@ -5896,7 +6028,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  			char *keycode=&ToolboxMembers[i].Keycodes[j][0];
  
  			int l=(int)strlen(keycode);
@@ -10051,7 +10050,7 @@ index b9c3f38..a6132a7 100644
  
  			if (memcmp(keystrokes+l2-l,keycode,l)==0)
  			{
-@@ -5943,102 +6074,24 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
+@@ -5943,102 +6075,24 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
  
  
  int prev_lang_code;
@@ -10171,7 +10170,7 @@ index b9c3f38..a6132a7 100644
  }
  
  extern int CalcStructuralChecksumOnly;
-@@ -6063,6 +6116,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6063,6 +6117,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
@@ -10187,7 +10186,7 @@ index b9c3f38..a6132a7 100644
  	if (ToolboxMembers[member].Above[submember]==-1) //drawing element
  	{
  		if (ToolboxMembers[member].userdef_mask&(1<<submember))
-@@ -6078,6 +6140,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6078,6 +6141,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  		else
  		{
  			IsDrawingMode=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;
