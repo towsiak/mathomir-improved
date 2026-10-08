@@ -8460,7 +8460,7 @@ index 0000000..bebbe21
 +}
 diff --git a/Mathomir/SymbolicDerivative.h b/Mathomir/SymbolicDerivative.h
 new file mode 100644
-index 0000000..f70504e
+index 0000000..0e05c34
 --- /dev/null
 +++ b/Mathomir/SymbolicDerivative.h
 @@ -0,0 +1,239 @@
@@ -8696,7 +8696,7 @@ index 0000000..f70504e
 +        else {std::string name=a->name=="asin"?"arcsin":a->name=="acos"?"arccos":a->name=="atan"?"arctan":a->name;s="<fun t=\""+name+"\" f=\"20\" E1=\"\"><ex br=\"1\">"+Xml(a->a)+"</ex></fun>";}
 +    }else {bool coefficient=a->op=='*' && a->a->op=='n' && (a->b->op=='v'||a->b->op=='f'||(a->b->op=='^'&&a->b->a->op!='n')||Precedence(a->b)==1);
 +        s=Xml(a->a,Precedence(a))+(coefficient?std::string():"<opr s=\""+(a->op=='*'?std::string("\xD7"):std::string(1,a->op))+"\" />")+Xml(a->b,a->op=='-'?2:Precedence(a));}
-+    if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="<elm tp=\"5\" E1=\"\"><ex br=\"1\">"+s+"</ex></elm>";return s;
++    if(Precedence(a)<parent || (a->op=='n'&&parent>2&&(a->number<0||Number(a->number).find_first_of("eE")!=std::string::npos)))s="<elm tp=\"5\" E1=\"\"><ex br=\"1\">"+s+"</ex></elm>";return s;
 +}
 +inline std::string Equation(const Result &r){std::string top="<fun t=\"d\" f=\"20\"";if(r.order>1)top+=" E2=\"\"";top+=" E1=\"\"><ex br=\"1\">"+Xml(r.original)+"</ex>";if(r.order>1)top+="<ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex>";top+="</fun>";
 +    std::string bottom="<fun t=\"d\" f=\"20\" E1=\"\"><ex><var t=\""+r.variable+"\" f=\"00\" />";if(r.order>1)bottom="<fun t=\"d\" f=\"20\" E1=\"\"><ex><elm tp=\"3\" E1=\"\" E2=\"\"><ex><var t=\""+r.variable+"\" f=\"00\" /></ex><ex><var t=\""+Number(r.order)+"\" f=\"00\" /></ex></elm>";bottom+="</ex></fun>";

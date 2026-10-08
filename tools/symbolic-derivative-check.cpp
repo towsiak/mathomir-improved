@@ -39,6 +39,7 @@ int main(){
     assert(polishedXml.find("<fun t=\"d\" f=\"20\" E1=\"\"><ex br=\"1\">")!=std::string::npos);
     assert(r.Find("2*3^x","x",1,e));assert(Xml(r.derivative).find("<opr s=\"\xD7\" />")!=std::string::npos);Check("2*3^x",2,18*std::log(3.));
     assert(r.Find("1e20*x","x",1,e));assert(Xml(r.derivative).find("1e+20")==std::string::npos);assert(Xml(r.derivative).find("<var t=\"10\" f=\"00\" />")!=std::string::npos);
+    Parser scientific;assert(Xml(scientific.Parse("1e20^x")).find("<ex><elm tp=\"5\" E1=\"\"><ex br=\"1\">")!=std::string::npos);
     assert(r.Find("ln(2x)","x",1,e));assert(!r.At(0,value,e));assert(!r.At(-1,value,e));
     assert(r.Find("x/(x+1)","x",1,e));assert(!r.At(-1,value,e));
     Check("sqrt(x^2+1)",2,2/std::sqrt(5.));Check("(x^2+1)/(x+1)",2,7./9);Check("1/(3x)",2,-1./12);
