@@ -89,6 +89,7 @@ public static class MathomirUiProbe {
   public static int GraphLegendPixels(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=126;y<176;y++)for(int x=156;x<190;x++){uint color=GetPixel(dc,x,y);if((color&255)+((color>>8)&255)+((color>>16)&255)<650)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int RedOverlay(IntPtr hwnd){IntPtr dc=GetDC(hwnd);try{int count=0;for(int y=190;y<240;y++)for(int x=195;x<290;x++){uint c=GetPixel(dc,x,y);if((c&255)>150 && ((c>>8)&255)<80 && ((c>>16)&255)<80)count++;}return count;}finally{ReleaseDC(hwnd,dc);}}
   public static int MoveGripY(IntPtr hwnd,int x) { IntPtr dc=GetDC(hwnd); try { int first=-1,last=-1; for(int y=20;y<190;y++) if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;} if(first<0) throw new Exception("Move grip was not painted at the object's upper-left"); return (first+last)/2; } finally {ReleaseDC(hwnd,dc);} }
+  public static int[] MoveGripNear(IntPtr hwnd,int cx,int cy) {IntPtr dc=GetDC(hwnd);try{for(int y=Math.Max(10,cy-70);y<=cy+30;y++)for(int x=cx-15;x<=cx+15;x++){bool cross=true;for(int k=-6;k<=6;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D || GetPixel(dc,x,y+k)!=0x009B5F2D){cross=false;break;}if(cross)return new int[]{x,y};}throw new Exception("Annotation move grip disappeared near "+cx+","+cy);}finally{ReleaseDC(hwnd,dc);}}
   public static int[] GripNear(IntPtr hwnd,int cx,int cy,bool delete){IntPtr dc=GetDC(hwnd);try{if(delete){int x0=99999,y0=99999,x1=-1,y1=-1;for(int y=cy-25;y<=cy+25;y++)for(int x=cx-15;x<=cx+15;x++)if(GetPixel(dc,x,y)==0x002D2DB4){x0=Math.Min(x0,x);y0=Math.Min(y0,y);x1=Math.Max(x1,x);y1=Math.Max(y1,y);}if(x1>=0)return new int[]{(x0+x1)/2,(y0+y1)/2};}else{for(int y=cy-20;y<=cy+20;y++)for(int x=cx-20;x<=cx+20;x++){bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};}}throw new Exception("Object grip was not visible near "+cx+","+cy);}finally{ReleaseDC(hwnd,dc);}}
   public static bool SizeGripAt(IntPtr hwnd,int x,int y) { IntPtr dc=GetDC(hwnd); try { for(int k=-6;k<=6;k++) if(GetPixel(dc,x+k,y-6)!=0x009B5F2D) return false; return true; }finally{ReleaseDC(hwnd,dc);} }
   public static int[] SizeGrip(IntPtr hwnd) { IntPtr dc=GetDC(hwnd); try { for(int y=130;y<300;y++) for(int x=110;x<290;x++) {bool line=true;for(int k=0;k<13;k++)if(GetPixel(dc,x+k,y)!=0x009B5F2D){line=false;break;}if(line)return new int[]{x+6,y+6};} throw new Exception("Size grip square was not painted");}finally{ReleaseDC(hwnd,dc);} }
@@ -1609,6 +1610,74 @@ try {
     if($restoredTyped.mathomir.ChildNodes.Count -ne 2){throw 'Undo did not restore the typed object deleted with its grip.'}
   }
   Write-Output 'Graph grips passed: ordinary/piecewise enlargement, repeated drag stability, unchanged coordinate bounds and definitions, Undo, and lower-left deletion for graphs, math and text.'
+
+  # Interaction tests, not just static visibility: annotations precede graphs
+  # in hit-testing even if the graph was created later.
+  $overlapAxes=@('-5','5','-5','5')|ForEach-Object {'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
+  $overlapGraph='<o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($overlapAxes -join '')+'<subexp d="0,0;4000,1000"><ex fh="100"><var t="x" f="00" /></ex></subexp></o>'
+  foreach($textMode in @($false,$true)){
+    foreach($graphLast in @($false,$true)){
+      foreach($zoomCase in @(@{zoom=60;command=32777},@{zoom=100;command=32775},@{zoom=200;command=33019})){
+        $overlapFixture=Join-Path (Split-Path $exe) ("overlap-drag-$textMode-$graphLast-$($zoomCase.zoom).mom")
+        $textFlag=if($textMode){' stxt="1"'}else{''}
+        $annotation='<o t="1" X="200" Y="220"><ex fh="100"'+$textFlag+'><var t="overlay note" f="00" color="1" /></ex></o>'
+        $objects=if($graphLast){$annotation+$overlapGraph}else{$overlapGraph+$annotation}
+        ('<?xml version="1.0"?><mathomir>'+$objects+'</mathomir>')|Set-Content $overlapFixture -Encoding ascii
+        [MathomirUiProbe]::OpenFile($main,$overlapFixture);Start-Sleep -Milliseconds 300
+        [MathomirUiProbe]::Send($view,273,$zoomCase.command)|Out-Null
+        [MathomirUiProbe]::Send($view,276,4)|Out-Null
+        for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
+        Start-Sleep -Milliseconds 900
+        $scale=$zoomCase.zoom/100.0
+        [MathomirUiProbe]::Mouse($view,512,0,([int](225*$scale)),([int](215*$scale)))
+        Start-Sleep -Milliseconds 100
+        $move=[MathomirUiProbe]::MoveGripNear($view,([int](200*$scale)-12),([int](220*$scale)-25))
+        # This point is just outside the old 9-pixel grip hitbox, in the gap
+        # between the annotation and its handle, and still inside the graph.
+        [MathomirUiProbe]::Mouse($view,512,0,($move[0]+10),($move[1]+10))
+        Start-Sleep -Milliseconds 100
+        $stableMove=[MathomirUiProbe]::MoveGripNear($view,$move[0],($move[1]+25))
+        if($stableMove[0] -ne $move[0] -or $stableMove[1] -ne $move[1]){throw 'Crossing the approach gap switched object controls.'}
+        [MathomirUiProbe]::Mouse($view,512,0,$move[0],$move[1])
+        [MathomirUiProbe]::Mouse($view,513,1,$move[0],$move[1])
+        $dx=[int](30*$scale);$dy=[int](20*$scale)
+        [MathomirUiProbe]::Mouse($view,512,1,($move[0]+$dx),($move[1]+$dy))
+        [MathomirUiProbe]::Mouse($view,514,0,($move[0]+$dx),($move[1]+$dy))
+        [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+        [xml]$overlapSaved=Get-Content $overlapFixture -Raw
+        $movedLabel=$overlapSaved.SelectSingleNode('/mathomir/*[@t="1" or @type="1"]')
+        $untouchedGraph=$overlapSaved.SelectSingleNode('/mathomir/*[*[self::dw or self::draw][@spec="51"]]')
+        if($movedLabel.X -ne '230' -or $movedLabel.Y -ne '240'){Write-Output $overlapSaved.OuterXml;throw "Overlapping annotation failed to move at zoom $($zoomCase.zoom), text=$textMode, graph-last=$graphLast"}
+        if($untouchedGraph.X -ne '100' -or $untouchedGraph.Y -ne '100' -or ((Get-GraphRange $overlapSaved) -join ',') -ne '-5,5,-5,5'){throw 'Moving an annotation moved or zoomed its background graph.'}
+        [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
+        [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+        [xml]$overlapUndo=Get-Content $overlapFixture -Raw
+        $restoredLabel=$overlapUndo.SelectSingleNode('/mathomir/*[@t="1" or @type="1"]')
+        if($restoredLabel.X -ne '200' -or $restoredLabel.Y -ne '220'){throw 'Undo did not restore the overlapping label.'}
+      }
+      # A direct click over the graph's plus button must belong to the label.
+      $coveredFixture=Join-Path (Split-Path $exe) ("overlap-control-$textMode-$graphLast.mom")
+      $annotation='<o t="1" X="154" Y="115"><ex fh="100"'+$textFlag+'><var t="overlay note" f="00" color="1" /></ex></o>'
+      $objects=if($graphLast){$annotation+$overlapGraph}else{$overlapGraph+$annotation}
+      ('<?xml version="1.0"?><mathomir>'+$objects+'</mathomir>')|Set-Content $coveredFixture -Encoding ascii
+      [MathomirUiProbe]::OpenFile($main,$coveredFixture);Start-Sleep -Milliseconds 300
+      [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+      [MathomirUiProbe]::Send($view,276,4)|Out-Null
+      for($page=0;$page -lt 10;$page++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
+      Start-Sleep -Milliseconds 900
+      [MathomirUiProbe]::Mouse($view,512,0,350,300)
+      # Deliberately omit a mouse-move to the click coordinate.
+      [MathomirUiProbe]::Mouse($view,513,1,161,110)
+      [MathomirUiProbe]::Mouse($view,514,0,161,110)
+      [MathomirUiProbe]::Send($view,258,27)|Out-Null
+      [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+      [xml]$coveredSaved=Get-Content $coveredFixture -Raw
+      if(((Get-GraphRange $coveredSaved) -join ',') -ne '-5,5,-5,5'){Write-Output $coveredSaved.OuterXml;throw 'Graph plus button stole a click from overlapping text.'}
+      if($coveredSaved.mathomir.ChildNodes.Count -ne 2){throw 'Clicking overlapping text created or deleted an object.'}
+    }
+  }
+  [MathomirUiProbe]::Send($view,273,32775)|Out-Null
+  Write-Output 'Overlap interaction checks passed: math/text labels, both creation orders, 60/100/200 percent zoom, approach-gap handle stability, drag/save/Undo, and direct clicks over graph controls.'
 
 
 
