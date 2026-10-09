@@ -143,7 +143,7 @@ try {
   Blank "grip-$style"
   '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="150"><ex><var t="x123456" f="00" /></ex></o></mathomir>'|Set-Content $fixture -Encoding ascii
   [GridUI]::Open($main,$fixture);Start-Sleep -Milliseconds 250;Grid $style 1
-  foreach($x in 105..120){[GridUI]::Mouse($view,512,0,$x,140)}
+  for($x=105;$x -le 190;$x+=5){[GridUI]::Mouse($view,512,0,$x,150)};Start-Sleep -Milliseconds 400
   $y=[GridUI]::MoveGripY($view,88);[GridUI]::Mouse($view,512,0,88,$y);[GridUI]::Mouse($view,513,1,88,$y);[GridUI]::Mouse($view,512,1,119,($y-7));[GridUI]::Mouse($view,514,0,119,($y-7));[GridUI]::Send($main,273,0xE103)|Out-Null
   [xml]$moved=Get-Content $fixture -Raw;$o=$moved.SelectSingleNode('/mathomir/*[self::o or self::obj][1]');$xy=[GridUI]::Expected($style,131,143,3);Write-Host "Grip grid ${style}: $($o.X),$($o.Y)";Check ([int]$o.X -eq $xy[0] -and [int]$o.Y -eq $xy[1]) "Move grip did not use grid $style"
  }
