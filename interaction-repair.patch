@@ -1503,10 +1503,10 @@ index 36238b0..5ad0c9a 100644
  	int SetColor(int color);
 diff --git a/Mathomir/FeatureHelp.h b/Mathomir/FeatureHelp.h
 new file mode 100644
-index 0000000..b25eaf4
+index 0000000..f6eada4
 --- /dev/null
 +++ b/Mathomir/FeatureHelp.h
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,76 @@
 +#pragma once
 +#include "Resource.h"
 +#include "MathDisplay.h"
@@ -1537,6 +1537,14 @@ index 0000000..b25eaf4
 +        if(text.empty()){::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts.erase(id);hoverKey=0;return;}
 +        if(hoverKey==key && texts[id]==text){info.rect=area;::SendMessageW(window,TTM_NEWTOOLRECTW,0,(LPARAM)&info);return;}
 +        ::SendMessageW(window,TTM_DELTOOLW,0,(LPARAM)&info);texts[id]=text;hoverKey=key;info.uFlags=TTF_SUBCLASS;info.rect=area;info.lpszText=(LPWSTR)texts[id].c_str();::SendMessageW(window,TTM_ADDTOOLW,0,(LPARAM)&info);
++        // This tool can be registered inside the owner's first WM_MOUSEMOVE.
++        // Its new subclass has missed that message, so start the hover timer explicitly.
++        POINT screen={};if(::GetCursorPos(&screen)){POINT cursor=screen;::ScreenToClient(owner,&cursor);
++            if(::PtInRect(&area,cursor)){MSG message={};message.hwnd=owner;message.message=WM_MOUSEMOVE;
++                message.lParam=MAKELPARAM(cursor.x,cursor.y);message.time=::GetMessageTime();message.pt=screen;
++                ::SendMessage(window,TTM_RELAYEVENT,0,(LPARAM)&message);
++            }
++        }
 +    }
 +};
 +inline const char *FeatureControlHelp(int dialog,int id){
