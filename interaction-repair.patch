@@ -9957,7 +9957,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..edb27a9 100644
+index b9c3f38..3abc95a 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -10047,15 +10047,17 @@ index b9c3f38..edb27a9 100644
  		memset((void*)&ToolboxFontFormating,0,(size_t)sizeof(ToolboxFontFormating));
  		AddFontFormating(0,0,0,0); //sans-serif
  		AddFontFormating(0,0,1,0); //sans-serif, italic
-@@ -753,6 +787,7 @@ CToolbox::CToolbox(int IsSubtoolbox)
+@@ -753,6 +787,9 @@ CToolbox::CToolbox(int IsSubtoolbox)
  	if (IsSubtoolbox==0)
  	{
  		LoadSettings(NULL);
++        // Modern grid preferences take precedence over the legacy .set fields at startup.
++        LoadCanvasGridPreferences();
 +		PaperWidth=1200; PaperHeight=1553; // Startup default: US Letter portrait
  		//init symbolic calculator (to be called only once)
  		ToolboxMembers[0].Submembers[0]->InitCalculator();
  
-@@ -862,7 +897,43 @@ int CToolbox::AddDrawingSubmember(int form, int Cx, int Cy)
+@@ -862,7 +899,43 @@ int CToolbox::AddDrawingSubmember(int form, int Cx, int Cy)
  {
  	int member=ToolboxNumMembers;
  	ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers]=(CExpression*)new CDrawing();
@@ -10100,7 +10102,7 @@ index b9c3f38..edb27a9 100644
  	ToolboxMembers[member].Above[ToolboxMembers[member].NumSubmembers]=-1; //indicates that this is drawing
  	ToolboxMembers[member].NumSubmembers++;
  	return 0;
-@@ -1497,6 +1568,7 @@ extern int prevDrawingMode2;
+@@ -1497,6 +1570,7 @@ extern int prevDrawingMode2;
  #pragma optimize("s",on)
  void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
  {
@@ -10108,7 +10110,7 @@ index b9c3f38..edb27a9 100644
  	try
  	{
  		IsWindowOutOfFocus=0;
-@@ -1912,13 +1984,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1912,13 +1986,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
  				//ToolbarEditNodes=0;
  				pMainView->SetMousePointer();
  			}
@@ -10123,7 +10125,7 @@ index b9c3f38..edb27a9 100644
  			if (icon==8) pMainView->OnKeyDown(VK_F4,0,0);
  			if (((KeyboardEntryBaseObject) && (KeyboardEntryObject)) || ((NumSelectedObjects==1) && (NumSelectedDrawings==0)))
  			{
-@@ -1948,6 +2014,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1948,6 +2016,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
  					{
  						yes=1;
  						if (parent->m_IsVertical) parent->m_IsVertical=0; else parent->m_IsVertical=1;
@@ -10131,7 +10133,7 @@ index b9c3f38..edb27a9 100644
  					}
  					if (icon==19)
  					{
-@@ -2159,76 +2226,15 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2159,76 +2228,15 @@ void CToolbox::PaintColorbox(CDC * dc)
  
  	int t3=ToolboxSize/3;
  	int tmpy=max(0,ToolboxSize-60)/16;
@@ -10217,7 +10219,7 @@ index b9c3f38..edb27a9 100644
  
  	//painting the line sizes
  	len=ToolboxSize/6;
-@@ -2290,8 +2296,11 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2290,8 +2298,11 @@ void CToolbox::PaintColorbox(CDC * dc)
  	if (m_SelectedColor==0) this->ShowHelptext("black color","","Alt+B","",6070);
  	if (m_SelectedColor==1) this->ShowHelptext("red color","","Alt+R","",6071);
  	if (m_SelectedColor==2) this->ShowHelptext("green color","","Alt+G","",6072);
@@ -10231,7 +10233,7 @@ index b9c3f38..edb27a9 100644
  
  	if ((m_SelectedColor>=10) && (m_SelectedColor<=19)) this->ShowHelptext("line width","","","",6080);
  	if (m_SelectedColor==20) this->ShowHelptext("node edit","","Ctrl","",6090);
-@@ -3186,23 +3195,9 @@ int CToolbox::PaintToolbar(CDC *dc)
+@@ -3186,23 +3197,9 @@ int CToolbox::PaintToolbar(CDC *dc)
  
  void CToolbox::ToolbarShowHelp()
  {
@@ -10258,7 +10260,7 @@ index b9c3f38..edb27a9 100644
  }
  
  void AddToolbarOption(unsigned char icon_index, unsigned char icon_state, unsigned char pixel_len, unsigned char pixel_separator)
-@@ -3516,6 +3511,8 @@ int prevKeyboardElement=-1;
+@@ -3516,6 +3513,8 @@ int prevKeyboardElement=-1;
  int prevToolbarItem=-1;
  void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -10267,7 +10269,7 @@ index b9c3f38..edb27a9 100644
  	try
  	{
  	
-@@ -3642,7 +3639,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3642,7 +3641,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			else
  				m_IsArrowSelected=0;
  			m_SelectedElement=-1;
@@ -10276,7 +10278,7 @@ index b9c3f38..edb27a9 100644
  
  			if ((ClipboardExpression==NULL) && (ClipboardDrawing==NULL))
  				if (m_FontModeElement!=prevFontElement)
-@@ -3659,7 +3656,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3659,7 +3658,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (m_FontModeElement!=-1)
  			{
  				m_FontModeElement=-1;
@@ -10285,7 +10287,7 @@ index b9c3f38..edb27a9 100644
  			}
  
  			point.y-=ToolboxSize/2; //subsctract the header size
-@@ -3679,13 +3676,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3679,13 +3678,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				if (Xres+Yres>=-ToolboxSize/5-3)
  				{
  					//the mouse is pointing at subtoolbox opening arrow
@@ -10301,7 +10303,7 @@ index b9c3f38..edb27a9 100644
  					m_IsArrowSelected=0;
  				}
  				
-@@ -3709,8 +3706,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3709,8 +3708,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				//color box
  				if (y<ToolboxSize/3) //selecting color
  				{
@@ -10312,7 +10314,7 @@ index b9c3f38..edb27a9 100644
  				}
  				else if (y<2*ToolboxSize/3) //selecting line width
  				{
-@@ -3724,7 +3721,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3724,7 +3723,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				}
  				else
  					m_SelectedColor=-1;
@@ -10321,7 +10323,7 @@ index b9c3f38..edb27a9 100644
  			}
  			else
  			{
-@@ -3747,7 +3744,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3747,7 +3746,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  					else if (point.x<2*ToolboxSize/3) m_SelectedTextControl=3;
  					else m_SelectedTextControl=4;
  				}
@@ -10330,7 +10332,7 @@ index b9c3f38..edb27a9 100644
  			}
  
  		}
-@@ -3771,13 +3768,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3771,13 +3770,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (Xres+Yres<=ToolboxSize/5-1)
  			{
  				//the mouse is pointing at subtoolbox opening arrow
@@ -10346,7 +10348,7 @@ index b9c3f38..edb27a9 100644
  				m_IsArrowSelected=0;
  			}
  			
-@@ -3793,7 +3790,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3793,7 +3792,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			theApp.m_pMainWnd->SetActiveWindow();
  			element=m_SelectedElement=font_element;
  			m_IsArrowSelected=0;
@@ -10355,7 +10357,7 @@ index b9c3f38..edb27a9 100644
  		}
  	}
  	else if (m_IsSubtoolbox==-2)
-@@ -3804,7 +3801,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3804,7 +3803,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		m_IsArrowSelected=0;
  		if ((row==4) && (point.x>ToolboxSize*5)) m_IsArrowSelected=1;
  		font_element=m_SelectedElement=row*100+key;
@@ -10364,7 +10366,7 @@ index b9c3f38..edb27a9 100644
  	}
  	else if (m_IsSubtoolbox==-1)
  	{
-@@ -3818,7 +3815,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3818,7 +3817,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			//the mouse is pointing at the toolbox element
  			if (point.x>2*ToolboxSize+delta_center) m_IsArrowSelected=1; else m_IsArrowSelected=0;
  			m_SelectedElement=font_element;
@@ -10373,7 +10375,7 @@ index b9c3f38..edb27a9 100644
  		}
  	}
  	else if (m_IsContextMenu)
-@@ -3902,7 +3899,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3902,7 +3901,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				m_KeyboardElement=i;
  				element=i;
  				//ToolboxKeyboardElements.Key[i]->SelectExpression(1);
@@ -10382,7 +10384,7 @@ index b9c3f38..edb27a9 100644
  				break;
  			}
  		}
-@@ -3911,17 +3908,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3911,17 +3910,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		{
  			element=255;
  			if (AlternateVirtualKeyboard!=3) AlternateVirtualKeyboard=2;
@@ -10403,7 +10405,7 @@ index b9c3f38..edb27a9 100644
  		}
  	}
  	else if (m_IsToolbar)
-@@ -3979,7 +3976,7 @@ finish_toolbox_mousemove:
+@@ -3979,7 +3978,7 @@ finish_toolbox_mousemove:
  			(prevToolboxElement!=element))
  		{
  			m_SelectedElement=element;
@@ -10412,7 +10414,7 @@ index b9c3f38..edb27a9 100644
  		}
  		prevToolboxElement=element;
  
-@@ -3988,7 +3985,7 @@ finish_toolbox_mousemove:
+@@ -3988,7 +3987,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) m_FontModeElement=-1;
@@ -10421,7 +10423,7 @@ index b9c3f38..edb27a9 100644
  
  		}
  
-@@ -4005,14 +4002,14 @@ finish_toolbox_mousemove:
+@@ -4005,14 +4004,14 @@ finish_toolbox_mousemove:
  
  		if (prevSelectedTextControl>0)
  		{
@@ -10438,7 +10440,7 @@ index b9c3f38..edb27a9 100644
  		}
  		prevSelectedColor=m_SelectedColor;
  	}
-@@ -4036,7 +4033,7 @@ finish_toolbox_mousemove:
+@@ -4036,7 +4035,7 @@ finish_toolbox_mousemove:
  				(m_IsSubtoolbox==-4))
  			{
  				m_SelectedElement=element;
@@ -10447,7 +10449,7 @@ index b9c3f38..edb27a9 100644
  			}
  		}
  		prevSubtoolboxElement=element;
-@@ -4047,7 +4044,7 @@ finish_toolbox_mousemove:
+@@ -4047,7 +4046,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) {m_SelectedElement=-1;}
@@ -10456,7 +10458,7 @@ index b9c3f38..edb27a9 100644
  		}
  		
  		prevFontElement=font_element;
-@@ -4069,7 +4066,7 @@ finish_toolbox_mousemove:
+@@ -4069,7 +4068,7 @@ finish_toolbox_mousemove:
  		{
  
  			if (element==-1) {m_KeyboardElement=-1;}
@@ -10465,7 +10467,7 @@ index b9c3f38..edb27a9 100644
  		}
  		prevKeyboardElement=element;
  	}
-@@ -4080,7 +4077,7 @@ finish_toolbox_mousemove:
+@@ -4080,7 +4079,7 @@ finish_toolbox_mousemove:
  		int langid=6000;
  		char *text="";
  		char *easycast="";
@@ -10474,7 +10476,7 @@ index b9c3f38..edb27a9 100644
  		char *command="";
  		char buff[32];
  		strcpy(buff,"");
-@@ -4093,7 +4090,8 @@ finish_toolbox_mousemove:
+@@ -4093,7 +4092,8 @@ finish_toolbox_mousemove:
  			if (ToolboxMembers[help_element].Above[help_subelement]==-1)
  			{
  				CDrawing *drw=(CDrawing*)ToolboxMembers[help_element].Submembers[help_subelement];
@@ -10484,7 +10486,7 @@ index b9c3f38..edb27a9 100644
  				if (drw->OriginalForm==1) {text="Rectangle";langid=6009;}
  				if (drw->OriginalForm==2) {text="Line";langid=6010;}
  				if (drw->OriginalForm==4) {text="Ellipse";langid=6011;}
-@@ -4103,6 +4101,25 @@ finish_toolbox_mousemove:
+@@ -4103,6 +4103,25 @@ finish_toolbox_mousemove:
  				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
  				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
  				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
@@ -10510,7 +10512,7 @@ index b9c3f38..edb27a9 100644
  			}
  			else
  			{
-@@ -4135,16 +4152,32 @@ finish_toolbox_mousemove:
+@@ -4135,16 +4154,32 @@ finish_toolbox_mousemove:
  			strcat(buff,ToolboxKeycodes[i].name);
  			if (key&0x400) {strcpy(buff,"\'");strcat(buff,ToolboxKeycodes[i].name);strcat(buff,"\'");}
  		}
@@ -10546,7 +10548,7 @@ index b9c3f38..edb27a9 100644
  }
  
  #pragma optimize("s",on)
-@@ -5658,8 +5691,8 @@ int CToolbox::LoadSettings(char * filename)
+@@ -5658,8 +5693,8 @@ int CToolbox::LoadSettings(char * filename)
  		fread(&ForceHighQualityImage,sizeof(int),1,fil);
  		fread(&ForceHalftoneImage,sizeof(int),1,fil);
  		fread(&DefaultFontSize,sizeof(int),1,fil);
@@ -10557,7 +10559,7 @@ index b9c3f38..edb27a9 100644
  		fread(&MovingDotSize,sizeof(int),1,fil);
  		fread(&MovingDotPermanent,sizeof(int),1,fil);
  		fread(&GRID,sizeof(int),1,fil);
-@@ -5853,6 +5886,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5853,6 +5888,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  unsigned int DoublestrokesTimer;
  CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  {
@@ -10657,7 +10659,7 @@ index b9c3f38..edb27a9 100644
  	//first we check for double-strokes
  	int l2=*len;
  	if (l2<1) return NULL;
-@@ -5896,7 +6022,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+@@ -5896,7 +6024,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  			char *keycode=&ToolboxMembers[i].Keycodes[j][0];
  
  			int l=(int)strlen(keycode);
@@ -10666,7 +10668,7 @@ index b9c3f38..edb27a9 100644
  
  			if (memcmp(keystrokes+l2-l,keycode,l)==0)
  			{
-@@ -5943,102 +6069,43 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
+@@ -5943,102 +6071,43 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
  
  
  int prev_lang_code;
@@ -10805,7 +10807,7 @@ index b9c3f38..edb27a9 100644
  }
  
  extern int CalcStructuralChecksumOnly;
-@@ -6063,6 +6130,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6063,6 +6132,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
@@ -10821,7 +10823,7 @@ index b9c3f38..edb27a9 100644
  	if (ToolboxMembers[member].Above[submember]==-1) //drawing element
  	{
  		if (ToolboxMembers[member].userdef_mask&(1<<submember))
-@@ -6078,6 +6154,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6078,6 +6156,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  		else
  		{
  			IsDrawingMode=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;
