@@ -1,3 +1,14 @@
+Grid styles and independent snapping — 2026-10-08
+- Grid toolbar button opens a preview with dots, square lines, graph paper,
+  horizontal ruling, vertical ruling and isometric triangles.
+- Each style remembers its own snap on/off setting. Grid visibility is separate;
+  hiding the grid temporarily disables snapping. Alt bypasses snapping.
+- Horizontal ruling snaps only Y; vertical ruling snaps only X; isometric
+  snapping selects the nearest triangular vertex. Drawing, placement and moves
+  use the same grid. Spacing (5-80), color and preferences are remembered.
+- Gray, soft blue or green guides, validated inputs and tooltips on all controls.
+- Grid remains a screen guide. Existing document contents retain their positions.
+
 Object and palette tooltip correction — 2026-10-08
 - Floating hover help on placed math, text, diagrams, images, drawing boxes and graphs.
 - Floating help on all palette categories, symbols, shapes, constructor tools, colors,

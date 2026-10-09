@@ -107,3 +107,9 @@ New freehand curves use **standard smart smoothing** by default. **Draw > Smart 
 Portable checks: `tools/symbolic-derivative-check.cpp` and `tools/smart-stroke-check.cpp`, built with C++11 plus address/undefined-behavior sanitizers. Windows UI checks exercise the actual derivative palette button, higher orders, numeric/domain checks, native placement/reopening, smoothing levels, saved strokes and Undo.
 
 Direct operations: while editing a math object (or after selecting it), **Ctrl+Enter** appends an editable `= result`. A native derivative such as `d(x^2+sin(x)+ln(x))/d(x)` is evaluated with the new symbolic rules. Typed `d/dx` followed by a parenthesized argument is recognized too. **Ctrl+Shift+Enter** appends a numerical approximation with the native approximate-equality symbol, for example `e^(pi)-e` gives approximately `20.4224108043`. Approximation honors the document's RAD/DEG setting. Executing again updates the existing result rather than adding another equals sign; Undo restores the prior expression. Both commands are in the Calculus menu and feature search.
+
+## Grid styles and snapping
+
+Click **Grid…** on the toolbar or choose **Options > Grid and Guidelines > Grid styles and options**. Select dots, square lines, graph paper, horizontal or vertical ruling, or isometric triangles. The preview shows the selected lattice and its snap target. Each style remembers its own **Snap to this grid** checkbox. Set spacing from 5 to 80 and choose gray, soft blue or green.
+
+Horizontal ruling snaps only the vertical coordinate; vertical ruling snaps only the horizontal coordinate. Isometric mode snaps to the nearest triangle vertex. Hold **Alt** for temporary free placement. Hiding the grid temporarily disables snapping, while preserving each style’s checkbox. The grid is a screen guide; it is not inserted into the document or printed.

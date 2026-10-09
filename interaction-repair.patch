@@ -1,3 +1,65 @@
+diff --git a/Mathomir/CanvasGrid.h b/Mathomir/CanvasGrid.h
+new file mode 100644
+index 0000000..9780407
+--- /dev/null
++++ b/Mathomir/CanvasGrid.h
+@@ -0,0 +1,56 @@
++#pragma once
++#include <cmath>
++#include <algorithm>
++namespace CanvasGrid {
++enum Style { Dots, Square, GraphPaper, Horizontal, Vertical, Isometric, StyleCount };
++inline const char *Name(int style){static const char *names[]={"Dots","Square lines","Graph paper","Horizontal ruled lines","Vertical ruled lines","Isometric triangles"};return names[(std::max)(0,(std::min)(StyleCount-1,style))];}
++inline const char *Description(int style){static const char *text[]={
++    "Dots: snap both coordinates to the nearest dot.",
++    "Square lines: snap to the nearest horizontal/vertical intersection.",
++    "Graph paper: fine squares, with a stronger line every five cells. Snap to all intersections.",
++    "Horizontal ruled lines: snap vertically to a line; horizontal movement stays free.",
++    "Vertical ruled lines: snap horizontally to a line; vertical movement stays free.",
++    "Isometric triangles: 60 deg directions. Snap to the nearest triangle vertex."};return text[(std::max)(0,(std::min)(StyleCount-1,style))];}
++struct Settings {int style,color;bool snap[StyleCount];Settings():style(Dots),color(0){for(int i=0;i<StyleCount;i++)snap[i]=true;}};
++inline Settings &Options(){static Settings settings;return settings;}
++struct Point {double x,y;Point(double a=0,double b=0):x(a),y(b){}};
++inline double RowStep(int style,double spacing){return style==Isometric?spacing*std::sqrt(3.0)/2:spacing;}
++inline Point Snap(int style,double spacing,Point p){
++    if(!std::isfinite(p.x)||!std::isfinite(p.y)||!std::isfinite(spacing)||spacing<=0)return p;
++    if(style==Horizontal)return Point(p.x,std::round(p.y/spacing)*spacing);
++    if(style==Vertical)return Point(std::round(p.x/spacing)*spacing,p.y);
++    if(style!=Isometric)return Point(std::round(p.x/spacing)*spacing,std::round(p.y/spacing)*spacing);
++    double height=RowStep(style,spacing),row=std::round(p.y/height),best=1e300;Point result=p;
++    // Search adjacent rows as well: rounding x and y separately is not nearest-vertex snapping.
++    for(int i=-2;i<=2;i++){double n=row+i,offset=std::fmod(std::fabs(n),2.0)*spacing/2;
++        Point candidate(std::round((p.x-offset)/spacing)*spacing+offset,n*height);
++        double dx=candidate.x-p.x,dy=candidate.y-p.y,d=dx*dx+dy*dy;
++        if(d<best){best=d;result=candidate;}
++    }return result;
++}
++// Callbacks receive screen coordinates. The same lattice drives rendering, preview and snapping.
++// Keep the world origin anchored through panning/zoom; thin dense grids without accumulating rounding errors.
++template<class Line,class Dot> void Paint(int style,double spacing,double zoom,double originX,double originY,int width,int height,Line line,Dot dot){
++    if(width<=0||height<=0||!std::isfinite(zoom)||zoom<=0||!std::isfinite(spacing)||spacing<=0)return;
++    double scale=zoom/100.0,stride=1;
++    while(spacing*scale*stride<6)stride*=2;
++    double step=spacing*stride,worldRight=originX+width/scale,worldBottom=originY+height/scale;
++    auto sx=[&](double x){return (x-originX)*scale;};auto sy=[&](double y){return (y-originY)*scale;};
++    if(style==Isometric){
++        double dy=RowStep(style,step),slope=std::sqrt(3.0);
++        for(double n=std::ceil(originY/dy);n*dy<=worldBottom;n++)line(0,sy(n*dy),width,sy(n*dy),false);
++        // y = +/-sqrt(3)*x + k*sqrt(3)*step; all crossings are triangular lattice vertices.
++        for(int direction=-1;direction<=1;direction+=2){double m=direction*slope;
++            double a=originY-m*originX,b=originY-m*worldRight,c=worldBottom-m*originX,d=worldBottom-m*worldRight;
++            double low=(std::min)((std::min)(a,b),(std::min)(c,d)),high=(std::max)((std::max)(a,b),(std::max)(c,d));
++            for(double k=std::ceil(low/(slope*step));k*slope*step<=high;k++){
++                double offset=k*slope*step;line(0,sy(m*originX+offset),width,sy(m*worldRight+offset),false);
++            }
++        }return;
++    }
++    double firstX=std::ceil(originX/step),firstY=std::ceil(originY/step);
++    if(style==Dots){for(double n=firstX;n*step<=worldRight;n++)for(double m=firstY;m*step<=worldBottom;m++)dot(sx(n*step),sy(m*step));return;}
++    if(style!=Horizontal)for(double n=firstX;n*step<=worldRight;n++)line(sx(n*step),0,sx(n*step),height,style==GraphPaper&&std::fmod(std::fabs(n),5.0)==0);
++    if(style!=Vertical)for(double n=firstY;n*step<=worldBottom;n++)line(0,sy(n*step),width,sy(n*step),style==GraphPaper&&std::fmod(std::fabs(n),5.0)==0);
++}
++}
 diff --git a/Mathomir/ColorPalette.h b/Mathomir/ColorPalette.h
 new file mode 100644
 index 0000000..2f73a4e
@@ -519,7 +581,7 @@ index 209a634..ef0dfd9 100644
  		if (oper==17) strcpy(Data1,"ln");
  		if (oper==18) //log10
 diff --git a/Mathomir/Expression.cpp b/Mathomir/Expression.cpp
-index 531282c..ba64df4 100644
+index 531282c..90df8fa 100644
 --- a/Mathomir/Expression.cpp
 +++ b/Mathomir/Expression.cpp
 @@ -18,7 +18,9 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -1083,6 +1145,23 @@ index 531282c..ba64df4 100644
  		if (m_pPaternalExpression) c+=500;
  		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
  		c+=m_InternalInsertionPoint;
+@@ -12732,13 +12963,13 @@ int CExpression::KeyboardInsertNewEquation(CDC *DC, short zoom, UINT nChar, CExp
+ 
+ 	int delta, delta2;
+ 
+-	if (IsShowGrid)
++	if (IsCanvasGridSnapActive())
+ 	{
+ 		delta=b+(zed)/4;
+ 		delta2=b+(zed)/4;
+ 
+-		delta=(delta/GRID+1)*GRID;
+-		delta2=(delta2/GRID+1)*GRID;
++		delta=CanvasGridSpacingY(delta);
++		delta2=CanvasGridSpacingY(delta2);
+ 	}
+ 	else
+ 	{
 @@ -14353,6 +14584,7 @@ int CExpression::GetKeyboardCursorPos(int * X, int * Y)
  	}
  	return 0;
@@ -1424,10 +1503,10 @@ index 36238b0..5ad0c9a 100644
  	int SetColor(int color);
 diff --git a/Mathomir/FeatureHelp.h b/Mathomir/FeatureHelp.h
 new file mode 100644
-index 0000000..1b56f10
+index 0000000..b25eaf4
 --- /dev/null
 +++ b/Mathomir/FeatureHelp.h
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,68 @@
 +#pragma once
 +#include "Resource.h"
 +#include "MathDisplay.h"
@@ -1461,6 +1540,19 @@ index 0000000..1b56f10
 +    }
 +};
 +inline const char *FeatureControlHelp(int dialog,int id){
++    if(dialog==IDD_CANVAS_GRID){
++        if(id==IDOK)return "Apply the grid appearance and this style's snap preference. Settings are remembered on restart.";
++        if(id==IDCANCEL)return "Close without changing grid settings.";
++        if(id==1360)return "Choose dots, square lines, graph paper, horizontal/vertical ruling or isometric triangles. Each style remembers its own snap on/off choice.";
++        if(id==1361)return "Choose fine (8), medium (16), coarse (24), or type a whole-number spacing from 5 to 80 document units. It stays fixed when zooming.";
++        if(id==1362)return "Show or hide the page grid. Hiding it also temporarily disables its snapping; the per-style preference is retained.";
++        if(id==1363)return "Enable or disable snapping for the selected style. Hold Alt to bypass grid snapping temporarily. Horizontal/vertical ruling snaps only its perpendicular coordinate.";
++        if(id==1364)return "Live grid preview. The cross shows a sample pointer; the blue point shows where that pointer snaps. Preview geometry matches the page grid.";
++        if(id==1365)return "Choose neutral gray, soft blue or green grid lines. They are a screen guide and do not add objects to the document.";
++        if(id==1366)return "Explanation of the selected style and its snapping behavior.";
++        if(id==1367)return "Validation message for the typed spacing. Enter a whole number from 5 to 80.";
++    }
++
 +    if(id==IDOK&&(dialog==IDD_NUMBER_FORMAT||dialog==IDD_ABOUTBOX))return "Close this dialog.";
 +    if(id==32482)return "Display rounding changes numerical presentation; it does not change source values or exact symbolic results.";
 +    if(id==32480)return "Choose automatic formatting, 0-8 decimal places, or 3-12 significant figures. Applies to numerical readouts and new approximations. Graphs, source values and exact mathematics retain full precision.";
@@ -3757,7 +3849,7 @@ index 0000000..6965d76
 +}
 +}
 diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
-index f751ecf..a702205 100644
+index f751ecf..b8771cb 100644
 --- a/Mathomir/MainFrm.cpp
 +++ b/Mathomir/MainFrm.cpp
 @@ -438,6 +438,16 @@ extern char dont_empty_clipboard;
@@ -3818,6 +3910,15 @@ index f751ecf..a702205 100644
  	theMenu->CheckMenuItem(ID_FONTSIZE_LARGE,(DefaultFontSize==120)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_NORMAL,(DefaultFontSize==100)?MF_CHECKED:MF_UNCHECKED);
  	theMenu->CheckMenuItem(ID_FONTSIZE_SMALL,(DefaultFontSize==85)?MF_CHECKED:MF_UNCHECKED);
+@@ -1200,7 +1219,7 @@ int CMainFrame::AdjustMenu(int adjust_undo_only)
+ 	theMenu->CheckMenuItem(ID_GRID_FINE,(GRID<10)?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_GRID_MEDIUM,((GRID>=10) && (GRID<=20))?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_GRID_COARSE,(GRID>20)?MF_CHECKED:MF_UNCHECKED);
+-	//theMenu->CheckMenuItem(ID_GRID_SNAPTOGRID,(SnapToGrid)?MF_CHECKED:MF_UNCHECKED);
++	theMenu->CheckMenuItem(ID_GRID_SNAPTOGRID,CanvasGrid::Options().snap[CanvasGrid::Options().style]?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_VIEW_SHOWGRID,(IsShowGrid)?MF_CHECKED:MF_UNCHECKED);
+ 	theMenu->CheckMenuItem(ID_SYMBOLICCALCULATOR_ENABLE,(IsMathDisabled)?MF_UNCHECKED:MF_CHECKED);
+ 	theMenu->CheckMenuItem(ID_IMAGINARYUNIT_I,(ImaginaryUnit=='i')?MF_CHECKED:MF_UNCHECKED);
 @@ -1305,6 +1324,8 @@ int CMainFrame::UndoEnableSaving()
  }
  
@@ -3943,8 +4044,29 @@ index 0000000..63c0087
 +    }return out;
 +}
 +}
+diff --git a/Mathomir/Mathomir.h b/Mathomir/Mathomir.h
+index bc554d5..81a939a 100644
+--- a/Mathomir/Mathomir.h
++++ b/Mathomir/Mathomir.h
+@@ -112,6 +112,16 @@ extern int AccessLockedObjects; //can access locked object or not by mouse
+ extern int GRID;
+ //extern int SnapToGrid;
+ extern int IsShowGrid;
++#include "CanvasGrid.h"
++void LoadCanvasGridPreferences();
++void SaveCanvasGridPreferences();
++inline bool IsCanvasGridSnapActive(){auto &s=CanvasGrid::Options();return IsShowGrid && s.snap[s.style];}
++inline void SnapCanvasGridPoint(int &x,int &y,int textOffset=0){
++    auto p=CanvasGrid::Snap(CanvasGrid::Options().style,GRID,CanvasGrid::Point(x+textOffset,y));
++    x=(int)std::round(p.x)-textOffset;y=(int)std::round(p.y);
++}
++inline int SnapCanvasGridY(int y){int style=CanvasGrid::Options().style;if(style==CanvasGrid::Vertical)return y;double step=CanvasGrid::RowStep(style,GRID);return (int)std::round(std::round(y/step)*step);}
++inline int CanvasGridSpacingY(int y){int style=CanvasGrid::Options().style;if(style==CanvasGrid::Vertical)return y;double step=CanvasGrid::RowStep(style,GRID);return (int)std::round((std::floor(y/step)+1)*step);}
+ extern int IsSimpleVariableMode;
+ extern int IsMathDisabled;
+ extern char ImaginaryUnit;
 diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
-index bdcebb4..eee7a80 100644
+index bdcebb4..6492a48 100644
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
 @@ -175,22 +175,22 @@ IDR_EquationTYPE        ICON                    "res\\MathomirDoc.ico"
@@ -4111,7 +4233,17 @@ index bdcebb4..eee7a80 100644
              MENUITEM "Default font size is &Large", ID_FONTSIZE_LARGE
              MENUITEM "Default font size is &Medium", ID_FONTSIZE_NORMAL
              MENUITEM "Default Font size is &Small", ID_FONTSIZE_SMALL
-@@ -394,6 +458,7 @@ BEGIN
+@@ -385,6 +449,9 @@ BEGIN
+         END
+         POPUP "&Grid and Guidelines"
+         BEGIN
++            MENUITEM "Grid styles and options...", ID_CANVAS_GRID_OPTIONS
++            MENUITEM "Snap to current grid", ID_GRID_SNAPTOGRID
++            MENUITEM SEPARATOR
+             MENUITEM "&Fine grid",                  ID_GRID_FINE
+             MENUITEM "&Medium grid",                ID_GRID_MEDIUM
+             MENUITEM "&Coarse grid",                ID_GRID_COARSE
+@@ -394,6 +461,7 @@ BEGIN
          POPUP "Symbolic &Computation"
          BEGIN
              MENUITEM "&Enable",                     ID_SYMBOLICCALCULATOR_ENABLE
@@ -4119,7 +4251,7 @@ index bdcebb4..eee7a80 100644
              MENUITEM SEPARATOR
              POPUP "Imaginary unit"
              BEGIN
-@@ -410,12 +475,60 @@ BEGIN
+@@ -410,12 +478,60 @@ BEGIN
              MENUITEM "Load settings...",            ID_SAVEOPTIONS_LOAD
          END
      END
@@ -4180,7 +4312,7 @@ index bdcebb4..eee7a80 100644
  END
  
  
-@@ -425,8 +538,8 @@ END
+@@ -425,8 +541,8 @@ END
  //
  
  VS_VERSION_INFO VERSIONINFO
@@ -4191,7 +4323,7 @@ index bdcebb4..eee7a80 100644
   FILEFLAGSMASK 0x3fL
  #ifdef _DEBUG
   FILEFLAGS 0x1L
-@@ -441,12 +554,12 @@ BEGIN
+@@ -441,12 +557,12 @@ BEGIN
      BEGIN
          BLOCK "040904e4"
          BEGIN
@@ -4208,7 +4340,7 @@ index bdcebb4..eee7a80 100644
          END
      END
      BLOCK "VarFileInfo"
-@@ -607,3 +720,248 @@ LANGUAGE 9, 1
+@@ -607,3 +723,268 @@ LANGUAGE 9, 1
  /////////////////////////////////////////////////////////////////////////////
  #endif    // not APSTUDIO_INVOKED
  
@@ -4457,8 +4589,28 @@ index bdcebb4..eee7a80 100644
 +    LTEXT "Choose how numerical results are displayed. Source values, graph calculations and exact symbolic results retain full precision.",-1,10,8,290,28
 +    DEFPUSHBUTTON "Close",IDOK,245,43,55,16
 +END
++
++IDD_CANVAS_GRID DIALOGEX 0,0,330,237
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Grid styles and snapping"
++FONT 9,"Segoe UI",400,0,0x1
++BEGIN
++    LTEXT "Style",-1,10,10,40,12
++    COMBOBOX 1360,52,7,167,120,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    LTEXT "Spacing",-1,228,10,40,12
++    COMBOBOX 1361,270,7,50,100,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
++    CONTROL "Show grid on page",1362,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,32,119,13
++    CONTROL "Snap to this grid",1363,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,140,32,119,13
++    LTEXT "Each style remembers its own snap setting.",-1,10,49,217,12
++    COMBOBOX 1365,228,46,92,70,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    CONTROL "",1364,"Static",SS_NOTIFY | WS_BORDER,10,65,310,99
++    LTEXT "",1366,10,171,310,30
++    LTEXT "",1367,10,204,214,22
++    DEFPUSHBUTTON "Apply",IDOK,230,214,44,16
++    PUSHBUTTON "Cancel",IDCANCEL,278,214,42,16
++END
 diff --git a/Mathomir/MathomirDoc.cpp b/Mathomir/MathomirDoc.cpp
-index 15ec728..5de9bd2 100644
+index 15ec728..b3be362 100644
 --- a/Mathomir/MathomirDoc.cpp
 +++ b/Mathomir/MathomirDoc.cpp
 @@ -29,6 +29,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4487,7 +4639,8 @@ index 15ec728..5de9bd2 100644
 +        TrigDegrees=0;
  	SetPathName("\\Untitled",0); //ClearPathName does not exist??
  	SetModifiedFlag(0);
- 	Toolbox->LoadSettings(NULL);
+-	Toolbox->LoadSettings(NULL);
++	Toolbox->LoadSettings(NULL);LoadCanvasGridPreferences();
 +	TrigDegrees=0; PaperWidth=1200; PaperHeight=1553; // New documents start on US Letter
  	ViewOnlyMode=0;
  	IsDrawingMode=0;
@@ -4681,7 +4834,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..0b5e9c1 100644
+index fc832eb..07e615f 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -4712,7 +4865,7 @@ index fc832eb..0b5e9c1 100644
  #include "atlimage.h"
  #include "gdiplusimaging.h" 
  #include "htmlhelp.h"
-@@ -132,6 +142,364 @@ unsigned int LongClickStartTime;
+@@ -132,6 +142,391 @@ unsigned int LongClickStartTime;
  CPoint LongClickPosition;
  CExpression *LongClickObject;
  tDocumentStruct *prevTouchedObject=NULL;
@@ -4731,6 +4884,33 @@ index fc832eb..0b5e9c1 100644
 +    ::DestroyWindow(old);::SetWindowLongPtr(replacement,GWLP_ID,(LONG_PTR)id);
 +    ::SendMessage(replacement,WM_SETFONT,(WPARAM)font,TRUE);
 +    ::SetWindowPos(replacement,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
++}
++
++void LoadCanvasGridPreferences()
++{
++    if(theApp.GetProfileInt("CanvasGrid","Version",0)!=1)return;
++    auto &s=CanvasGrid::Options();s.style=max(0,min((int)CanvasGrid::StyleCount-1,theApp.GetProfileInt("CanvasGrid","Style",0)));
++    s.color=max(0,min(2,theApp.GetProfileInt("CanvasGrid","Color",0)));
++    int mask=theApp.GetProfileInt("CanvasGrid","SnapMask",63);for(int i=0;i<CanvasGrid::StyleCount;i++)s.snap[i]=(mask&(1<<i))!=0;
++    GRID=max(5,min(80,theApp.GetProfileInt("CanvasGrid","Spacing",16)));IsShowGrid=theApp.GetProfileInt("CanvasGrid","Visible",0)!=0;
++}
++void SaveCanvasGridPreferences()
++{
++    auto &s=CanvasGrid::Options();int mask=0;for(int i=0;i<CanvasGrid::StyleCount;i++)if(s.snap[i])mask|=1<<i;
++    theApp.WriteProfileInt("CanvasGrid","Version",1);theApp.WriteProfileInt("CanvasGrid","Style",s.style);theApp.WriteProfileInt("CanvasGrid","Color",s.color);
++    theApp.WriteProfileInt("CanvasGrid","SnapMask",mask);theApp.WriteProfileInt("CanvasGrid","Spacing",GRID);theApp.WriteProfileInt("CanvasGrid","Visible",IsShowGrid);
++}
++static void PaintCanvasGrid(CDC *dc,const CanvasGrid::Settings &s,int spacing,int zoom,int originX,int originY,int width,int height)
++{
++    static const COLORREF minor[]={RGB(222,227,232),RGB(211,226,243),RGB(214,234,222)};
++    static const COLORREF major[]={RGB(178,188,198),RGB(161,190,223),RGB(160,199,174)};
++    static const COLORREF dots[]={RGB(156,166,176),RGB(113,157,202),RGB(94,165,119)};
++    int color=max(0,min(2,s.color));CPen thin(PS_SOLID,1,minor[color]),strong(PS_SOLID,1,major[color]);int saved=dc->SaveDC();
++    dc->IntersectClipRect(0,0,width,height);
++    CanvasGrid::Paint(s.style,spacing,zoom,originX,originY,width,height,
++        [&](double x1,double y1,double x2,double y2,bool heavy){dc->SelectObject(heavy?&strong:&thin);dc->MoveTo((int)std::round(x1),(int)std::round(y1));dc->LineTo((int)std::round(x2),(int)std::round(y2));},
++        [&](double x,double y){dc->FillSolidRect((int)std::round(x),(int)std::round(y),zoom>=180?2:1,zoom>=180?2:1,dots[color]);});
++    dc->RestoreDC(saved);
 +}
 +
 +static void LoadDisplayRounding()
@@ -5077,7 +5257,7 @@ index fc832eb..0b5e9c1 100644
  char IsWindowOutOfFocus;
  
  #define NUM_SPECIAL_KEYS 21
-@@ -157,6 +525,10 @@ struct
+@@ -157,6 +552,10 @@ struct
  
  
  
@@ -5088,7 +5268,7 @@ index fc832eb..0b5e9c1 100644
  CExpression *TheKeyboardClipboard;
  
  IMPLEMENT_DYNCREATE(CMathomirView, CView)
-@@ -167,6 +539,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -167,6 +566,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
  	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
  	ON_WM_LBUTTONDOWN()
@@ -5098,7 +5278,7 @@ index fc832eb..0b5e9c1 100644
  	ON_WM_SIZE()
  	ON_WM_HSCROLL()
  	ON_WM_VSCROLL()
-@@ -213,6 +588,47 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -213,6 +615,47 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  	ON_COMMAND(ID_OUTPUTIMAGE_SIZE80, OnOutputimageSize80)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHIGHQUALITY, OnOutputimageForcehighquality)
  	ON_COMMAND(ID_OUTPUTIMAGE_FORCEHALFTONE, OnOutputimageForcehalftone)
@@ -5146,17 +5326,26 @@ index fc832eb..0b5e9c1 100644
  	ON_COMMAND(ID_FONTSIZE_VERYLARGE, OnFontsizeVerylarge)
  	ON_COMMAND(ID_FONTSIZE_LARGE, OnFontsizeLarge)
  	ON_COMMAND(ID_FONTSIZE_NORMAL, OnFontsizeNormal)
-@@ -291,7 +707,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+@@ -225,6 +668,8 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
+ 	ON_COMMAND(ID_HELP_QUICKGUIDE, OnHelpQuickguide)
+ 	ON_WM_ERASEBKGND()
+ 	ON_COMMAND(ID_EDIT_ACCESSLOCKEDOBJECTS, OnEditAccesslockedobjects)
++	ON_COMMAND(ID_CANVAS_GRID_OPTIONS, OnCanvasGridOptions)
++	ON_COMMAND(ID_GRID_SNAPTOGRID, OnGridSnaptogrid)
+ 	ON_COMMAND(ID_GRID_FINE, OnGridFine)
+ 	ON_COMMAND(ID_GRID_MEDIUM, OnGridMedium)
+ 	ON_COMMAND(ID_GRID_COARSE, OnGridCoarse)
+@@ -291,7 +736,9 @@ BEGIN_MESSAGE_MAP(CMathomirView, CView)
  
  CMathomirView::CMathomirView()
  {
-+    LoadDisplayRounding();
++    LoadDisplayRounding();LoadCanvasGridPreferences();
  	// TODO: add construction code here
 +	AutoFitPageWidth=true;
  	m_PopupMenuObject=NULL;
  	pMainView=this;
  	pMainViewBase=(CView*)this;
-@@ -392,6 +810,7 @@ int CMathomirView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+@@ -392,6 +839,7 @@ int CMathomirView::OnCreate(LPCREATESTRUCT lpCreateStruct)
  	if (CView::OnCreate(lpCreateStruct) == -1)
  		return -1;
  
@@ -5164,7 +5353,7 @@ index fc832eb..0b5e9c1 100644
  	SetTimer(1,10,NULL); //this is for cursor and copy-paste
  	return 0;
  }
-@@ -489,8 +908,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
+@@ -489,8 +937,60 @@ int RullerGuidelines[12]; //index of object in TheDocument struct
  int NumRullerGuidelines=0;
  
  
@@ -5226,7 +5415,7 @@ index fc832eb..0b5e9c1 100644
  	tDocumentStruct *ds=TheDocument;
  	int SelectedElement;
  	NumRullerGuidelines=0;
-@@ -509,6 +980,14 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -509,6 +1009,14 @@ void CMathomirView::OnDraw(CDC* pDC)
  
  		ClientArea.right=pDC->GetDeviceCaps(PHYSICALWIDTH);
  		ClientArea.bottom=pDC->GetDeviceCaps(PHYSICALHEIGHT);
@@ -5241,7 +5430,7 @@ index fc832eb..0b5e9c1 100644
  		ViewZoom=(short)(100*ClientArea.bottom/PaperHeight);
  		ViewY=(PagePrinted-1)*PaperHeight+5+pDC->GetDeviceCaps(PHYSICALOFFSETY)*100/ViewZoom;
  		ViewX=15+pDC->GetDeviceCaps(PHYSICALOFFSETX)*100/ViewZoom;
-@@ -576,17 +1055,18 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -576,17 +1084,18 @@ void CMathomirView::OnDraw(CDC* pDC)
  					((CDrawing*)(ds->Object))->CalculateSize(&tmpDC,ViewZoom,&l,&b);
  					((CDrawing*)(ds->Object))->SelectDrawing(0);
  				}
@@ -5264,7 +5453,7 @@ index fc832eb..0b5e9c1 100644
  				}
  				else
  				{
-@@ -624,19 +1104,24 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -624,19 +1133,24 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			if (MainViewCX<TheClientRect.right) MainViewCX=TheClientRect.right;
  			if (MainViewCY<TheClientRect.bottom) MainViewCY=TheClientRect.bottom;
@@ -5290,7 +5479,41 @@ index fc832eb..0b5e9c1 100644
  			int RelativeHeight=(PaperHeight)*ViewZoom/100;
  			int RelativeStart=-(ViewY%PaperHeight)*ViewZoom/100;
  
-@@ -725,8 +1210,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -685,31 +1199,8 @@ void CMathomirView::OnDraw(CDC* pDC)
+ 				RelativeStart+=RelativeHeight;
+ 			}
+ 
+-			//painting grid
+-			if (IsShowGrid)
+-			{
+-				int sx=TheClientRect.right*100/ViewZoom;
+-				int sy=TheClientRect.bottom*100/ViewZoom;
+-				int step=(ViewZoom<50)?2*GRID:GRID;
+-				short *yarray=(short*)new short[sy/step*2+8];
+-				int ylen=0;
+-				for (int jj=(ViewY/GRID)*GRID-ViewY;jj<sy;jj+=step)
+-				{
+-					*(yarray+ylen)=jj*ViewZoom/100;
+-					ylen++;
+-				}
+-				for (int ii=(ViewX/GRID)*GRID-ViewX;ii<sx;ii+=step)
+-				{
+-					int ax=ii*ViewZoom/100;
+-					short *pnt=yarray;
+-					for (int jj=ylen;jj>0;jj--,pnt++)
+-					{
+-						bitmapDC.SetPixelV(ax,*pnt,RGB(0,192,0));
+-						if (ViewZoom&0xFF00) bitmapDC.SetPixelV(ax,*pnt+1,RGB(0,192,0));
+-					}				
+-				}
+-				delete yarray;
+-			}
++            if(IsShowGrid)PaintCanvasGrid(&bitmapDC,CanvasGrid::Options(),GRID,ViewZoom,ViewX,ViewY,TheClientRect.Width(),TheClientRect.Height());
++
+ 		}
+ 		else
+ 			bitmapDC.FillSolidRect(0,0,TheClientRect.right,TheClientRect.bottom,RGB(255,255,255));
+@@ -725,8 +1216,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		}
  
  
@@ -5306,7 +5529,7 @@ index fc832eb..0b5e9c1 100644
  			if ((ds->absolute_Y<-1000) && (ds->absolute_Y>-1200))
  			{
  				if (NumRullerGuidelines<13) RullerGuidelines[NumRullerGuidelines++]=NumDocumentElements-i-1;
-@@ -753,6 +1245,9 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -753,6 +1251,9 @@ void CMathomirView::OnDraw(CDC* pDC)
  			{				
  				int RelativeX=(ds->absolute_X-ViewX)*ViewZoom/100;
  				int RelativeY=(ds->absolute_Y-ViewY)*ViewZoom/100;
@@ -5316,7 +5539,7 @@ index fc832eb..0b5e9c1 100644
  				if ((ds->MovingDotState==3) && (((MouseMode!=9) && (MouseMode!=11)) || (SelectedHandle!=5)))
  				{
  					GentlyPaintObject(ds,&bitmapDC);
-@@ -761,7 +1256,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -761,7 +1262,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					if (ds->Type==1)
  						((CExpression*)(ds->Object))->PaintExpression(&bitmapDC,ViewZoom,RelativeX,RelativeY,&TheClientRect);
@@ -5325,7 +5548,7 @@ index fc832eb..0b5e9c1 100644
  						((CDrawing*)(ds->Object))->PaintDrawing(&bitmapDC,ViewZoom,RelativeX,RelativeY,ds->absolute_X,ds->absolute_Y,&TheClientRect);
  				}
  
-@@ -785,6 +1280,8 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -785,6 +1286,8 @@ void CMathomirView::OnDraw(CDC* pDC)
  			}
  		}
  
@@ -5334,7 +5557,7 @@ index fc832eb..0b5e9c1 100644
  		if ((prevNumSelectedObjects!=NumSelectedObjects) && ((prevNumSelectedObjects<3) || (NumSelectedObjects<3)))
  		{
  			if ((UseToolbar) && (Toolbox) &&(Toolbox->Toolbar)) {Toolbox->Toolbar->ConfigureToolbar();}
-@@ -795,13 +1292,15 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -795,13 +1298,15 @@ void CMathomirView::OnDraw(CDC* pDC)
  		{
  			tmpDrawing->PaintDrawing(&bitmapDC,ViewZoom,(MovingStartX/10-ViewX)*ViewZoom/100,(MovingStartY/10-ViewY)*ViewZoom/100,-1,-1);
  		}
@@ -5351,7 +5574,7 @@ index fc832eb..0b5e9c1 100644
  		//painting multiple selection box
  		if (MultipleStartX!=-1)
  		{
-@@ -1122,11 +1621,13 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1122,11 +1627,13 @@ void CMathomirView::OnDraw(CDC* pDC)
  				{
  					lasttillen=tillen;
  					bitmapDC.SelectClipRgn(NULL);
@@ -5365,7 +5588,7 @@ index fc832eb..0b5e9c1 100644
  				}
  
  				int RelativeX=TillenRelativeX+(ds->absolute_X-vX)*Tillens.Zoom/100;
-@@ -1198,6 +1699,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1198,6 +1705,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			if (myrgn) 
  			{
  				bitmapDC.SelectClipRgn(NULL);
@@ -5373,7 +5596,7 @@ index fc832eb..0b5e9c1 100644
  				delete myrgn;
  			}
  
-@@ -1229,6 +1731,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1229,6 +1737,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  				CRgn myrgn;
  				myrgn.CreateRectRgn(RegionX,RegionY,RegionX+RegionW,RegionY+RegionH);
  				bitmapDC.SelectClipRgn(&myrgn);
@@ -5381,7 +5604,7 @@ index fc832eb..0b5e9c1 100644
  
  
  				ds=TheDocument;
-@@ -1264,6 +1767,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1264,6 +1773,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  					}
  				}
  				bitmapDC.SelectClipRgn(NULL);
@@ -5389,7 +5612,7 @@ index fc832eb..0b5e9c1 100644
  			}
  
  
-@@ -1279,6 +1783,7 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1279,6 +1789,7 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.SetROP2(R2_MASKPEN);
  			int xx=PreopenDrawingToolboxX-ToolboxSize;
  			int yy=PreopenDrawingToolboxY-ToolboxSize;
@@ -5397,7 +5620,7 @@ index fc832eb..0b5e9c1 100644
  			CPen pen1;
  			CBrush brush1;
  			brush1.CreateSolidBrush(RGB(240,240,255));
-@@ -1290,9 +1795,10 @@ void CMathomirView::OnDraw(CDC* pDC)
+@@ -1290,9 +1801,10 @@ void CMathomirView::OnDraw(CDC* pDC)
  			bitmapDC.MoveTo(xx+2*ToolboxSize/3+3,yy);bitmapDC.LineTo(xx+2*ToolboxSize/3+3,yy+ToolboxSize+5);
  			bitmapDC.MoveTo(xx,yy+ToolboxSize/3+1);bitmapDC.LineTo(xx+ToolboxSize+5,yy+ToolboxSize/3+1);
  			bitmapDC.MoveTo(xx,yy+2*ToolboxSize/3+3);bitmapDC.LineTo(xx+ToolboxSize+5,yy+2*ToolboxSize/3+3);
@@ -5409,7 +5632,7 @@ index fc832eb..0b5e9c1 100644
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
  		if ((cursor.x>=0) && (cursor.y>=0))	PaintClipboard(cursor.x,cursor.y);
-@@ -1349,14 +1855,68 @@ CBitmap *NewlineBitmap=NULL;
+@@ -1349,14 +1861,68 @@ CBitmap *NewlineBitmap=NULL;
  
  
  int MultipleModeWasAccepted=0;
@@ -5478,7 +5701,7 @@ index fc832eb..0b5e9c1 100644
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
  	LeftClickTimer=0;
-@@ -1448,7 +2008,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1448,7 +2014,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  	//if drawing mode is on - start drawing
  	if (ShowRullerCounter) //rullers not displayed
  	if (!ViewOnlyMode)
@@ -5487,7 +5710,21 @@ index fc832eb..0b5e9c1 100644
  		(ClipboardDrawing==NULL) && (ClipboardExpression==NULL))
  	{
  		if (NumSelectedObjects)
-@@ -1795,6 +2355,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1483,11 +2049,10 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ 					}
+ 				}
+ 			}
+-			else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++			else if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 			{
+ 				MovingStartX/=10;MovingStartY/=10;
+-				MovingStartX=((MovingStartX+GRID/2)/GRID)*GRID;
+-				MovingStartY=((MovingStartY+GRID/2)/GRID)*GRID;
++				SnapCanvasGridPoint(MovingStartX,MovingStartY);
+ 				MovingStartX*=10;MovingStartY*=10;
+ 			}
+ 		}
+@@ -1795,6 +2360,28 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  			}
  			else if ((ds->Type==1) && (ClipboardDrawing==NULL)) 
  			{
@@ -5516,7 +5753,20 @@ index fc832eb..0b5e9c1 100644
  				//nothing in the clipboard, then copy into the clipboard
  				root_object_flag=0;
  				RootObjectCopy=0;
-@@ -2051,7 +2633,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -2014,10 +2601,9 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ 			AbsoluteX=prevGuidlineX;
+ 			make_text=SelectedGuidelineType;
+ 		}
+-		else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++		else if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 		{
+-			AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID-3;
+-			AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
++			SnapCanvasGridPoint(AbsoluteX,AbsoluteY,3);
+ 		}
+ 
+ 
+@@ -2051,7 +2637,7 @@ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  		//ds->absolute_Y=AbsoluteY;
  		//ds->Type=1; //expression
  		ds->Object=(CObject*)new CExpression(NULL,NULL,DefaultFontSize);
@@ -5525,7 +5775,7 @@ index fc832eb..0b5e9c1 100644
  		{
  			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
  			//((CExpression*)(ds->Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -2169,12 +2751,13 @@ void CMathomirView::AdjustPosition(void)
+@@ -2169,12 +2755,13 @@ void CMathomirView::AdjustPosition(void)
  	if (theApp.m_pMainWnd==NULL)
  	{
  		GetWindowRect(&cr);
@@ -5541,7 +5791,7 @@ index fc832eb..0b5e9c1 100644
  }
  
  void CMathomirView::OnSize(UINT nType, int cx, int cy)
-@@ -2182,9 +2765,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
+@@ -2182,9 +2769,9 @@ void CMathomirView::OnSize(UINT nType, int cx, int cy)
  	
  	if (Tillens.Show) Tillens.Show=0;
  
@@ -5553,7 +5803,7 @@ index fc832eb..0b5e9c1 100644
  	SetClassLong(this->m_hWnd,GCL_STYLE,style);
  
  	if (theApp.m_pMainWnd) AdjustPosition();
-@@ -2196,7 +2779,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2196,7 +2783,11 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  {
  	tDocumentStruct tmp;
  	
@@ -5566,7 +5816,7 @@ index fc832eb..0b5e9c1 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -2238,6 +2825,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
+@@ -2238,6 +2829,7 @@ void ChangeZOrderOfSelectedObjects(int newpos)
  
  void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  {
@@ -5574,7 +5824,7 @@ index fc832eb..0b5e9c1 100644
  	PaintDrawingHotspot(1);
  	SelectedTab=0;
  	if (Tillens.Show) {Tillens.Show=0;InvalidateRect(NULL,1);}
-@@ -2300,7 +2888,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+@@ -2300,7 +2892,7 @@ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
  		ViewX=nPos;
  		if (ViewX<0) ViewX=0;
  		InvalidateRect(NULL,0);
@@ -5583,7 +5833,7 @@ index fc832eb..0b5e9c1 100644
  	}
  	if (nSBCode==SB_THUMBTRACK)
  	{
-@@ -2722,7 +3310,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
+@@ -2722,7 +3314,7 @@ void CMathomirView::PaintDrawingHotspot(char erase_only)
  		if ((IsDrawingMode<10) || (IsDrawingMode>13)) //not for rasters (linear and logaritmic)
  		if ((IsDrawingMode<18) || (IsDrawingMode>26)) //not for section line, Okay, ?, !, X and diagonals
  		{
@@ -5592,7 +5842,7 @@ index fc832eb..0b5e9c1 100644
  			
  			int w=SelectedLineWidth*ViewZoom/100;
  			int dot_shape=1;
-@@ -2812,6 +3400,76 @@ int SelectedTabObjectIndex;
+@@ -2812,6 +3404,76 @@ int SelectedTabObjectIndex;
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -5669,7 +5919,21 @@ index fc832eb..0b5e9c1 100644
  
  	try
  	{
-@@ -3338,6 +3996,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3137,11 +3799,10 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 			if ((IsDrawingMode!=7) && (IsDrawingMode!=6) && 
+ 				(IsDrawingMode!=26) && (IsDrawingMode!=25) &&
+ 				(IsDrawingMode!=3) && (IsDrawingMode!=14))			
+-			if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++			if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 			{
+ 				AbsoluteX/=10;AbsoluteY/=10;
+-				AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID;
+-				AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
++				SnapCanvasGridPoint(AbsoluteX,AbsoluteY);
+ 				AbsoluteX*=10;AbsoluteY*=10;
+ 			}
+ 			if ((prevXX!=AbsoluteX) || (prevYY!=AbsoluteY))
+@@ -3338,6 +3999,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  		}
  
  		CObject *TouchedSubelement=NULL;
@@ -5677,7 +5941,7 @@ index fc832eb..0b5e9c1 100644
  		tDocumentStruct *TouchedObject=NULL;
  		tDocumentStruct *TouchedExpression=NULL;
  		char IsTouchedExpressionFullyInside=0;
-@@ -3437,6 +4096,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3437,6 +4099,12 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			}
  
  
@@ -5690,7 +5954,7 @@ index fc832eb..0b5e9c1 100644
  			if ((AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+ccc) &&
  				(AbsoluteX>=ds->absolute_X-extends) && (AbsoluteX<=ds->absolute_X+ds->Length+extends) &&
  				((ds->MovingDotState!=5) || (AccessLockedObjects)))
-@@ -3553,6 +4218,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3553,6 +4221,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  								}
  							}
  							TouchedObject=ds;
@@ -5698,7 +5962,7 @@ index fc832eb..0b5e9c1 100644
  							TouchedExpression=ds;
  							if ((((CExpression*)ds->Object)->m_Selection>0) && (((CExpression*)ds->Object)->m_Selection<16383))
  								IsInsertionPointTouched=ds;
-@@ -3605,38 +4271,65 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3605,38 +4274,65 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  			ScheduleFullRepaint=1;
  		}
  		
@@ -5792,7 +6056,66 @@ index fc832eb..0b5e9c1 100644
  			prevSelectionChecksum=SelectionChecksum;
  			prev_any_drawing_touched=any_drawing_touched;
  		}		
-@@ -4103,6 +4796,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -3657,9 +4353,9 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 		}
+ 
+ 		int absy=AbsoluteY;
+-		if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++		if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 		{
+-			absy=((absy+GRID/2)/GRID)*GRID;
++			absy=SnapCanvasGridY(absy);
+ 		}
+ 
+ 		if (absy!=prevSpacingY)
+@@ -3837,7 +4533,7 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 					int X=SelectedDocumentObject->absolute_X+deltaX;
+ 					int Y=SelectedDocumentObject2->absolute_Y+deltaY;					
+ 
+-					if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++					if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 					{
+ 						/*int corrx=0,corry=0;
+ 						if (SelectedDocumentObject2->Type==1) corry+=-SelectedDocumentObject2->Above;
+@@ -3855,22 +4551,10 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 						}
+ 						X+=corrx;
+ 						Y+=corry;
+-						X=((X+GRID/2)/GRID)*GRID;
+-						Y=((Y+GRID/2)/GRID)*GRID;
++						SnapCanvasGridPoint(X,Y);
+ 						deltaX=X-SelectedDocumentObject->absolute_X-corrx;
+ 						deltaY=Y-SelectedDocumentObject2->absolute_Y-corry;*/
+-						if (deltaX>1)
+-							deltaX=((deltaX+GRID/2)/GRID)*GRID;
+-						else if (deltaX<-1)
+-							deltaX=((deltaX-GRID/2)/GRID)*GRID;
+-						else 
+-							deltaX=0;
+-						if (deltaY>1)
+-							deltaY=((deltaY+GRID/2)/GRID)*GRID;
+-						else if (deltaY<-1)
+-							deltaY=((deltaY-GRID/2)/GRID)*GRID;
+-						else
+-							deltaY=0;
++                        SnapCanvasGridPoint(deltaX,deltaY);
+ 					}
+ 					int i;
+ 					tDocumentStruct *ds=TheDocument;
+@@ -3890,10 +4574,9 @@ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ 					int X=SelectedDocumentObject->absolute_X+deltaX;
+ 					int Y=SelectedDocumentObject->absolute_Y+deltaY;
+ 
+-					if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++					if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 					{
+-						X=((X+GRID/2)/GRID)*GRID-3;
+-						Y=((Y+GRID/2)/GRID)*GRID;
++						SnapCanvasGridPoint(X,Y,3);
+ 						deltaX=X-SelectedDocumentObject->absolute_X;
+ 						deltaY=Y-SelectedDocumentObject->absolute_Y;
+ 					}
+@@ -4103,6 +4786,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  	if (MouseWheelDelta>=120)
  	{
@@ -5800,7 +6123,7 @@ index fc832eb..0b5e9c1 100644
  		MouseWheelDelta=0;
  		//zoom increasing
  
-@@ -4127,6 +4821,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4127,6 +4811,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  	}
  	if (MouseWheelDelta<=-120)
  	{
@@ -5808,7 +6131,7 @@ index fc832eb..0b5e9c1 100644
  		MouseWheelDelta=0;
  
  		if (ViewZoom>=480) ViewZoom=400;
-@@ -4169,31 +4864,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4169,31 +4854,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  		if (ViewY>ViewMaxY) ViewY=ViewMaxY;
  
  
@@ -5841,7 +6164,7 @@ index fc832eb..0b5e9c1 100644
  	}
  
  	return CView::OnMouseWheel(nFlags, zDelta, pt);
-@@ -4201,6 +4872,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
+@@ -4201,6 +4862,7 @@ BOOL CMathomirView::OnMouseWheel(UINT nFlags, short zDelta, CPoint pt)
  
  void CMathomirView::OnZoom40()
  {
@@ -5849,7 +6172,7 @@ index fc832eb..0b5e9c1 100644
  	ViewZoom=40;
  	RepaintTheView(1);
  
-@@ -4208,6 +4880,7 @@ void CMathomirView::OnZoom40()
+@@ -4208,6 +4870,7 @@ void CMathomirView::OnZoom40()
  
  void CMathomirView::OnZoom60()
  {
@@ -5857,7 +6180,7 @@ index fc832eb..0b5e9c1 100644
  	ViewZoom=60;
  	RepaintTheView(1);
  }
-@@ -4326,7 +4999,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4326,7 +4989,8 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  	//prevViewZoom=ViewZoom;
  
  
@@ -5867,7 +6190,7 @@ index fc832eb..0b5e9c1 100644
  	SetScrollRange(SB_VERT,0,ViewMaxY,0);
  	SetScrollPos(SB_HORZ,ViewX,1);
  	SetScrollPos(SB_VERT,ViewY,1);
-@@ -4341,24 +5015,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
+@@ -4341,24 +5005,28 @@ int CMathomirView::RepaintTheView(int force_recalculate)
  
  void CMathomirView::OnZoom80()
  {
@@ -5896,7 +6219,7 @@ index fc832eb..0b5e9c1 100644
  	ViewZoom=240;
  	RepaintTheView(1);
  }
-@@ -4373,6 +5051,7 @@ UINT prevChar;
+@@ -4373,6 +5041,7 @@ UINT prevChar;
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -5904,7 +6227,7 @@ index fc832eb..0b5e9c1 100644
  	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
  	//initial keyboard testing (determining key codes when the shift key is used)
  	//if (keystringmode==2) {keystring3[keystringcnt++]=nChar;return;}
-@@ -4457,6 +5136,19 @@ char RepaintedOnCtrlWhileDrawing=0;
+@@ -4457,6 +5126,19 @@ char RepaintedOnCtrlWhileDrawing=0;
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -5924,7 +6247,7 @@ index fc832eb..0b5e9c1 100644
  
  	if ((ListPopup) && (ListPopup->IsWindowVisible()))
  	{
-@@ -4472,7 +5164,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -4472,7 +5154,6 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  			ListPopup->OnKeyDown(nChar,nRepCnt,nFlags);
  			ListPopup->OnChar(nChar,nRepCnt,nFlags);
  			
@@ -5932,7 +6255,20 @@ index fc832eb..0b5e9c1 100644
  			this->SetFocus();
  			return;
  		}
-@@ -5168,7 +5859,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5157,10 +5838,9 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+ 					{
+ 						//NumDocumentElements++;
+ 						//CheckDocumentMemoryReservations();
+-						if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++						if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 						{
+-							absX=((absX+GRID/2)/GRID)*GRID-3;
+-							absY=((absY+GRID/2)/GRID)*GRID;
++							SnapCanvasGridPoint(absX,absY,3);
+ 						}
+ 						AddDocumentObject(1,absX,absY);
+ 						//TheDocument[NumDocumentElements-1].absolute_X=absX;
+@@ -5168,7 +5848,7 @@ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  						short l,a=0,b;
  						//TheDocument[NumDocumentElements-1].Type=1;
  						TheDocument[NumDocumentElements-1].Object=(CObject*)(new CExpression(NULL,NULL,DefaultFontSize));
@@ -5941,7 +6277,7 @@ index fc832eb..0b5e9c1 100644
  						{
  							((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSize=RootObjectFontSize;
  							//((CExpression*)(TheDocument[NumDocumentElements-1].Object))->m_FontSizeHQ=RootObjectFontSizeHQ;
-@@ -5360,7 +6051,7 @@ int CMathomirView::ScrollCursorIntoView()
+@@ -5360,7 +6040,7 @@ int CMathomirView::ScrollCursorIntoView()
  
  			int bottom=KeyboardEntryBaseObject->absolute_Y+KeyboardEntryBaseObject->Below;
  			if (bottom>Y+6*tmp) bottom=Y+6*tmp;
@@ -5950,7 +6286,7 @@ index fc832eb..0b5e9c1 100644
  			{this->SetScrollPos(SB_VERT,bottom-(TheClientRect.bottom)*100/ViewZoom+tmp/2,0);OnVScroll(SB_THUMBPOSITION,0,NULL);RepaintAll=0;}
  
  	
-@@ -5414,11 +6105,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5414,11 +6094,11 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		//check validity of important pointers
  		try
  		{
@@ -5967,7 +6303,7 @@ index fc832eb..0b5e9c1 100644
  		}
  		catch (...)
  		{
-@@ -5453,7 +6144,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5453,7 +6133,28 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  		}
  
  		
@@ -5996,7 +6332,7 @@ index fc832eb..0b5e9c1 100644
  
  		if ((ret==0) || (ret==88))
  		{
-@@ -5523,7 +6235,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5523,7 +6224,7 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  			if (elm)
  			{	
  				{
@@ -6005,7 +6341,7 @@ index fc832eb..0b5e9c1 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -5634,49 +6346,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5634,49 +6335,8 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  					GentlyPaintObject(KeyboardEntryBaseObject,DC);
  				}
  
@@ -6057,7 +6393,7 @@ index fc832eb..0b5e9c1 100644
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
-@@ -5793,7 +6464,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5793,7 +6453,9 @@ void CMathomirView::SendKeyStroke(UINT nChar, UINT nRepCnt, UINT nFlags)
  							fcolor=Toolbox->GetUniformFormattingColor();
  						}
  						int inserting_position=tmp->m_Selection-1;
@@ -6068,7 +6404,7 @@ index fc832eb..0b5e9c1 100644
  						{
  							QuickTypeUsed=2;
  							LastQuickTypeObject=ds;
-@@ -5836,7 +6509,7 @@ if ((nChar!=6) )
+@@ -5836,7 +6498,7 @@ if ((nChar!=6) )
  			if (elm)
  			{	
  				{
@@ -6077,7 +6413,20 @@ index fc832eb..0b5e9c1 100644
  					KeystrokeNumElements[KeystrokesListLen]=position;
  					if ((elm->Data1[0]==0) && (position>0)) KeystrokeNumElements[KeystrokesListLen]=position-1;
  					KeystrokesList[KeystrokesListLen++]=(IsALTDown)?1:nChar;
-@@ -6118,6 +6791,19 @@ unsigned int prevTimerTickTime;
+@@ -5990,10 +6652,9 @@ if ((nChar!=6) )
+ 						absX=prevGuidlineX;
+ 						make_text=SelectedGuidelineType;
+ 					}
+-					else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++					else if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 					{
+-						absX=((absX+GRID/2)/GRID)*GRID-3;
+-						absY=((absY+GRID/2)/GRID)*GRID;
++						SnapCanvasGridPoint(absX,absY,3);
+ 					}
+ 
+ 					AddDocumentObject(1,absX,absY);
+@@ -6118,6 +6779,19 @@ unsigned int prevTimerTickTime;
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -6097,7 +6446,7 @@ index fc832eb..0b5e9c1 100644
  	//faster timing functions here
  	unsigned int TimerTickTime=GetTickCount();
  	unsigned int TimerTickDelta=TimerTickTime-prevTimerTickTime;
-@@ -6558,23 +7244,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
+@@ -6558,23 +7232,17 @@ void CMathomirView::OnTimer(UINT nIDEvent)
  	if ((theApp.m_pMainWnd) && (theApp.m_pMainWnd->IsWindowVisible()))
  		if ((Popup) && (Popup->IsWindowVisible())) Popup->PaintWorkIndicator();
  	
@@ -6132,7 +6481,7 @@ index fc832eb..0b5e9c1 100644
  
  	if (GetForegroundWindow()==theApp.m_pMainWnd)
  	{
-@@ -7585,6 +8265,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
+@@ -7585,6 +8253,14 @@ void CMathomirView::OnRButtonUp(UINT nFlags, CPoint point)
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -6147,7 +6496,48 @@ index fc832eb..0b5e9c1 100644
  	char WasWindowOutOfFocus=IsWindowOutOfFocus;
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
-@@ -8112,23 +8800,23 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+@@ -7883,10 +8559,9 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ 				}
+ 			}
+ 		}
+-		else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++		else if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 		{
+-			cx=((cx+GRID/2)/GRID)*GRID;
+-			cy=((cy+GRID/2)/GRID)*GRID;
++			SnapCanvasGridPoint(cx,cy);
+ 			int x1,y1;
+ 			ClipboardDrawing->FindRealCorner(&x1,&y1);
+ 			cx-=x1;
+@@ -8013,11 +8688,10 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ 				(((IsDrawingMode==6) || (IsDrawingMode==7)) && (LeftClickTimer>3)) ||    //erasers
+ 				(IsDrawingMode==20) || (IsDrawingMode==21) || (IsDrawingMode==22) || (IsDrawingMode==23)) //check mark, exclamation mark, question mark, star
+ 			{
+-				if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++				if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 				{
+ 					AbsoluteX/=10;AbsoluteY/=10;
+-					AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID;
+-					AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
++					SnapCanvasGridPoint(AbsoluteX,AbsoluteY);
+ 					AbsoluteX*=10;AbsoluteY*=10;
+ 				}
+ 				if ((prevXX!=AbsoluteX) || (prevYY!=AbsoluteY))
+@@ -8058,10 +8732,10 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ 	if (MouseMode==4) //spacing mode
+ 	{
+ 		int absy=AbsoluteY;
+-		if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++		if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 		{
+-			absy=((absy+GRID/2)/GRID)*GRID;
+-			startSpacingY=((startSpacingY+GRID/2)/GRID)*GRID;
++			absy=SnapCanvasGridY(absy);
++			startSpacingY=SnapCanvasGridY(startSpacingY);
+ 		}
+ 		if (startSpacingY>absy)
+ 		{
+@@ -8112,23 +8786,22 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  					MultipleModeWasAccepted=0;
  				}
  		}
@@ -6163,10 +6553,11 @@ index fc832eb..0b5e9c1 100644
  				make_text=SelectedGuidelineType;
  			}
 -			else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
-+			else if (!exactPlacement && (nFlags&MK_SHIFT) && (IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++			else if (!exactPlacement && (nFlags&MK_SHIFT) && (IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
  			{
- 				AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID-3;
- 				AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
+-				AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID-3;
+-				AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
++				SnapCanvasGridPoint(AbsoluteX,AbsoluteY,3);
  			}			
  			if (!IsDrawingMode)
  			{
@@ -6175,7 +6566,26 @@ index fc832eb..0b5e9c1 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8565,7 +9253,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8468,7 +9141,7 @@ int CMathomirView::PaintClipboard(int X, int Y)
+ 		newy=Y-MovingStartY*ViewZoom/100;
+ 
+ 		if ((SpecialDrawingHover==NULL) || (((CDrawing*)SpecialDrawingHover->Object)->IsSpecialDrawing!=50)) //note: we dont use snap to grid inside drawing box
+-		if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++		if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 		{
+ 			int X=ViewX+newx*100/ViewZoom;
+ 			int Y=ViewY+newy*100/ViewZoom;
+@@ -8477,8 +9150,7 @@ int CMathomirView::PaintClipboard(int X, int Y)
+ 			ClipboardDrawing->FindRealCorner(&x1,&y1);
+ 			X+=x1;
+ 			Y+=y1;
+-			X=((X+GRID/2)/GRID)*GRID;
+-			Y=((Y+GRID/2)/GRID)*GRID;
++			SnapCanvasGridPoint(X,Y);
+ 
+ 			newx=(X-x1-ViewX)*ViewZoom/100;
+ 			newy=(Y-y1-ViewY)*ViewZoom/100;
+@@ -8565,7 +9237,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -6186,7 +6596,7 @@ index fc832eb..0b5e9c1 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +10100,1010 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +10084,1015 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -6274,7 +6684,8 @@ index fc832eb..0b5e9c1 100644
 +        case ID_FILE_PRINT: return "printer paper output document";
 +        case ID_FILE_PRINT_PREVIEW: return "printer page preview before printing";
 +        case ID_FILE_PRINT_SETUP: return "printer settings properties paper quality layout dialog";
-+        case ID_VIEW_SHOWGRID: return "snap snapping spacing placement grid";
++        case ID_VIEW_SHOWGRID: return "show hide grid";
++        case ID_CANVAS_GRID_OPTIONS: return "grid dots lines square graph paper ruled isometric triangular snap snapping spacing placement";
 +        case ID_EDIT_DELETE: return "remove erase selected objects";
 +        case ID_EDIT_UNDO: return "revert reverse change";
 +        case ID_EDIT_COPYLATEXCODE: return "export equation latex code";
@@ -6710,6 +7121,10 @@ index fc832eb..0b5e9c1 100644
 +    if (!object) { EndGripMove(true); return; }
 +    object->absolute_X=MoveStartX+(point.x-MoveStartPoint.x)*100/ViewZoom;
 +    object->absolute_Y=MoveStartY+(point.y-MoveStartPoint.y)*100/ViewZoom;
++    if(IsCanvasGridSnapActive() && !(GetKeyState(VK_MENU)&0x8000)){
++        int ox=0,oy=0;if(object->Type==2)((CDrawing*)object->Object)->FindRealCorner(&ox,&oy);else ox=3;
++        int x=object->absolute_X+ox,y=object->absolute_Y+oy;SnapCanvasGridPoint(x,y);object->absolute_X=x-ox;object->absolute_Y=y-oy;
++    }
 +    GetDocument()->SetModifiedFlag(); InvalidateRect(NULL,FALSE); UpdateWindow();
 +}
 +void CMathomirView::EndGripMove(bool cancel)
@@ -7197,7 +7612,7 @@ index fc832eb..0b5e9c1 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +11116,138 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +11105,138 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -7336,7 +7751,7 @@ index fc832eb..0b5e9c1 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +11264,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +11253,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -7344,7 +7759,137 @@ index fc832eb..0b5e9c1 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -10115,19 +11942,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -9659,10 +11475,9 @@ int CMathomirView::PasteDrawing(CDC *DC,int cursorX, int cursorY, CObject *drawi
+ 				}
+ 			}
+ 		}
+-		else if ((IsShowGrid) && (!(GetKeyState(VK_MENU)&0xFFFE)))
++		else if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+ 		{
+-			AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID;
+-			AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
++			SnapCanvasGridPoint(AbsoluteX,AbsoluteY);
+ 		
+ 			int x1,y1;
+ 			mydrw->FindRealCorner(&x1,&y1);
+@@ -9741,36 +11556,98 @@ void CMathomirView::OnEditAccesslockedobjects()
+ 
+ }
+ 
++class CCanvasGridPreview:public CWnd
++{
++public:
++    CanvasGrid::Settings settings;int spacing;bool visible;
++    CCanvasGridPreview():spacing(16),visible(true){}
++    virtual LRESULT WindowProc(UINT message,WPARAM wp,LPARAM lp){
++        if(message==WM_PAINT){CPaintDC dc(this);CRect r;GetClientRect(&r);dc.FillSolidRect(r,RGB(255,255,255));
++            PaintCanvasGrid(&dc,settings,spacing,100,0,0,r.Width(),r.Height());
++            CanvasGrid::Point pointer(r.Width()*.61+3,r.Height()*.56+2),target=pointer;
++            if(visible&&settings.snap[settings.style])target=CanvasGrid::Snap(settings.style,spacing,pointer);
++            CPen guide(PS_SOLID,1,RGB(80,90,100)),blue(PS_SOLID,1,RGB(38,87,156));CBrush dot(RGB(38,87,156));int saved=dc.SaveDC();
++            dc.SelectObject(&guide);int px=(int)std::round(pointer.x),py=(int)std::round(pointer.y),x=(int)std::round(target.x),y=(int)std::round(target.y);
++            dc.MoveTo(px-5,py);dc.LineTo(px+6,py);dc.MoveTo(px,py-5);dc.LineTo(px,py+6);dc.SelectObject(&blue);dc.MoveTo(px,py);dc.LineTo(x,y);dc.SelectObject(&dot);dc.Ellipse(x-3,y-3,x+4,y+4);dc.RestoreDC(saved);return 0;
++        }return CWnd::WindowProc(message,wp,lp);
++    }
++};
++class CCanvasGridDialog:public CFeatureDialog
++{
++    bool initializing;int previous;CCanvasGridPreview preview;
++    void Refresh(){
++        settings.snap[settings.style]=IsDlgButtonChecked(1363)==BST_CHECKED;
++        show=IsDlgButtonChecked(1362)==BST_CHECKED;
++        settings.color=((CComboBox*)GetDlgItem(1365))->GetCurSel();
++        CString text;GetDlgItemText(1361,text);text.Trim();char *end=NULL;const char *start=text;long number=strtol(start,&end,10);
++        bool valid=end!=start&&end&&!*end&&number>=5&&number<=80;
++        SetDlgItemText(1367,valid?"":"Enter a whole-number spacing from 5 to 80.");GetDlgItem(IDOK)->EnableWindow(valid);
++        if(valid)spacing=(int)number;
++        std::wstring help=MathDisplay::HelpNotation(CanvasGrid::Description(settings.style));
++        help+=show?L"\nHold Alt to bypass snapping temporarily.":L"\nPage grid is hidden: snapping is temporarily off.";
++        ::SetWindowTextW(GetDlgItem(1366)->GetSafeHwnd(),help.c_str());
++        preview.settings=settings;preview.spacing=spacing;preview.visible=show;preview.Invalidate(FALSE);
++    }
++public:
++    CanvasGrid::Settings settings;int spacing;bool show;
++    CCanvasGridDialog():CFeatureDialog(IDD_CANVAS_GRID,theApp.m_pMainWnd),initializing(true),previous(CanvasGrid::Options().style),settings(CanvasGrid::Options()),spacing(GRID),show(true){}
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1364,this);
++        CComboBox *styles=(CComboBox*)GetDlgItem(1360);for(int i=0;i<CanvasGrid::StyleCount;i++)styles->AddString(CanvasGrid::Name(i));styles->SetCurSel(settings.style);
++        CComboBox *spaces=(CComboBox*)GetDlgItem(1361);for(int i: {8,16,24,32,48,64,80}){CString text;text.Format("%d",i);spaces->AddString(text);}SetDlgItemInt(1361,spacing);
++        CComboBox *colors=(CComboBox*)GetDlgItem(1365);colors->AddString("Neutral gray");colors->AddString("Soft blue");colors->AddString("Green");colors->SetCurSel(settings.color);
++        CheckDlgButton(1362,show?BST_CHECKED:BST_UNCHECKED);CheckDlgButton(1363,settings.snap[settings.style]?BST_CHECKED:BST_UNCHECKED);
++        initializing=false;Refresh();return TRUE;
++    }
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);
++        if(initializing)return CFeatureDialog::OnCommand(wp,lp);
++        if(id==1360&&notification==CBN_SELCHANGE){settings.snap[previous]=IsDlgButtonChecked(1363)==BST_CHECKED;settings.style=((CComboBox*)GetDlgItem(1360))->GetCurSel();previous=settings.style;CheckDlgButton(1363,settings.snap[settings.style]?BST_CHECKED:BST_UNCHECKED);Refresh();return TRUE;}
++        if(id==1362||id==1363||(id==1365&&notification==CBN_SELCHANGE)||(id==1361&&(notification==CBN_SELCHANGE||notification==CBN_EDITCHANGE))){
++            // An editable combo's selection notification precedes its edit text update.
++            if(id==1361&&notification==CBN_SELCHANGE){CString text;CComboBox *c=(CComboBox*)GetDlgItem(1361);c->GetLBText(c->GetCurSel(),text);c->SetWindowText(text);}
++            Refresh();return TRUE;
++        }return CFeatureDialog::OnCommand(wp,lp);
++    }
++    virtual void OnOK(){Refresh();if(GetDlgItem(IDOK)->IsWindowEnabled())CFeatureDialog::OnOK();}
++};
++void CMathomirView::OnCanvasGridOptions()
++{
++    if(GetCapture())ReleaseCapture();if(Toolbox)Toolbox->HideSubtoolbox();
++    CCanvasGridDialog dialog;if(dialog.DoModal()!=IDOK)return;
++    CanvasGrid::Options()=dialog.settings;GRID=dialog.spacing;IsShowGrid=dialog.show;SaveCanvasGridPreferences();
++    ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();RepaintTheView();
++    if(Toolbox&&Toolbox->Toolbar)Toolbox->Toolbar->UpdateToolbar(1);
++}
++
+ void CMathomirView::OnGridFine()
+ {
+-	GRID=8;
++	GRID=8;SaveCanvasGridPreferences();
+ 	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
+ 	if (IsShowGrid) RepaintTheView();
+ }
+ 
+ void CMathomirView::OnGridMedium()
+ {
+-	GRID=16;
++	GRID=16;SaveCanvasGridPreferences();
+ 	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
+ 	if (IsShowGrid) RepaintTheView();
+ }
+ 
+ void CMathomirView::OnGridCoarse()
+ {
+-	GRID=24;
++	GRID=24;SaveCanvasGridPreferences();
+ 	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
+ 	if (IsShowGrid) RepaintTheView();
+ }
+ 
+-/*void CMathomirView::OnGridSnaptogrid()
++void CMathomirView::OnGridSnaptogrid()
+ {
+-	if (SnapToGrid) SnapToGrid=0; else SnapToGrid=1;
+-	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
+-}*/
++    auto &s=CanvasGrid::Options();s.snap[s.style]=!s.snap[s.style];SaveCanvasGridPreferences();
++    ((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();
++}
+ 
+ void CMathomirView::OnViewShowgrid()
+ {
+-	if (IsShowGrid) IsShowGrid=0; else IsShowGrid=1;
++	if (IsShowGrid) IsShowGrid=0; else IsShowGrid=1;SaveCanvasGridPreferences();
+ 	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
+ 	RepaintTheView();
+ }
+@@ -9872,8 +11749,7 @@ int CMathomirView::StartKeyboardEntryAt(int AbsoluteX, int AbsoluteY, int start_
+ 		/*if (((GetKeyState(VK_MENU)&0xFFFE) && (!SnapToGrid)) ||
+ 			((!(GetKeyState(VK_MENU)&0xFFFE)) && (SnapToGrid)))
+ 		{
+-			AbsoluteX=((AbsoluteX+GRID/2)/GRID)*GRID;
+-			AbsoluteY=((AbsoluteY+GRID/2)/GRID)*GRID;
++			SnapCanvasGridPoint(AbsoluteX,AbsoluteY);
+ 		}*/
+ 		AddDocumentObject(1,AbsoluteX,AbsoluteY);
+ 		tDocumentStruct *ds;
+@@ -10115,19 +11991,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -7380,7 +7925,7 @@ index fc832eb..0b5e9c1 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +11976,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +12025,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -7388,7 +7933,7 @@ index fc832eb..0b5e9c1 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +12091,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +12140,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -7396,7 +7941,7 @@ index fc832eb..0b5e9c1 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12497,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12546,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -7404,7 +7949,7 @@ index fc832eb..0b5e9c1 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12798,793 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12847,793 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
@@ -8199,7 +8744,7 @@ index fc832eb..0b5e9c1 100644
 +    MouseMode=0;SetFocus();RepaintTheView();
 +}
 diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
-index 94dd0e4..a7c34eb 100644
+index 94dd0e4..5905b47 100644
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -44,6 +44,11 @@ protected:
@@ -8282,6 +8827,14 @@ index 94dd0e4..a7c34eb 100644
  	afx_msg void OnFontsizeVerylarge();
  	afx_msg void OnFontsizeLarge();
  	afx_msg void OnFontsizeNormal();
+@@ -136,6 +195,7 @@ public:
+ 	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
+ 	int PasteDrawing(CDC *DC,int cursorX, int cursorY, CObject* drawing=NULL,int select=0);
+ 	afx_msg void OnEditAccesslockedobjects();
++	afx_msg void OnCanvasGridOptions();
+ 	afx_msg void OnGridFine();
+ 	afx_msg void OnGridMedium();
+ 	afx_msg void OnGridCoarse();
 diff --git a/Mathomir/NativeSymbolic.h b/Mathomir/NativeSymbolic.h
 new file mode 100644
 index 0000000..5c47a0d
@@ -8653,7 +9206,7 @@ index 0000000..a7411c5
 +inline Point AngleLabel(const Shape &s,size_t i,double size){Point p=PagePoint(s,i,size);double a=AngleStart(s,i)+InteriorAngle(s,i)/2,r=MarkerRadius(s,i,size)+12;return Point(p.x+r*std::cos(a),p.y-r*std::sin(a));}
 +}
 diff --git a/Mathomir/PopupMenu.cpp b/Mathomir/PopupMenu.cpp
-index 7166815..1a552c8 100644
+index 7166815..f6729f2 100644
 --- a/Mathomir/PopupMenu.cpp
 +++ b/Mathomir/PopupMenu.cpp
 @@ -19,6 +19,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -8684,11 +9237,37 @@ index 7166815..1a552c8 100644
  					if (m_SelectedOption==i) lrg=TSize/24; else lrg=1;
  					dc->FillSolidRect(Options[i].X+TSize/8+1-lrg,Options[i].Y+1+TSize_1p20-lrg,TSize/8+2*lrg,TSize/8+2*lrg,clr);
  					if (Options[i].IsChecked&0x01) 
+@@ -3453,9 +3454,9 @@ search_second_pass:
+ 
+ 				int delta2=a+b+5+(a+b)/6;
+ 
+-				if (IsShowGrid)
++				if (IsCanvasGridSnapActive())
+ 				{
+-					delta2=(delta2/GRID+1)*GRID;
++					delta2=CanvasGridSpacingY(delta2);
+ 				}
+ 
+ 				AddDocumentObject(1,minX,maxY+a+5+a/6);
+@@ -3600,10 +3601,10 @@ search_second_pass:
+ 					int delta=org_ds->Below+a+(org_ds->Below+a)/6+5;
+ 					int delta2=a+b+5+(a+b)/6;
+ 
+-					if (IsShowGrid)
++					if (IsCanvasGridSnapActive())
+ 					{
+-						delta=(delta/GRID+1)*GRID;
+-						delta2=(delta2/GRID+1)*GRID;
++						delta=CanvasGridSpacingY(delta);
++						delta2=CanvasGridSpacingY(delta2);
+ 					}
+ 
+ 
 diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
-index 05446cf..c9b1ad9 100644
+index 05446cf..d2c8d9d 100644
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
-@@ -174,3 +174,136 @@
+@@ -174,3 +174,138 @@
  #define _APS_NEXT_SYMED_VALUE           101
  #endif
  #endif
@@ -8825,6 +9404,8 @@ index 05446cf..c9b1ad9 100644
 +
 +#define ID_NUMBER_FORMAT 33098
 +#define IDD_NUMBER_FORMAT 188
++#define IDD_CANVAS_GRID 189
++#define ID_CANVAS_GRID_OPTIONS 33099
 diff --git a/Mathomir/ScalarFunctions.h b/Mathomir/ScalarFunctions.h
 new file mode 100644
 index 0000000..22b17e5
@@ -9365,7 +9946,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..171eaee 100644
+index b9c3f38..f948e2e 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -9379,6 +9960,15 @@ index b9c3f38..171eaee 100644
  #include "Mathomir.h"
  #include "Toolbox.h"
  #include ".\toolbox.h"
+@@ -310,7 +313,7 @@ const struct
+ 	{31104,"Paste","Paste (Ctrl+V)",25},   //4
+ 	{30301,"Zoom","Zoom to default (1:1)",25}, //5
+ 	{0,"Image","Take bitmap image (F9)",25},    //6
+-	{32838,"Grid","Activate grid",25},         //7
++	{ID_CANVAS_GRID_OPTIONS,"Grid...","Grid styles, spacing and per-style snapping",0},         //7
+ 	{6017,"Draw","Hand-drawing tools(F4)",25}, //8
+ 	{48,"Increase","Increase font size",25},//9
+ 	{47,"Decrease","Decrease font size",25},//10
 @@ -331,7 +334,7 @@ const struct
  	{72,"Left","Left align",25},//25
  	{73,"Center","Center align",25},//26
@@ -9507,7 +10097,22 @@ index b9c3f38..171eaee 100644
  	try
  	{
  		IsWindowOutOfFocus=0;
-@@ -1948,6 +2020,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
+@@ -1912,13 +1984,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
+ 				//ToolbarEditNodes=0;
+ 				pMainView->SetMousePointer();
+ 			}
+-			if (icon==7)
+-			{
+-				if (IsShowGrid) IsShowGrid=0; else IsShowGrid=1;
+-				((CMainFrame*)theApp.m_pMainWnd)->AdjustMenu();
+-				pMainView->InvalidateRect(NULL,0);
+-				pMainView->UpdateWindow();
+-			}
++            if(icon==7){ReleaseCapture();pMainView->PostMessage(WM_COMMAND,ID_CANVAS_GRID_OPTIONS);return;}
+ 			if (icon==8) pMainView->OnKeyDown(VK_F4,0,0);
+ 			if (((KeyboardEntryBaseObject) && (KeyboardEntryObject)) || ((NumSelectedObjects==1) && (NumSelectedDrawings==0)))
+ 			{
+@@ -1948,6 +2014,7 @@ void CToolbox::OnLButtonDown(UINT nFlags, CPoint point)
  					{
  						yes=1;
  						if (parent->m_IsVertical) parent->m_IsVertical=0; else parent->m_IsVertical=1;
@@ -9515,7 +10120,7 @@ index b9c3f38..171eaee 100644
  					}
  					if (icon==19)
  					{
-@@ -2159,76 +2232,15 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2159,76 +2226,15 @@ void CToolbox::PaintColorbox(CDC * dc)
  
  	int t3=ToolboxSize/3;
  	int tmpy=max(0,ToolboxSize-60)/16;
@@ -9601,7 +10206,7 @@ index b9c3f38..171eaee 100644
  
  	//painting the line sizes
  	len=ToolboxSize/6;
-@@ -2290,8 +2302,11 @@ void CToolbox::PaintColorbox(CDC * dc)
+@@ -2290,8 +2296,11 @@ void CToolbox::PaintColorbox(CDC * dc)
  	if (m_SelectedColor==0) this->ShowHelptext("black color","","Alt+B","",6070);
  	if (m_SelectedColor==1) this->ShowHelptext("red color","","Alt+R","",6071);
  	if (m_SelectedColor==2) this->ShowHelptext("green color","","Alt+G","",6072);
@@ -9615,7 +10220,7 @@ index b9c3f38..171eaee 100644
  
  	if ((m_SelectedColor>=10) && (m_SelectedColor<=19)) this->ShowHelptext("line width","","","",6080);
  	if (m_SelectedColor==20) this->ShowHelptext("node edit","","Ctrl","",6090);
-@@ -3186,23 +3201,9 @@ int CToolbox::PaintToolbar(CDC *dc)
+@@ -3186,23 +3195,9 @@ int CToolbox::PaintToolbar(CDC *dc)
  
  void CToolbox::ToolbarShowHelp()
  {
@@ -9642,7 +10247,7 @@ index b9c3f38..171eaee 100644
  }
  
  void AddToolbarOption(unsigned char icon_index, unsigned char icon_state, unsigned char pixel_len, unsigned char pixel_separator)
-@@ -3516,6 +3517,8 @@ int prevKeyboardElement=-1;
+@@ -3516,6 +3511,8 @@ int prevKeyboardElement=-1;
  int prevToolbarItem=-1;
  void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -9651,7 +10256,7 @@ index b9c3f38..171eaee 100644
  	try
  	{
  	
-@@ -3642,7 +3645,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3642,7 +3639,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			else
  				m_IsArrowSelected=0;
  			m_SelectedElement=-1;
@@ -9660,7 +10265,7 @@ index b9c3f38..171eaee 100644
  
  			if ((ClipboardExpression==NULL) && (ClipboardDrawing==NULL))
  				if (m_FontModeElement!=prevFontElement)
-@@ -3659,7 +3662,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3659,7 +3656,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (m_FontModeElement!=-1)
  			{
  				m_FontModeElement=-1;
@@ -9669,7 +10274,7 @@ index b9c3f38..171eaee 100644
  			}
  
  			point.y-=ToolboxSize/2; //subsctract the header size
-@@ -3679,13 +3682,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3679,13 +3676,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				if (Xres+Yres>=-ToolboxSize/5-3)
  				{
  					//the mouse is pointing at subtoolbox opening arrow
@@ -9685,7 +10290,7 @@ index b9c3f38..171eaee 100644
  					m_IsArrowSelected=0;
  				}
  				
-@@ -3709,8 +3712,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3709,8 +3706,8 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				//color box
  				if (y<ToolboxSize/3) //selecting color
  				{
@@ -9696,7 +10301,7 @@ index b9c3f38..171eaee 100644
  				}
  				else if (y<2*ToolboxSize/3) //selecting line width
  				{
-@@ -3724,7 +3727,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3724,7 +3721,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				}
  				else
  					m_SelectedColor=-1;
@@ -9705,7 +10310,7 @@ index b9c3f38..171eaee 100644
  			}
  			else
  			{
-@@ -3747,7 +3750,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3747,7 +3744,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  					else if (point.x<2*ToolboxSize/3) m_SelectedTextControl=3;
  					else m_SelectedTextControl=4;
  				}
@@ -9714,7 +10319,7 @@ index b9c3f38..171eaee 100644
  			}
  
  		}
-@@ -3771,13 +3774,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3771,13 +3768,13 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			if (Xres+Yres<=ToolboxSize/5-1)
  			{
  				//the mouse is pointing at subtoolbox opening arrow
@@ -9730,7 +10335,7 @@ index b9c3f38..171eaee 100644
  				m_IsArrowSelected=0;
  			}
  			
-@@ -3793,7 +3796,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3793,7 +3790,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			theApp.m_pMainWnd->SetActiveWindow();
  			element=m_SelectedElement=font_element;
  			m_IsArrowSelected=0;
@@ -9739,7 +10344,7 @@ index b9c3f38..171eaee 100644
  		}
  	}
  	else if (m_IsSubtoolbox==-2)
-@@ -3804,7 +3807,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3804,7 +3801,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		m_IsArrowSelected=0;
  		if ((row==4) && (point.x>ToolboxSize*5)) m_IsArrowSelected=1;
  		font_element=m_SelectedElement=row*100+key;
@@ -9748,7 +10353,7 @@ index b9c3f38..171eaee 100644
  	}
  	else if (m_IsSubtoolbox==-1)
  	{
-@@ -3818,7 +3821,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3818,7 +3815,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  			//the mouse is pointing at the toolbox element
  			if (point.x>2*ToolboxSize+delta_center) m_IsArrowSelected=1; else m_IsArrowSelected=0;
  			m_SelectedElement=font_element;
@@ -9757,7 +10362,7 @@ index b9c3f38..171eaee 100644
  		}
  	}
  	else if (m_IsContextMenu)
-@@ -3902,7 +3905,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3902,7 +3899,7 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  				m_KeyboardElement=i;
  				element=i;
  				//ToolboxKeyboardElements.Key[i]->SelectExpression(1);
@@ -9766,7 +10371,7 @@ index b9c3f38..171eaee 100644
  				break;
  			}
  		}
-@@ -3911,17 +3914,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
+@@ -3911,17 +3908,17 @@ void CToolbox::OnMouseMove(UINT nFlags, CPoint point)
  		{
  			element=255;
  			if (AlternateVirtualKeyboard!=3) AlternateVirtualKeyboard=2;
@@ -9787,7 +10392,7 @@ index b9c3f38..171eaee 100644
  		}
  	}
  	else if (m_IsToolbar)
-@@ -3979,7 +3982,7 @@ finish_toolbox_mousemove:
+@@ -3979,7 +3976,7 @@ finish_toolbox_mousemove:
  			(prevToolboxElement!=element))
  		{
  			m_SelectedElement=element;
@@ -9796,7 +10401,7 @@ index b9c3f38..171eaee 100644
  		}
  		prevToolboxElement=element;
  
-@@ -3988,7 +3991,7 @@ finish_toolbox_mousemove:
+@@ -3988,7 +3985,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) m_FontModeElement=-1;
@@ -9805,7 +10410,7 @@ index b9c3f38..171eaee 100644
  
  		}
  
-@@ -4005,14 +4008,14 @@ finish_toolbox_mousemove:
+@@ -4005,14 +4002,14 @@ finish_toolbox_mousemove:
  
  		if (prevSelectedTextControl>0)
  		{
@@ -9822,7 +10427,7 @@ index b9c3f38..171eaee 100644
  		}
  		prevSelectedColor=m_SelectedColor;
  	}
-@@ -4036,7 +4039,7 @@ finish_toolbox_mousemove:
+@@ -4036,7 +4033,7 @@ finish_toolbox_mousemove:
  				(m_IsSubtoolbox==-4))
  			{
  				m_SelectedElement=element;
@@ -9831,7 +10436,7 @@ index b9c3f38..171eaee 100644
  			}
  		}
  		prevSubtoolboxElement=element;
-@@ -4047,7 +4050,7 @@ finish_toolbox_mousemove:
+@@ -4047,7 +4044,7 @@ finish_toolbox_mousemove:
  			(prevFontElement!=font_element))
  		{
  			if (font_element==-1) {m_SelectedElement=-1;}
@@ -9840,7 +10445,7 @@ index b9c3f38..171eaee 100644
  		}
  		
  		prevFontElement=font_element;
-@@ -4069,7 +4072,7 @@ finish_toolbox_mousemove:
+@@ -4069,7 +4066,7 @@ finish_toolbox_mousemove:
  		{
  
  			if (element==-1) {m_KeyboardElement=-1;}
@@ -9849,7 +10454,7 @@ index b9c3f38..171eaee 100644
  		}
  		prevKeyboardElement=element;
  	}
-@@ -4080,7 +4083,7 @@ finish_toolbox_mousemove:
+@@ -4080,7 +4077,7 @@ finish_toolbox_mousemove:
  		int langid=6000;
  		char *text="";
  		char *easycast="";
@@ -9858,7 +10463,7 @@ index b9c3f38..171eaee 100644
  		char *command="";
  		char buff[32];
  		strcpy(buff,"");
-@@ -4093,7 +4096,8 @@ finish_toolbox_mousemove:
+@@ -4093,7 +4090,8 @@ finish_toolbox_mousemove:
  			if (ToolboxMembers[help_element].Above[help_subelement]==-1)
  			{
  				CDrawing *drw=(CDrawing*)ToolboxMembers[help_element].Submembers[help_subelement];
@@ -9868,7 +10473,7 @@ index b9c3f38..171eaee 100644
  				if (drw->OriginalForm==1) {text="Rectangle";langid=6009;}
  				if (drw->OriginalForm==2) {text="Line";langid=6010;}
  				if (drw->OriginalForm==4) {text="Ellipse";langid=6011;}
-@@ -4103,6 +4107,25 @@ finish_toolbox_mousemove:
+@@ -4103,6 +4101,25 @@ finish_toolbox_mousemove:
  				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
  				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
  				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
@@ -9894,7 +10499,7 @@ index b9c3f38..171eaee 100644
  			}
  			else
  			{
-@@ -4135,16 +4158,32 @@ finish_toolbox_mousemove:
+@@ -4135,16 +4152,32 @@ finish_toolbox_mousemove:
  			strcat(buff,ToolboxKeycodes[i].name);
  			if (key&0x400) {strcpy(buff,"\'");strcat(buff,ToolboxKeycodes[i].name);strcat(buff,"\'");}
  		}
@@ -9930,7 +10535,7 @@ index b9c3f38..171eaee 100644
  }
  
  #pragma optimize("s",on)
-@@ -5658,8 +5697,8 @@ int CToolbox::LoadSettings(char * filename)
+@@ -5658,8 +5691,8 @@ int CToolbox::LoadSettings(char * filename)
  		fread(&ForceHighQualityImage,sizeof(int),1,fil);
  		fread(&ForceHalftoneImage,sizeof(int),1,fil);
  		fread(&DefaultFontSize,sizeof(int),1,fil);
@@ -9941,7 +10546,7 @@ index b9c3f38..171eaee 100644
  		fread(&MovingDotSize,sizeof(int),1,fil);
  		fread(&MovingDotPermanent,sizeof(int),1,fil);
  		fread(&GRID,sizeof(int),1,fil);
-@@ -5853,6 +5892,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+@@ -5853,6 +5886,99 @@ void CToolbox::OnSysKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  unsigned int DoublestrokesTimer;
  CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  {
@@ -10041,7 +10646,7 @@ index b9c3f38..171eaee 100644
  	//first we check for double-strokes
  	int l2=*len;
  	if (l2<1) return NULL;
-@@ -5896,7 +6028,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
+@@ -5896,7 +6022,7 @@ CExpression *CToolbox::CheckForKeycodes(char *keystrokes, int *len)
  			char *keycode=&ToolboxMembers[i].Keycodes[j][0];
  
  			int l=(int)strlen(keycode);
@@ -10050,7 +10655,7 @@ index b9c3f38..171eaee 100644
  
  			if (memcmp(keystrokes+l2-l,keycode,l)==0)
  			{
-@@ -5943,102 +6075,43 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
+@@ -5943,102 +6069,43 @@ CExpression* CToolbox::ReturnKeycode(int keycode_order,char **Keycode)
  
  
  int prev_lang_code;
@@ -10189,7 +10794,7 @@ index b9c3f38..171eaee 100644
  }
  
  extern int CalcStructuralChecksumOnly;
-@@ -6063,6 +6136,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6063,6 +6130,15 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  	}
  	Sleep(10);
  
@@ -10205,7 +10810,7 @@ index b9c3f38..171eaee 100644
  	if (ToolboxMembers[member].Above[submember]==-1) //drawing element
  	{
  		if (ToolboxMembers[member].userdef_mask&(1<<submember))
-@@ -6078,6 +6160,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+@@ -6078,6 +6154,7 @@ void CToolbox::PickUpElementFromToolbox(int member, int submember)
  		else
  		{
  			IsDrawingMode=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;

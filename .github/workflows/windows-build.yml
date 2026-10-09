@@ -32,6 +32,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Grid styles and snapping UI checks
+        shell: pwsh
+        run: ./tools/canvas-grid-smoke.ps1
       - name: Tooltips and rounding UI checks
         shell: pwsh
         run: ./tools/feature-help-smoke.ps1
