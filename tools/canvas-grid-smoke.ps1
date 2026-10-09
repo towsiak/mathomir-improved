@@ -110,6 +110,7 @@ try {
  foreach($style in 0..5){Grid $style 0;$signatures+=[GridUI]::Signature($view,160,160,160,160)}
  Check (($signatures|Select-Object -Unique).Count -eq 6) 'Different grid styles render identically'
  Grid 0 0 0;$hidden=[GridUI]::Signature($view,160,160,160,160);Check ($signatures -notcontains $hidden) 'A grid style did not paint on the page'
+ $d=Dialog;Check ([GridUI]::Send([GridUI]::Child($d,1362),240,0) -eq 0) "Opening grid options changed hidden-grid preference";[GridUI]::Send($d,273,2)|Out-Null
  # Test the real toolbar entry, including its visible hover help.
  $bar=[GridUI]::CaptionChild($main,'Toolbar');Check ($bar -ne [IntPtr]::Zero) 'Toolbar missing';$r=[GridUI]::Client($bar);$found=$false
  for($x=5;$x -lt $r.right;$x+=10){[GridUI]::Mouse($bar,512,0,$x,[int]($r.bottom/2));if([GridUI]::HintText($bar,$app.Id) -match 'Grid styles'){$found=$true;break}}
@@ -126,8 +127,10 @@ try {
   [GridUI]::Send($main,273,0xE103)|Out-Null
   [xml]$saved=Get-Content $fixture -Raw;$o=$saved.SelectSingleNode('/mathomir/*[self::o or self::obj][last()]');Check ($null -ne $o) 'Mouse drawing produced no object'
   $xy=if($snap){$expected[$style]}else{@(131,143)}
-  Write-Host "Grid $style snap=${snap}: saved origin $($o.X),$($o.Y)"
-  Check ([int]$o.X -eq $xy[0] -and [int]$o.Y -eq $xy[1]) "Grid $style snap=$snap placed object at wrong coordinates: $($o.OuterXml)"
+  $ink=$o.SelectSingleNode("./draw | ./dw");Check ($null -ne $ink -and $ink.HasAttribute("X1")) "Rectangle has no saved ink coordinates"
+  $inkX=[int]$o.X+[int]$ink.X1/1000;$inkY=[int]$o.Y+[int]$ink.Y1/1000
+  Write-Host "Grid $style snap=${snap}: visible corner $inkX,$inkY"
+  Check ($inkX -eq $xy[0] -and $inkY -eq $xy[1]) "Grid $style snap=$snap placed object at wrong coordinates: $($o.OuterXml)"
  }}
  # Placed math uses the ink-origin offset; native move grips must obey the same style.
  foreach($style in 0..5){

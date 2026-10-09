@@ -4834,7 +4834,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..455c921 100644
+index fc832eb..2d5b979 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -7804,13 +7804,13 @@ index fc832eb..455c921 100644
 +        SetDlgItemText(1367,valid?"":"Enter a whole-number spacing from 5 to 80.");GetDlgItem(IDOK)->EnableWindow(valid);
 +        if(valid)spacing=(int)number;
 +        std::wstring help=MathDisplay::HelpNotation(CanvasGrid::Description(settings.style));
-+        help+=show?L"\nHold Alt to bypass snapping temporarily.":L"\nPage grid is hidden: snapping is temporarily off.";
++        help+=!show?L"\nPage grid is hidden: snapping is temporarily off.":settings.snap[settings.style]?L"\nHold Alt to bypass snapping temporarily.":L"\nSnapping is off for this style: placement stays free.";
 +        ::SetWindowTextW(GetDlgItem(1366)->GetSafeHwnd(),help.c_str());
 +        preview.settings=settings;preview.spacing=spacing;preview.visible=show;preview.Invalidate(FALSE);
 +    }
 +public:
 +    CanvasGrid::Settings settings;int spacing;bool show;
-+    CCanvasGridDialog():CFeatureDialog(IDD_CANVAS_GRID,theApp.m_pMainWnd),initializing(true),previous(CanvasGrid::Options().style),settings(CanvasGrid::Options()),spacing(GRID),show(true){}
++    CCanvasGridDialog():CFeatureDialog(IDD_CANVAS_GRID,theApp.m_pMainWnd),initializing(true),previous(CanvasGrid::Options().style),settings(CanvasGrid::Options()),spacing(GRID),show(IsShowGrid!=0){}
 +    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1364,this);
 +        CComboBox *styles=(CComboBox*)GetDlgItem(1360);for(int i=0;i<CanvasGrid::StyleCount;i++)styles->AddString(CanvasGrid::Name(i));styles->SetCurSel(settings.style);
 +        CComboBox *spaces=(CComboBox*)GetDlgItem(1361);for(int i: {8,16,24,32,48,64,80}){CString text;text.Format("%d",i);spaces->AddString(text);}SetDlgItemInt(1361,spacing);
