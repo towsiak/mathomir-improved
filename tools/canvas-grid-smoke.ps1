@@ -151,9 +151,13 @@ try {
  # Persist different snap settings, custom spacing and color; check after a full restart.
  Grid 3 0;Grid 5 1
  $d=Dialog;[GridUI]::Set([GridUI]::Child($d,1361),'13');[GridUI]::Send($d,273,((5-shl 16)-bor 1361))|Out-Null;[GridUI]::Send([GridUI]::Child($d,1365),334,2)|Out-Null;[GridUI]::Send($d,273,((1-shl 16)-bor 1365))|Out-Null;[GridUI]::Send($d,273,1)|Out-Null
+ Start-Sleep -Milliseconds 250
  Stop-Process -Id $app.Id -Force;$app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru;Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;$view=[GridUI]::Child($main,0xE900)
  $d=Dialog;Check ([GridUI]::Send([GridUI]::Child($d,1362),240,0) -eq 1) 'Grid visibility not persisted';Check ([GridUI]::Send([GridUI]::Child($d,1360),327,0) -eq 5) 'Grid style not persisted';Check ([GridUI]::Text([GridUI]::Child($d,1361)) -eq '13') 'Custom spacing not persisted';Check ([GridUI]::Send([GridUI]::Child($d,1365),327,0) -eq 2) 'Grid color not persisted'
  Style $d 3;Check ([GridUI]::Send([GridUI]::Child($d,1363),240,0) -eq 0) 'Per-style snapping not persisted'
  foreach($style in 0..5){Style $d $style;Box $d 1363 1};Style $d 0;Box $d 1362 0;[GridUI]::Set([GridUI]::Child($d,1361),'16');[GridUI]::Send($d,273,((5-shl 16)-bor 1361))|Out-Null;[GridUI]::Send([GridUI]::Child($d,1365),334,0)|Out-Null;[GridUI]::Send($d,273,((1-shl 16)-bor 1365))|Out-Null;[GridUI]::Send($d,273,1)|Out-Null
+ # EndDialog returns before the parent saves settings; let the modal loop finish before killing the process.
+ Start-Sleep -Milliseconds 250
+ $d=Dialog;Check ([GridUI]::Send([GridUI]::Child($d,1362),240,0) -eq 0) 'Grid cleanup did not hide the grid';Check ([GridUI]::Send([GridUI]::Child($d,1360),327,0) -eq 0) 'Grid cleanup did not reset style';Check ([GridUI]::Text([GridUI]::Child($d,1361)) -eq '16') 'Grid cleanup did not reset spacing';Check ([GridUI]::Send([GridUI]::Child($d,1365),327,0) -eq 0) 'Grid cleanup did not reset color';[GridUI]::Send($d,273,2)|Out-Null;Start-Sleep -Milliseconds 200
  Write-Host 'Grid Windows checks passed: toolbar, all six rendered styles, twelve drawing/snap placements, typed math and grip placement in every style, per-style memory, persistence, validation and hover help.'
 } finally {if(!$app.HasExited){Stop-Process -Id $app.Id -Force}}
