@@ -70,6 +70,8 @@ public static class GridUI {
  [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h,IntPtr dc);
  [DllImport("gdi32.dll")] static extern uint GetPixel(IntPtr dc,int x,int y);
  public static ulong Signature(IntPtr h,int left,int top,int width,int height){IntPtr dc=GetDC(h);try{ulong hash=1469598103934665603;unchecked{for(int y=top;y<top+height;y++)for(int x=left;x<left+width;x++)hash=(hash^GetPixel(dc,x,y))*1099511628211;}return hash;}finally{ReleaseDC(h,dc);}}
+ public static int MoveGripY(IntPtr h,int x){IntPtr dc=GetDC(h);try{int first=-1,last=-1;for(int y=20;y<190;y++)if(GetPixel(dc,x,y)==0x009B5F2D){if(first<0)first=y;last=y;}if(first<0)throw new Exception("Move grip not painted");return (first+last)/2;}finally{ReleaseDC(h,dc);}}
+ public static int[] Expected(int style,int x,int y,int offset){double px=x+offset,py=y;if(style==3)return new[]{x,(int)Math.Round(py/16,MidpointRounding.AwayFromZero)*16};if(style==4)return new[]{(int)Math.Round(px/16,MidpointRounding.AwayFromZero)*16-offset,y};if(style!=5)return new[]{(int)Math.Round(px/16,MidpointRounding.AwayFromZero)*16-offset,(int)Math.Round(py/16,MidpointRounding.AwayFromZero)*16};double best=double.MaxValue,bx=px,by=py;for(int row=-50;row<=50;row++)for(int col=-50;col<=50;col++){double vx=col*16+Math.Abs(row%2)*8,vy=row*16*Math.Sqrt(3)/2,d=(vx-px)*(vx-px)+(vy-py)*(vy-py);if(d<best){best=d;bx=vx;by=vy;}}return new[]{(int)Math.Round(bx,MidpointRounding.AwayFromZero)-offset,(int)Math.Round(by,MidpointRounding.AwayFromZero)};}
  public static int Blue(IntPtr h){IntPtr dc=GetDC(h);try{int count=0;for(int y=190;y<375;y++)for(int x=150;x<500;x++)if(GetPixel(dc,x,y)==0xC00000)count++;return count;}finally{ReleaseDC(h,dc);}}
  public static void Place(IntPtr h){Send(h,512,0,(100<<16)|100);Send(h,513,1,(100<<16)|100);Send(h,514,0,(100<<16)|100);Send(h,258,27);Send(h,512,0,(50<<16)|850);}
 }
@@ -124,9 +126,24 @@ try {
   [GridUI]::Send($main,273,0xE103)|Out-Null
   [xml]$saved=Get-Content $fixture -Raw;$o=$saved.SelectSingleNode('/mathomir/*[self::o or self::obj][last()]');Check ($null -ne $o) 'Mouse drawing produced no object'
   $xy=if($snap){$expected[$style]}else{@(131,143)}
-  Write-Host "Grid $style snap=$snap: saved origin $($o.X),$($o.Y)"
+  Write-Host "Grid $style snap=${snap}: saved origin $($o.X),$($o.Y)"
   Check ([int]$o.X -eq $xy[0] -and [int]$o.Y -eq $xy[1]) "Grid $style snap=$snap placed object at wrong coordinates: $($o.OuterXml)"
  }}
+ # Placed math uses the ink-origin offset; native move grips must obey the same style.
+ foreach($style in 0..5){
+  Blank "typed-free-$style";Grid $style 0
+  [GridUI]::Mouse($view,512,0,137,157);[GridUI]::Mouse($view,513,1,137,157);[GridUI]::Mouse($view,514,0,137,157);[GridUI]::Send($view,258,120)|Out-Null;[GridUI]::Send($view,258,27)|Out-Null;[GridUI]::Send($main,273,0xE103)|Out-Null
+  [xml]$free=Get-Content $fixture -Raw;$o=$free.SelectSingleNode('/mathomir/*[self::o or self::obj][last()]');Check ($null -ne $o) 'Typing produced no math object';$xy=[GridUI]::Expected($style,[int]$o.X,[int]$o.Y,3)
+  Blank "typed-snap-$style";Grid $style 1
+  [GridUI]::Mouse($view,512,0,137,157);[GridUI]::Mouse($view,513,1,137,157);[GridUI]::Mouse($view,514,0,137,157);[GridUI]::Send($view,258,120)|Out-Null;[GridUI]::Send($view,258,27)|Out-Null;[GridUI]::Send($main,273,0xE103)|Out-Null
+  [xml]$snapped=Get-Content $fixture -Raw;$o=$snapped.SelectSingleNode('/mathomir/*[self::o or self::obj][last()]');Write-Host "Typed grid ${style}: $($o.X),$($o.Y)";Check ([int]$o.X -eq $xy[0] -and [int]$o.Y -eq $xy[1]) "Typed math did not use grid $style"
+  Blank "grip-$style"
+  '<?xml version="1.0"?><mathomir><o t="1" X="100" Y="150"><ex><var t="x123456" f="00" /></ex></o></mathomir>'|Set-Content $fixture -Encoding ascii
+  [GridUI]::Open($main,$fixture);Start-Sleep -Milliseconds 250;Grid $style 1
+  foreach($x in 105..120){[GridUI]::Mouse($view,512,0,$x,140)}
+  $y=[GridUI]::MoveGripY($view,88);[GridUI]::Mouse($view,512,0,88,$y);[GridUI]::Mouse($view,513,1,88,$y);[GridUI]::Mouse($view,512,1,119,($y-7));[GridUI]::Mouse($view,514,0,119,($y-7));[GridUI]::Send($main,273,0xE103)|Out-Null
+  [xml]$moved=Get-Content $fixture -Raw;$o=$moved.SelectSingleNode('/mathomir/*[self::o or self::obj][1]');$xy=[GridUI]::Expected($style,131,143,3);Write-Host "Grip grid ${style}: $($o.X),$($o.Y)";Check ([int]$o.X -eq $xy[0] -and [int]$o.Y -eq $xy[1]) "Move grip did not use grid $style"
+ }
  # Persist different snap settings, custom spacing and color; check after a full restart.
  Grid 3 0;Grid 5 1
  $d=Dialog;[GridUI]::Set([GridUI]::Child($d,1361),'13');[GridUI]::Send($d,273,((5-shl 16)-bor 1361))|Out-Null;[GridUI]::Send([GridUI]::Child($d,1365),334,2)|Out-Null;[GridUI]::Send($d,273,((1-shl 16)-bor 1365))|Out-Null;[GridUI]::Send($d,273,1)|Out-Null
@@ -134,5 +151,5 @@ try {
  $d=Dialog;Check ([GridUI]::Send([GridUI]::Child($d,1360),327,0) -eq 5) 'Grid style not persisted';Check ([GridUI]::Text([GridUI]::Child($d,1361)) -eq '13') 'Custom spacing not persisted';Check ([GridUI]::Send([GridUI]::Child($d,1365),327,0) -eq 2) 'Grid color not persisted'
  Style $d 3;Check ([GridUI]::Send([GridUI]::Child($d,1363),240,0) -eq 0) 'Per-style snapping not persisted'
  foreach($style in 0..5){Style $d $style;Box $d 1363 1};Style $d 0;Box $d 1362 0;[GridUI]::Set([GridUI]::Child($d,1361),'16');[GridUI]::Send($d,273,((5-shl 16)-bor 1361))|Out-Null;[GridUI]::Send([GridUI]::Child($d,1365),334,0)|Out-Null;[GridUI]::Send($d,273,((1-shl 16)-bor 1365))|Out-Null;[GridUI]::Send($d,273,1)|Out-Null
- Write-Host 'Grid Windows checks passed: toolbar, all six rendered styles, twelve drawing/snap placements, per-style memory, persistence, validation and hover help.'
+ Write-Host 'Grid Windows checks passed: toolbar, all six rendered styles, twelve drawing/snap placements, typed math and grip placement in every style, per-style memory, persistence, validation and hover help.'
 } finally {if(!$app.HasExited){Stop-Process -Id $app.Id -Force}}

@@ -9946,7 +9946,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..5e63962 100644
+index b9c3f38..edb27a9 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -9965,7 +9965,7 @@ index b9c3f38..5e63962 100644
  	{30301,"Zoom","Zoom to default (1:1)",25}, //5
  	{0,"Image","Take bitmap image (F9)",25},    //6
 -	{32838,"Grid","Activate grid",25},         //7
-+	{ID_CANVAS_GRID_OPTIONS,"Grid...","Grid styles and snapping",0},         //7
++	{ID_CANVAS_GRID_OPTIONS,"Grid...","Grid styles and snapping",25},         //7
  	{6017,"Draw","Hand-drawing tools(F4)",25}, //8
  	{48,"Increase","Increase font size",25},//9
  	{47,"Decrease","Decrease font size",25},//10
