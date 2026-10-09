@@ -4834,7 +4834,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..07e615f 100644
+index fc832eb..455c921 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -5508,7 +5508,7 @@ index fc832eb..07e615f 100644
 -				}
 -				delete yarray;
 -			}
-+            if(IsShowGrid)PaintCanvasGrid(&bitmapDC,CanvasGrid::Options(),GRID,ViewZoom,ViewX,ViewY,TheClientRect.Width(),TheClientRect.Height());
++            if(IsShowGrid)PaintCanvasGrid(&bitmapDC,CanvasGrid::Options(),GRID,ViewZoom,ViewX,ViewY,TheClientRect.right-TheClientRect.left,TheClientRect.bottom-TheClientRect.top);
 +
  		}
  		else
@@ -9946,7 +9946,7 @@ index 0000000..97c9c69
 +}
 +}
 diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
-index b9c3f38..f948e2e 100644
+index b9c3f38..5e63962 100644
 --- a/Mathomir/Toolbox.cpp
 +++ b/Mathomir/Toolbox.cpp
 @@ -18,7 +18,10 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
@@ -9965,7 +9965,7 @@ index b9c3f38..f948e2e 100644
  	{30301,"Zoom","Zoom to default (1:1)",25}, //5
  	{0,"Image","Take bitmap image (F9)",25},    //6
 -	{32838,"Grid","Activate grid",25},         //7
-+	{ID_CANVAS_GRID_OPTIONS,"Grid...","Grid styles, spacing and per-style snapping",0},         //7
++	{ID_CANVAS_GRID_OPTIONS,"Grid...","Grid styles and snapping",0},         //7
  	{6017,"Draw","Hand-drawing tools(F4)",25}, //8
  	{48,"Increase","Increase font size",25},//9
  	{47,"Decrease","Decrease font size",25},//10
