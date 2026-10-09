@@ -4834,7 +4834,7 @@ index 381b4e2..cb07877 100644
  	int UnscrambleMOMFile(char ** bufer, int len);
  };
 diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
-index fc832eb..2d5b979 100644
+index fc832eb..b721dc4 100644
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -19,17 +19,27 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -6566,7 +6566,18 @@ index fc832eb..2d5b979 100644
  				{
  					int mark_for_redraw=0;
  					if ((KeyboardEntryObject) && (KeyboardEntryBaseObject))
-@@ -8468,7 +9141,7 @@ int CMathomirView::PaintClipboard(int X, int Y)
+@@ -8174,6 +8847,10 @@ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ 				}
+ 				else 
+ 				{
++                    // A normal blank-page click starts typing directly, before OnChar can snap it.
++                    // Preserve exact placements (e.g. annotations) and explicit guideline alignment.
++                    if(!exactPlacement && IsCanvasGridSnapActive() && !(GetKeyState(VK_MENU)&0x8000)
++                        && !((nFlags&MK_SHIFT) && GuidlineElement>=0))SnapCanvasGridPoint(AbsoluteX,AbsoluteY,3);
+ 					StartKeyboardEntryAt(AbsoluteX,AbsoluteY,make_text);
+ 					if (KeyboardEntryObject) SetMousePointer();
+ 				}
+@@ -8468,7 +9145,7 @@ int CMathomirView::PaintClipboard(int X, int Y)
  		newy=Y-MovingStartY*ViewZoom/100;
  
  		if ((SpecialDrawingHover==NULL) || (((CDrawing*)SpecialDrawingHover->Object)->IsSpecialDrawing!=50)) //note: we dont use snap to grid inside drawing box
@@ -6575,7 +6586,7 @@ index fc832eb..2d5b979 100644
  		{
  			int X=ViewX+newx*100/ViewZoom;
  			int Y=ViewY+newy*100/ViewZoom;
-@@ -8477,8 +9150,7 @@ int CMathomirView::PaintClipboard(int X, int Y)
+@@ -8477,8 +9154,7 @@ int CMathomirView::PaintClipboard(int X, int Y)
  			ClipboardDrawing->FindRealCorner(&x1,&y1);
  			X+=x1;
  			Y+=y1;
@@ -6585,7 +6596,7 @@ index fc832eb..2d5b979 100644
  
  			newx=(X-x1-ViewX)*ViewZoom/100;
  			newy=(Y-y1-ViewY)*ViewZoom/100;
-@@ -8565,7 +9237,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+@@ -8565,7 +9241,9 @@ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
  				KeyboardEntryBaseObject--;
  			}
  
@@ -6596,7 +6607,7 @@ index fc832eb..2d5b979 100644
  			if (prevTouchedObject>object) prevTouchedObject--;
  			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
  			if (SelectedDocumentObject>object) SelectedDocumentObject--;
-@@ -9410,6 +10084,1015 @@ void CMathomirView::OnOutputimageForcehalftone()
+@@ -9410,6 +10088,1015 @@ void CMathomirView::OnOutputimageForcehalftone()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -7612,7 +7623,7 @@ index fc832eb..2d5b979 100644
  void CMathomirView::OnFontsizeVerylarge()
  {
  	DefaultFontSize=150; //bilo 185
-@@ -9422,6 +11105,138 @@ void CMathomirView::OnFontsizeLarge()
+@@ -9422,6 +11109,138 @@ void CMathomirView::OnFontsizeLarge()
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
  
@@ -7751,7 +7762,7 @@ index fc832eb..2d5b979 100644
  void CMathomirView::OnFontsizeNormal()
  {
  	DefaultFontSize=100;
-@@ -9438,6 +11253,7 @@ void CMathomirView::OnFontsizeSmall()
+@@ -9438,6 +11257,7 @@ void CMathomirView::OnFontsizeSmall()
  
  void CMathomirView::OnEditUndo()
  {
@@ -7759,7 +7770,7 @@ index fc832eb..2d5b979 100644
  	if (UndoNumLevels==0) return; //nothing to restore
  
  	//first stop the keyboard entry mode if it is active
-@@ -9659,10 +11475,9 @@ int CMathomirView::PasteDrawing(CDC *DC,int cursorX, int cursorY, CObject *drawi
+@@ -9659,10 +11479,9 @@ int CMathomirView::PasteDrawing(CDC *DC,int cursorX, int cursorY, CObject *drawi
  				}
  			}
  		}
@@ -7772,7 +7783,7 @@ index fc832eb..2d5b979 100644
  		
  			int x1,y1;
  			mydrw->FindRealCorner(&x1,&y1);
-@@ -9741,36 +11556,98 @@ void CMathomirView::OnEditAccesslockedobjects()
+@@ -9741,36 +11560,98 @@ void CMathomirView::OnEditAccesslockedobjects()
  
  }
  
@@ -7879,7 +7890,7 @@ index fc832eb..2d5b979 100644
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  	RepaintTheView();
  }
-@@ -9872,8 +11749,7 @@ int CMathomirView::StartKeyboardEntryAt(int AbsoluteX, int AbsoluteY, int start_
+@@ -9872,8 +11753,7 @@ int CMathomirView::StartKeyboardEntryAt(int AbsoluteX, int AbsoluteY, int start_
  		/*if (((GetKeyState(VK_MENU)&0xFFFE) && (!SnapToGrid)) ||
  			((!(GetKeyState(VK_MENU)&0xFFFE)) && (SnapToGrid)))
  		{
@@ -7889,7 +7900,7 @@ index fc832eb..2d5b979 100644
  		}*/
  		AddDocumentObject(1,AbsoluteX,AbsoluteY);
  		tDocumentStruct *ds;
-@@ -10115,19 +11991,22 @@ void CMathomirView::OnAutosaveHigh()
+@@ -10115,19 +11995,22 @@ void CMathomirView::OnAutosaveHigh()
  
  void CMathomirView::OnAutosaveLoadtheautosave()
  {
@@ -7925,7 +7936,7 @@ index fc832eb..2d5b979 100644
  }
  
  void CMathomirView::OnZoomWheelzoomadjustspointer()
-@@ -10146,6 +12025,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
+@@ -10146,6 +12029,7 @@ void CMathomirView::OnKeyboardAltmenushortcuts()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomin()
  {
@@ -7933,7 +7944,7 @@ index fc832eb..2d5b979 100644
  	if (ViewZoom>=480) return;
  	PaintDrawingHotspot(1);
  
-@@ -10260,6 +12140,7 @@ void CMathomirView::OnViewZoomin()
+@@ -10260,6 +12144,7 @@ void CMathomirView::OnViewZoomin()
  #pragma optimize("s",on)
  void CMathomirView::OnViewZoomout()
  {
@@ -7941,7 +7952,7 @@ index fc832eb..2d5b979 100644
  	PaintDrawingHotspot(1);
  	//RECT r;
  	//GetClientRect(&r);
-@@ -10665,6 +12546,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
+@@ -10665,6 +12550,7 @@ void CMathomirView::OnOutputimagePrintfontsasimages()
  
  void CMathomirView::OnViewZoomto1()
  {
@@ -7949,7 +7960,7 @@ index fc832eb..2d5b979 100644
  	DWORD t,t2;
  	if ((IsHalftoneRendering) && (IsHighQualityRendering) && (ViewZoom>300)) ViewZoom=300; //for speed
  	
-@@ -10965,3 +12847,793 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
+@@ -10965,3 +12851,793 @@ void CMathomirView::OnKeyboardUsecomplexindexes()
  	if (UseComplexIndexes) UseComplexIndexes=0; else UseComplexIndexes=1;
  	((CMainFrame*)(theApp.m_pMainWnd))->AdjustMenu();
  }
