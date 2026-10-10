@@ -18,12 +18,13 @@ function WholePanel {
 }
 function Places($p,$digits){$combo=[MathomirUiProbe]::Child($p,1391);[MathomirUiProbe]::Send($combo,334,($digits+1))|Out-Null;[MathomirUiProbe]::Send($p,273,((1 -shl 16) -bor 1391))|Out-Null;Start-Sleep -Milliseconds 100}
 function ResultText($p){[MathomirUiProbe]::Text([MathomirUiProbe]::Child($p,1393))}
-function Apply($p){[MathomirUiProbe]::Mouse($p,512,0,60,54);[MathomirUiProbe]::Mouse($p,513,1,60,54);[MathomirUiProbe]::Mouse($p,514,0,60,54);Start-Sleep -Milliseconds 200;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $file -Raw)}
+function Apply($p){$button=[MathomirUiProbe]::Child($p,1390);[MathomirUiProbe]::Mouse($button,512,0,30,12);[MathomirUiProbe]::Mouse($button,513,1,30,12);[MathomirUiProbe]::Mouse($button,514,0,30,12);Start-Sleep -Milliseconds 200;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $file -Raw)}
 $power='<elm tp="3" E1="" E2=""><ex><var t="e" f="00" /></ex><ex><var t="p" f="60" /></ex></elm>'
 try{
  for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 200;$appProcess.Refresh();if($appProcess.MainWindowHandle -ne 0){break}}
  $main=$appProcess.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,59648);Check ($view -ne [IntPtr]::Zero) ('No view: '+[MathomirUiProbe]::AllText($main));Write-Output ('Selection test frame: '+[MathomirUiProbe]::Text($main))
  LoadMath $power;$p=WholePanel;Places $p 2;Check ((ResultText $p) -eq '≈ 23.14') ('Wrong e-to-pi preview: '+(ResultText $p))
+ Write-Output 'Whole-expression panel and live rounded preview passed.'
  # The dropdown remains open and the highlight survives the trip to the panel.
  $combo=[MathomirUiProbe]::Child($p,1391);[MathomirUiProbe]::Send($combo,335,1)|Out-Null;Start-Sleep -Milliseconds 300;Check ([MathomirUiProbe]::IsWindowVisible($p)) 'Panel hid while decimal choices were open';[MathomirUiProbe]::Send($combo,335,0)|Out-Null
  Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($view);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'selection-approx-ui.png'));$graphics.Dispose();$image.Dispose()

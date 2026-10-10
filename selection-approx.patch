@@ -60,7 +60,15 @@
  	if (ClipboardBackground.DC)
  	{
  		ClipboardBackground.DC->DeleteDC();
-@@ -1952,6 +1991,7 @@
+@@ -886,6 +925,7 @@
+ 
+ BOOL CMathomirView::PreCreateWindow(CREATESTRUCT& cs)
+ {
++    cs.style|=WS_CLIPCHILDREN;
+ 	// TODO: Modify the Window class or styles here by modifying
+ 	//  the CREATESTRUCT cs
+ 
+@@ -1952,6 +1992,7 @@
  
  void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  {
@@ -68,7 +76,7 @@
      // Resolve the current point even when no preceding mouse-move was delivered.
      // Placement and an active selection gesture retain their existing state.
      if(MouseMode==0 && !IsDrawingMode && !TouchMouseMode && !(nFlags&MK_SHIFT) &&
-@@ -3462,6 +3502,7 @@
+@@ -3462,6 +3503,7 @@
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -76,7 +84,22 @@
      CCanvasHintScope canvasHintScope;
      if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive)
      {
-@@ -4728,6 +4769,7 @@
+@@ -3664,12 +3706,12 @@
+ 				NoNewSelections=1;
+ 			}
+ 			else
+-				SetCapture();
++				if(!m_SelectionApproxPanel || !m_SelectionApproxPanel->IsWindowVisible())SetCapture();
+ 		}
+ 	}
+ 	else
+ 	{
+-		SetCapture();
++		if(!m_SelectionApproxPanel || !m_SelectionApproxPanel->IsWindowVisible())SetCapture();
+ 	}
+ 
+ 	//calculate absolute positions of mouse arrow
+@@ -4728,6 +4770,7 @@
  	}
  
  	this->ReleaseDC(DC);
@@ -84,7 +107,7 @@
  	CView::OnMouseMove(nFlags, point);
  	}
  	catch(...)
-@@ -5135,6 +5177,7 @@
+@@ -5135,6 +5178,7 @@
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -92,7 +115,7 @@
      if(nChar==1 && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))return;
  	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
  	//initial keyboard testing (determining key codes when the shift key is used)
-@@ -5220,6 +5263,7 @@
+@@ -5220,6 +5264,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -100,7 +123,7 @@
      if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
      if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
  	if (MouseMovingActive && nChar==VK_ESCAPE) { EndGripMove(true); SurpressCharMessage=1; return; }
-@@ -6873,6 +6917,12 @@
+@@ -6873,6 +6918,12 @@
  unsigned int TimerTickAccumulator;
  void CMathomirView::OnTimer(UINT nIDEvent)
  {
@@ -113,7 +136,7 @@
  	// Modal dialogs disable the frame. Leave their message loop and focus alone.
  	if (theApp.m_pMainWnd && !theApp.m_pMainWnd->IsWindowEnabled())
  	{
-@@ -9029,6 +9079,7 @@
+@@ -9029,6 +9080,7 @@
  			RepaintTheView();
  		}
  	}
@@ -121,7 +144,7 @@
  	CView::OnLButtonUp(nFlags, point);
  	}
  	catch(...)
-@@ -13187,10 +13238,86 @@
+@@ -13187,10 +13239,88 @@
  
  
  
@@ -171,11 +194,13 @@
 +    try{std::string formula=NativeSymbolic::Formula(&input);SymbolicDerivative::Parser parser;auto parsed=parser.Parse(formula);extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);if(!SymbolicDerivative::Finite(value)){HideSelectionApproxPanel();return;}
 +        if(m_SelectionApproxDismissed==SelectionNativeXml(root)+"|"+formula){HideSelectionApproxPanel();return;}
 +        if(!m_SelectionApproxPanel){m_SelectionApproxPanel=new CSelectionApproxPanel(this);if(!m_SelectionApproxPanel->CreatePanel()){delete m_SelectionApproxPanel;m_SelectionApproxPanel=NULL;return;}}
-+        auto panel=m_SelectionApproxPanel;panel->root=(CObject*)root;panel->parent=selected;panel->first=first;panel->last=last;panel->rootXml=SelectionNativeXml(root);panel->formula=formula;panel->value=value;panel->objectRect=area;panel->zoom=ViewZoom;panel->vx=ViewX;panel->vy=ViewY;
++        auto panel=m_SelectionApproxPanel;
++        if(panel->IsWindowVisible()&&panel->root==(CObject*)root&&panel->parent==selected&&panel->first==first&&panel->last==last&&panel->rootXml==SelectionNativeXml(root)&&panel->zoom==ViewZoom&&panel->vx==ViewX&&panel->vy==ViewY)return;
++        panel->root=(CObject*)root;panel->parent=selected;panel->first=first;panel->last=last;panel->rootXml=SelectionNativeXml(root);panel->formula=formula;panel->value=value;panel->objectRect=area;panel->zoom=ViewZoom;panel->vx=ViewX;panel->vy=ViewY;
 +        CRect client;GetClientRect(client);int width=334,height=78;if(client.Width()<width+16||client.Height()<height+16){HideSelectionApproxPanel();return;}
 +        int x=max(8,min(area.left,client.right-width-8));int y=area.bottom+12;if(y+height>client.bottom-8)y=area.top-height-12;if(y<8)y=max(8,min(area.bottom+12,client.bottom-height-8));
 +        if(GetCapture()==this && !(GetKeyState(VK_LBUTTON)&0x8000))ReleaseCapture();
-+        panel->SetWindowPos(&wndTop,x,y,width,height,SWP_NOACTIVATE|SWP_SHOWWINDOW);panel->Refresh();
++        panel->SetWindowPos(&wndTop,x,y,width,height,SWP_NOACTIVATE|SWP_SHOWWINDOW);panel->Refresh();panel->RedrawWindow(NULL,NULL,RDW_INVALIDATE|RDW_UPDATENOW|RDW_ALLCHILDREN);
 +    }catch(const std::exception &e){if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("selection-approx-diagnostics.txt","a");if(trace){fprintf(trace,"selection parse: %s\n",e.what());fclose(trace);}}HideSelectionApproxPanel();}
 +}
 +void CMathomirView::ApplySelectionApproximation()
@@ -210,7 +235,7 @@
      if(ViewOnlyMode)return;
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute begin: undo=%d clipboard=%d keyboard=%d\n",UndoNumLevels,ClipboardExpression!=NULL,KeyboardEntryObject!=NULL);fclose(trace);}}
      tDocumentStruct *object=NULL;
-@@ -13920,4 +14047,5 @@
+@@ -13920,4 +14050,5 @@
          if(TheDocument[i].Object && (TheDocument[i].Type==1 || TheDocument[i].Type==2))
          {TheDocument[i].MovingDotState=3;NumSelectedObjects++;}
      MouseMode=0;SetFocus();RepaintTheView();
