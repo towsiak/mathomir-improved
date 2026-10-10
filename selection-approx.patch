@@ -141,7 +141,7 @@
 +{
 +    auto panel=m_SelectionApproxPanel;if(!panel||!panel->GetSafeHwnd()||!panel->IsWindowVisible())return false;
 +    tDocumentStruct *object=NULL;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==panel->root&&TheDocument[i].Type==1){object=TheDocument+i;break;}
-+    if(!object||ViewOnlyMode||IsDrawingMode||!theApp.m_pMainWnd->IsWindowEnabled()||panel->zoom!=ViewZoom||panel->vx!=ViewX||panel->vy!=ViewY||SelectionNativeXml((CExpression*)object->Object)!=panel->rootXml){HideSelectionApproxPanel();return false;}
++    if(!object||NumSelectedObjects>1||ViewOnlyMode||IsDrawingMode||!theApp.m_pMainWnd->IsWindowEnabled()||panel->zoom!=ViewZoom||panel->vx!=ViewX||panel->vy!=ViewY||SelectionNativeXml((CExpression*)object->Object)!=panel->rootXml){HideSelectionApproxPanel();return false;}
 +    if(panel->decimals.GetDroppedState())return true;
 +    if(panel->objectRect.PtInRect(point))return false;
 +    CRect rect;panel->GetWindowRect(rect);ScreenToClient(rect);rect.UnionRect(rect,panel->objectRect);rect.InflateRect(8,8);
@@ -149,26 +149,26 @@
 +}
 +void CMathomirView::UpdateSelectionApproxPanel(CPoint point,bool force)
 +{
-+    if(ViewOnlyMode||IsDrawingMode||ClipboardExpression||ClipboardDrawing||MouseMovingActive||MouseSizingActive||MouseRotationActive||MouseMode!=0||GetCapture()==this||Popup->IsWindowVisible())return;
++    if(ViewOnlyMode||IsDrawingMode||ClipboardExpression||ClipboardDrawing||MouseMovingActive||MouseSizingActive||MouseRotationActive||MouseMode!=0||GetCapture()==this||Popup->IsWindowVisible()){HideSelectionApproxPanel();return;}
 +    CObject *wanted=KeyboardEntryBaseObject?KeyboardEntryBaseObject->Object:prevTouchedObject?prevTouchedObject->Object:NULL;
 +    tDocumentStruct *object=NULL;
-+    if(NumSelectedObjects){if(NumSelectedObjects!=1)return;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState==3){if(TheDocument[i].Type!=1)return;object=TheDocument+i;break;}}
++    if(NumSelectedObjects){if(NumSelectedObjects!=1){HideSelectionApproxPanel();return;}for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState==3){if(TheDocument[i].Type!=1){HideSelectionApproxPanel();return;}object=TheDocument+i;break;}}
 +    else for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==wanted&&TheDocument[i].Type==1){object=TheDocument+i;break;}
-+    if(!object||!object->Object)return;
++    if(!object||!object->Object){HideSelectionApproxPanel();return;}
 +    CRect area((object->absolute_X-ViewX)*ViewZoom/100,(object->absolute_Y-object->Above-ViewY)*ViewZoom/100,(object->absolute_X+object->Length-ViewX)*ViewZoom/100+1,(object->absolute_Y+object->Below-ViewY)*ViewZoom/100+1);
-+    if(!force&&!area.PtInRect(point))return;
-+    auto root=(CExpression*)object->Object;if(root->m_StartAsText)return;
-+    auto selected=object->MovingDotState==3?root:root->AdjustSelection();if(!selected||selected->m_StartAsText)return;
++    if(!force&&!area.PtInRect(point)){HideSelectionApproxPanel();return;}
++    auto root=(CExpression*)object->Object;if(root->m_StartAsText){HideSelectionApproxPanel();return;}
++    auto selected=object->MovingDotState==3?root:root->AdjustSelection();if(!selected||selected->m_StartAsText){HideSelectionApproxPanel();return;}
 +    int first=-1,last=-1;bool keyboardSelection=false;for(int i=0;i<selected->m_NumElements;i++)if(selected->m_pElementList[i].Type>0&&selected->m_pElementList[i].IsSelected){if(first<0)first=i;last=i;keyboardSelection|=selected->m_pElementList[i].IsSelected==2;}
-+    if(first<0||last<first||(KeyboardEntryObject&&!keyboardSelection))return;
++    if(first<0||last<first||(KeyboardEntryObject&&!keyboardSelection)){HideSelectionApproxPanel();return;}
 +    CExpression input(NULL,NULL,selected->m_FontSize);input.Delete();for(int i=first;i<=last;i++)input.InsertElement(selected->m_pElementList+i,input.m_NumElements);
 +    // A saved equation is evaluated from its original left side.
 +    if(selected==root&&first==0)for(int i=0;i<input.m_NumElements;i++)if(input.m_pElementList[i].Type==2&&(input.m_pElementList[i].pElementObject->Data1[0]=='='||input.m_pElementList[i].pElementObject->Data1[0]==(char)0xBB)){while(input.m_NumElements>i)input.DeleteElement(i);break;}
 +    try{std::string formula=NativeSymbolic::Formula(&input);SymbolicDerivative::Parser parser;auto parsed=parser.Parse(formula);extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);if(!SymbolicDerivative::Finite(value)){HideSelectionApproxPanel();return;}
-+        if(m_SelectionApproxDismissed==SelectionNativeXml(root)+"|"+formula)return;
++        if(m_SelectionApproxDismissed==SelectionNativeXml(root)+"|"+formula){HideSelectionApproxPanel();return;}
 +        if(!m_SelectionApproxPanel){m_SelectionApproxPanel=new CSelectionApproxPanel(this);if(!m_SelectionApproxPanel->CreatePanel()){delete m_SelectionApproxPanel;m_SelectionApproxPanel=NULL;return;}}
-+        auto panel=m_SelectionApproxPanel;panel->root=root;panel->parent=selected;panel->first=first;panel->last=last;panel->rootXml=SelectionNativeXml(root);panel->formula=formula;panel->value=value;panel->objectRect=area;panel->zoom=ViewZoom;panel->vx=ViewX;panel->vy=ViewY;
-+        CRect client;GetClientRect(client);int width=334,height=78;if(client.Width()<width+16||client.Height()<height+16)return;
++        auto panel=m_SelectionApproxPanel;panel->root=(CObject*)root;panel->parent=selected;panel->first=first;panel->last=last;panel->rootXml=SelectionNativeXml(root);panel->formula=formula;panel->value=value;panel->objectRect=area;panel->zoom=ViewZoom;panel->vx=ViewX;panel->vy=ViewY;
++        CRect client;GetClientRect(client);int width=334,height=78;if(client.Width()<width+16||client.Height()<height+16){HideSelectionApproxPanel();return;}
 +        int x=max(8,min(area.left,client.right-width-8));int y=area.bottom+12;if(y+height>client.bottom-8)y=area.top-height-12;if(y<8)y=max(8,min(area.bottom+12,client.bottom-height-8));
 +        panel->SetWindowPos(&wndTop,x,y,width,height,SWP_NOACTIVATE|SWP_SHOWWINDOW);panel->Refresh();
 +    }catch(const std::exception &){HideSelectionApproxPanel();}
@@ -177,7 +177,7 @@
 +{
 +    auto panel=m_SelectionApproxPanel;if(!panel||!panel->IsWindowVisible()||ViewOnlyMode)return;
 +    tDocumentStruct *object=NULL;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==1&&TheDocument[i].Object==panel->root){object=TheDocument+i;break;}
-+    if(!object||SelectionNativeXml((CExpression*)object->Object)!=panel->rootXml){HideSelectionApproxPanel();SetFocus();return;}
++    if(!object||NumSelectedObjects>1||SelectionNativeXml((CExpression*)object->Object)!=panel->rootXml){HideSelectionApproxPanel();SetFocus();return;}
 +    int digits=panel->Digits();theApp.WriteProfileInt("Math","SelectionDecimals",digits);
 +    auto root=(CExpression*)object->Object;auto parent=panel->parent;int first=panel->first,last=panel->last;
 +    bool whole=parent==root&&first==0;for(int i=last+1;whole&&i<root->m_NumElements;i++)if(root->m_pElementList[i].Type>0&&!(root->m_pElementList[i].Type==1&&!root->m_pElementList[i].pElementObject->Data1[0]))whole=false;
