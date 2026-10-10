@@ -184,3 +184,14 @@ jobs:
           ./tools/log-base-smoke.ps1
           ./tools/integral-evaluation-smoke.ps1
           ./tools/windows-smoke.ps1
+
+      - name: Upload native memory diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Native-Memory-Diagnostics
+          path: |
+            source/build/asan*
+            source/build/selection-approx-diagnostics.txt
+            source/build/selection-approx-ui.png
+          if-no-files-found: warn
