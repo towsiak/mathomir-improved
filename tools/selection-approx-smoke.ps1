@@ -35,15 +35,17 @@ try{
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -notmatch '23\.14') 'Undo failed'
  foreach($digits in @(0,4,8)){$p=WholePanel;Places $p $digits;$doc=Apply $p;$want=if($digits -eq 0){'23'}elseif($digits -eq 4){'23.1407'}else{'23.14069263'};Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="'+$want+'"]')) ('Wrong decimal places: '+$digits);[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null}
  LoadMath '<var t="2" f="00" />';$p=WholePanel;Places $p 2;$doc=Apply $p;Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2.00"]')) ('Requested trailing zeroes were lost: '+$doc.OuterXml)
+ Write-Output 'Approximate button, 0/2/4/8 places, trailing zeroes and whole-expression Undo passed.'
  # Hover a selected power inside a sum; only the highlighted part is replaced.
  LoadMath ('<var t="2" f="00" /><opr s="+" />'+$power);$found=$false
  for($y=108;$y -le 130 -and !$found;$y+=3){for($x=129;$x -le 185;$x+=3){[MathomirUiProbe]::Mouse($view,512,0,$x,$y);$p=Panel;if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)){Places $p 2;if((ResultText $p) -eq '≈ 23.14'){$found=$true;break}}}}
  Check $found 'Selected subexpression did not show its own approximation';$doc=Apply $p
  Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2"]') -and $doc.SelectSingleNode('//elm[@tp="1" and @tx="23.14"]') -and !$doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]') -and !$doc.SelectSingleNode('//elm[@tp="3"]')) ('Partial approximation changed surrounding math: '+$doc.OuterXml)
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw;Check ($doc.SelectSingleNode('//elm[@tp="3"]')) 'Partial approximation Undo failed'
+ Write-Output 'Selected-part replacement and Undo passed.'
  LoadMath $power;$p=WholePanel;[MathomirUiProbe]::Send($p,273,1392)|Out-Null;Start-Sleep -Milliseconds 400;Check (![MathomirUiProbe]::IsWindowVisible($p)) 'Dismissed panel reopened'
  LoadMath '<fun t="ln" E1=""><ex><var t="-1" f="00" /></ex></fun>';[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::Mouse($view,512,0,105,126);$p=Panel;Check ($p -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($p)) 'Undefined logarithm showed an approximation'
  # Per-result decimals must not change the normal approximation preference.
- LoadMath $power;[MathomirUiProbe]::ExecuteKey($view,$true);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -match '23\.1406926328') 'Panel changed global rounding preferences'
+ LoadMath $power;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$true);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -match '23\.1406926328') 'Panel changed global rounding preferences'
  Write-Output 'Selection approximation passed: automatic panel, live Unicode preview, actual Approximate button, decimal dropdown, 0/2/4/8 places, trailing zeroes, original retention, partial replacement, Undo, dismissal, undefined-domain rejection and unchanged global rounding.'
 }catch{Write-Output ([MathomirUiProbe]::AllText($main));$trace=Join-Path (Split-Path $exe) 'selection-approx-diagnostics.txt';if(Test-Path $trace){Get-Content $trace|Select-Object -Last 30|Write-Output};throw}finally{if(!$appProcess.HasExited){$appProcess.Kill();$appProcess.WaitForExit()}}
