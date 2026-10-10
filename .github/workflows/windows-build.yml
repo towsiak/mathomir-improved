@@ -27,6 +27,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../integral-evaluation.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../integral-followup.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh

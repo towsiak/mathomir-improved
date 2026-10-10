@@ -1,0 +1,37 @@
+diff --git a/Mathomir/IntegralPaint.h b/Mathomir/IntegralPaint.h
+--- a/Mathomir/IntegralPaint.h
++++ b/Mathomir/IntegralPaint.h
+@@ -9,14 +9,18 @@
+     auto px=[&](double x){return plot.left+(int)((x-xmin)/(xmax-xmin)*(plot.Width()-1));};
+     auto py=[&](double y){double f=(y-ymin)/(ymax-ymin);f=(std::max)(-1.,(std::min)(2.,f));return plot.bottom-1-(int)(f*(plot.Height()-1));};
+     double low=(std::min)(s.a,s.b),high=(std::max)(s.a,s.b);
+-    CBrush positive,negative;positive.CreateHatchBrush(HS_BDIAGONAL,RGB(80,125,185));negative.CreateHatchBrush(HS_BDIAGONAL,RGB(180,95,115));
++    const int patternScale=(std::max)(1,plot.Width()/600),spacing=8*patternScale,stroke=2*patternScale;
+     dc.SetBkMode(OPAQUE);
+     for(int i=0;i<plot.Width();i++){
+         double x=xmin+(xmax-xmin)*(i+.5)/plot.Width();if(x<low||x>high)continue;
+         double y=IntegralArea::Value(s,r,x);if(!SymbolicDerivative::Finite(y))continue;
+         int y0=py(0),yf=py(y);CRect strip(plot.left+i,(std::min)(y0,yf),plot.left+i+1,(std::max)(y0,yf));
+         COLORREF tint=y>=0?RGB(219,234,253):RGB(252,222,229);
+-        if(s.hatch){dc.SetBkColor(tint);dc.FillRect(strip,y>=0?&positive:&negative);}else dc.FillSolidRect(strip,tint);
++        dc.FillSolidRect(strip,tint);
++        // Explicit clipped strokes avoid device-dependent hatch-brush colors.
++        if(s.hatch){int top=(std::max)(strip.top,plot.top),bottom=(std::min)(strip.bottom,plot.bottom);int phase=(plot.left+i+top)%spacing;
++            int start=top-phase;for(int yy=start;yy<bottom;yy+=spacing){int first=(std::max)(top,yy),last=(std::min)(bottom,yy+stroke);if(last>first)dc.FillSolidRect(plot.left+i,first,1,last-first,y>=0?RGB(80,125,185):RGB(180,95,115));}}
++
+     }
+     CPen bounds(PS_DASH,1,RGB(110,115,125)),axis(PS_SOLID,1,RGB(165,170,178)),line(PS_SOLID,2,RGB(25,35,50));
+     dc.SelectObject(&axis);if(ymin<=0&&ymax>=0){dc.MoveTo(plot.left,py(0));dc.LineTo(plot.right,py(0));}
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13422,7 +13422,8 @@
+ static CDrawing *FindIntegralGraph(CDrawing *drawing,int depth=0){if(!drawing||depth>32)return NULL;if(drawing->IsSpecialDrawing==51&&drawing->SpecialData){auto p=(CFunctionPlotter*)drawing->SpecialData;if(p->integral.enabled||(p->pieces.empty()&&p->scatterPoints.empty()))return drawing;}for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0){CDrawing *found=FindIntegralGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1);if(found)return found;}return NULL;}
+ void CMathomirView::OnIntegralShader()
+ {
+-    if(ViewOnlyMode)return;OnChar(27,1,0);CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object->MovingDotState==3)){existing=FindIntegralGraph((CDrawing*)object->Object);if(existing)break;}}
++    if(ViewOnlyMode)return;CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object->MovingDotState==3)){existing=FindIntegralGraph((CDrawing*)object->Object);if(existing)break;}}
++    if(MouseMode==102)existing=NULL;OnChar(27,1,0);
+     CIntegralDialog dialog;if(existing){auto plotter=(CFunctionPlotter*)existing->SpecialData;dialog.settings=plotter->integral;if(!plotter->integral.enabled){try{plotter->EnsureFunctionSlots();auto expression=(CExpression*)existing->Items[8].pSubdrawing;int first=0;for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='=')first=n+1;dialog.settings.formula=NativeSymbolic::Formula(expression,first);}catch(const std::exception &){}double ymin,ymax;plotter->PlotFunctionGetBondaries(&dialog.settings.a,&dialog.settings.b,&ymin,&ymax);dialog.settings.radians=plotter->is_x_pi!=0;}}if(dialog.DoModal()!=IDOK)return;
+     CDrawing *drawing=existing;CFunctionPlotter *plotter;
+     if(existing){plotter=(CFunctionPlotter*)drawing->SpecialData;if(!plotter->StopForZoom()){AfxMessageBox("The graph is still finishing. Try again shortly.");return;}UndoSave("edit integral area");}
