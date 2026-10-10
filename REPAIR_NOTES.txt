@@ -1,3 +1,11 @@
+Signed unit-circle arcs and arrows — 2026-10-10
+- Automatic direction now follows end minus start: 0 to -90 makes a clockwise
+  quarter-turn to the negative y-axis. Arrowheads follow the actual arc tangent.
+- Negative degree and decimal-radian labels keep their native minus sign.
+- Complete turns retain their signed sweep; equal start/end draws no arrow.
+- Explicit clockwise/counterclockwise overrides remain available.
+- Native Windows checks measure saved arc angles, quadrants and arrow direction.
+
 Grid styles and independent snapping — 2026-10-08
 - Grid toolbar button opens a preview with dots, square lines, graph paper,
   horizontal ruling, vertical ruling and isometric triangles.

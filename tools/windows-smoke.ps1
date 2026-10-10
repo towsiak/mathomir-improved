@@ -1066,7 +1066,7 @@ try {
     [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1133),334,[int]$radian)|Out-Null
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1130),$(if($radian){'pi/6'}else{'30'}))
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1131),$(if($radian){'5*pi/6'}else{'150'}))
-    [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1134),334,[int]$radian)|Out-Null
+    [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1134),334,$(if($radian){2}else{1}))|Out-Null
     [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($unitDialog,1140),$(if($radian){'pi/4, -pi/2, pi/3, 7*pi/3, pi/6'}else{'45, -90, 60, 420, 30'}))
     [MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1137),241,1)|Out-Null
     if([MathomirUiProbe]::Send([MathomirUiProbe]::Child($unitDialog,1139),240,0) -ne 1){throw 'Unit circle point markers were not enabled by default.'}
