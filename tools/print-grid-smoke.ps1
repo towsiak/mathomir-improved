@@ -53,5 +53,7 @@ try{
  $d=Options
  if([GridUI]::Send([GridUI]::Child($d,1368),240,0) -ne 0){throw 'Print-grid preference did not persist.'}
  Box $d 1368 1;[GridUI]::Send($d,273,1)|Out-Null;Start-Sleep -Milliseconds 250
+ # Leave the shared runner with its normal hidden grid and free movement.
+ Set-Grid 0 0 1
  Write-Output 'Print grid passed: all six styles, three colors, OnPrint and MFC preview at 100/50 percent, pages 1/2, hidden/excluded grids, distinct output, restored viewport and persisted print preference.'
 }finally{$app.Refresh();if(!$app.HasExited){Stop-Process -Id $app.Id -Force};Remove-Item Env:MATHOMIR_PRINT_GRID_CHECK -ErrorAction SilentlyContinue}
