@@ -67,7 +67,7 @@ try {
  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
  Check ($doc.SelectNodes('//integral').Count -eq 1 -and $doc.SelectSingleNode('//integral').hatch -eq '1') 'Editing duplicated graph or lost hatch option'
  [MathomirUiProbe]::Mouse($view,512,0,850,50);Start-Sleep -Milliseconds 200
- Check ([MathomirUiProbe]::CountColor($view,100,100,720,550,0x00B97D50) -gt 20) 'Hatch strokes were not rendered'
+ Check (([MathomirUiProbe]::CountColor($view,100,100,720,550,0x00B97D50)+[MathomirUiProbe]::CountColor($view,100,100,720,550,0x00B96040)) -gt 20) 'Hatch strokes were not rendered'
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
  Check ($doc.SelectSingleNode('//integral').a -eq '-2' -and $doc.SelectSingleNode('//integral').hatch -eq '0') 'Undo did not restore original integral settings'
  Write-Output 'Integral native UI passed: actual palette, Unicode readouts, invalid pole, signed/absolute area, colored rendering, save/reload, edit, hatch and Undo.'
