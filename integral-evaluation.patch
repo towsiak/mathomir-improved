@@ -1,0 +1,509 @@
+diff --git a/Mathomir/Drawing.h b/Mathomir/Drawing.h
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -3,6 +3,7 @@
+ #include "Piecewise.h"
+ #include <atomic>
+ #include "Statistics.h"
++#include "IntegralArea.h"
+ 
+ //scalling factor that defines drawings inner precision
+ #define DRWZOOM 32
+@@ -115,6 +116,7 @@
+ class CFunctionPlotter
+ {
+ public:
++    IntegralArea::Settings integral;IntegralArea::Result integralResult;std::string integralError;
+     std::vector<Piecewise::Row> pieces;
+     bool pieceRadians;
+     std::vector<Statistics::Point> scatterPoints;int statisticsModel;bool scatterResidual;
+diff --git a/Mathomir/FeatureHelp.h b/Mathomir/FeatureHelp.h
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -39,6 +39,17 @@
+     }
+ };
+ inline const char *FeatureControlHelp(int dialog,int id){
++    if(dialog==IDD_INTEGRAL_SHADER){
++        if(id==1370)return "Formula in x, such as sin(x), x^2, ln(x), floor(x) or exp(-x^2). Proper finite real integrals only.";
++        if(id==1371||id==1372)return "Finite integration bound. Constants such as -2, 1/2 and pi are accepted. Reversing the bounds reverses the signed integral only.";
++        if(id==1373)return "Use radians for trigonometric functions. Uncheck for degrees; bounds are always x values.";
++        if(id==1374)return "Use diagonal hatching instead of a solid tint. Shading is clipped between the curve and x-axis and to the integration bounds.";
++        if(id==1375)return "Show bounds, signed integral and total area in the graph legend. Blue is positive area; rose is negative area.";
++        if(id==1376)return "Validate and integrate the formula numerically, then update the preview. Undefined points, poles and unreliable estimates are rejected.";
++        if(id==1377)return "Preview of the exact region that will be shaded. Positive and negative areas use distinct colors; dashed lines mark the bounds.";
++        if(id==1378)return "Signed numerical integral, total area and estimated quadrature error. Numerical estimates are approximate, even when the display rounds to an integer.";
++        if(id>=1379&&id<=1381)return "Load an editable integral-shading example.";
++    }
+     if(dialog==IDD_CANVAS_GRID){
+         if(id==IDOK)return "Apply the grid appearance and this style's snap preference. Settings are remembered on restart.";
+         if(id==IDCANCEL)return "Close without changing grid settings.";
+diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
+--- a/Mathomir/FunctionPlotter.cpp
++++ b/Mathomir/FunctionPlotter.cpp
+@@ -20,6 +20,7 @@
+ *********************************************************************************************************/
+ #include "StdAfx.h"
+ #include "PiAxis.h"
++#include "IntegralPaint.h"
+ #include "MathDisplay.h"
+ #include "GraphZoom.h"
+ #include "GraphDiscontinuities.h"
+@@ -168,6 +169,7 @@
+ 	CFunctionPlotter *org=(CFunctionPlotter*)Original->SpecialData;
+ 	if (!org) return 0;
+ 
++    integral=org->integral;integralResult=org->integralResult;integralError=org->integralError;
+     pieces=org->pieces;pieceRadians=org->pieceRadians;scatterPoints=org->scatterPoints;statisticsModel=org->statisticsModel;scatterResidual=org->scatterResidual;
+ 	is_y_log=org->is_y_log;
+ 	is_x_log=org->is_x_log;
+@@ -957,6 +959,14 @@
+             DC->RestoreDC(clip);
+             lx+=width+8;rowHeight=max(rowHeight,height);
+         }
++        if(integral.enabled && integral.labels){
++            int sy=ly+rowHeight+4;DC->SelectObject(GetFontFromPool(4,0,0,max(8,10*zoom/100)));DC->SetTextAlign(TA_LEFT|TA_TOP);DC->SetBkMode(TRANSPARENT);DC->SetTextColor(RGB(40,50,65));
++            std::wstring lines[3]={L"a = "+MathDisplay::Number(integral.a)+L"; b = "+MathDisplay::Number(integral.b),
++                integralResult.ready?L"Signed integral \u2248 "+MathDisplay::Number(integralResult.integral)+L"; total area \u2248 "+MathDisplay::Number(integralResult.area):L"Integral unavailable: check the formula and bounds.",
++                is_x_log||is_y_log?L"Area shading requires linear axes.":L"Blue: above axis; rose: below axis."};
++            for(int row=0;row<3;row++){SIZE size;::GetTextExtentPoint32W(DC->GetSafeHdc(),lines[row].c_str(),(int)lines[row].size(),&size);if(sy+size.cy>=Y+Ylen-BottomMargin-2)break;
++                DC->FillSolidRect(origin,sy,min(size.cx+6,limit-origin),size.cy+4,RGB(255,255,255));::TextOutW(DC->GetSafeHdc(),origin+2,sy+2,lines[row].c_str(),(int)lines[row].size());sy+=size.cy+4;}
++        }
+         if(!scatterPoints.empty()){
+             int sy=ly+rowHeight+4;DC->SelectObject(GetFontFromPool(4,0,0,max(8,10*zoom/100)));DC->SetTextAlign(TA_LEFT|TA_TOP);DC->SetTextColor(ImprovedColor(3));
+             std::wstring text=(scatterResidual?L"Residuals: ":L"Data: ")+MathDisplay::Count((double)scatterPoints.size())+L" blue points";SIZE size;::GetTextExtentPoint32W(DC->GetSafeHdc(),text.c_str(),(int)text.size(),&size);if(sy+size.cy<Y+Ylen-BottomMargin-2){DC->FillSolidRect(origin,sy,min(size.cx+6,limit-origin),size.cy+4,RGB(255,255,255));::TextOutW(DC->GetSafeHdc(),origin+2,sy+2,text.c_str(),(int)text.size());}
+@@ -971,6 +981,7 @@
+ int CFunctionPlotter::MouseClick(int X, int Y)
+ {
+     EnsureFunctionSlots();
++    if(integral.enabled && TheState==108 && X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER,0);return 1;}
+     if(!pieces.empty() && TheState>=108 && TheState<=115 && X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_PIECEWISE_GRAPH,0);return 1;}
+     if(!pieces.empty() && TheState==16){analyze=0;AfxMessageBox("Piecewise graphs use the table editor and Evaluate f(x). Open Graph > Piecewise function grapher.");return 1;}
+     bool labelsHit=X!=0x7FFFFFFF && !ClipboardExpression && SpecialDrawingHover &&
+@@ -989,6 +1000,7 @@
+ 		pMainView->ReleaseDC(DC);
+ 	}
+ 
++    if(integral.enabled && TheState==8 && X!=0x7FFFFFFF && !ClipboardExpression){pMainView->PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER,0);return 1;}
+ 	if (ThreadHandle)
+ 	if (GetKeyState(VK_LBUTTON)&0x8000)
+ 	{
+@@ -1614,12 +1626,14 @@
+ 
+ double CFunctionPlotter::PieceValue(int slot,double x,CExpression *function,void *variables)
+ {
++    if(integral.enabled && slot==0 && integralResult.ready)return IntegralArea::Value(integral,integralResult,x);
+     if(slot<(int)pieces.size())return pieces[slot].Contains(x)?pieces[slot].program.Value(x,pieceRadians):sqrt(-1.0);
+     return function->PlotterCalculateFunctionValue(x,variables,is_x_pi!=0);
+ }
+ int CFunctionPlotter::XML_output(char * output,int num_tabs,char only_calculate)
+ {
+     std::string text;
++    if(integral.enabled)text+="<integral f=\""+Piecewise::Hex(integral.formula)+"\" a=\""+Piecewise::Number(integral.a)+"\" b=\""+Piecewise::Number(integral.b)+"\" rad=\""+(integral.radians?"1":"0")+"\" hatch=\""+(integral.hatch?"1":"0")+"\" labels=\""+(integral.labels?"1":"0")+"\" />\r\n";
+     for(size_t i=0;i<pieces.size();i++){
+         const Piecewise::Row &r=pieces[i];
+         text+="<piece f=\""+Piecewise::Hex(r.formula)+"\" lo=\""+Piecewise::Number(r.low)+"\" hi=\""+Piecewise::Number(r.high)+"\" lc=\""+(r.leftClosed?"1":"0")+"\" hc=\""+(r.rightClosed?"1":"0")+"\" rad=\""+(pieceRadians?"1":"0")+"\" />\r\n";
+@@ -1632,6 +1646,19 @@
+ }
+ char *CFunctionPlotter::XML_input(char *file)
+ {
++    if(strncmp(file,"integral ",9)==0){
++        IntegralArea::Settings proposed;char attribute[64],value[384];file+=8;
++        do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,384);if(!file)return NULL;
++            if(strcmp(attribute,"f")==0)proposed.formula=Piecewise::Unhex(value);
++            if(strcmp(attribute,"a")==0)proposed.a=Piecewise::StoredBound(value);
++            if(strcmp(attribute,"b")==0)proposed.b=Piecewise::StoredBound(value);
++            if(strcmp(attribute,"rad")==0)proposed.radians=atoi(value)!=0;
++            if(strcmp(attribute,"hatch")==0)proposed.hatch=atoi(value)!=0;
++            if(strcmp(attribute,"labels")==0)proposed.labels=atoi(value)!=0;
++        }while(attribute[0]);
++        std::string error;IntegralArea::Result result;if(IntegralArea::Calculate(proposed,result,error)){proposed.enabled=true;integral=proposed;integralResult=result;is_x_pi=proposed.radians?1:0;}
++        return file;
++    }
+     if(strncmp(file,"stats ",6)==0 || strncmp(file,"sample ",7)==0){
+         bool sample=file[1]=='a';file+=sample?6:5;char attribute[64],value[384];Statistics::Point point;point.x=point.y=point.sourceY=sqrt(-1.0);
+         do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,384);if(!file)return NULL;
+@@ -1788,6 +1815,10 @@
+ 			cnt++;
+ 		}
+ 		abort_request=0;
++        if(integral.enabled){integralError.clear();
++            try{if(Base->NumItems>8){auto expression=(CExpression*)Base->Items[8].pSubdrawing;int first=0;for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='=')first=n+1;integral.formula=NativeSymbolic::Formula(expression,first);}IntegralArea::Calculate(integral,integralResult,integralError);}
++            catch(const std::exception &e){integralResult.ready=false;integralError=e.what();}
++        }
+ 		if (reset_plot==2) calc_y=1;
+ 
+ 		//get the dimensions of the function ploter frame
+@@ -2054,6 +2085,8 @@
+                 if (found) {Ymin=low;Ymax=high;SetBounds(Xmin,Xmax,Ymin,Ymax);mDC.FillSolidRect(0,0,Xlen,Ylen,RGB(255,255,255));start_drawing_point=0;for(int k=0;k<8;k++)prevy[k]=sqrt(-1.0);}
+             }
+ 
++            if(integral.enabled && integralResult.ready && !is_x_log && !is_y_log && (start_drawing_point==0))
++                PaintIntegralArea(mDC,integral,integralResult,CRect(0,0,Xlen,Ylen),Xmin,Xmax,Ymin,Ymax);
+ 			//compute scaling factors
+ 			double F1=(is_y_log==0)?((double)Ylen/(double)(Ymax-Ymin)):((double)Ylen/log10(Ymax/Ymin));
+ 			//double F2=(double)Ylen/log10(Ymax/Ymin);
+diff --git a/Mathomir/IntegralArea.h b/Mathomir/IntegralArea.h
+new file mode 100644
+--- /dev/null
++++ b/Mathomir/IntegralArea.h
+@@ -0,0 +1,69 @@
++#pragma once
++#include "SymbolicDerivative.h"
++#include "GraphDiscontinuities.h"
++#include "MathDisplay.h"
++
++// Proper finite real integrals. Adaptive refinement integrates f and |f|
++// independently; cancelling positive/negative areas must not hide an error.
++namespace IntegralArea {
++struct Settings {
++    std::string formula;double a,b;bool enabled,radians,hatch,labels;
++    Settings():formula("sin(x)"),a(0),b(3.14159265358979323846),enabled(false),radians(true),hatch(false),labels(true){}
++};
++struct Result {
++    SymbolicDerivative::Expr expression;double integral,area,error,ymin,ymax;int evaluations;bool ready;
++    Result():integral(0),area(0),error(0),ymin(0),ymax(0),evaluations(0),ready(false){}
++};
++inline double Value(const Settings &s,const Result &r,double x){return SymbolicDerivative::Value(r.expression,"x",x,s.radians);}
++inline bool Constant(const std::string &text,double &value,std::string &error){
++    try{SymbolicDerivative::Parser p;value=SymbolicDerivative::Value(p.Parse(text),"",0);
++        if(!SymbolicDerivative::Finite(value))throw std::runtime_error("Enter a finite constant, such as -2, 1/2 or pi.");return true;
++    }catch(const std::exception &e){error=e.what();return false;}
++}
++inline void Denominators(SymbolicDerivative::Expr n,std::vector<SymbolicDerivative::Expr> &out){
++    if(!n)return;if(n->op=='/')out.push_back(n->b);
++    if(n->op=='^' && n->b && n->b->op=='n' && n->b->number<0)out.push_back(n->a);
++    if(n->op=='f' && (n->name=="tan"||n->name=="sec"))out.push_back(SymbolicDerivative::F("cos",n->a));
++    if(n->op=='f' && (n->name=="cot"||n->name=="csc"))out.push_back(SymbolicDerivative::F("sin",n->a));
++    Denominators(n->a,out);Denominators(n->b,out);
++}
++struct Pair {double signedValue,absoluteValue;Pair(double s=0,double a=0):signedValue(s),absoluteValue(a){}};
++inline Pair Simpson(double a,double b,double fa,double fm,double fb){double h=(b-a)/6;return Pair(h*(fa+4*fm+fb),h*(std::fabs(fa)+4*std::fabs(fm)+std::fabs(fb)));}
++class Integrator {
++    const Settings &settings;Result &result;double low,high;
++    double At(double x){if(++result.evaluations>250000)throw std::runtime_error("This integral needs too much refinement. Reduce the interval or simplify the function.");
++        double y=Value(settings,result,x);if(!SymbolicDerivative::Finite(y))throw std::runtime_error("The function is undefined or unbounded inside these bounds. Improper integrals are not supported.");
++        result.ymin=(std::min)(result.ymin,y);result.ymax=(std::max)(result.ymax,y);return y;}
++    Pair Refine(double a,double b,double fa,double fm,double fb,Pair whole,double tolerance,int depth){
++        double m=a+(b-a)/2,l=a+(m-a)/2,r=m+(b-m)/2;
++        double fl=At(l),fr=At(r);Pair left=Simpson(a,m,fa,fl,fm),right=Simpson(m,b,fm,fr,fb);
++        Pair total(left.signedValue+right.signedValue,left.absoluteValue+right.absoluteValue);
++        double e=(std::max)(std::fabs(total.signedValue-whole.signedValue),std::fabs(total.absoluteValue-whole.absoluteValue))/15;
++        if(e<=tolerance || depth==0 || l==a || r==b){result.error+=e;return total;}
++        Pair x=Refine(a,m,fa,fl,fm,left,tolerance/2,depth-1),y=Refine(m,b,fm,fr,fb,right,tolerance/2,depth-1);
++        return Pair(x.signedValue+y.signedValue,x.absoluteValue+y.absoluteValue);
++    }
++public:
++    Integrator(const Settings &s,Result &r):settings(s),result(r),low((std::min)(s.a,s.b)),high((std::max)(s.a,s.b)){}
++    void Run(){
++        std::vector<SymbolicDerivative::Expr> denominators;Denominators(result.expression,denominators);
++        for(auto denominator:denominators){std::vector<double> roots;GraphDiscontinuities::Roots([&](double x){return SymbolicDerivative::Value(denominator,"x",x,settings.radians);},low,high,roots);
++            if(!roots.empty())throw std::runtime_error("A denominator is zero in this interval. Choose bounds that avoid the excluded point; improper integrals are not supported.");}
++        // Seed subintervals avoid missing broad peaks or isolated domain gaps.
++        const int count=128;double previous=At(low);Pair sum;
++        for(int i=0;i<count;i++){double a=low+(high-low)*i/count,b=low+(high-low)*(i+1)/count,m=a+(b-a)/2;
++            double fm=At(m),fb=At(b);Pair part=Refine(a,b,previous,fm,fb,Simpson(a,b,previous,fm,fb),1e-9/count,28);
++            sum.signedValue+=part.signedValue;sum.absoluteValue+=part.absoluteValue;previous=fb;}
++        result.integral=settings.b<settings.a?-sum.signedValue:sum.signedValue;result.area=sum.absoluteValue;
++        if(!SymbolicDerivative::Finite(result.integral)||!SymbolicDerivative::Finite(result.area)||result.error>1e-7*(1+result.area))throw std::runtime_error("The numerical estimate did not converge reliably. Reduce the interval; check for poles or rapid oscillations.");
++    }
++};
++inline bool Calculate(const Settings &s,Result &r,std::string &error){
++    r=Result();try{if(!SymbolicDerivative::Finite(s.a)||!SymbolicDerivative::Finite(s.b)||s.a==s.b||!SymbolicDerivative::Finite(s.b-s.a))throw std::runtime_error("Enter two distinct finite bounds. Reversed bounds are allowed.");
++        SymbolicDerivative::Parser p;r.expression=p.Parse(s.formula);Integrator(s,r).Run();r.ready=true;return true;
++    }catch(const std::exception &e){error=e.what();return false;}
++}
++inline std::wstring Report(const Settings &s,const Result &r){
++    return L"Bounds: "+MathDisplay::Number(s.a)+L" \u2192 "+MathDisplay::Number(s.b)+L"    Signed integral \u2248 "+MathDisplay::Number(r.integral)+L"\r\nTotal area \u2248 "+MathDisplay::Number(r.area)+L"    Estimated numerical error \u2248 "+MathDisplay::Number(r.error)+L"\r\nBlue: above the x-axis. Rose: below. Reversing bounds changes the integral sign, not the total area.";
++}
++}
+diff --git a/Mathomir/IntegralPaint.h b/Mathomir/IntegralPaint.h
+new file mode 100644
+--- /dev/null
++++ b/Mathomir/IntegralPaint.h
+@@ -0,0 +1,34 @@
++#pragma once
++#include "IntegralArea.h"
++
++inline void PaintIntegralArea(CDC &dc,const IntegralArea::Settings &s,const IntegralArea::Result &r,
++    CRect plot,double xmin,double xmax,double ymin,double ymax,bool curve=false)
++{
++    if(!r.ready || xmin>=xmax || ymin>=ymax || plot.Width()<2 || plot.Height()<2)return;
++    int saved=dc.SaveDC();dc.IntersectClipRect(plot);dc.SetROP2(R2_COPYPEN);
++    auto px=[&](double x){return plot.left+(int)((x-xmin)/(xmax-xmin)*(plot.Width()-1));};
++    auto py=[&](double y){double f=(y-ymin)/(ymax-ymin);f=(std::max)(-1.,(std::min)(2.,f));return plot.bottom-1-(int)(f*(plot.Height()-1));};
++    double low=(std::min)(s.a,s.b),high=(std::max)(s.a,s.b);
++    CBrush positive,negative;positive.CreateHatchBrush(HS_BDIAGONAL,RGB(80,125,185));negative.CreateHatchBrush(HS_BDIAGONAL,RGB(180,95,115));
++    dc.SetBkMode(OPAQUE);
++    for(int i=0;i<plot.Width();i++){
++        double x=xmin+(xmax-xmin)*(i+.5)/plot.Width();if(x<low||x>high)continue;
++        double y=IntegralArea::Value(s,r,x);if(!SymbolicDerivative::Finite(y))continue;
++        int y0=py(0),yf=py(y);CRect strip(plot.left+i,(std::min)(y0,yf),plot.left+i+1,(std::max)(y0,yf));
++        COLORREF tint=y>=0?RGB(219,234,253):RGB(252,222,229);
++        if(s.hatch){dc.SetBkColor(tint);dc.FillRect(strip,y>=0?&positive:&negative);}else dc.FillSolidRect(strip,tint);
++    }
++    CPen bounds(PS_DASH,1,RGB(110,115,125)),axis(PS_SOLID,1,RGB(165,170,178)),line(PS_SOLID,2,RGB(25,35,50));
++    dc.SelectObject(&axis);if(ymin<=0&&ymax>=0){dc.MoveTo(plot.left,py(0));dc.LineTo(plot.right,py(0));}
++    dc.SelectObject(&bounds);for(double x:{s.a,s.b})if(x>=xmin&&x<=xmax){dc.MoveTo(px(x),plot.top);dc.LineTo(px(x),plot.bottom);}
++    if(curve){dc.SelectObject(&line);bool previous=false;for(int i=0;i<plot.Width();i++){
++        double x=xmin+(xmax-xmin)*i/(plot.Width()-1),y=IntegralArea::Value(s,r,x);
++        if(!SymbolicDerivative::Finite(y)){previous=false;continue;}if(previous)dc.LineTo(plot.left+i,py(y));else dc.MoveTo(plot.left+i,py(y));previous=true;
++    }}
++    dc.RestoreDC(saved);
++}
++inline void IntegralViewport(const IntegralArea::Settings &s,const IntegralArea::Result &r,double &xmin,double &xmax,double &ymin,double &ymax)
++{
++    xmin=(std::min)(s.a,s.b);xmax=(std::max)(s.a,s.b);double xp=(xmax-xmin)*.1;xmin-=xp;xmax+=xp;
++    ymin=r.ymin;ymax=r.ymax;double yp=(std::max)((ymax-ymin)*.15,1e-6);ymin-=yp;ymax+=yp;
++}
+diff --git a/Mathomir/Mathomir.rc b/Mathomir/Mathomir.rc
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -498,6 +498,7 @@
+     END
+     POPUP "&Graph"
+     BEGIN
++        MENUITEM "Integral area shader...", ID_INTEGRAL_SHADER
+         MENUITEM "Piecewise function grapher...", ID_PIECEWISE_GRAPH
+         MENUITEM "Statistics and regression...", ID_STATISTICS_REGRESSION
+         MENUITEM "Number rounding...", ID_NUMBER_FORMAT
+@@ -989,3 +990,28 @@
+     DEFPUSHBUTTON "Apply",IDOK,230,234,44,16
+     PUSHBUTTON "Cancel",IDCANCEL,278,234,42,16
+ END
++
++IDD_INTEGRAL_SHADER DIALOGEX 0,0,500,291
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Integral area shader"
++FONT 8,"MS Shell Dlg"
++BEGIN
++    LTEXT "Shade between f(x) and the x-axis, with finite integration bounds.",-1,10,9,475,14
++    LTEXT "f(x)",-1,10,31,22,12
++    EDITTEXT 1370,36,29,314,15,ES_AUTOHSCROLL
++    PUSHBUTTON "Calculate",1376,360,28,128,17
++    LTEXT "Lower bound a",-1,10,55,75,12
++    EDITTEXT 1371,88,53,95,15,ES_AUTOHSCROLL
++    LTEXT "Upper bound b",-1,207,55,75,12
++    EDITTEXT 1372,285,53,95,15,ES_AUTOHSCROLL
++    CONTROL "Radians",1373,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,397,54,88,14
++    CONTROL "Diagonal hatch",1374,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,78,113,14
++    CONTROL "Show bounds and area labels",1375,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,140,78,205,14
++    CONTROL "",1377,"Static",SS_BLACKFRAME,10,101,478,99
++    LTEXT "",1378,10,210,478,39
++    PUSHBUTTON "Sine: 0 to pi",1379,10,264,91,17
++    PUSHBUTTON "Signed area",1380,107,264,83,17
++    PUSHBUTTON "Parabola",1381,196,264,70,17
++    DEFPUSHBUTTON "Place shaded graph",IDOK,301,263,111,18
++    PUSHBUTTON "Cancel",IDCANCEL,422,263,66,18
++END
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -23,6 +23,7 @@
+ #include "stdafx.h"
+ #include <afxpriv.h>
+ #include "UnitCircleGeometry.h"
++#include "IntegralPaint.h"
+ #include "SymbolicDerivative.h"
+ #include "ColorPalette.h"
+ #include "GeometryShapes.h"
+@@ -226,7 +227,7 @@
+         auto &s=MathDisplay::Options();::SendMessage(combo,CB_SETCURSEL,s.mode==1?s.digits+1:s.mode==2?s.digits+7:0,0);::SendMessage(zeros,BM_SETCHECK,s.trailingZeros?BST_CHECKED:BST_UNCHECKED,0);::EnableWindow(zeros,s.mode!=0);
+     }
+ public:
+-    CFeatureDialog(UINT id,CWnd *owner=NULL):CDialog(id,owner),resource(id),footer(id==IDD_PIECEWISE||id==IDD_SYMBOLIC_DERIVATIVE||id==IDD_STATISTICS_REGRESSION||id==IDD_POLYGON_CONSTRUCTOR||id==IDD_UNIT_CIRCLE||id==IDD_NUMBER_FORMAT){}
++    CFeatureDialog(UINT id,CWnd *owner=NULL):CDialog(id,owner),resource(id),footer(id==IDD_INTEGRAL_SHADER||id==IDD_PIECEWISE||id==IDD_SYMBOLIC_DERIVATIVE||id==IDD_STATISTICS_REGRESSION||id==IDD_POLYGON_CONSTRUCTOR||id==IDD_UNIT_CIRCLE||id==IDD_NUMBER_FORMAT){}
+     virtual BOOL OnInitDialog(){LoadDisplayRounding();BOOL result=CDialog::OnInitDialog();if(footer)AddRounding();PostMessage(WM_APP+71);return result;}
+     virtual BOOL PreTranslateMessage(MSG *message){tips.Relay(message);return CDialog::PreTranslateMessage(message);}
+     virtual LRESULT WindowProc(UINT message,WPARAM wp,LPARAM lp){if(message==WM_APP+71){RegisterHelp();return 0;}return CDialog::WindowProc(message,wp,lp);}
+@@ -420,6 +421,7 @@
+ std::wstring FeatureDrawingHelp(CDrawing *drawing,int depth)
+ {
+     if(!drawing || depth>16)return L"Drawing object";
++    if(drawing->IsSpecialDrawing==51 && drawing->SpecialData && ((CFunctionPlotter*)drawing->SpecialData)->integral.enabled)return L"Integral area graph - blue positive area, rose negative area. Click f1 or Graph > Integral area shader to edit the formula and bounds. Drag its resize corner to enlarge it.";
+     if(drawing->IsSpecialDrawing==51)return L"Function graph - edit the formulas and coordinate limits; drag its resize corner to enlarge it.";
+     if(drawing->IsSpecialDrawing==52)return L"Image object - use its corner to resize; right-click for image options.";
+     if(drawing->IsSpecialDrawing==50)return L"Drawing box - draw or edit objects within this container.";
+@@ -430,6 +432,8 @@
+     if(drawing->OriginalForm==4)return L"Ellipse or circle";
+     if(drawing->OriginalForm==65)return L"Unit circle - angles and coordinates";
+     switch(drawing->OriginalForm){
++        case 93:return L"Integral area shader - finite bounds, signed integral and total area; solid tint or diagonal hatch.";
++        case 94:return L"Evaluate selected or currently typed math - append = or approximate result inline (Ctrl+Enter).";
+         case 5:return L"Arrow - draw a straight arrow from its start to its tip.";
+         case 6:return L"Large eraser - drag across drawing strokes to remove them.";
+         case 7:return L"Pencil eraser - remove a small part of a drawing stroke.";
+@@ -663,6 +667,7 @@
+     ON_COMMAND(ID_PIECEWISE_GRAPH,OnPiecewiseGraph)
+     ON_COMMAND(ID_SYMBOLIC_DERIVATIVE,OnSymbolicDerivative)
+     ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
++    ON_COMMAND(ID_INTEGRAL_SHADER,OnIntegralShader)
+     ON_COMMAND(ID_NUMBER_FORMAT,OnNumberFormat)
+     ON_COMMAND(ID_EXECUTE_EXPRESSION,OnExecuteExpression)
+     ON_COMMAND(ID_APPROXIMATE_EXPRESSION,OnApproximateExpression)
+@@ -10478,6 +10483,7 @@
+     dialog.Add(ID_NUMBER_FORMAT,"Display > Number rounding...","rounding round decimals significant figures precision trailing zeros approximation display");
+     dialog.Add(ID_STATISTICS_REGRESSION,"Statistics > Statistics and regression...","statistics regression linear quadratic cubic polynomial exponential logarithmic power scatter data residual mean median standard deviation correlation");
+     dialog.Add(ID_SYMBOLIC_DERIVATIVE,"Calculus > Symbolic derivative finder...","differentiate derivative calculus symbolic slope chain product quotient higher order");
++    dialog.Add(ID_INTEGRAL_SHADER,"Graph > Integral area shader...","integral area bounds shade shading calculus hatch signed absolute numerical");
+     dialog.Add(ID_PIECEWISE_GRAPH,"Graph > Piecewise function grapher...","piecewise pieces intervals open closed endpoints domain jumps step graph");
+     dialog.Add(ID_INSERT_UNIT_CIRCLE,"Insert > Unit circle maker","unit circle angle start end arc radians degrees trig triangle coordinates palette");
+     dialog.Add(ID_INSERT_TABLE,"Insert > Configure table","table grid rows columns cells spreadsheet borders alignment text math palette");
+@@ -13199,8 +13205,19 @@
+         std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+SymbolicDerivative::Xml(derivative.derivative)+"</ex>";std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);
+     }else{
+         if(!error.empty()){AfxMessageBox(error.c_str());return;}
++        // Closed functions/constants evaluate directly. Exact arithmetic keeps
++        // the symbolic engine; decimal function results use approximate equals.
++        bool numeric=false;double numericValue=0;std::string formula;
++        try{formula=NativeSymbolic::Formula(&left);SymbolicDerivative::Parser parser;auto parsed=parser.Parse(formula);extern int TrigDegrees;
++            numericValue=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);
++            numeric=SymbolicDerivative::Finite(numericValue) && formula.find_first_of("abcdefghijklmnopqrstuvwxyz")!=std::string::npos;
++        }catch(const std::exception &){}
++        if(numeric){approximate=true;std::string xml="<ex fh=\""+SymbolicDerivative::Number(source->m_FontSize)+"\">"+MathDisplay::ApproximationXml(numericValue)+"</ex>";
++            std::vector<char> data(xml.begin(),xml.end());data.push_back(0);answer.XML_input(&data[0]);
++        }else{
+         answer.CopyExpression(&left,0);int changes=0;for(int step=0;step<80;step++){if(!answer.Compute(0,answer.m_NumElements-1,0))break;changes++;}
+-        if(!changes){AfxMessageBox("No supported calculation was found. For a derivative, use d(f)/d(x), d/dx followed by its argument, or the Symbolic derivative finder.");return;}
++        if(!changes){AfxMessageBox("No finite calculation was found. Check the real domain and give variables a value. Use Ctrl+Shift+Enter for a decimal approximation.");return;}
++        }
+     }
+     int index=(int)(object-TheDocument);OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
+     UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&left,0);
+@@ -13356,6 +13373,63 @@
+     for(int i=0;i<8;i++){auto expression=(CExpression*)drawing->Items[8+i].pSubdrawing;expression->Delete();if(i==0){std::string xml="<ex fh=\"100\">"+SymbolicDerivative::Xml(dialog.residual?SymbolicDerivative::N(0):dialog.result.Expression(),0,17)+"</ex>";std::vector<char>b(xml.begin(),xml.end());b.push_back(0);expression->XML_input(&b[0]);}}
+     double xmin=dialog.result.x.minimum,xmax=dialog.result.x.maximum,ymin=dialog.result.y.minimum,ymax=dialog.result.y.maximum;if(dialog.residual){ymin=*std::min_element(dialog.result.residuals.begin(),dialog.result.residuals.end());ymax=*std::max_element(dialog.result.residuals.begin(),dialog.result.residuals.end());ymin=min(ymin,0.);ymax=max(ymax,0.);}
+     double xp=max((xmax-xmin)*.1,1e-9),yp=max((ymax-ymin)*.12,(ymax==ymin?max(1.,fabs(ymin)*.05):1e-12));xmin-=xp;xmax+=xp;ymin-=yp;ymax+=yp;plotter->SetBounds(xmin,xmax,ymin,ymax);
++    if(existing){GetDocument()->SetModifiedFlag();plotter->TheState=0;plotter->PlotFunction(1);RepaintTheView(1);SetFocus();return;}
++    RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
++}
++
++class CIntegralPreview : public CStatic
++{
++public:
++    IntegralArea::Settings settings;IntegralArea::Result result;
++    void Set(const IntegralArea::Settings &s,const IntegralArea::Result &r){settings=s;result=r;if(m_hWnd)Invalidate();}
++protected:
++    afx_msg void OnPaint(){CPaintDC dc(this);CRect rect;GetClientRect(&rect);dc.FillSolidRect(rect,RGB(255,255,255));
++        if(!result.ready){dc.SetBkMode(TRANSPARENT);dc.DrawText("Calculate to preview the shaded area.",rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE);return;}
++        double xmin,xmax,ymin,ymax;IntegralViewport(settings,result,xmin,xmax,ymin,ymax);
++        CRect plot(10,8,rect.right-10,rect.bottom-25);PaintIntegralArea(dc,settings,result,plot,xmin,xmax,ymin,ymax,true);
++        dc.SetBkMode(TRANSPARENT);dc.SetTextColor(RGB(60,65,75));std::wstring text=L"a = "+MathDisplay::Number(settings.a)+L"    b = "+MathDisplay::Number(settings.b);
++        ::TextOutW(dc.GetSafeHdc(),12,rect.bottom-20,text.c_str(),(int)text.size());
++    }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CIntegralPreview,CStatic)
++    ON_WM_PAINT()
++END_MESSAGE_MAP()
++class CIntegralDialog : public CFeatureDialog
++{
++public:
++    IntegralArea::Settings settings;IntegralArea::Result result;CIntegralPreview preview;bool initializing;
++    CIntegralDialog():CFeatureDialog(IDD_INTEGRAL_SHADER,theApp.m_pMainWnd),initializing(true){}
++    CString Text(int id){CString text;GetDlgItemText(id,text);text.Trim();return text;}
++    bool Calculate(){std::string error;settings.formula=(LPCSTR)Text(1370);settings.radians=IsDlgButtonChecked(1373)==BST_CHECKED;settings.hatch=IsDlgButtonChecked(1374)==BST_CHECKED;settings.labels=IsDlgButtonChecked(1375)==BST_CHECKED;settings.enabled=true;
++        if(!IntegralArea::Constant((LPCSTR)Text(1371),settings.a,error)||!IntegralArea::Constant((LPCSTR)Text(1372),settings.b,error)||!IntegralArea::Calculate(settings,result,error)){
++            result.ready=false;preview.Set(settings,result);GetDlgItem(IDOK)->EnableWindow(FALSE);SetDlgItemText(1378,error.c_str());return false;}
++        preview.Set(settings,result);GetDlgItem(IDOK)->EnableWindow(TRUE);std::wstring report=IntegralArea::Report(settings,result);::SetDlgItemTextW(m_hWnd,1378,report.c_str());return true;
++    }
++    virtual void OnRoundingChanged(){if(result.ready){std::wstring report=IntegralArea::Report(settings,result);::SetDlgItemTextW(m_hWnd,1378,report.c_str());preview.Set(settings,result);}}
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1377,this);CreateUnicodeReadout(this,1378);((CEdit*)GetDlgItem(1370))->LimitText(160);
++        SetDlgItemText(1370,settings.formula.c_str());SetDlgItemText(1371,Piecewise::Number(settings.a).c_str());SetDlgItemText(1372,Piecewise::Number(settings.b).c_str());CheckDlgButton(1373,settings.radians?BST_CHECKED:BST_UNCHECKED);CheckDlgButton(1374,settings.hatch?BST_CHECKED:BST_UNCHECKED);CheckDlgButton(1375,settings.labels?BST_CHECKED:BST_UNCHECKED);initializing=false;Calculate();return TRUE;
++    }
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);if(initializing)return CFeatureDialog::OnCommand(wp,lp);
++        if(id==1376){Calculate();return TRUE;}
++        if(id>=1379&&id<=1381){const char *formulas[]={"sin(x)","x","x^2"},*a[]={"0","-2","-1"},*b[]={"pi","2","2"};initializing=true;SetDlgItemText(1370,formulas[id-1379]);SetDlgItemText(1371,a[id-1379]);SetDlgItemText(1372,b[id-1379]);CheckDlgButton(1373,BST_CHECKED);initializing=false;Calculate();return TRUE;}
++        if(id==1373||id==1374||id==1375){Calculate();return TRUE;}
++        if(id>=1370&&id<=1372&&notification==EN_CHANGE){result.ready=false;preview.Set(settings,result);GetDlgItem(IDOK)->EnableWindow(FALSE);::SetDlgItemTextW(m_hWnd,1378,L"Press Calculate after changing the formula or bounds.");return TRUE;}
++        return CFeatureDialog::OnCommand(wp,lp);
++    }
++    virtual void OnOK(){if(Calculate())CFeatureDialog::OnOK();}
++};
++static CDrawing *FindIntegralGraph(CDrawing *drawing,int depth=0){if(!drawing||depth>32)return NULL;if(drawing->IsSpecialDrawing==51&&drawing->SpecialData){auto p=(CFunctionPlotter*)drawing->SpecialData;if(p->integral.enabled||(p->pieces.empty()&&p->scatterPoints.empty()))return drawing;}for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0){CDrawing *found=FindIntegralGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1);if(found)return found;}return NULL;}
++void CMathomirView::OnIntegralShader()
++{
++    if(ViewOnlyMode)return;OnChar(27,1,0);CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object->MovingDotState==3)){existing=FindIntegralGraph((CDrawing*)object->Object);if(existing)break;}}
++    CIntegralDialog dialog;if(existing){auto plotter=(CFunctionPlotter*)existing->SpecialData;dialog.settings=plotter->integral;if(!plotter->integral.enabled){try{plotter->EnsureFunctionSlots();auto expression=(CExpression*)existing->Items[8].pSubdrawing;int first=0;for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='=')first=n+1;dialog.settings.formula=NativeSymbolic::Formula(expression,first);}catch(const std::exception &){}double ymin,ymax;plotter->PlotFunctionGetBondaries(&dialog.settings.a,&dialog.settings.b,&ymin,&ymax);dialog.settings.radians=plotter->is_x_pi!=0;}}if(dialog.DoModal()!=IDOK)return;
++    CDrawing *drawing=existing;CFunctionPlotter *plotter;
++    if(existing){plotter=(CFunctionPlotter*)drawing->SpecialData;if(!plotter->StopForZoom()){AfxMessageBox("The graph is still finishing. Try again shortly.");return;}UndoSave("edit integral area");}
++    else{drawing=new CDrawing();int x,y;drawing->StartCreatingItem(51);drawing->UpdateCreatingItem(6000,4400,0,0);drawing->EndCreatingItem(&x,&y);plotter=(CFunctionPlotter*)drawing->SpecialData;}
++    plotter->EnsureFunctionSlots();plotter->integral=dialog.settings;plotter->is_x_pi=dialog.settings.radians?1:0;plotter->is_x_log=plotter->is_y_log=plotter->analyze=0;
++    CExpression *function=(CExpression*)drawing->Items[8].pSubdrawing;function->Delete();std::string xml="<ex fh=\"100\">"+SymbolicDerivative::Xml(dialog.result.expression)+"</ex>";std::vector<char> buffer(xml.begin(),xml.end());buffer.push_back(0);function->XML_input(&buffer[0]);
++    double xmin,xmax,ymin,ymax;IntegralViewport(dialog.settings,dialog.result,xmin,xmax,ymin,ymax);plotter->SetBounds(xmin,xmax,ymin,ymax);
+     if(existing){GetDocument()->SetModifiedFlag();plotter->TheState=0;plotter->PlotFunction(1);RepaintTheView(1);SetFocus();return;}
+     RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
+ }
+diff --git a/Mathomir/MathomirView.h b/Mathomir/MathomirView.h
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -135,6 +135,7 @@
+     void OnPiecewiseGraph();
+     void OnSymbolicDerivative();
+     void OnStatisticsRegression();
++    void OnIntegralShader();
+     void OnNumberFormat();
+     void OnExecuteExpression();
+     void OnApproximateExpression();
+diff --git a/Mathomir/Resource.h b/Mathomir/Resource.h
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -309,3 +309,5 @@
+ #define IDD_NUMBER_FORMAT 188
+ #define IDD_CANVAS_GRID 189
+ #define ID_CANVAS_GRID_OPTIONS 33099
++#define ID_INTEGRAL_SHADER 33100
++#define IDD_INTEGRAL_SHADER 190
+diff --git a/Mathomir/Toolbox.cpp b/Mathomir/Toolbox.cpp
+--- a/Mathomir/Toolbox.cpp
++++ b/Mathomir/Toolbox.cpp
+@@ -732,6 +732,12 @@
+         for(int shape=72;shape<=84;shape++)AddDrawingSubmember(shape,30,20);
+         AddDrawingSubmember(90,30,20); //polygon constructor
+         ToolboxNumMembers++;
++        // Separate calculus palette: the existing drawing palette has 32 slots.
++        AddDrawingSubmember(93,30,20); //integral shader
++        AddDrawingSubmember(94,30,20); //inline evaluation
++        AddDrawingSubmember(91,30,20);AddDrawingSubmember(92,30,20);
++        AddDrawingSubmember(51,20,20);AddDrawingSubmember(89,30,20);
++        ToolboxNumMembers++;
+ 
+ 		memset((void*)&ToolboxFontFormating,0,(size_t)sizeof(ToolboxFontFormating));
+ 		AddFontFormating(0,0,0,0); //sans-serif
+@@ -900,11 +906,13 @@
+ 	int member=ToolboxNumMembers;
+ 	ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers]=(CExpression*)new CDrawing();
+ 	CDrawing *icon=(CDrawing*)ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers];
+-    if(form>=60 && form<=92)
++    if(form>=60 && form<=94)
+     {
+         icon->m_Color=0;icon->OriginalForm=(char)form;
+         auto line=[&](double x1,double y1,double x2,double y2,int width=1){int index=icon->NumItems;icon->InsertItemAt(index);tDrawingItem *item=icon->Items+index;item->Type=1;item->pSubdrawing=NULL;item->LineWidth=width*DRWZOOM;item->X1=(int)(x1*DRWZOOM);item->Y1=(int)(y1*DRWZOOM);item->X2=(int)(x2*DRWZOOM);item->Y2=(int)(y2*DRWZOOM);};
+-        if(form==92){line(2,0,2,19);line(2,19,29,19);line(5,16,27,3);line(6,13,8,13);line(11,11,13,11);line(17,7,19,7);line(24,5,26,5);}
++        if(form==93){line(1,18,29,18);line(1,18,1,1);line(4,15,10,4,2);line(10,4,18,3,2);line(18,3,26,13,2);for(int x=6;x<=24;x+=3)line(x,17,x,x<12?8:10);}
++        else if(form==94){line(2,6,13,6,2);line(2,13,13,13,2);line(18,5,21,7);line(21,7,24,5);line(24,5,28,7);line(18,12,21,14);line(21,14,24,12);line(24,12,28,14);}
++        else if(form==92){line(2,0,2,19);line(2,19,29,19);line(5,16,27,3);line(6,13,8,13);line(11,11,13,11);line(17,7,19,7);line(24,5,26,5);}
+         else if(form==91){line(0,10,12,10);line(3,5,3,1);line(3,1,9,1);line(9,1,9,8);line(9,8,3,8);line(3,13,3,19);line(3,19,9,19);line(9,19,9,13);line(16,16,29,4);line(23,4,29,4);line(29,4,29,10);}
+         else if(form==90){line(6,2,23,0);line(23,0,29,12);line(29,12,18,20);line(18,20,1,13);line(1,13,6,2);line(14,6,14,14);line(10,10,18,10);}
+         else if(form==89){
+@@ -4103,6 +4111,8 @@
+ 				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
+ 				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
+ 				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
++                    if(drw->OriginalForm==93){text="Integral area shader\r\nBounds, signed integral and total area";langid=0;}
++                    if(drw->OriginalForm==94){text="Evaluate expression\r\nAppend = or approximate result (Ctrl+Enter)";langid=0;}
+                     if(drw->OriginalForm==92){text="Statistics and regression\r\nData, fitted curves, residuals and summaries";langid=0;}
+                     if(drw->OriginalForm==91){text="Symbolic derivative finder\r\nRules, higher derivatives and editable results";langid=0;}
+                     if(drw->OriginalForm==90){text="Polygon constructor\r\nRegular presets and custom coordinates";langid=0;}
+@@ -6135,9 +6145,9 @@
+     if(ToolboxMembers[member].Above[submember]==-1)
+     {
+         int form=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;
+-        if(form>=60 && form<=92)
++        if(form>=60 && form<=94)
+         {
+-            UINT command=form==92?ID_STATISTICS_REGRESSION:form==91?ID_SYMBOLIC_DERIVATIVE:form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
++            UINT command=form==94?ID_EXECUTE_EXPRESSION:form==93?ID_INTEGRAL_SHADER:form==92?ID_STATISTICS_REGRESSION:form==91?ID_SYMBOLIC_DERIVATIVE:form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
+             theApp.m_pMainWnd->SendMessage(WM_COMMAND,command,0); return;
+         }
+     }
