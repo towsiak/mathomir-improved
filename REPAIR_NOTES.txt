@@ -416,3 +416,6 @@ The equals/approximation icon in the same calculus palette evaluates selected or
 
 Arbitrary-base logarithm entry
 Open the Logarithm builder from the function palette, calculus palette, Graph menu or Search. Enter the base and argument in separate fields (for example sqrt(3) and x). The preview typesets the radical as an editable subscript; check a value at x, then Place logarithm or Place graph. Bases must be positive constants different from 1. Formula fields and direct math execution now accept log(base, argument), including log(sqrt(3),x) and log(2/3,x). One-argument log(x) remains base 10. Custom logs work in native graphs, piecewise functions, inline evaluation, derivatives and the integral shader.
+
+Highlight approximation panel (2026-10-10)
+Highlight finite real math to show a small panel beside it. The panel previews its value and offers Approximate plus Auto or 0-8 decimal places. Whole expressions retain the original and append an approximate result; a selected part inside an expression is replaced locally. Undo restores the original. Decimal choices apply to this result only and preserve requested trailing zeroes. Click the cross or press Escape to dismiss; clicking elsewhere or changing the expression invalidates the panel. Undefined and parameter-dependent expressions do not offer a misleading result.
