@@ -1,0 +1,191 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include "ScalarFunctions.h"
+ #include "stdafx.h"
++#include <afxpriv.h>
+ #include "UnitCircleGeometry.h"
+ #include "SymbolicDerivative.h"
+ #include "ColorPalette.h"
+@@ -165,6 +166,7 @@
+     if(theApp.GetProfileInt("CanvasGrid","Version",0)!=1)return;
+     auto &s=CanvasGrid::Options();s.style=max(0,min((int)CanvasGrid::StyleCount-1,theApp.GetProfileInt("CanvasGrid","Style",0)));
+     s.color=max(0,min(2,theApp.GetProfileInt("CanvasGrid","Color",0)));
++    s.print=theApp.GetProfileInt("CanvasGrid","Print",1)!=0;
+     int mask=theApp.GetProfileInt("CanvasGrid","SnapMask",63);for(int i=0;i<CanvasGrid::StyleCount;i++)s.snap[i]=(mask&(1<<i))!=0;
+     GRID=max(5,min(80,theApp.GetProfileInt("CanvasGrid","Spacing",16)));IsShowGrid=theApp.GetProfileInt("CanvasGrid","Visible",0)!=0;
+ }
+@@ -172,18 +174,22 @@
+ {
+     auto &s=CanvasGrid::Options();int mask=0;for(int i=0;i<CanvasGrid::StyleCount;i++)if(s.snap[i])mask|=1<<i;
+     theApp.WriteProfileInt("CanvasGrid","Version",1);theApp.WriteProfileInt("CanvasGrid","Style",s.style);theApp.WriteProfileInt("CanvasGrid","Color",s.color);
++    theApp.WriteProfileInt("CanvasGrid","Print",s.print);
+     theApp.WriteProfileInt("CanvasGrid","SnapMask",mask);theApp.WriteProfileInt("CanvasGrid","Spacing",GRID);theApp.WriteProfileInt("CanvasGrid","Visible",IsShowGrid);
+ }
+-static void PaintCanvasGrid(CDC *dc,const CanvasGrid::Settings &s,int spacing,int zoom,int originX,int originY,int width,int height)
++static void PaintCanvasGrid(CDC *dc,const CanvasGrid::Settings &s,int spacing,int zoom,int originX,int originY,int width,int height,bool printing=false)
+ {
+     static const COLORREF minor[]={RGB(222,227,232),RGB(211,226,243),RGB(214,234,222)};
+     static const COLORREF major[]={RGB(178,188,198),RGB(161,190,223),RGB(160,199,174)};
+     static const COLORREF dots[]={RGB(156,166,176),RGB(113,157,202),RGB(94,165,119)};
+-    int color=max(0,min(2,s.color));CPen thin(PS_SOLID,1,minor[color]),strong(PS_SOLID,1,major[color]);int saved=dc->SaveDC();
++    int color=max(0,min(2,s.color));
++    int stroke=printing?max(1,(int)std::round(zoom/100.0)):1;
++    int dotSize=printing?max(1,(int)std::round(zoom/100.0)):(zoom>=180?2:1);
++    CPen thin(PS_SOLID,stroke,minor[color]),strong(PS_SOLID,stroke,major[color]);int saved=dc->SaveDC();
+     dc->IntersectClipRect(0,0,width,height);
+     CanvasGrid::Paint(s.style,spacing,zoom,originX,originY,width,height,
+         [&](double x1,double y1,double x2,double y2,bool heavy){dc->SelectObject(heavy?&strong:&thin);dc->MoveTo((int)std::round(x1),(int)std::round(y1));dc->LineTo((int)std::round(x2),(int)std::round(y2));},
+-        [&](double x,double y){dc->FillSolidRect((int)std::round(x),(int)std::round(y),zoom>=180?2:1,zoom>=180?2:1,dots[color]);});
++        [&](double x,double y){dc->FillSolidRect((int)std::round(x),(int)std::round(y),dotSize,dotSize,dots[color]);});
+     dc->RestoreDC(saved);
+ }
+ 
+@@ -591,6 +597,7 @@
+ 	ON_COMMAND(ID_FILE_PRINT, CView::OnFilePrint)
+ 	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
+ 	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
++    ON_MESSAGE(WM_APP+155,OnPrintGridCheck)
+ 	ON_WM_LBUTTONDOWN()
+ 	ON_WM_LBUTTONDBLCLK()
+     ON_WM_CAPTURECHANGED()
+@@ -1035,6 +1042,10 @@
+ 
+ 		ClientArea.right=pDC->GetDeviceCaps(PHYSICALWIDTH);
+ 		ClientArea.bottom=pDC->GetDeviceCaps(PHYSICALHEIGHT);
++        // Metafile/preview devices may expose only printable dimensions.
++        if(ClientArea.right<=0)ClientArea.right=pDC->GetDeviceCaps(HORZRES);
++        if(ClientArea.bottom<=0)ClientArea.bottom=pDC->GetDeviceCaps(VERTRES);
++        if(ClientArea.right<=0 || ClientArea.bottom<=0)return;
+         if(ClientArea.right>0 && ClientArea.bottom>0)
+         {
+             SafePrinterAspect=(double)ClientArea.right/ClientArea.bottom;
+@@ -1043,10 +1054,14 @@
+             SafePrinterRight=(double)max(0,ClientArea.right-pDC->GetDeviceCaps(HORZRES)-pDC->GetDeviceCaps(PHYSICALOFFSETX))/ClientArea.bottom;
+             SafePrinterBottom=(double)max(0,ClientArea.bottom-pDC->GetDeviceCaps(VERTRES)-pDC->GetDeviceCaps(PHYSICALOFFSETY))/ClientArea.bottom;
+         }
+-		ViewZoom=(short)(100*ClientArea.bottom/PaperHeight);
++		ViewZoom=(short)max(1,100*ClientArea.bottom/PaperHeight);
+ 		ViewY=(PagePrinted-1)*PaperHeight+5+pDC->GetDeviceCaps(PHYSICALOFFSETY)*100/ViewZoom;
+ 		ViewX=15+pDC->GetDeviceCaps(PHYSICALOFFSETX)*100/ViewZoom;
+ 		int ViewYBottom=ViewY+ClientArea.bottom*100/ViewZoom;
++
++        if(IsShowGrid && CanvasGrid::Options().print)
++            PaintCanvasGrid(pDC,CanvasGrid::Options(),GRID,ViewZoom,ViewX,ViewY,
++                pDC->GetDeviceCaps(HORZRES),pDC->GetDeviceCaps(VERTRES),true);
+ 
+ 		//Page numbering
+ 		if (PageNumeration&0x0F)
+@@ -9371,6 +9386,30 @@
+ 	return 0;
+ }
+ 
++// Opt-in regression probe: exercise the real OnPrint path and MFC preview DC.
++LRESULT CMathomirView::OnPrintGridCheck(WPARAM mode,LPARAM page)
++{
++    char enabled[8]={};if(!::GetEnvironmentVariableA("MATHOMIR_PRINT_GRID_CHECK",enabled,8))return -1;
++    CClientDC screen(this);CDC output;if(!output.CreateCompatibleDC(&screen))return -2;
++    int width=screen.GetDeviceCaps(HORZRES),height=screen.GetDeviceCaps(VERTRES);
++    CBitmap bitmap;if(width<=0||height<=0||!bitmap.CreateCompatibleBitmap(&screen,width,height))return -3;
++    CBitmap *old=output.SelectObject(&bitmap);output.FillSolidRect(0,0,width,height,RGB(255,255,255));
++    int oldPage=PagePrinted,oldX=ViewX,oldY=ViewY,oldZoom=ViewZoom;
++    CPrintInfo info;info.m_nCurPage=(UINT)max(1,(int)page);
++    if(mode>=2){
++        CPreviewDC preview;preview.m_bPrinting=TRUE;
++        preview.SetAttribDC(screen.m_hDC);preview.SetOutputDC(output.m_hDC);preview.SetScaleRatio(1,mode==3?2:1);
++        OnPrint(&preview,&info);preview.ReleaseOutputDC();preview.ReleaseAttribDC();
++    }else{output.m_bPrinting=TRUE;OnPrint(&output,&info);output.m_bPrinting=FALSE;}
++    bool restored=ViewX==oldX && ViewY==oldY && ViewZoom==oldZoom;PagePrinted=oldPage;
++    output.SelectObject(old);BITMAPINFO data={};data.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
++    data.bmiHeader.biWidth=width;data.bmiHeader.biHeight=-height;data.bmiHeader.biPlanes=1;data.bmiHeader.biBitCount=32;data.bmiHeader.biCompression=BI_RGB;
++    std::vector<DWORD> pixels(width*height);int rows=::GetDIBits(screen.m_hDC,(HBITMAP)bitmap.GetSafeHandle(),0,height,&pixels[0],&data,DIB_RGB_COLORS);
++    if(!restored||rows!=height)return -4;
++    long count=0;for(size_t i=0;i<pixels.size();i++){DWORD p=pixels[i]&0xffffff;if(p!=0xffffff && p!=0)count++;}
++    return count;
++}
++
+ void CMathomirView::OnPrint(CDC* pDC, CPrintInfo* pInfo)
+ {
+ 	PagePrinted=pInfo->m_nCurPage;
+@@ -11675,6 +11714,7 @@
+     void Refresh(){
+         settings.snap[settings.style]=IsDlgButtonChecked(1363)==BST_CHECKED;
+         show=IsDlgButtonChecked(1362)==BST_CHECKED;
++        settings.print=IsDlgButtonChecked(1368)==BST_CHECKED;
+         settings.color=((CComboBox*)GetDlgItem(1365))->GetCurSel();
+         CString text;GetDlgItemText(1361,text);text.Trim();char *end=NULL;const char *start=text;long number=strtol(start,&end,10);
+         bool valid=end!=start&&end&&!*end&&number>=5&&number<=80;
+@@ -11693,12 +11733,13 @@
+         CComboBox *spaces=(CComboBox*)GetDlgItem(1361);for(int i: {8,16,24,32,48,64,80}){CString text;text.Format("%d",i);spaces->AddString(text);}SetDlgItemInt(1361,spacing);
+         CComboBox *colors=(CComboBox*)GetDlgItem(1365);colors->AddString("Neutral gray");colors->AddString("Soft blue");colors->AddString("Green");colors->SetCurSel(settings.color);
+         CheckDlgButton(1362,show?BST_CHECKED:BST_UNCHECKED);CheckDlgButton(1363,settings.snap[settings.style]?BST_CHECKED:BST_UNCHECKED);
++        CheckDlgButton(1368,settings.print?BST_CHECKED:BST_UNCHECKED);
+         initializing=false;Refresh();return TRUE;
+     }
+     virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);
+         if(initializing)return CFeatureDialog::OnCommand(wp,lp);
+         if(id==1360&&notification==CBN_SELCHANGE){settings.snap[previous]=IsDlgButtonChecked(1363)==BST_CHECKED;settings.style=((CComboBox*)GetDlgItem(1360))->GetCurSel();previous=settings.style;CheckDlgButton(1363,settings.snap[settings.style]?BST_CHECKED:BST_UNCHECKED);Refresh();return TRUE;}
+-        if(id==1362||id==1363||(id==1365&&notification==CBN_SELCHANGE)||(id==1361&&(notification==CBN_SELCHANGE||notification==CBN_EDITCHANGE))){
++        if(id==1362||id==1363||id==1368||(id==1365&&notification==CBN_SELCHANGE)||(id==1361&&(notification==CBN_SELCHANGE||notification==CBN_EDITCHANGE))){
+             // An editable combo's selection notification precedes its edit text update.
+             if(id==1361&&notification==CBN_SELCHANGE){CString text;CComboBox *c=(CComboBox*)GetDlgItem(1361);c->GetLBText(c->GetCurSel(),text);c->SetWindowText(text);}
+             Refresh();return TRUE;
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -49,6 +49,7 @@
+ 	afx_msg void OnFitPageWidth();
+     void OnSelectAllObjects();
+     void PaintSafePrintGuide(CDC *dc);
++    afx_msg LRESULT OnPrintGridCheck(WPARAM mode,LPARAM page);
+ 	void AdjustPosition(void);
+ 	afx_msg void OnSize(UINT nType, int cx, int cy);
+ 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
+--- a/Mathomir/CanvasGrid.h
++++ b/Mathomir/CanvasGrid.h
+@@ -11,7 +11,7 @@
+     "Horizontal ruled lines: snap vertically to a line; horizontal movement stays free.",
+     "Vertical ruled lines: snap horizontally to a line; vertical movement stays free.",
+     "Isometric triangles: 60 deg directions. Snap to the nearest triangle vertex."};return text[(std::max)(0,(std::min)(StyleCount-1,style))];}
+-struct Settings {int style,color;bool snap[StyleCount];Settings():style(Dots),color(0){for(int i=0;i<StyleCount;i++)snap[i]=true;}};
++struct Settings {int style,color;bool print,snap[StyleCount];Settings():style(Dots),color(0),print(true){for(int i=0;i<StyleCount;i++)snap[i]=true;}};
+ inline Settings &Options(){static Settings settings;return settings;}
+ struct Point {double x,y;Point(double a=0,double b=0):x(a),y(b){}};
+ inline double RowStep(int style,double spacing){return style==Isometric?spacing*std::sqrt(3.0)/2:spacing;}
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -47,8 +47,9 @@
+         if(id==1362)return "Show or hide the page grid. Hiding it also temporarily disables its snapping; the per-style preference is retained.";
+         if(id==1363)return "Enable or disable snapping for the selected style. Hold Alt to bypass grid snapping temporarily. Horizontal/vertical ruling snaps only its perpendicular coordinate.";
+         if(id==1364)return "Live grid preview. The cross shows a sample pointer; the blue point shows where that pointer snaps. Preview geometry matches the page grid.";
+-        if(id==1365)return "Choose neutral gray, soft blue or green grid lines. They are a screen guide and do not add objects to the document.";
++        if(id==1365)return "Choose neutral gray, soft blue or green grid lines. The selected color appears on screen and, when enabled, in printed grids. The grid does not add document objects.";
+         if(id==1366)return "Explanation of the selected style and its snapping behavior.";
++        if(id==1368)return "Include the visible page grid in print preview and printed output. Turn this off to print only your work. Hidden grids are never printed. This preference is remembered.";
+         if(id==1367)return "Validation message for the typed spacing. Enter a whole number from 5 to 80.";
+     }
+ 
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -969,7 +969,7 @@
+     DEFPUSHBUTTON "Close",IDOK,245,43,55,16
+ END
+ 
+-IDD_CANVAS_GRID DIALOGEX 0,0,330,237
++IDD_CANVAS_GRID DIALOGEX 0,0,330,255
+ STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+ CAPTION "Grid styles and snapping"
+ FONT 9,"Segoe UI",400,0,0x1
+@@ -984,7 +984,8 @@
+     COMBOBOX 1365,228,46,92,70,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+     CONTROL "",1364,"Static",SS_NOTIFY | WS_BORDER,10,65,310,99
+     LTEXT "",1366,10,171,310,30
+-    LTEXT "",1367,10,204,214,22
+-    DEFPUSHBUTTON "Apply",IDOK,230,214,44,16
+-    PUSHBUTTON "Cancel",IDCANCEL,278,214,42,16
+-END
++    CONTROL "Include visible grid in print and preview",1368,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,204,310,13
++    LTEXT "",1367,10,224,214,22
++    DEFPUSHBUTTON "Apply",IDOK,230,234,44,16
++    PUSHBUTTON "Cancel",IDCANCEL,278,234,42,16
++END

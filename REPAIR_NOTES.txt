@@ -1,3 +1,11 @@
+Page grids in print preview and printing — 2026-10-10
+- Visible dots, square grids, graph paper, ruling and isometric grids now render
+  behind page content in both print preview and printed output.
+- Line and dot sizes scale with printer resolution; page alignment is retained.
+- Grid options include a remembered print/preview checkbox, enabled by default.
+  Hidden grids are omitted; uncheck the option to print only document content.
+- Native tests exercise OnPrint and MFC preview, all six styles and later pages.
+
 Signed unit-circle arcs and arrows — 2026-10-10
 - Automatic direction now follows end minus start: 0 to -90 makes a clockwise
   quarter-turn to the negative y-axis. Arrowheads follow the actual arc tangent.
@@ -15,7 +23,7 @@ Grid styles and independent snapping — 2026-10-08
   snapping selects the nearest triangular vertex. Drawing, placement and moves
   use the same grid. Spacing (5-80), color and preferences are remembered.
 - Gray, soft blue or green guides, validated inputs and tooltips on all controls.
-- Grid remains a screen guide. Existing document contents retain their positions.
+- Grid remains a separate background. Existing document contents retain their positions.
 
 Object and palette tooltip correction — 2026-10-08
 - Floating hover help on placed math, text, diagrams, images, drawing boxes and graphs.
