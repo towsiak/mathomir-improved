@@ -26,6 +26,8 @@ function Set-Grid($style,$show,$print,$color=0){
  [GridUI]::Send($d,273,((1-shl 16)-bor 1365))|Out-Null
  Box $d 1362 $show;Box $d 1368 $print
  [GridUI]::Send($d,273,1)|Out-Null
+ # EndDialog replies before the parent finishes saving its modal result.
+ Start-Sleep -Milliseconds 250
 }
 try{
  Start-App
@@ -50,6 +52,6 @@ try{
  Stop-Process -Id $app.Id -Force;Start-App
  $d=Options
  if([GridUI]::Send([GridUI]::Child($d,1368),240,0) -ne 0){throw 'Print-grid preference did not persist.'}
- Box $d 1368 1;[GridUI]::Send($d,273,1)|Out-Null
+ Box $d 1368 1;[GridUI]::Send($d,273,1)|Out-Null;Start-Sleep -Milliseconds 250
  Write-Output 'Print grid passed: all six styles, three colors, OnPrint and MFC preview at 100/50 percent, pages 1/2, hidden/excluded grids, distinct output, restored viewport and persisted print preference.'
 }finally{$app.Refresh();if(!$app.HasExited){Stop-Process -Id $app.Id -Force};Remove-Item Env:MATHOMIR_PRINT_GRID_CHECK -ErrorAction SilentlyContinue}
