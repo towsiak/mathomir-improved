@@ -131,6 +131,15 @@
              // An editable combo's selection notification precedes its edit text update.
              if(id==1361&&notification==CBN_SELCHANGE){CString text;CComboBox *c=(CComboBox*)GetDlgItem(1361);c->GetLBText(c->GetCurSel(),text);c->SetWindowText(text);}
              Refresh();return TRUE;
+@@ -13692,6 +13733,8 @@
+     if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}
+     if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
+     IsDrawingMode=modes[command-ID_DRAW_PEN];MouseMode=0;
++    // A ruler left open by the preceding dialog must not swallow the first stroke.
++    ShowRullerCounter=5;
+     SetFocus();SetMousePointer();RepaintTheView();
+ }
+ 
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -49,6 +49,7 @@
