@@ -163,3 +163,14 @@ diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
  			{
  				int i=0;
  				while (keystring[i])
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -6447,7 +6447,7 @@
+ 
+ 		if (KeyboardEntryBaseObject==NULL)
+ 		if (!ViewOnlyMode)
+-		if ((nChar>6) && (nChar!=11) && (nChar!=12))
++		if ((nChar>6) && (nChar!=11) && (nChar!=12) && (nChar!=VK_ESCAPE))
+ 		{
+ 			//replacing or inserting individual character/operator into an expression
+ 			//at the point where mouse is pointing
