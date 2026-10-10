@@ -152,3 +152,14 @@ diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
  	if (UndoSavingDisabled) return 1; 
  
  	//if ((UseToolbar) && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -5164,7 +5164,7 @@
+ 		}
+ 		else
+ 		{
+-			if ((prevChar==nChar) && (nChar!=8))
++			if ((prevChar==nChar) && (nChar>=32) && (nChar<256))
+ 			{
+ 				int i=0;
+ 				while (keystring[i])
