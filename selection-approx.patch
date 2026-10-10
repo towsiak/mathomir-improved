@@ -121,7 +121,7 @@
  	CView::OnLButtonUp(nFlags, point);
  	}
  	catch(...)
-@@ -13187,10 +13238,85 @@
+@@ -13187,10 +13238,86 @@
  
  
  
@@ -151,7 +151,7 @@
 +{
 +    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("selection-approx-diagnostics.txt","a");if(trace){fprintf(trace,"guard: view=%d draw=%d clipboard=%d/%d move=%d/%d/%d mode=%d capture=%d popup=%d selected=%d\n",ViewOnlyMode,IsDrawingMode,ClipboardExpression!=NULL,ClipboardDrawing!=NULL,MouseMovingActive,MouseSizingActive,MouseRotationActive,MouseMode,GetCapture()==this,Popup->IsWindowVisible(),NumSelectedObjects);fclose(trace);}}
 +
-+    if(ViewOnlyMode||IsDrawingMode||ClipboardExpression||ClipboardDrawing||MouseMovingActive||MouseSizingActive||MouseRotationActive||MouseMode!=0||GetCapture()==this||Popup->IsWindowVisible()){HideSelectionApproxPanel();return;}
++    if(ViewOnlyMode||IsDrawingMode||ClipboardExpression||ClipboardDrawing||MouseMovingActive||MouseSizingActive||MouseRotationActive||MouseMode!=0||Popup->IsWindowVisible()){HideSelectionApproxPanel();return;}
 +    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("selection-approx-diagnostics.txt","a");if(trace){fprintf(trace,"update: selected=%d keyboard=%d touched=%d zoom=%d point=%d,%d\n",NumSelectedObjects,KeyboardEntryObject!=NULL,prevTouchedObject!=NULL,ViewZoom,point.x,point.y);fclose(trace);}}
 +    CObject *wanted=KeyboardEntryBaseObject?KeyboardEntryBaseObject->Object:prevTouchedObject?prevTouchedObject->Object:NULL;
 +    tDocumentStruct *object=NULL;
@@ -174,6 +174,7 @@
 +        auto panel=m_SelectionApproxPanel;panel->root=(CObject*)root;panel->parent=selected;panel->first=first;panel->last=last;panel->rootXml=SelectionNativeXml(root);panel->formula=formula;panel->value=value;panel->objectRect=area;panel->zoom=ViewZoom;panel->vx=ViewX;panel->vy=ViewY;
 +        CRect client;GetClientRect(client);int width=334,height=78;if(client.Width()<width+16||client.Height()<height+16){HideSelectionApproxPanel();return;}
 +        int x=max(8,min(area.left,client.right-width-8));int y=area.bottom+12;if(y+height>client.bottom-8)y=area.top-height-12;if(y<8)y=max(8,min(area.bottom+12,client.bottom-height-8));
++        if(GetCapture()==this && !(GetKeyState(VK_LBUTTON)&0x8000))ReleaseCapture();
 +        panel->SetWindowPos(&wndTop,x,y,width,height,SWP_NOACTIVATE|SWP_SHOWWINDOW);panel->Refresh();
 +    }catch(const std::exception &e){if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("selection-approx-diagnostics.txt","a");if(trace){fprintf(trace,"selection parse: %s\n",e.what());fclose(trace);}}HideSelectionApproxPanel();}
 +}
@@ -209,7 +210,7 @@
      if(ViewOnlyMode)return;
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute begin: undo=%d clipboard=%d keyboard=%d\n",UndoNumLevels,ClipboardExpression!=NULL,KeyboardEntryObject!=NULL);fclose(trace);}}
      tDocumentStruct *object=NULL;
-@@ -13920,4 +14046,5 @@
+@@ -13920,4 +14047,5 @@
          if(TheDocument[i].Object && (TheDocument[i].Type==1 || TheDocument[i].Type==2))
          {TheDocument[i].MovingDotState=3;NumSelectedObjects++;}
      MouseMode=0;SetFocus();RepaintTheView();
