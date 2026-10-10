@@ -320,3 +320,23 @@
              theApp.m_pMainWnd->SendMessage(WM_COMMAND,command,0); return;
          }
      }
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13296,13 +13296,13 @@
+     CLogBaseDialog():CFeatureDialog(IDD_LOG_BASE_BUILDER,theApp.m_pMainWnd),graph(false),initializing(true){preview.emptyText="Enter a valid base and argument to preview.";}
+     CString Text(int id){CString text;GetDlgItemText(id,text);text.Trim();return text;}
+     bool Build(){
+-        try{SymbolicDerivative::Parser parser;auto base=parser.Parse((LPCSTR)Text(1382));auto argument=parser.Parse((LPCSTR)Text(1383));
+-            double b=SymbolicDerivative::Value(base,"",0);if(LogHasParameters(base)||!SymbolicDerivative::Finite(b)||b<=0||b==1)throw std::runtime_error("The base must be a positive constant different from 1. Examples: sqrt(3), 2/3, pi or e.");
++        try{extern int TrigDegrees;bool radians=TrigDegrees==0;SymbolicDerivative::Parser parser;auto base=parser.Parse((LPCSTR)Text(1382));auto argument=parser.Parse((LPCSTR)Text(1383));
++            double b=SymbolicDerivative::Value(base,"",0,radians);if(LogHasParameters(base)||!SymbolicDerivative::Finite(b)||b<=0||b==1)throw std::runtime_error("The base must be a positive constant different from 1. Examples: sqrt(3), 2/3, pi or e.");
+             logarithm=SymbolicDerivative::Raw('l',argument,base);
+-            if(!LogHasParameters(argument)&&!SymbolicDerivative::Finite(SymbolicDerivative::Value(logarithm,"",0)))throw std::runtime_error("The argument must be positive for a real logarithm.");
++            if(!LogHasParameters(argument)&&!SymbolicDerivative::Finite(SymbolicDerivative::Value(logarithm,"",0,radians)))throw std::runtime_error("The argument must be positive for a real logarithm.");
+             xml="<ex fh=\"100\">"+SymbolicDerivative::Xml(logarithm)+"</ex>";preview.Set(xml);GetDlgItem(IDOK)->EnableWindow(TRUE);GetDlgItem(1388)->EnableWindow(!LogHasParameters(argument,true));
+             std::wstring report=L"Base > 0, base \u2260 1; argument > 0. Formula syntax: log(base, argument).";
+-            double x=SymbolicDerivative::NaN();try{auto point=parser.Parse((LPCSTR)Text(1386));if(!LogHasParameters(point))x=SymbolicDerivative::Value(point,"",0);}catch(const std::exception &){}
++            double x=SymbolicDerivative::NaN();try{auto point=parser.Parse((LPCSTR)Text(1386));if(!LogHasParameters(point))x=SymbolicDerivative::Value(point,"",0,radians);}catch(const std::exception &){}
+             if(!SymbolicDerivative::Finite(x))report+=L"\r\nEnter a finite constant for the optional x check.";
+             else {extern int TrigDegrees;double value=SymbolicDerivative::Value(logarithm,"x",x,TrigDegrees==0);
+                 if(SymbolicDerivative::Finite(value))report+=L"\r\nValue at x = "+MathDisplay::Number(x)+L" \u2248 "+MathDisplay::Number(value);
