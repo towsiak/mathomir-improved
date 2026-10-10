@@ -196,3 +196,16 @@ diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
      UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&completed,0);
      CDC *dc=GetDC();short length,above,below;source->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
      object->Length=length*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
+--- a/Mathomir/Element.cpp
++++ b/Mathomir/Element.cpp
+@@ -3507,8 +3507,9 @@
+ 				output+=8;
+ 			}
+ 		}
++		// The child and closing tag already account for every output byte.
++		// Rewriting tmpstr here exceeded the size-only pass for nested elements.
+ 		len+=8+num_tabs;
+-		if (!only_calculate) {strcpy(output,tmpstr);output+=tmp;}
+ 	}
+ 	return len;
+ }
