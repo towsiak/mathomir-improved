@@ -22,7 +22,7 @@ function Apply($p){[MathomirUiProbe]::Mouse($p,512,0,60,54);[MathomirUiProbe]::M
 $power='<elm tp="3" E1="" E2=""><ex><var t="e" f="00" /></ex><ex><var t="p" f="60" /></ex></elm>'
 try{
  for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 200;$appProcess.Refresh();if($appProcess.MainWindowHandle -ne 0){break}}
- $main=$appProcess.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,59648)
+ $main=$appProcess.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,59648);Check ($view -ne [IntPtr]::Zero) ('No view: '+[MathomirUiProbe]::AllText($main));Write-Output ('Selection test frame: '+[MathomirUiProbe]::Text($main))
  LoadMath $power;$p=WholePanel;Places $p 2;Check ((ResultText $p) -eq '≈ 23.14') ('Wrong e-to-pi preview: '+(ResultText $p))
  # The dropdown remains open and the highlight survives the trip to the panel.
  $combo=[MathomirUiProbe]::Child($p,1391);[MathomirUiProbe]::Send($combo,335,1)|Out-Null;Start-Sleep -Milliseconds 300;Check ([MathomirUiProbe]::IsWindowVisible($p)) 'Panel hid while decimal choices were open';[MathomirUiProbe]::Send($combo,335,0)|Out-Null
@@ -42,4 +42,4 @@ try{
  # Per-result decimals must not change the normal approximation preference.
  LoadMath $power;[MathomirUiProbe]::ExecuteKey($view,$true);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -match '23\.1406926328') 'Panel changed global rounding preferences'
  Write-Output 'Selection approximation passed: automatic panel, live Unicode preview, actual Approximate button, decimal dropdown, 0/2/4/8 places, trailing zeroes, original retention, partial replacement, Undo, dismissal, undefined-domain rejection and unchanged global rounding.'
-}finally{if(!$appProcess.HasExited){$appProcess.Kill();$appProcess.WaitForExit()}}
+}catch{Write-Output ([MathomirUiProbe]::AllText($main));$trace=Join-Path (Split-Path $exe) 'selection-approx-diagnostics.txt';if(Test-Path $trace){Get-Content $trace|Select-Object -Last 30|Write-Output};throw}finally{if(!$appProcess.HasExited){$appProcess.Kill();$appProcess.WaitForExit()}}
