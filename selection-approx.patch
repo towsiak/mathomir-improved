@@ -145,7 +145,7 @@
  	CView::OnLButtonUp(nFlags, point);
  	}
  	catch(...)
-@@ -13187,10 +13238,89 @@
+@@ -13187,10 +13238,93 @@
  
  
  
@@ -177,7 +177,11 @@
 +
 +    if(ViewOnlyMode||IsDrawingMode||ClipboardExpression||ClipboardDrawing||MouseMovingActive||MouseSizingActive||MouseRotationActive||MouseMode!=0||Popup->IsWindowVisible()){HideSelectionApproxPanel();return;}
 +    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("selection-approx-diagnostics.txt","a");if(trace){fprintf(trace,"update: selected=%d keyboard=%d touched=%d zoom=%d point=%d,%d\n",NumSelectedObjects,KeyboardEntryObject!=NULL,prevTouchedObject!=NULL,ViewZoom,point.x,point.y);fclose(trace);}}
-+    CObject *wanted=KeyboardEntryBaseObject?KeyboardEntryBaseObject->Object:prevTouchedObject?prevTouchedObject->Object:NULL;
++    // Document loads and Undo can replace the backing document array.
++    // Match saved selection addresses before reading through them.
++    CObject *wanted=NULL;
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument+i==KeyboardEntryBaseObject){wanted=TheDocument[i].Object;break;}
++    if(!wanted)for(int i=0;i<NumDocumentElements;i++)if(TheDocument+i==prevTouchedObject){wanted=TheDocument[i].Object;break;}
 +    tDocumentStruct *object=NULL;
 +    if(NumSelectedObjects){if(NumSelectedObjects!=1){HideSelectionApproxPanel();return;}for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState==3){if(TheDocument[i].Type!=1){HideSelectionApproxPanel();return;}object=TheDocument+i;break;}}
 +    else for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==wanted&&TheDocument[i].Type==1){object=TheDocument+i;break;}
@@ -237,7 +241,7 @@
      if(ViewOnlyMode)return;
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute begin: undo=%d clipboard=%d keyboard=%d\n",UndoNumLevels,ClipboardExpression!=NULL,KeyboardEntryObject!=NULL);fclose(trace);}}
      tDocumentStruct *object=NULL;
-@@ -13920,4 +14050,5 @@
+@@ -13920,4 +14054,5 @@
          if(TheDocument[i].Object && (TheDocument[i].Type==1 || TheDocument[i].Type==2))
          {TheDocument[i].MovingDotState=3;NumSelectedObjects++;}
      MouseMode=0;SetFocus();RepaintTheView();
