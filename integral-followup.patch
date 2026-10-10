@@ -89,3 +89,31 @@ diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
  	}
  	return ret;
  }
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13219,11 +13219,19 @@
+         if(!changes){AfxMessageBox("No finite calculation was found. Check the real domain and give variables a value. Use Ctrl+Shift+Enter for a decimal approximation.");return;}
+         }
+     }
+-    int index=(int)(object-TheDocument);OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
+-    UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&left,0);
+-    while(source->m_NumElements>0 && source->m_pElementList[source->m_NumElements-1].Type==0)source->DeleteElement(source->m_NumElements-1);
+-    source->InsertEmptyElement(source->m_NumElements,2,approximate?(char)0xBB:'=');
+-    for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)source->InsertElement(answer.m_pElementList+i,source->m_NumElements);
++    CExpression completed(NULL,NULL,source->m_FontSize);completed.CopyExpression(&left,0);
++    while(completed.m_NumElements>0){auto last=completed.m_pElementList+completed.m_NumElements-1;
++        bool empty=last->Type==0 || (last->Type==1 && last->pElementObject && !last->pElementObject->Data1[0] && NativeSymbolic::Empty((CExpression*)last->pElementObject->Expression1) && NativeSymbolic::Empty((CExpression*)last->pElementObject->Expression2));
++        if(!empty)break;completed.DeleteElement(completed.m_NumElements-1);}
++    completed.InsertEmptyElement(completed.m_NumElements,2,approximate?(char)0xBB:'=');
++    for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)completed.InsertElement(answer.m_pElementList+i,completed.m_NumElements);
++    int index=(int)(object-TheDocument);
++    // Stop typing explicitly: Ctrl+Enter still holds Ctrl while executing.
++    if(KeyboardEntryObject)((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
++    OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
++    auto nativeXml=[](CExpression *expression){int size=expression->XML_output(NULL,0,1);std::vector<char> data(size+1,0);expression->XML_output(&data[0],0,0);return std::string(&data[0],size);};
++    if(nativeXml(source)==nativeXml(&completed)){RepaintTheView(1);SetFocus();return;}
++    UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&completed,0);
+     CDC *dc=GetDC();short length,above,below;source->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
+     object->Length=length*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
+ }

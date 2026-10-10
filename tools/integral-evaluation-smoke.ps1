@@ -95,7 +95,7 @@ try {
   Check ($root.OuterXml -match '0\.69314718056') "ln(2) was not evaluated inline by $method : $($root.OuterXml)"
   $before=$root.OuterXml;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::Send($main,273,33095)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
   Check ($doc.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]').OuterXml -eq $before) 'Evaluation duplicated result'
-  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
+  Write-Output ("Evaluation Undo before: "+[MathomirUiProbe]::MenuText($main,0xE12B));[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
   Check ($doc.OuterXml -notmatch '0\.69314718056') 'Evaluation Undo failed'
  }
  Write-Output 'Inline function evaluation passed: literally typed ln(2), Ctrl+Enter and actual palette button, preserved original, replacement on repeated execution and Undo.'
