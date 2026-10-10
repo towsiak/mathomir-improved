@@ -110,7 +110,7 @@ jobs:
             source/build/*integral*.mom
             source/build/integral-ui.png
             source/build/selection-approx-ui.png
-            source/build/selection-approx-smoke.mom
+            source/build/selection-approx-*-smoke.mom
             source/build/selection-approx-diagnostics.txt
           if-no-files-found: ignore
       - uses: actions/upload-artifact@v4

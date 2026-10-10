@@ -3,9 +3,11 @@ $all=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
 Invoke-Expression $all.Substring(0,$all.IndexOf('$exe ='))
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
 $appProcess=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
+$script:fixtureNumber=0;$script:file=$null
 function Check($ok,$message){if(!$ok){throw $message}}
 function LoadMath($body){
- $script:file=Join-Path (Split-Path $exe) 'selection-approx-smoke.mom'
+ if($script:file){[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null}
+ $script:fixtureNumber++;$script:file=Join-Path (Split-Path $exe) ('selection-approx-'+$script:fixtureNumber+'-smoke.mom')
  ('<?xml version="1.0"?><mathomir><o t="1" X="100" Y="130"><ex fh="200">'+$body+'</ex></o></mathomir>')|Set-Content $file -Encoding ascii
  [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 500;[MathomirUiProbe]::Send($main,273,32775)|Out-Null
 }
@@ -31,7 +33,7 @@ try{
  $doc=Apply $p;Check ($doc.SelectSingleNode('//elm[@tp="3"]') -and $doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]') -and $doc.SelectSingleNode('//elm[@tp="1" and @tx="23.14"]')) ('Approximate button lost original or result: '+$doc.OuterXml)
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -notmatch '23\.14') 'Undo failed'
  foreach($digits in @(0,4,8)){$p=WholePanel;Places $p $digits;$doc=Apply $p;$want=if($digits -eq 0){'23'}elseif($digits -eq 4){'23.1407'}else{'23.14069263'};Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="'+$want+'"]')) ('Wrong decimal places: '+$digits);[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null}
- LoadMath '<var t="2" f="00" />';$p=WholePanel;Places $p 2;$doc=Apply $p;Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2.00"]')) 'Requested trailing zeroes were lost'
+ LoadMath '<var t="2" f="00" />';$p=WholePanel;Places $p 2;$doc=Apply $p;Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2.00"]')) ('Requested trailing zeroes were lost: '+$doc.OuterXml)
  # Hover a selected power inside a sum; only the highlighted part is replaced.
  LoadMath ('<var t="2" f="00" /><opr s="+" />'+$power);$found=$false
  for($y=108;$y -le 130 -and !$found;$y+=3){for($x=129;$x -le 185;$x+=3){[MathomirUiProbe]::Mouse($view,512,0,$x,$y);$p=Panel;if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)){Places $p 2;if((ResultText $p) -eq '≈ 23.14'){$found=$true;break}}}}
