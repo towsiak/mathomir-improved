@@ -86,6 +86,7 @@ try {
  Write-Output 'Long native integral formula round trip passed without truncation.'
  # Literal typed ln(2), ordinary Execute and the actual evaluation palette.
  foreach($method in @('keyboard','palette')){
+  Write-Output ('Evaluation method: '+$method)
   $file=Join-Path (Split-Path $exe) ('inline-ln2-'+$method+'.mom');'<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $file -Encoding ascii
   [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 400
   [MathomirUiProbe]::Mouse($view,512,0,250,180);[MathomirUiProbe]::Mouse($view,513,1,250,180);[MathomirUiProbe]::Mouse($view,514,0,250,180)
@@ -103,6 +104,7 @@ try {
  $client=[MathomirUiProbe]::ClientRect($view)
  foreach($color in @(0x00FDEADB,0x00E5DEFC,0x00B97D50,0x00735FB4)){Write-Output ("Diagnostic full-view color "+$color+": "+[MathomirUiProbe]::CountColor($view,0,0,$client.Right,$client.Bottom,$color))}
  if(Test-Path $file){Write-Output (Get-Content $file -Raw)}
+ $trace=Join-Path (Split-Path $exe) 'evaluation-diagnostics.txt';if(Test-Path $trace){Write-Output (Get-Content $trace -Tail 40)}
  $diagnostics=Join-Path (Split-Path $exe) 'graph-diagnostics.txt';if(Test-Path $diagnostics){Write-Output (Get-Content $diagnostics -Tail 25)}
  try{Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($view);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'integral-ui.png'));$graphics.Dispose();$image.Dispose()}catch{Write-Output $_}
  throw

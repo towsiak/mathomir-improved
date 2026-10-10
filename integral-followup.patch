@@ -117,3 +117,38 @@ diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
      CDC *dc=GetDC();short length,above,below;source->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
      object->Length=length*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
  }
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13188,7 +13188,9 @@
+ void CMathomirView::OnApproximateExpression(){ExecuteExpression(true);}
+ void CMathomirView::ExecuteExpression(bool approximate)
+ {
+-    if(ViewOnlyMode)return;tDocumentStruct *object=NULL;
++    if(ViewOnlyMode)return;
++    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute begin: undo=%d clipboard=%d keyboard=%d\n",UndoNumLevels,ClipboardExpression!=NULL,KeyboardEntryObject!=NULL);fclose(trace);}}
++    tDocumentStruct *object=NULL;
+     if(KeyboardEntryBaseObject && KeyboardEntryBaseObject->Type==1)object=KeyboardEntryBaseObject;
+     if(!object)for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==1 && TheDocument[i].MovingDotState==3){if(object){AfxMessageBox("Select one math object to execute.");return;}object=TheDocument+i;}
+     if(!object && prevTouchedObject && prevTouchedObject->Type==1)object=prevTouchedObject;
+@@ -13226,6 +13228,9 @@
+     completed.InsertEmptyElement(completed.m_NumElements,2,approximate?(char)0xBB:'=');
+     for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)completed.InsertElement(answer.m_pElementList+i,completed.m_NumElements);
+     int index=(int)(object-TheDocument);
++    RestoreClipboardBackground();Popup->HidePopupMenu();Toolbox->HideSubtoolbox();
++    if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}
++    if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
+     // Stop typing explicitly: Ctrl+Enter still holds Ctrl while executing.
+     if(KeyboardEntryObject)((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
+     OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
+diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -1331,6 +1331,7 @@
+ //saves undo information (saves the current sate of documment)
+ int CMainFrame::UndoSave(char * text,int unique_ID)
+ {
++    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"undo save: %d disabled=%d %s\n",UndoNumLevels,UndoSavingDisabled,text);fclose(trace);}}
+ 	if (UndoSavingDisabled) return 1; 
+ 
+ 	//if ((UseToolbar) && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
