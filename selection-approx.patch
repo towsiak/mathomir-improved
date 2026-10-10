@@ -145,7 +145,7 @@
  	CView::OnLButtonUp(nFlags, point);
  	}
  	catch(...)
-@@ -13187,10 +13238,88 @@
+@@ -13187,10 +13238,89 @@
  
  
  
@@ -193,6 +193,7 @@
 +    // A saved equation is evaluated from its original left side.
 +    if(selected==root&&first==0)for(int i=0;i<input.m_NumElements;i++)if(input.m_pElementList[i].Type==2&&(input.m_pElementList[i].pElementObject->Data1[0]=='='||input.m_pElementList[i].pElementObject->Data1[0]==(char)0xBB)){while(input.m_NumElements>i)input.DeleteElement(i);break;}
 +    try{std::string formula=NativeSymbolic::Formula(&input);SymbolicDerivative::Parser parser;auto parsed=parser.Parse(formula);extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);if(!SymbolicDerivative::Finite(value)){HideSelectionApproxPanel();return;}
++        ShowFeatureCanvasHint(0,NULL);if(CanvasHints.Handle())::SendMessage(CanvasHints.Handle(),TTM_POP,0,0);
 +        if(m_SelectionApproxDismissed==SelectionNativeXml(root)+"|"+formula){HideSelectionApproxPanel();return;}
 +        if(!m_SelectionApproxPanel){m_SelectionApproxPanel=new CSelectionApproxPanel(this);if(!m_SelectionApproxPanel->CreatePanel()){delete m_SelectionApproxPanel;m_SelectionApproxPanel=NULL;return;}}
 +        auto panel=m_SelectionApproxPanel;
@@ -236,7 +237,7 @@
      if(ViewOnlyMode)return;
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute begin: undo=%d clipboard=%d keyboard=%d\n",UndoNumLevels,ClipboardExpression!=NULL,KeyboardEntryObject!=NULL);fclose(trace);}}
      tDocumentStruct *object=NULL;
-@@ -13920,4 +14049,5 @@
+@@ -13920,4 +14050,5 @@
          if(TheDocument[i].Object && (TheDocument[i].Type==1 || TheDocument[i].Type==2))
          {TheDocument[i].MovingDotState=3;NumSelectedObjects++;}
      MouseMode=0;SetFocus();RepaintTheView();

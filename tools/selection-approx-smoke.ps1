@@ -29,6 +29,7 @@ try{
  Write-Output 'Whole-expression panel and live rounded preview passed.'
  # The dropdown remains open and the highlight survives the trip to the panel.
  $combo=[MathomirUiProbe]::Child($p,1391);[MathomirUiProbe]::Send($combo,335,1)|Out-Null;Start-Sleep -Milliseconds 300;Check ([MathomirUiProbe]::IsWindowVisible($p)) 'Panel hid while decimal choices were open';[MathomirUiProbe]::Send($combo,335,0)|Out-Null
+ $button=[MathomirUiProbe]::Child($p,1390);[MathomirUiProbe]::Mouse($button,512,0,30,12);Start-Sleep -Milliseconds 150
  Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($view);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'selection-approx-ui.png'));$graphics.Dispose();$image.Dispose()
  $doc=Apply $p;Check ($doc.SelectSingleNode('//elm[@tp="3"]') -and $doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]') -and $doc.SelectSingleNode('//elm[@tp="1" and @tx="23.14"]')) ('Approximate button lost original or result: '+$doc.OuterXml)
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -notmatch '23\.14') 'Undo failed'
