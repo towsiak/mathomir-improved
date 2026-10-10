@@ -174,3 +174,25 @@ diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
  		{
  			//replacing or inserting individual character/operator into an expression
  			//at the point where mouse is pointing
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13233,9 +13233,17 @@
+     if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
+     // Stop typing explicitly: Ctrl+Enter still holds Ctrl while executing.
+     if(KeyboardEntryObject)((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
+-    OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
++    if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
++    source->DeselectExpression();
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState==3)TheDocument[i].MovingDotState=0;
++    NumSelectedObjects=0;NumSelectedDrawings=0;MouseMode=0;
++    auto tracePhase=[](const char *phase){if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute phase: %s\n",phase);fclose(trace);}}};
++    tracePhase("stopped typing");
++    CDC *preparedDC=GetDC();short preparedL,preparedA,preparedB;completed.CalculateSize(preparedDC,ViewZoom,&preparedL,&preparedA,&preparedB);source->CalculateSize(preparedDC,ViewZoom,&preparedL,&preparedA,&preparedB);ReleaseDC(preparedDC);
++    tracePhase("prepared layout");
+     auto nativeXml=[](CExpression *expression){int size=expression->XML_output(NULL,0,1);std::vector<char> data(size+1,0);expression->XML_output(&data[0],0,0);return std::string(&data[0],size);};
+-    if(nativeXml(source)==nativeXml(&completed)){RepaintTheView(1);SetFocus();return;}
++    std::string oldXml=nativeXml(source);tracePhase("source serialized");std::string newXml=nativeXml(&completed);tracePhase("result serialized");
++    if(oldXml==newXml){RepaintTheView(1);SetFocus();return;}
+     UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&completed,0);
+     CDC *dc=GetDC();short length,above,below;source->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
+     object->Length=length*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
