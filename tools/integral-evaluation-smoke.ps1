@@ -10,6 +10,7 @@ public static class IntegralUI {
 }
 '@
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
+$env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $appProcess=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function Palette {
@@ -69,6 +70,19 @@ try {
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
  Check ($doc.SelectSingleNode('//integral').a -eq '-2' -and $doc.SelectSingleNode('//integral').hatch -eq '0') 'Undo did not restore original integral settings'
  Write-Output 'Integral native UI passed: actual palette, Unicode readouts, invalid pole, signed/absolute area, colored rendering, save/reload, edit, hatch and Undo.'
+ # Native powers expand the stored formula beyond the old 160-character cap.
+ $longFile=Join-Path (Split-Path $exe) 'long-integral-formula-smoke.mom';'<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $longFile -Encoding ascii
+ [MathomirUiProbe]::OpenFile($main,$longFile);Start-Sleep -Milliseconds 400;$d=IntegralDialog
+ $longFormula=(2..30 | ForEach-Object {'x^'+$_}) -join '+'
+ [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1370),$longFormula);[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1371),'0');[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1372),'1');[MathomirUiProbe]::Send($d,273,1376)|Out-Null
+ Check ([IntegralUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1))) 'Long valid formula was rejected'
+ [MathomirUiProbe]::PostMessage($d,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 600
+ [MathomirUiProbe]::Mouse($view,512,0,100,100);[MathomirUiProbe]::Mouse($view,513,1,100,100);[MathomirUiProbe]::Mouse($view,514,0,100,100);[MathomirUiProbe]::Send($view,258,27)|Out-Null;Start-Sleep -Seconds 2
+ [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $longFile -Raw;$longHex=$doc.SelectSingleNode('//integral').f
+ Check ($longHex.Length -gt 320) 'Long-formula fixture did not exercise the expanded native storage'
+ [MathomirUiProbe]::OpenFile($main,$longFile);Start-Sleep -Seconds 2;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $longFile -Raw
+ Check ($doc.SelectSingleNode('//integral').f -eq $longHex) 'Long integral formula was truncated on reload'
+ Write-Output 'Long native integral formula round trip passed without truncation.'
  # Literal typed ln(2), ordinary Execute and the actual evaluation palette.
  foreach($method in @('keyboard','palette')){
   $file=Join-Path (Split-Path $exe) ('inline-ln2-'+$method+'.mom');'<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $file -Encoding ascii
@@ -84,4 +98,11 @@ try {
   Check ($doc.OuterXml -notmatch '0\.69314718056') 'Evaluation Undo failed'
  }
  Write-Output 'Inline function evaluation passed: literally typed ln(2), Ctrl+Enter and actual palette button, preserved original, replacement on repeated execution and Undo.'
-}finally{if(!$appProcess.HasExited){Stop-Process -Id $appProcess.Id -Force}}
+}catch{
+ $client=[MathomirUiProbe]::ClientRect($view)
+ foreach($color in @(0x00FDEADB,0x00E5DEFC,0x00B97D50,0x00735FB4)){Write-Output ("Diagnostic full-view color "+$color+": "+[MathomirUiProbe]::CountColor($view,0,0,$client.Right,$client.Bottom,$color))}
+ if(Test-Path $file){Write-Output (Get-Content $file -Raw)}
+ $diagnostics=Join-Path (Split-Path $exe) 'graph-diagnostics.txt';if(Test-Path $diagnostics){Write-Output (Get-Content $diagnostics -Tail 25)}
+ try{Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($view);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'integral-ui.png'));$graphics.Dispose();$image.Dispose()}catch{Write-Output $_}
+ throw
+}finally{Remove-Item Env:MATHOMIR_GRAPH_DIAGNOSTICS -ErrorAction SilentlyContinue;if(!$appProcess.HasExited){Stop-Process -Id $appProcess.Id -Force}}

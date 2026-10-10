@@ -88,6 +88,15 @@ jobs:
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/statistics-smoke.ps1
           ./tools/windows-smoke.ps1
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: Integral-Diagnostics
+          path: |
+            source/build/graph-diagnostics.txt
+            source/build/*integral*.mom
+            source/build/integral-ui.png
+          if-no-files-found: ignore
       - name: Package
         shell: pwsh
         run: |
