@@ -74,3 +74,18 @@ diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
          }
  		if (reset_plot==2) calc_y=1;
  
+diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -2069,6 +2069,11 @@
+ 			for(const char *p=bounds;*p;++p)metadata=metadata*33u+(unsigned char)*p;
+ 		}
+ 		if(!plot->pieces.empty())ret^=metadata;
++        if(plot->integral.enabled){
++            const auto &s=plot->integral;std::string text=s.formula+"|"+Piecewise::Number(s.a)+"|"+Piecewise::Number(s.b)+"|"+(s.radians?"1":"0")+(s.hatch?"1":"0")+(s.labels?"1":"0");
++            unsigned int area=5381;for(unsigned char c:text)area=area*33u+c;ret^=(int)area;
++        }
++
+ 	}
+ 	return ret;
+ }

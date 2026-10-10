@@ -66,6 +66,7 @@ try {
  [MathomirUiProbe]::PostMessage($d,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 700;[MathomirUiProbe]::Send($view,258,27)|Out-Null;Start-Sleep -Seconds 1
  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
  Check ($doc.SelectNodes('//integral').Count -eq 1 -and $doc.SelectSingleNode('//integral').hatch -eq '1') 'Editing duplicated graph or lost hatch option'
+ [MathomirUiProbe]::Mouse($view,512,0,850,50);Start-Sleep -Milliseconds 200
  Check ([MathomirUiProbe]::CountColor($view,100,100,720,550,0x00B97D50) -gt 20) 'Hatch strokes were not rendered'
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw
  Check ($doc.SelectSingleNode('//integral').a -eq '-2' -and $doc.SelectSingleNode('//integral').hatch -eq '0') 'Undo did not restore original integral settings'
