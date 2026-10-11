@@ -38,7 +38,7 @@ try{
  for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 200;$appProcess.Refresh();if($appProcess.MainWindowHandle -ne 0){break}}
  $main=$appProcess.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,59648)
  $file=Join-Path (Split-Path $exe) 'ai-help-smoke.mom';'<?xml version="1.0"?><mathomir><o t="1" X="100" Y="130"><ex fh="200"><var t="2" f="00" /></ex></o></mathomir>'|Set-Content $file -Encoding ascii
- [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null
+ [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,32775)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null
  [MathomirUiProbe]::Mouse($view,512,0,105,126);[MathomirUiProbe]::Mouse($view,516,2,105,126);[MathomirUiProbe]::Mouse($view,517,0,105,126);Start-Sleep -Milliseconds 100;$popup=[MathomirUiProbe]::Window($appProcess.Id,'PopupMenu');$panel=[MathomirUiProbe]::CaptionChild($popup,'Math selection');Check ($panel -ne [IntPtr]::Zero) 'Selection panel missing'
  [MathomirUiProbe]::Mouse($view,512,0,470,330);Start-Sleep -Milliseconds 350;Check ([MathomirUiProbe]::IsWindowVisible($panel)) 'Approximation panel vanished while crossing the page'
  $button=[MathomirUiProbe]::Child($panel,1394);Check ($button -ne [IntPtr]::Zero) 'AI Explain button missing'
