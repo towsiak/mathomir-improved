@@ -18,7 +18,7 @@ int main(){
     CComPtr<IRichEditOle> ole;SendMessage(reader,EM_GETOLEINTERFACE,0,(LPARAM)&ole);CComPtr<ITextDocument2> native;ole->QueryInterface(__uuidof(ITextDocument2),(void**)&native);check(native!=NULL,"Native math interface missing");
     CComPtr<ITextRange2> range;native->Range2(0,tomForward,&range);CComBSTR backing;check(SUCCEEDED(range->GetText(&backing)),"Built math cannot be read");
     std::wstring raw(backing.m_str?backing.m_str:L"");check(raw.find(L'\ufdd0')!=raw.npos,"No built-up math objects in the backing store");
-    CComBSTR omml;HRESULT exported=range->GetText2(tomConvertOMML,&omml);if(SUCCEEDED(exported)&&omml.m_str){std::wstring xml(omml.m_str);check(xml.find(L"<m:f")!=xml.npos&&xml.find(L"<m:rad")!=xml.npos,"Fractions/roots are not real typeset objects");}
+    CComBSTR omml;HRESULT exported=range->GetText2(0x00080000 /* tomConvertOMML */,&omml);if(SUCCEEDED(exported)&&omml.m_str){std::wstring xml(omml.m_str);check(xml.find(L"<m:f")!=xml.npos&&xml.find(L"<m:rad")!=xml.npos,"Fractions/roots are not real typeset objects");}
     auto plain=AiPresentation::Format(L"plain {\\rtf1} text");SetWindowTextW(reader,plain.text.c_str());check(AiPresentation::BuildMath(reader,plain)==0,"Plain text was interpreted as math");
     std::cout<<"Native math presentation passed: "<<built<<" built-up zones, stacked fractions, nested roots, variable powers and boxed conversion; no browser or Office installation.\n";
     range.Release();native.Release();ole.Release();DestroyWindow(reader);CoUninitialize();

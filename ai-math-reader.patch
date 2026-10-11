@@ -247,7 +247,7 @@
 +        CComPtr<ITextRange2> range;if(SUCCEEDED(native->Range2((long)it->first,(long)it->last,&range))&&range){
 +            if(SUCCEEDED(range->SetText(CComBSTR(it->linear.c_str())))){
 +                CComPtr<ITextFont2> font;range->GetFont2(&font);if(font){font->SetName(CComBSTR(L"Cambria Math"));font->SetMathZone(tomTrue);}
-+                HRESULT built=range->BuildUpMath(tomMathBuildUpRecurse|tomMathAlphabetics);
++                HRESULT built=range->BuildUpMath(0);
 +                if(built==S_OK)builtCount++;
 +                else {range->SetText(CComBSTR(document.text.substr(it->first,it->last-it->first).c_str()));if(font)font->SetMathZone(tomFalse);}
 +            }
