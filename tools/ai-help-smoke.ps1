@@ -49,11 +49,11 @@ try{
  Check (([AiUI]::GetWindowLong([MathomirUiProbe]::Child($d,1411),-16) -band 32) -ne 0) 'API key field is not masked'
  Provider $d 1;Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1414)) -eq 'openai/gpt-oss-120b') 'Groq default model missing';Ask $d 'ln(2)';Check ((Status $d).Contains('API key')) ('Missing key not explained: '+(Status $d));Check ([AiUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1404))) 'Missing key left panel busy'
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1411),'gsk_mathomir_ci_only');[MathomirUiProbe]::Send($d,273,1412)|Out-Null;Check ([AiUI]::SavedKey('Groq')) 'Windows Credential Manager did not save key'
- Provider $d 0;Check (![AiUI]::SavedKey('OpenAI') -and [MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1411)) -eq '') 'Groq key leaked to OpenAI';
+ Provider $d 0;Check (![AiUI]::SavedKey('OpenAI') -and [MathomirUiProbe]::Send([MathomirUiProbe]::Child($d,1411),193,0) -eq 0) 'Groq key leaked to OpenAI';
  Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1414)) -eq 'gpt-4.1-mini-2025-04-14') 'OpenAI model was overwritten';
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1411),'sk-mathomir-ci-only');
  if($OnlineFixture){Ask $d 'ln(2)';WaitReply $d;Check ((Status $d).Contains('AI reply received')) 'OpenAI fixture request failed'}
- Provider $d 1;Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1411)) -eq '') 'Provider switch retained a typed key';
+ Provider $d 1;Check ([MathomirUiProbe]::Send([MathomirUiProbe]::Child($d,1411),193,0) -eq 0) 'Provider switch retained a typed key';
  if($OnlineFixture){
   Ask $d 'ln(2)';WaitReply $d;$reply=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1407));Check ($reply.Contains('ln(2) ≈ 0.6931')) ('Unicode reply failed: '+$reply)
   [MathomirUiProbe]::Send($d,273,1406)|Out-Null;Check ((Get-Clipboard -Raw).Contains('ln(2) ≈ 0.6931')) 'Unicode copy failed'
@@ -67,5 +67,5 @@ try{
  [MathomirUiProbe]::Send($d,273,1413)|Out-Null;Check (![AiUI]::SavedKey('Groq')) 'Saved key was not removed';[MathomirUiProbe]::Send($d,273,2)|Out-Null;Start-Sleep -Milliseconds 200
  $d=OpenAI;[MathomirUiProbe]::Send($d,273,2)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -notmatch 'sk-mathomir|gsk_mathomir|AI reply') 'AI changed document or leaked credentials'
  Write-Output ('AI help passed: built-in fixed selection panel, Groq and OpenAI provider isolation, separate model defaults, cleared typed keys on switching, actual AI Explain click, selection import, Unicode controls, missing-key guidance, masked key, Windows Credential Manager save/remove, unchanged native math, and menu reopening. Test HTTP enabled: '+$OnlineFixture)
-}catch{Write-Output ([MathomirUiProbe]::AllText($main));Get-ChildItem (Split-Path $exe) -Filter 'asan*' -File|ForEach-Object{Get-Content $_.FullName|Write-Output};throw}
+}catch{Write-Output ('AI process exited: '+$appProcess.HasExited);if($d -ne [IntPtr]::Zero){Write-Output ([MathomirUiProbe]::AllText($d))};Write-Output ([MathomirUiProbe]::AllText($main));Get-ChildItem (Split-Path $exe) -Filter 'asan*' -File|ForEach-Object{Get-Content $_.FullName|Write-Output};throw}
 finally{if(!$appProcess.HasExited){$appProcess.Kill();$appProcess.WaitForExit()};if($server -and !$server.HasExited){$server.Kill();$server.WaitForExit()};Remove-Item Env:MATHOMIR_AI_TEST_PORT -ErrorAction SilentlyContinue}

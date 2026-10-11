@@ -92,6 +92,37 @@
      if(status==429)return "The API quota or rate limit was reached. Check API billing and limits, or try again later. No automatic retry was sent.";
      if(status==413)return "The request is too large. Shorten the submitted math or working.";
      if(status>=500)return "The AI service is temporarily unavailable. Try again later.";
+--- a/Mathomir/Expression.cpp
++++ b/Mathomir/Expression.cpp
+@@ -10733,7 +10733,7 @@
+ //the expression must be prepared (m_Selection)...
+ CElement *prevQuickTypeElement;
+ #pragma optimize("s",on)
+-int CExpression::KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt, UINT nFlags,int fcolor, int *x, int *y)
++int CExpression::KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt, UINT nFlags,int fcolor, int *x, int *y,bool keepCursor)
+ {
+ 	if (ViewOnlyMode) return 0;
+ 	int retval=0;
+@@ -10777,6 +10777,8 @@
+ 	newFocus=(CExpression*)KeyboardEntryObject; //the keyboard focus my change;
+ 	if (newFocus==NULL) goto keyboardquicktype_end;
+ 	if (newFocus->m_IsKeyboardEntry<1) goto keyboardquicktype_end;
++    // A click starts a lasting caret session. Hover-only quick typing keeps its legacy behavior.
++    if(keepCursor){CExpression *parent=newFocus;while(parent->m_pPaternalExpression)parent=parent->m_pPaternalExpression;short l,a,b;parent->CalculateSize(DC,ViewZoom,&l,&a,&b);parent->GetKeyboardCursorPos(x,y);ClipboardExpression=tmp_clipboard_storage;((CMainFrame*)theApp.m_pMainWnd)->UndoEnableSaving();return 2;}
+ 
+ 	if ((KeyboardExponentMode) || (KeyboardIndexMode))
+ 	{
+--- a/Mathomir/Expression.h
++++ b/Mathomir/Expression.h
+@@ -212,7 +212,7 @@
+ 	int PaintDecoration(CDC *DC,short zoom,int X, int Y,int LastDecorationElement,int i, int LastDecoration,int color=0);
+ 	// direction<0 find positions above x,y;  direction>0 find positions below x,y
+ 	int KeyboardStartAt(int X, int Y, char direction,char between=0);
+-	int KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt, UINT nFlags,int fcolor, int *x, int *y);
++	int KeyboardQuickType(CDC* DC, short zoom, UINT nChar, UINT nRepCnt, UINT nFlags,int fcolor, int *x, int *y,bool keepCursor=false);
+ 	int KeyboardInsertNewEquation(CDC *DC, short zoom, UINT nChar,CExpression *orig,int TypingMode);
+ 	int GetKeyboardCursorPos(int * X, int * Y);
+ 	int ChangeFontSize(float factor);
 --- a/Mathomir/FeatureHelp.h
 +++ b/Mathomir/FeatureHelp.h
 @@ -40,19 +40,20 @@
@@ -203,7 +234,42 @@
      afx_msg void OnPaint(){CPaintDC dc(this);CRect r;GetClientRect(r);dc.FillSolidRect(r,RGB(255,255,255));dc.Draw3dRect(r,RGB(172,187,201),RGB(172,187,201));auto old=dc.SelectObject(&font);dc.SetBkMode(TRANSPARENT);dc.SetTextColor(RGB(28,39,49));dc.SelectObject(old);}
      afx_msg HBRUSH OnCtlColor(CDC *dc,CWnd *window,UINT kind){dc->SetBkColor(RGB(255,255,255));dc->SetTextColor(RGB(28,39,49));return (HBRUSH)::GetStockObject(WHITE_BRUSH);}
      virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1394){view->OnAiHelp();return TRUE;}if(id==1390){view->ApplySelectionApproximation();return TRUE;}if(id==1391&&HIWORD(wp)==CBN_SELCHANGE){Refresh();return TRUE;}if(id==1392){view->DismissSelectionApproxPanel();view->SetFocus();return TRUE;}return CWnd::OnCommand(wp,lp);}
-@@ -13258,28 +13261,38 @@
+@@ -2000,6 +2003,7 @@
+ 	RepaintTheView();
+ }
+ 
++static CObject *ExplicitTypingRoot=NULL;
+ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ {
+     m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
+@@ -2008,6 +2012,8 @@
+     if(MouseMode==0 && !IsDrawingMode && !TouchMouseMode && !(nFlags&MK_SHIFT) &&
+         !ClipboardExpression && !ClipboardDrawing)
+         OnMouseMove(nFlags&~MK_LBUTTON,point);
++    ExplicitTypingRoot=NULL;
++    if(!ViewOnlyMode&&!IsDrawingMode&&!ClipboardExpression&&!ClipboardDrawing)for(int i=NumDocumentElements-1;i>=0;i--){auto d=TheDocument+i;if(d->Type!=1||!d->Object||d->MovingDotState==5)continue;CRect r((d->absolute_X-ViewX)*ViewZoom/100,(d->absolute_Y-d->Above-ViewY)*ViewZoom/100,(d->absolute_X+d->Length-ViewX)*ViewZoom/100+1,(d->absolute_Y+d->Below-ViewY)*ViewZoom/100+1);if(r.PtInRect(point)){ExplicitTypingRoot=d->Object;break;}}
+     HideQuickActionSearch(); FunctionHelpText.Empty();
+     DeleteGripClick=false;
+     tDocumentStruct *deleteTarget=ResizeHandleDocument();
+@@ -5188,6 +5194,7 @@
+ char lockRepeat;
+ void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
+ {
++    if(KeyboardEntryObject||nChar==27)ExplicitTypingRoot=NULL;
+     m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
+     if(nChar==1 && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))return;
+ 	if (SurpressCharMessage) {SurpressCharMessage=0;return;}
+@@ -6604,7 +6611,8 @@
+ 							fcolor=Toolbox->GetUniformFormattingColor();
+ 						}
+ 						int inserting_position=tmp->m_Selection-1;
+-                        int quickResult=tmp->KeyboardQuickType(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,&x,&y);
++                        int quickResult=tmp->KeyboardQuickType(DC,ViewZoom,nChar,nRepCnt,nFlags,fcolor,&x,&y,ExplicitTypingRoot==ds->Object);
++                        if(quickResult)ExplicitTypingRoot=NULL;
+                         if(quickResult==2)KeyboardEntryBaseObject=ds;
+                         if(quickResult)
+ 						{
+@@ -13258,28 +13266,38 @@
  }
  void CMathomirView::DismissSelectionApproxPanel()
  {
@@ -248,7 +314,7 @@
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("selection-approx-diagnostics.txt","a");if(trace){fprintf(trace,"update: selected=%d keyboard=%d touched=%d zoom=%d point=%d,%d\n",NumSelectedObjects,KeyboardEntryObject!=NULL,prevTouchedObject!=NULL,ViewZoom,point.x,point.y);fclose(trace);}}
      // Document loads and Undo can replace the backing document array.
      // Match saved selection addresses before reading through them.
-@@ -13288,41 +13301,39 @@
+@@ -13288,41 +13306,39 @@
      if(!wanted)for(int i=0;i<NumDocumentElements;i++)if(TheDocument+i==prevTouchedObject){wanted=TheDocument[i].Object;break;}
      tDocumentStruct *object=NULL;
      if(NumSelectedObjects){if(NumSelectedObjects!=1){HideSelectionApproxPanel();return;}for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState==3){if(TheDocument[i].Type!=1){HideSelectionApproxPanel();return;}object=TheDocument+i;break;}}
@@ -301,7 +367,7 @@
      // Replace a selected part only; adding an equality inside a sum would change its meaning.
      auto settings=MathDisplay::Options();MathDisplay::Options()=panel->Format();std::string xml="<ex fh=\""+SymbolicDerivative::Number(parent->m_FontSize)+"\">"+MathDisplay::ApproximationXml(panel->value)+"</ex>";MathDisplay::Options()=settings;
      if(panel->value<0&&(first>0||last+1<parent->m_NumElements)){
-@@ -14117,40 +14128,47 @@
+@@ -14117,40 +14133,47 @@
  static std::wstring AiText(HWND control){int length=::GetWindowTextLengthW(control);if(length>64000)throw std::runtime_error("The text is too long.");std::vector<wchar_t> text(length+1,0);::GetWindowTextW(control,text.data(),length+1);return std::wstring(text.data());}
  class CAiHelpDialog:public CFeatureDialog
  {
@@ -362,7 +428,7 @@
          return CFeatureDialog::OnCommand(wp,lp);
      }
      virtual void OnCancel(){if(closing)return;closing=true;if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Text(1411,L"");CFeatureDialog::OnCancel();}
-@@ -14170,5 +14188,5 @@
+@@ -14170,5 +14193,5 @@
          }
      }
      // Capture the selected math before stopping typing or dismissing its panel.
