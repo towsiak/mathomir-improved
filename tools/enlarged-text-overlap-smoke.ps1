@@ -69,4 +69,10 @@ try {
  $d=SaveDoc;Check ($d.mathomir.ChildNodes.Count -eq 4) 'Independent typing inside a power became part of the large equation';Check ((Root $d).OuterXml -eq $rootXml) 'Independent typing altered the large equation'
  Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($main);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'enlarged-overlap-ui.png'));$graphics.Dispose();$image.Dispose()
  Write-Output 'Enlarged overlap passed: 400/800 percent fonts, text and nested powers, both creation orders, 60/100/200 percent zoom, label/stroke grips and approach gaps, root preservation, Undo, palette placement over controls, independent typing.'
-}finally{$app.Refresh();if(!$app.HasExited){$app.Kill();$app.WaitForExit()}}
+}finally{
+ $app.Refresh();if(!$app.HasExited){
+  Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($main);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'enlarged-overlap-ui.png'));$graphics.Dispose();$image.Dispose()
+  Write-Output ('Last scene: '+$fixture+'; title='+[MathomirUiProbe]::Text($main)+'; view='+[MathomirUiProbe]::ClientRect($view).Right+','+[MathomirUiProbe]::ClientRect($view).Bottom)
+  $app.Kill();$app.WaitForExit()
+ }
+}

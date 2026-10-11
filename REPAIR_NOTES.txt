@@ -493,3 +493,6 @@ ENLARGED TEXT AND ANNOTATION INTERACTIONS
 - Smaller labels and strokes remain selectable inside enlarged text and equations, including nested powers and either creation order. Empty regions below powers no longer act as painted content.
 - Hover/click/release use the same object target; approaching an annotation grip preserves its owner. Thin strokes have a consistent three-pixel selection margin.
 - Pending palette items cannot be consumed by underlying move/resize/rotate/delete controls. Shift-click places a separate text or math object over an existing expression; normal insertion is preserved.
+
+FULL FILE PATH IN TITLE BAR
+- The title bar includes the complete current file path beside the filename and application title. Opening another file or using Save As refreshes it; untitled documents keep their normal caption.

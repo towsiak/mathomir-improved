@@ -47,6 +47,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../enlarged-text-overlap.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../title-file-path.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -63,6 +65,9 @@ jobs:
       - name: AI formatted text and native math engine checks
         shell: pwsh
         run: ./tools/ai-presentation-test.ps1
+      - name: Full file path title UI checks
+        shell: pwsh
+        run: ./tools/title-path-smoke.ps1
       - name: Enlarged text placement and selection UI checks
         shell: pwsh
         run: ./tools/enlarged-text-overlap-smoke.ps1
@@ -162,6 +167,7 @@ jobs:
           path: |
             source/build/selection-approx-ui.png
             source/build/unit-common-coordinates-ui.png
+            source/build/enlarged-hit-diagnostics.txt
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom
             source/build/ai-help-ui.png
@@ -222,6 +228,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../enlarged-text-overlap.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../title-file-path.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -241,6 +249,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/title-path-smoke.ps1
           ./tools/enlarged-text-overlap-smoke.ps1
           ./tools/cursor-stability-smoke.ps1
           ./tools/ai-help-smoke.ps1 -OnlineFixture
@@ -256,6 +265,7 @@ jobs:
         with:
           name: Native-Memory-Diagnostics
           path: |
+            source/build/enlarged-hit-diagnostics.txt
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom
             source/build/ai-help-ui.png

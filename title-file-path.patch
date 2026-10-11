@@ -1,0 +1,33 @@
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -149,6 +149,20 @@
+ 
+ 
+ #pragma optimize("s",on)
++void CMainFrame::OnUpdateFrameTitle(BOOL bAddToTitle)
++{
++    CFrameWnd::OnUpdateFrameTitle(bAddToTitle);
++    if(!bAddToTitle)return;
++    CDocument *document=GetActiveDocument();
++    if(!document || document->GetTitle().CompareNoCase("Untitled")==0)return;
++    CString path=document->GetPathName();
++    if(path.IsEmpty() || path.CompareNoCase("Recovered document")==0)return;
++    CString caption;GetWindowText(caption);
++    // MFC continues to own the filename and app title. Append the document's
++    // complete path without changing Save As, recent-file names or print titles.
++    if(caption.Find(path)<0){caption+="  |  ";caption+=path;SetWindowText(caption);}
++}
++
+ BOOL CMainFrame::PreCreateWindow(CREATESTRUCT& cs)
+ {
+ 	if( !CFrameWnd::PreCreateWindow(cs) )
+--- a/Mathomir/MainFrm.h
++++ b/Mathomir/MainFrm.h
+@@ -21,6 +21,7 @@
+ // Overrides
+ public:
+ 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
++    virtual void OnUpdateFrameTitle(BOOL bAddToTitle);
+ 
+ // Implementation
+ public:
