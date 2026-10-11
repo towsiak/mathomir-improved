@@ -9,11 +9,11 @@ function Root($d){return $d.SelectSingleNode('/mathomir/*[.//var[@t="MMMM"] or .
 function Label($d){return $d.SelectSingleNode('/mathomir/*[.//var[@t="note"] or .//elm[@tx="note"]]')}
 function Scene($font,$power,$rootLast,$zoom,$suffix){
  $script:fixture=Join-Path (Split-Path $exe) ("enlarged-overlap-$font-$power-$rootLast-$zoom-$suffix.mom")
- $script:noteX=100+[int]($font*.14);$script:noteY=245
+ $script:noteX=100+[int]($font*.14);$script:noteY=175
  $formula=if($power){'<elm tp="3" E1="" E2=""><ex fh="'+$font+'"><var t="e" f="00" /></ex><ex fh="'+[int]($font*.7)+'"><var t="2" f="00" /><var t="x" f="00" /></ex></elm>'}else{'<var t="MMMM" f="00" />'}
- $root='<o t="1" X="100" Y="260"><ex fh="'+$font+'">'+$formula+'</ex></o>'
- $note='<o t="1" X="'+$noteX+'" Y="245"><ex fh="100" stxt="1"><var t="note" f="00" color="1" /></ex></o>'
- $line='<o t="2" X="'+$noteX+'" Y="255"><dw d="32|0,0;800,0" /></o>'
+ $root='<o t="1" X="100" Y="190"><ex fh="'+$font+'">'+$formula+'</ex></o>'
+ $note='<o t="1" X="'+$noteX+'" Y="175"><ex fh="100" stxt="1"><var t="note" f="00" color="1" /></ex></o>'
+ $line='<o t="2" X="'+$noteX+'" Y="185"><dw d="32|0,0;800,0" /></o>'
  $objects=if($rootLast){$note+$line+$root}else{$root+$note+$line}
  ('<?xml version="1.0"?><mathomir>'+$objects+'</mathomir>')|Set-Content $fixture -Encoding ascii
  [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 250
@@ -38,19 +38,26 @@ try {
   Scene $font $power $rootLast $zoom 'label'
   DragAnnotation $noteX $noteY
   $d=SaveDoc;$label=Label $d
-  Check ($label.X -eq [string]($noteX+30) -and $label.Y -eq '265') "Label drag failed: $font/$power/$rootLast/$zoom"
+  Check ($label.X -eq [string]($noteX+30) -and $label.Y -eq '195') "Label drag failed: $font/$power/$rootLast/$zoom"
   Check ((Root $d).OuterXml -eq $rootXml) 'Selecting/moving the small label altered the enlarged expression'
-  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$d=SaveDoc;Check ((Label $d).X -eq [string]$noteX -and (Label $d).Y -eq '245') 'Label move Undo failed'
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$d=SaveDoc;Check ((Label $d).X -eq [string]$noteX -and (Label $d).Y -eq '175') 'Label move Undo failed'
   # Grab the thin brace/line independently even while it overlaps the root's box.
-  [MathomirUiProbe]::Mouse($view,512,0,[int](($noteX+15)*$scale),[int](255*$scale));Start-Sleep -Milliseconds 80
-  $g=[MathomirUiProbe]::MoveGripNear($view,([int]($noteX*$scale)-12),[int](255*$scale)-12)
+  [MathomirUiProbe]::Mouse($view,512,0,[int](($noteX+15)*$scale),[int](185*$scale));Start-Sleep -Milliseconds 80
+  $g=[MathomirUiProbe]::MoveGripNear($view,([int]($noteX*$scale)-12),[int](185*$scale)-12)
   [MathomirUiProbe]::Mouse($view,512,0,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,513,1,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,512,1,($g[0]+[int](30*$scale)),($g[1]+[int](20*$scale)));[MathomirUiProbe]::Mouse($view,514,0,($g[0]+[int](30*$scale)),($g[1]+[int](20*$scale)))
-  $d=SaveDoc;$line=$d.SelectSingleNode('/mathomir/*[@t="2" or @type="2"]');Check ($line.X -eq [string]($noteX+30) -and $line.Y -eq '275') "Thin stroke drag failed: $font/$power/$rootLast/$zoom";Check ((Root $d).OuterXml -eq $rootXml) 'Stroke move changed the large equation'
+  $d=SaveDoc;$line=$d.SelectSingleNode('/mathomir/*[@t="2" or @type="2"]');Check ($line.X -eq [string]($noteX+30) -and $line.Y -eq '205') "Thin stroke drag failed: $font/$power/$rootLast/$zoom";Check ((Root $d).OuterXml -eq $rootXml) 'Stroke move changed the large equation'
  }}}}
+ Scene 800 $true $true 100 'direct-label-edit'
+ [MathomirUiProbe]::Mouse($view,512,0,500,300)
+ [MathomirUiProbe]::Mouse($view,513,1,($noteX+15),($noteY-5));[MathomirUiProbe]::Mouse($view,514,0,($noteX+15),($noteY-5))
+ [MathomirUiProbe]::Send($view,258,[int][char]'Z')|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null
+ $d=SaveDoc;Check ((Root $d).OuterXml -eq $rootXml) 'Direct editing of the small annotation changed its large equation'
+ $texts=($d.SelectNodes('//var | //elm[@tp="1"]')|ForEach-Object {if($_.HasAttribute('t')){$_.t}else{$_.tx}})-join ''
+ Check ($texts.Contains('Z') -and $d.mathomir.ChildNodes.Count -eq 3) 'Direct click did not edit the existing small annotation'
  # A palette shape must survive a click on an existing object's move handle.
  Scene 800 $true $false 100 'placing-grip'
- [MathomirUiProbe]::Mouse($view,512,0,130,250);Start-Sleep -Milliseconds 100
- $g=[MathomirUiProbe]::MoveGripNear($view,88,120)
+ [MathomirUiProbe]::Mouse($view,512,0,130,180);Start-Sleep -Milliseconds 100
+ $g=[MathomirUiProbe]::MoveGripNear($view,88,50)
  [MathomirUiProbe]::Send($main,273,33059)|Out-Null
  [MathomirUiProbe]::Mouse($view,512,0,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,513,1,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,514,0,$g[0],$g[1]);[MathomirUiProbe]::Send($view,258,27)|Out-Null
  $d=SaveDoc;Check ($d.mathomir.ChildNodes.Count -eq 4) 'Existing grip consumed the pending palette object';Check ((Root $d).OuterXml -eq $rootXml) 'Palette placement moved/resized the underlying equation'
@@ -60,11 +67,11 @@ try {
  $dialog=[IntPtr]::Zero;for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 100;$dialog=[MathomirUiProbe]::Window($app.Id,'Symbolic derivative finder');if($dialog -ne [IntPtr]::Zero){break}}
  Check ($dialog -ne [IntPtr]::Zero) 'Derivative palette expression source did not open'
  [MathomirUiProbe]::Send($dialog,273,1)|Out-Null;Start-Sleep -Milliseconds 150
- [MathomirUiProbe]::Mouse($view,512,0,130,250);[MathomirUiProbe]::Mouse($view,513,5,130,250);[MathomirUiProbe]::Mouse($view,514,4,130,250);[MathomirUiProbe]::Send($view,258,27)|Out-Null
+ [MathomirUiProbe]::Mouse($view,512,0,130,180);[MathomirUiProbe]::Mouse($view,513,5,130,180);[MathomirUiProbe]::Mouse($view,514,4,130,180);[MathomirUiProbe]::Send($view,258,27)|Out-Null
  $d=SaveDoc;Check ($d.mathomir.ChildNodes.Count -eq 4) 'Shift placement inserted/replaced part of the enlarged expression';Check ((Root $d).OuterXml -eq $rootXml) 'Shift placement altered the underlying equation'
  # Standalone annotation via double-click also works inside the enlarged box.
  Scene 800 $true $false 100 'new-text'
- [MathomirUiProbe]::Mouse($view,512,0,($noteX+45),245);[MathomirUiProbe]::Mouse($view,515,1,($noteX+45),245);[MathomirUiProbe]::Mouse($view,514,0,($noteX+45),245)
+ [MathomirUiProbe]::Mouse($view,512,0,($noteX+45),175);[MathomirUiProbe]::Mouse($view,515,1,($noteX+45),175);[MathomirUiProbe]::Mouse($view,514,0,($noteX+45),175)
  foreach($c in 'standalone'.ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$c)|Out-Null};[MathomirUiProbe]::Send($view,258,27)|Out-Null
  $d=SaveDoc;Check ($d.mathomir.ChildNodes.Count -eq 4) 'Independent typing inside a power became part of the large equation';Check ((Root $d).OuterXml -eq $rootXml) 'Independent typing altered the large equation'
  Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($main);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'enlarged-overlap-ui.png'));$graphics.Dispose();$image.Dispose()
