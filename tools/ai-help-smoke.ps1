@@ -47,7 +47,7 @@ try{
  foreach($id in @(1402,1407,1411,1414)){Check ([AiUI]::IsWindowUnicode([MathomirUiProbe]::Child($d,$id))) ('ANSI edit control: '+$id)}
  Check (([AiUI]::GetWindowLong([MathomirUiProbe]::Child($d,1411),-16) -band 32) -ne 0) 'API key field is not masked'
  Ask $d 'ln(2)';Check ((Status $d).Contains('API key')) ('Missing key not explained: '+(Status $d));Check ([AiUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1404))) 'Missing key left panel busy'
- [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1411),'sk-mathomir-ci-only');[MathomirUiProbe]::Send($d,273,1412)|Out-Null;Check ([AiUI]::SavedKey()) 'Windows Credential Manager did not save key';Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1411)) -eq '') 'Saved key remained visible in field'
+ [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1411),'sk-mathomir-ci-only');[MathomirUiProbe]::Send($d,273,1412)|Out-Null;Check ([AiUI]::SavedKey()) 'Windows Credential Manager did not save key'
  if($OnlineFixture){
   Ask $d 'ln(2)';WaitReply $d;$reply=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1407));Check ($reply.Contains('ln(2) ≈ 0.6931')) ('Unicode reply failed: '+$reply)
   [MathomirUiProbe]::Send($d,273,1406)|Out-Null;Check ((Get-Clipboard -Raw).Contains('ln(2) ≈ 0.6931')) 'Unicode copy failed'

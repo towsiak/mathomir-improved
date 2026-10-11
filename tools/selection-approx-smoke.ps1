@@ -84,7 +84,7 @@ try{
   Write-Output ('Nested '+$case.name+' preserved structure, siblings and exact Undo.')
  }
  LoadMath '<var t="3" f="00" /><opr s="*" /><fun t="ln" E1=""><ex><var t="0.5" f="00" /></ex></fun>'; $p=FindValue '≈ -0.69';$doc=Apply $p
- Check ($doc.SelectSingleNode('//elm[@tp="5"]/*[self::ex or self::expr]/elm[@tx="0.69"]')) ('Negative factor lost grouping: '+$doc.OuterXml)
+ Check ($doc.SelectSingleNode('//elm[@tp="5"]/*[self::ex or self::expr][@br="1"]/elm[@tx="0.69"]')) ('Negative factor lost grouping: '+$doc.OuterXml)
  Write-Output 'Negative replacement retained grouping and multiplication precedence.'
  LoadMath $power;$p=WholePanel;[MathomirUiProbe]::Send($p,273,1392)|Out-Null;Start-Sleep -Milliseconds 400;Check (![MathomirUiProbe]::IsWindowVisible($p)) 'Dismissed panel reopened'
  LoadMath '<fun t="ln" E1=""><ex><var t="-1" f="00" /></ex></fun>';[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::Mouse($view,512,0,105,126);$p=Panel;Check ($p -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($p)) 'Undefined logarithm showed an approximation'

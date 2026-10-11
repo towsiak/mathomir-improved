@@ -111,7 +111,7 @@ diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
      // Replace a selected part only; adding an equality inside a sum would change its meaning.
      auto settings=MathDisplay::Options();MathDisplay::Options()=panel->Format();std::string xml="<ex fh=\""+SymbolicDerivative::Number(parent->m_FontSize)+"\">"+MathDisplay::ApproximationXml(panel->value)+"</ex>";MathDisplay::Options()=settings;
 +    if(panel->value<0&&(first>0||last+1<parent->m_NumElements)){
-+        std::string grouped="<ex fh=\""+SymbolicDerivative::Number(parent->m_FontSize)+"\"><elm tp=\"5\" E1=\"\">"+xml+"</elm></ex>";xml=grouped;
++        xml.insert(xml.find('>')," br=\"1\"");xml="<ex fh=\""+SymbolicDerivative::Number(parent->m_FontSize)+"\"><elm tp=\"5\" E1=\"\">"+xml+"</elm></ex>";
 +    }
      CExpression answer(NULL,NULL,parent->m_FontSize);std::vector<char> bytes(xml.begin(),xml.end());bytes.push_back(0);answer.XML_input(&bytes[0]);
      CExpression completed(NULL,NULL,parent->m_FontSize);completed.CopyExpression(parent,0);for(int i=last;i>=first;i--)completed.DeleteElement(i);int offset=first;for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)completed.InsertElement(answer.m_pElementList+i,offset++);
