@@ -19,7 +19,7 @@ $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
 $appProcess=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function ClickAt($x,$y){[MathomirUiProbe]::Mouse($view,512,0,$x,$y);[MathomirUiProbe]::Mouse($view,513,1,$x,$y);[MathomirUiProbe]::Mouse($view,514,0,$x,$y)}
-function Type($text){foreach($character in $text.ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$character)|Out-Null}}
+function EnterText($text){foreach($character in $text.ToCharArray()){[MathomirUiProbe]::Send($view,258,[int]$character)|Out-Null}}
 function Saved { [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $file -Raw) }
 function Tokens($node){($node.SelectNodes('.//elm[@tp="1"]')|ForEach-Object{$_.tx}) -join ''}
 try{
@@ -35,21 +35,21 @@ try{
   $n++;$file=Join-Path (Split-Path $exe) ('cursor-stability-'+$n+'.mom')
   ('<?xml version="1.0"?><mathomir><o t="1" X="100" Y="130"><ex fh="200" stxt="1"><var t="HELLO" f="00" />'+$case.middle+'</ex></o><o t="1" X="100" Y="230"><ex fh="200" stxt="1"><var t="SECOND" f="00" /></ex></o></mathomir>')|Set-Content $file -Encoding ascii
   [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 450;[MathomirUiProbe]::Send($main,273,32775)|Out-Null
-  ClickAt 124 125;Type 'Q'
+  ClickAt 124 125;EnterText 'Q'
   $doc=Saved;$first=$doc.SelectSingleNode('/mathomir/*[1]');$before=Tokens $first
   Check ($before -match 'H.*Q.*ELLO|HE.*Q.*LLO|HEL.*Q.*LO|HELL.*Q.*O') ('Could not place a mid-word caret: '+$doc.OuterXml)
   # Mouse hover and timer/redraw must not redirect subsequent typing to the other box.
   [MathomirUiProbe]::Mouse($view,512,0,140,225);Start-Sleep -Milliseconds 1200
-  Type 'R';[CursorKeys]::Arrow($view,37);[CursorKeys]::Arrow($view,39);Type 'S'
+  EnterText 'R';[CursorKeys]::Arrow($view,37);[CursorKeys]::Arrow($view,39);EnterText 'S'
   $doc=Saved;Check ((Tokens $doc.SelectSingleNode('/mathomir/*[1]')) -eq $before.Replace('Q','QRS')) ('Typing, hover or opposite arrows moved the caret: '+$doc.OuterXml)
   Check ((Tokens $doc.SelectSingleNode('/mathomir/*[2]')) -eq 'SECOND') 'Hover stole text into a different box'
   # Switching modes between an arrow pair must invalidate the saved arrow location.
-  [CursorKeys]::Arrow($view,37);[CursorKeys]::Toggle($view);[CursorKeys]::Toggle($view);[CursorKeys]::Arrow($view,39);Type 'T'
+  [CursorKeys]::Arrow($view,37);[CursorKeys]::Toggle($view);[CursorKeys]::Toggle($view);[CursorKeys]::Arrow($view,39);EnterText 'T'
   $doc=Saved;Check ((Tokens $doc.SelectSingleNode('/mathomir/*[1]')) -eq $before.Replace('Q','QRST')) ('Text/math switches restored an old cursor position: '+$doc.OuterXml)
-  [MathomirUiProbe]::Send($view,258,8)|Out-Null;Type 'U'
+  [MathomirUiProbe]::Send($view,258,8)|Out-Null;EnterText 'U'
   $doc=Saved;Check ((Tokens $doc.SelectSingleNode('/mathomir/*[1]')) -eq $before.Replace('Q','QRSU')) ('Backspace changed the insertion location: '+$doc.OuterXml)
   # Explicitly clicking another box starts a fresh cursor session.
-  ClickAt 124 225;Type 'V';[CursorKeys]::Arrow($view,37);[CursorKeys]::Arrow($view,39);Type 'W'
+  ClickAt 124 225;EnterText 'V';[CursorKeys]::Arrow($view,37);[CursorKeys]::Arrow($view,39);EnterText 'W'
   $doc=Saved;Check ((Tokens $doc.SelectSingleNode('/mathomir/*[1]')) -eq $before.Replace('Q','QRSU')) 'New box input modified the previous box'
   Check ((Tokens $doc.SelectSingleNode('/mathomir/*[2]')) -match 'S.*VW.*ECOND|SE.*VW.*COND|SEC.*VW.*OND|SECO.*VW.*ND|SECON.*VW.*D') ('Caret left the newly clicked box: '+$doc.OuterXml)
   if($case.name -eq 'mixed power'){Check ($doc.SelectSingleNode('//elm[@tp="3"]/*[self::ex or self::expr][2]/elm[@tx="2"]')) 'Mixed input changed the power level'}

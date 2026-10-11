@@ -1,0 +1,148 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13663,8 +13663,8 @@
+ class CUnitCircleDialog:public CFeatureDialog
+ {
+ public:
+-    double start,end;int radius,direction;bool radians,labels,coordinates,common,triangle,points;std::vector<double> pointAngles;
+-    CUnitCircleDialog():CFeatureDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),direction(0),radians(false),labels(true),coordinates(true),common(false),triangle(true),points(true){}
++    double start,end;int radius,direction;bool radians,labels,coordinates,common,commonCoordinates,triangle,points;std::vector<double> pointAngles;
++    CUnitCircleDialog():CFeatureDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),direction(0),radians(false),labels(true),coordinates(true),common(false),commonCoordinates(false),triangle(true),points(true){}
+     virtual BOOL OnInitDialog()
+     {
+         CFeatureDialog::OnInitDialog();SetDlgItemText(IDC_UNIT_START,"0");SetDlgItemText(IDC_UNIT_END,"90");SetDlgItemInt(IDC_UNIT_RADIUS,radius);
+@@ -13694,7 +13694,7 @@
+         points=IsDlgButtonChecked(IDC_UNIT_POINTS)==BST_CHECKED;
+         direction=((CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION))->GetCurSel();
+         labels=IsDlgButtonChecked(IDC_UNIT_LABELS)==BST_CHECKED;coordinates=IsDlgButtonChecked(IDC_UNIT_COORDINATES)==BST_CHECKED;
+-        common=IsDlgButtonChecked(IDC_UNIT_COMMON)==BST_CHECKED;triangle=IsDlgButtonChecked(IDC_UNIT_TRIANGLE)==BST_CHECKED;CFeatureDialog::OnOK();
++        common=IsDlgButtonChecked(IDC_UNIT_COMMON)==BST_CHECKED;commonCoordinates=IsDlgButtonChecked(IDC_UNIT_COMMON_COORDINATES)==BST_CHECKED;triangle=IsDlgButtonChecked(IDC_UNIT_TRIANGLE)==BST_CHECKED;CFeatureDialog::OnOK();
+     }
+ };
+ static int UnitAppend(CExpression *expression,int type,char symbol)
+@@ -13874,6 +13874,20 @@
+     SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
+ }
+ 
++static bool UnitCommonAngle(double angle)
++{
++    const int angles[]={0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330};
++    for(int i=0;i<16;i++)if(fabs(remainder(angle-angles[i],360.))<1e-8)return true;
++    return false;
++}
++static void UnitCoordinatePair(CExpression *label,double angle)
++{
++    const double a=angle*3.14159265358979323846/180.;
++    label->InsertEmptyElement(0,2,'(');UnitValue(label,cos(a));
++    label->InsertEmptyElement(label->m_NumElements,2,',');UnitValue(label,sin(a));
++    label->InsertEmptyElement(label->m_NumElements,2,')');
++}
++
+ void CMathomirView::OnUnitCircle()
+ {
+     if(ViewOnlyMode)return;OnChar(27,1,0);CUnitCircleDialog setup;if(setup.DoModal()!=IDOK)return;
+@@ -13892,7 +13906,7 @@
+         double angle=endpoint?setup.end:setup.start,a=angle*pi/180,x=c+r*cos(a),y=c-r*sin(a);IntervalLine(drawing,c,c,x,y,2);if(setup.points)UnitPoint(drawing,x,y);
+         CExpression label(NULL,NULL,80);
+         if(setup.labels){UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a)+(sameRay?20:0),0,0);}
+-        if(setup.coordinates && !sameRay)
++        if(setup.coordinates && !sameRay && !(setup.commonCoordinates && UnitCommonAngle(angle)))
+         {
+             CExpression coordinates(NULL,NULL,70);coordinates.InsertEmptyElement(0,2,'(');UnitValue(&coordinates,cos(a));coordinates.InsertEmptyElement(coordinates.m_NumElements,2,',');UnitValue(&coordinates,sin(a));coordinates.InsertEmptyElement(coordinates.m_NumElements,2,')');
+             drawing->CopyExpressionIntoSubgroup(&coordinates,c+(r+65)*cos(a)-25,c-(r+65)*sin(a)+10,0,0);
+@@ -13900,7 +13914,7 @@
+     }
+     if(setup.triangle){double x=c+r*cos(end),y=c-r*sin(end);IntervalLine(drawing,c,c,x,c);IntervalLine(drawing,x,c,x,y);double dx=x>=c?-7:7,dy=y>=c?7:-7;IntervalLine(drawing,x+dx,c,x+dx,c+dy);IntervalLine(drawing,x+dx,c+dy,x,c+dy);}
+     const int commonAngles[]={0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330};
+-    if(setup.common)
++    if(setup.common || setup.commonCoordinates)
+     {
+         for(int i=0;i<16;i++)
+         {
+@@ -13910,9 +13924,26 @@
+             for(size_t j=0;j<setup.pointAngles.size();j++)if(fabs(remainder(setup.pointAngles[j]-angle,360.))<1e-8)extra=true;
+             if(setup.points && !endpoint && !extra)UnitPoint(drawing,c+r*cos(a),c-r*sin(a));
+             IntervalLine(drawing,c+(r-4)*cos(a),c-(r-4)*sin(a),c+(r+4)*cos(a),c-(r+4)*sin(a));
+-            if(endpoint || extra)continue;
++            if(endpoint || extra || !setup.common)continue;
+             CExpression label(NULL,NULL,65);UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+20)*cos(a)-12,c-(r+20)*sin(a),0,0);
+         }
++    }
++    if(setup.commonCoordinates)
++    {
++        const int banks[2][8]={{90,120,135,150,180,210,225,240},{60,45,30,0,330,315,300,270}};
++        CDC *dc=GetDC();double extent=max(r,112.);
++        for(int side=0;side<2;side++)for(int row=0;row<8;row++)
++        {
++            double angle=banks[side][row],a=angle*pi/180;
++            CExpression label(NULL,NULL,70);UnitCoordinatePair(&label,angle);
++            short length,above,below;label.CalculateSize(dc,100,&length,&above,&below);
++            double y=c-extent+row*2*extent/7.;
++            double edge=side?c+r+80:c-r-80;
++            double x=side?edge:edge-length;
++            IntervalLine(drawing,c+(r+7)*cos(a),c-(r+7)*sin(a),edge+(side?-7:7),y,1);
++            drawing->CopyExpressionIntoSubgroup(&label,(int)x,(int)y,0,0);
++        }
++        ReleaseDC(dc);
+     }
+     for(size_t i=0;i<setup.pointAngles.size();i++)
+     {
+@@ -13924,7 +13955,7 @@
+         if(!endpoint || !setup.points)UnitPoint(drawing,c+r*cos(a),c-r*sin(a));
+         if(endpoint)continue;
+         if(setup.labels){CExpression label(NULL,NULL,65);UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a),0,0);}
+-        if(setup.coordinates){CExpression label(NULL,NULL,70);label.InsertEmptyElement(0,2,'(');UnitValue(&label,cos(a));label.InsertEmptyElement(label.m_NumElements,2,',');UnitValue(&label,sin(a));label.InsertEmptyElement(label.m_NumElements,2,')');drawing->CopyExpressionIntoSubgroup(&label,c+(r+65)*cos(a)-25,c-(r+65)*sin(a)+10,0,0);}
++        if(setup.coordinates && !(setup.commonCoordinates && UnitCommonAngle(angle))){CExpression label(NULL,NULL,70);label.InsertEmptyElement(0,2,'(');UnitValue(&label,cos(a));label.InsertEmptyElement(label.m_NumElements,2,',');UnitValue(&label,sin(a));label.InsertEmptyElement(label.m_NumElements,2,')');drawing->CopyExpressionIntoSubgroup(&label,c+(r+65)*cos(a)-25,c-(r+65)*sin(a)+10,0,0);}
+     }
+     ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;
+     IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -261,6 +261,7 @@
+ #define IDC_UNIT_TRIANGLE 1138
+ #define IDC_UNIT_POINTS 1139
+ #define IDC_UNIT_POINT_ANGLES 1140
++#define IDC_UNIT_COMMON_COORDINATES 1141
+ 
+ #define ID_TRIANGLE_45 33053
+ #define ID_TRIANGLE_30 33054
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -748,7 +748,7 @@
+ END
+ 
+ 
+-IDD_UNIT_CIRCLE DIALOGEX 0,0,310,266
++IDD_UNIT_CIRCLE DIALOGEX 0,0,310,286
+ STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+ CAPTION "Unit circle maker"
+ FONT 9,"Segoe UI"
+@@ -770,11 +770,12 @@
+     CONTROL "Common angles and points",IDC_UNIT_COMMON,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,149,145,12
+     CONTROL "End-angle right triangle",IDC_UNIT_TRIANGLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,155,149,145,12
+     CONTROL "Mark start/end and common points",IDC_UNIT_POINTS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,169,287,12
+-    LTEXT "Extra points",-1,10,192,65,12
+-    EDITTEXT IDC_UNIT_POINT_ANGLES,80,189,217,14,ES_AUTOHSCROLL
+-    LTEXT "Optional comma-separated angles in selected units: 30, 45, 120 or pi/6, pi/4. Up to 32 points.",-1,10,209,287,24
+-    DEFPUSHBUTTON "OK",IDOK,192,244,50,14
+-    PUSHBUTTON "Cancel",IDCANCEL,247,244,50,14
++    CONTROL "Common point coordinates (exact)",IDC_UNIT_COMMON_COORDINATES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,189,287,12
++    LTEXT "Extra points",-1,10,212,65,12
++    EDITTEXT IDC_UNIT_POINT_ANGLES,80,209,217,14,ES_AUTOHSCROLL
++    LTEXT "Optional comma-separated angles in selected units: 30, 45, 120 or pi/6, pi/4. Up to 32 points.",-1,10,229,287,24
++    DEFPUSHBUTTON "OK",IDOK,192,264,50,14
++    PUSHBUTTON "Cancel",IDCANCEL,247,264,50,14
+ END
+ 
+ IDD_PIECEWISE DIALOGEX 0,0,590,352
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -108,7 +108,7 @@
+     if(dialog==IDD_SYMBOLIC_DERIVATIVE){if(id==1300)return "Enter a symbolic formula. Supports products, quotients, chain rules and functions such as sin(x), exp(x), ln(x), sqrt(x) and x^x.";if(id==1301)return "Single differentiation variable. Other variables are treated as constant parameters.";if(id==1302)return "Choose the first through fifth derivative. Higher orders repeatedly differentiate the symbolic result.";if(id==1303)return "Compute and simplify the derivative symbolically, then show rules and domain notes.";if(id==1304)return "Typeset editable result. Exact coefficients and expressions are preserved.";if(id==1305)return "Formula syntax for the derivative, useful for copying or inspecting the expression.";if(id==1306)return "Include the original derivative operation and equals sign when placing the result.";if(id==1307)return "Evaluation point; constants such as 1/2 and pi/3 are accepted. Trigonometric derivatives use radians.";if(id==1308)return "Evaluate the current derivative at the typed point. Unsupported parameters or undefined points are explained.";if(id==1309)return "Numerical derivative value or validation message, using your display-rounding choice.";if(id>=1310&&id<=1313)return "Load and differentiate an editable example.";if(id==1314)return "Rules used and domain limitations. Differentiation does not restore excluded points.";}
+     if(dialog==IDD_STATISTICS_REGRESSION){if(id==1340)return "Paste up to 256 x,y pairs, one per line. Separate columns with commas, tabs, semicolons or spaces. An x,y header is optional; data are kept at full precision.";if(id==1341)return "Linear; polynomial degrees 2-6; exponential; logarithmic; or power fit. Exponential/power least squares fits ln(y); quality statistics use original y. Logarithmic/power require x > 0; exponential/power require y > 0.";if(id==1342)return "Calculate the selected least-squares fit, summaries, residuals and preview. Invalid or singular data produce an explanation.";if(id==1343)return "Replace the dialog data with an example for the selected model, then calculate it.";if(id==1344)return "Blue dots show data; the black curve is the fitted model. Residual mode shows observed minus predicted y with a zero line.";if(id==1345)return "Legend for the current scatter or residual preview.";if(id==1346)return "Column summaries, quartiles, sample/population SD, Pearson r, R-squared, SSE, RMSE and residual standard error. Residuals are observed minus predicted y. Undefined statistics are identified explicitly.";if(id==1347)return "Place or preview residuals instead of observed y. Original data remain saved for editing and refitting.";if(id==1348)return "Fit quality, prediction or validation message. R-squared is undefined for constant responses.";if(id==1349)return "Place the typeset fitted equation with an approximate-equals sign. Logarithmic and power fits show x > 0.";if(id==1350)return "Typeset fitted equation. Rounding controls numerical readouts; the fit itself retains full precision.";if(id==1351)return "Prediction x value, such as 2, 1/2 or pi. Predictions outside the data range are extrapolations.";if(id==1352)return "Evaluate the fitted model at the typed x. Logarithmic/power predictions require x > 0.";}
+     if(dialog==IDD_POLYGON_CONSTRUCTOR){static const char *tips[]={"Construct a regular polygon with equally spaced vertices.","Construct a polygon from typed vertices in boundary order. Concave outlines are allowed; crossings are rejected.","Choose a regular preset; the side count remains editable.","Whole-number side count from 3 to 64.","Interpret the size value as circumradius or side length.","Coordinate-space circumradius or side length; this determines area/perimeter, independently of page size.","Rotation in degrees around the polygon centre.","Reverse the regular polygon's winding direction.","Enter ordered vertices such as (0,0), (4,0), (4,3). Constants and concave outlines are supported.","", "Convert the regular polygon to editable custom coordinates.","Load a custom concave example.","Reverse vertex order without changing the outline.","Page drawing size, 40-1000 units. Resizing the page object does not change coordinate-space measurements.","Outline width, a whole number from 1 to 8.","Show vertex labels.","Show each vertex's coordinate pair.","Draw diagonals between nonadjacent vertices.","Area, perimeter and validation message. Rounding affects displayed measurements only.","Preview uses equal horizontal and vertical scales. Labels and markers update live.","Show interior-angle markers, including reflex angles in concave polygons.","Show numerical interior-angle values in degrees."};if(id>=1280&&id<=1301)return tips[id-1280];}
+-    if(dialog==IDD_UNIT_CIRCLE){if(id==IDC_UNIT_START||id==IDC_UNIT_END)return "Angle measured from the positive x-axis, in the selected units. Negative angles and up to ten turns are allowed; radians accept pi/6.";if(id==IDC_UNIT_MODE)return "Degrees or radians for all angle entries, including extra points. Pi fractions may be entered in radians.";if(id==IDC_UNIT_DIRECTION)return "Automatic follows end minus start: 0 to -90 is a clockwise quarter-turn. Choose an explicit direction only to override that signed rotation.";if(id==IDC_UNIT_RADIUS)return "Page radius from 60 to 600. The mathematical unit-circle coordinates remain unchanged when resized.";if(id==IDC_UNIT_LABELS)return "Show start/end and selected point angles.";if(id==IDC_UNIT_COORDINATES)return "Show point coordinates. Common angles keep exact fractions and radicals.";if(id==IDC_UNIT_COMMON)return "Add standard teaching angles and points around the circle.";if(id==IDC_UNIT_TRIANGLE)return "Draw the end-angle right triangle with horizontal and vertical components.";if(id==IDC_UNIT_POINTS)return "Mark start, end, common and extra point locations on the circle.";if(id==IDC_UNIT_POINT_ANGLES)return "Optional comma-separated angles, up to 32, in the selected units. Example: pi/6, pi/4, 2*pi/3.";}
++    if(dialog==IDD_UNIT_CIRCLE){if(id==IDC_UNIT_START||id==IDC_UNIT_END)return "Angle measured from the positive x-axis, in the selected units. Negative angles and up to ten turns are allowed; radians accept pi/6.";if(id==IDC_UNIT_MODE)return "Degrees or radians for all angle entries, including extra points. Pi fractions may be entered in radians.";if(id==IDC_UNIT_DIRECTION)return "Automatic follows end minus start: 0 to -90 is a clockwise quarter-turn. Choose an explicit direction only to override that signed rotation.";if(id==IDC_UNIT_RADIUS)return "Page radius from 60 to 600. The mathematical unit-circle coordinates remain unchanged when resized.";if(id==IDC_UNIT_LABELS)return "Show start/end and selected point angles.";if(id==IDC_UNIT_COORDINATES)return "Show point coordinates. Common angles keep exact fractions and radicals.";if(id==IDC_UNIT_COMMON_COORDINATES)return "Show exact coordinate pairs at all 16 standard unit-circle points, with fractions and square roots. Independent of angle labels; duplicate endpoint/extra coordinates are suppressed.";if(id==IDC_UNIT_COMMON)return "Add standard teaching angles and points around the circle.";if(id==IDC_UNIT_TRIANGLE)return "Draw the end-angle right triangle with horizontal and vertical components.";if(id==IDC_UNIT_POINTS)return "Mark start, end, common and extra point locations on the circle.";if(id==IDC_UNIT_POINT_ANGLES)return "Optional comma-separated angles, up to 32, in the selected units. Example: pi/6, pi/4, 2*pi/3.";}
+     if(dialog==IDD_TABLE_SETUP){if(id==IDC_TABLE_ROWS)return "Number of table rows, 1-20.";if(id==IDC_TABLE_COLUMNS)return "Number of table columns, 1-12; use at least two cells overall.";if(id==IDC_TABLE_FONT)return "Editable cell font size, 40-800 percent.";if(id==IDC_TABLE_BORDERS)return "All grid lines, outer border, header separator or no borders.";if(id==IDC_TABLE_ALIGN)return "Align each cell's content left, centre or right. Tab moves between editable cells.";}
+     if(dialog==IDD_ROTATE_EQUATION){if(id==IDC_ROTATION_ANGLE)return "Rotation in degrees: positive clockwise, negative counterclockwise. Decimals are accepted; 0 straightens the object.";if(id==IDC_ROTATION_MOUSE)return "Rotate by dragging the object handle. Hold Shift for 15-degree steps; Escape cancels.";}
+     return NULL;

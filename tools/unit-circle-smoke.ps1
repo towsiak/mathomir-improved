@@ -97,5 +97,69 @@ try{
     [xml]$reopened=Get-Content $fixture -Raw
     if($reopened.SelectNodes('//subexp/*[self::ex or self::expr]').Count -ne $expectedLabels){throw 'Unit-circle labels did not survive reopening.'}
   }
+
+  function UnitScalar($nodes){
+    $sign=1.;$value=0.
+    foreach($node in $nodes){
+      if($node.tp -eq '2' -and $node.stp -eq '-'){$sign=-1.;continue}
+      if($node.tp -eq '1'){$value+=$sign*[double]$node.tx;$sign=1.;continue}
+      $children=$node.SelectNodes('./*[self::ex or self::expr]')
+      if($node.tp -eq '4'){$value+=$sign*(UnitScalar $children[0].SelectNodes('./elm'))/(UnitScalar $children[1].SelectNodes('./elm'));$sign=1.;continue}
+      if($node.tp -eq '8'){$value+=$sign*[Math]::Sqrt((UnitScalar $children[0].SelectNodes('./elm')));$sign=1.;continue}
+    }
+    return $value
+  }
+  foreach($coordinateCase in @(
+    @{radius=60;a='0';b='-90';mode=0;extra='30,390,-330';enabled=$true},
+    @{radius=150;a='-360';b='450';mode=0;extra='30,390';enabled=$true},
+    @{radius=300;a='pi/3';b='-pi/2';mode=1;extra='pi/6,13*pi/6,-11*pi/6';enabled=$true},
+    @{radius=150;a='0';b='90';mode=0;extra='';enabled=$false}
+  )){
+    $fixture=Join-Path (Split-Path $exe) ('common-unit-coordinates-'+$coordinateCase.radius+'-'+$coordinateCase.enabled+'.mom')
+    '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $fixture -Encoding ascii
+    [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 250
+    [MathomirUiProbe]::PostMessage($main,273,[IntPtr]33052,[IntPtr]::Zero)|Out-Null
+    for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;$dialog=[MathomirUiProbe]::Window($appProcess.Id,'Unit circle maker');if($dialog -ne [IntPtr]::Zero){break}}
+    $checkbox=[MathomirUiProbe]::Child($dialog,1141)
+    if($checkbox -eq [IntPtr]::Zero){throw 'Missing common point coordinates checkbox'}
+    if([MathomirUiProbe]::Send($checkbox,240,0) -ne 0){throw 'Common coordinates should be opt-in'}
+    [MathomirUiProbe]::Send($checkbox,241,([int]$coordinateCase.enabled))|Out-Null
+    [MathomirUiProbe]::Send([MathomirUiProbe]::Child($dialog,1133),334,$coordinateCase.mode)|Out-Null
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($dialog,1130),$coordinateCase.a)
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($dialog,1131),$coordinateCase.b)
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($dialog,1132),[string]$coordinateCase.radius)
+    [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($dialog,1140),$coordinateCase.extra)
+    [MathomirUiProbe]::PostMessage($dialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null
+    for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 100;if(![MathomirUiProbe]::IsWindowVisible($dialog)){break}}
+    if([MathomirUiProbe]::IsWindowVisible($dialog)){throw 'Common coordinates dialog rejected valid angles'}
+    [MathomirUiProbe]::Mouse($view,512,0,100,160);[MathomirUiProbe]::Mouse($view,513,1,100,160);[MathomirUiProbe]::Mouse($view,514,0,100,160)
+    [MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+    [xml]$saved=Get-Content $fixture -Raw
+    $labels=$saved.SelectNodes('//subexp/*[self::ex or self::expr][elm[@tp="2" and @stp=","]]')
+    $expected=if($coordinateCase.enabled){16}else{2}
+    if($labels.Count -ne $expected){throw ('Wrong coordinate count, expected '+$expected+': '+$saved.OuterXml)}
+    if($coordinateCase.enabled){
+      $found=@()
+      foreach($label in $labels){
+        $parts=$label.SelectNodes('./elm');$comma=-1
+        for($i=0;$i -lt $parts.Count;$i++){if($parts[$i].tp -eq '2' -and $parts[$i].stp -eq ','){$comma=$i;break}}
+        $x=UnitScalar $parts[0..($comma-1)];$y=UnitScalar $parts[($comma+1)..($parts.Count-1)]
+        if([Math]::Abs($x*$x+$y*$y-1) -gt 1e-10){throw 'Coordinate pair is not on the unit circle'}
+        $angle=[Math]::Atan2($y,$x)*180/[Math]::PI;if($angle -lt -1e-8){$angle+=360};$found+=[int][Math]::Round($angle)
+      }
+      if((($found|Sort-Object|ForEach-Object{$_}) -join ',') -ne '0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330'){throw ('Wrong signed coordinates: '+($found -join ','))}
+      $fractions=0;$roots=0
+      foreach($label in $labels){$fractions+=$label.SelectNodes('.//elm[@tp="4"]').Count;$roots+=$label.SelectNodes('.//elm[@tp="8"]').Count}
+      if($fractions -ne 24 -or $roots -ne 16){throw 'Common coordinates lost exact fraction/radical notation'}
+      [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 250;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+      [xml]$reopened=Get-Content $fixture -Raw
+      if($reopened.SelectNodes('//subexp/*[self::ex or self::expr][elm[@tp="2" and @stp=","]]').Count -ne 16){throw 'Common coordinates did not survive save/reopen'}
+      if($coordinateCase.radius -eq 150){
+        Add-Type -AssemblyName System.Drawing
+        $rect=[MathomirUiProbe]::WindowRect($view);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'unit-common-coordinates-ui.png'));$graphics.Dispose();$image.Dispose()
+      }
+    }
+    Write-Output ('Unit-circle coordinates passed: radius '+$coordinateCase.radius+', enabled='+$coordinateCase.enabled+', labels='+$labels.Count+', signed exact pairs and no coterminal duplicates.')
+  }
   Write-Output 'Signed unit-circle UI passed: negative degrees/radians, exact pi and decimal labels, default quarter-turn, measured signed arc, tangent arrowheads, full turns, zero sweep, direction overrides and reopen.'
 }finally{$appProcess.Refresh();if(!$appProcess.HasExited){Stop-Process -Id $appProcess.Id -Force}}
