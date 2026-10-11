@@ -8,8 +8,9 @@
   <PropertyGroup Label="Configuration"><ConfigurationType>Application</ConfigurationType><PlatformToolset>v143</PlatformToolset><UseOfMfc>Static</UseOfMfc><CharacterSet>MultiByte</CharacterSet></PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup><OutDir>$(MSBuildProjectDirectory)\..\build\</OutDir><IntDir>$(MSBuildProjectDirectory)\..\build\obj\</IntDir><TargetName>Mathomir</TargetName></PropertyGroup>
+  <PropertyGroup Condition="'$(MathomirAiTesting)'=='true'"><AiTestDefine>MATHOMIR_AI_TESTING;</AiTestDefine></PropertyGroup>
   <ItemDefinitionGroup>
-    <ClCompile><Optimization>MaxSpeed</Optimization><PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;WINVER=0x0601;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions><RuntimeLibrary>MultiThreaded</RuntimeLibrary><PrecompiledHeader>NotUsing</PrecompiledHeader><WarningLevel>Level3</WarningLevel><ExceptionHandling>Sync</ExceptionHandling><ConformanceMode>false</ConformanceMode></ClCompile>
+    <ClCompile><Optimization>MaxSpeed</Optimization><PreprocessorDefinitions>$(AiTestDefine)WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;WINVER=0x0601;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions><RuntimeLibrary>MultiThreaded</RuntimeLibrary><PrecompiledHeader>NotUsing</PrecompiledHeader><WarningLevel>Level3</WarningLevel><ExceptionHandling>Sync</ExceptionHandling><ConformanceMode>false</ConformanceMode></ClCompile>
     <ResourceCompile><PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
     <Link><SubSystem>Windows</SubSystem><TargetMachine>MachineX86</TargetMachine><AdditionalDependencies>msimg32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>

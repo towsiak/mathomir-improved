@@ -419,3 +419,38 @@ Open the Logarithm builder from the function palette, calculus palette, Graph me
 
 Highlight approximation panel (2026-10-10)
 Highlight finite real math to show a small panel beside it. The panel previews its value and offers Approximate plus Auto or 0-8 decimal places. Whole expressions retain the original and append an approximate result; a selected part inside an expression is replaced locally. Undo restores the original. Decimal choices apply to this result only and preserve requested trailing zeroes. Click the cross or press Escape to dismiss; clicking elsewhere or changing the expression invalidates the panel. Undefined and parameter-dependent expressions do not offer a misleading result.
+
+AI HELP AND REFINED APPROXIMATION (October 2026)
+Highlight a constant expression or a nested part: the compact panel stays open
+until you dismiss it or click on the page. Choose decimal places, then Approximate.
+Fractions, exponents, roots and function arguments keep their native hierarchy.
+Selected parts are replaced; whole expressions retain the original with an
+approximate answer. Ctrl+Z restores the original. Negative partial replacements
+are grouped to preserve multiplication, division and power precedence.
+
+Optional online AI: Calculus > AI math help, the calculus palette AI button,
+or AI Explain in the selection panel. Choose Explain, Check working, or Graph
+ideas. Edit the imported selection before clicking Ask AI. Unsupported notation
+can be entered directly; it is never silently expanded to the whole expression.
+Only this text and the angle setting are submitted. AI never edits the document.
+Replies support Unicode math and Copy reply. Tooltips explain all controls.
+
+Uses the official OpenAI Responses API with your personal API key. API charges
+are separate from ChatGPT subscriptions. No shared or embedded key is provided.
+The default is gpt-4.1-mini-2025-04-14; the model field is editable for account
+access or future upgrades. Saving the masked key is optional and uses Windows
+Credential Manager for your Windows account, never .mom files or preferences.
+OPENAI_API_KEY is also supported. Remove key clears the saved credential.
+
+Requests run in the background. Stop waiting and Close leave the app responsive;
+a request already received by OpenAI may still count toward usage. There are no
+automatic retries. Authentication, quota, unavailable model, network, malformed
+reply and truncated-answer errors are shown clearly. Review AI mathematics.
+The production app uses the fixed official HTTPS host and rejects redirects.
+No AI model, Python runtime or SDK is bundled.
+
+Validation: native Windows UI and memory checks, bounded JSON/protocol tests,
+and separate diagnostic-only local HTTP fixtures for successful Unicode replies,
+rate limits, unavailable models, malformed responses and cancellation races.
+Live provider responses require the user's API key and are not covered by the
+offline test fixture. The production EXE has no local test-server override.

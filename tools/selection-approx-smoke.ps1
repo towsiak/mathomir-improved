@@ -18,6 +18,13 @@ function WholePanel {
  $p=Panel;Check ($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)) 'Highlighting did not show the approximation panel'
  return $p
 }
+function FindValue($value){
+ for($y=65;$y -le 180;$y+=2){for($x=98;$x -le 260;$x+=2){
+  [MathomirUiProbe]::Mouse($view,512,0,$x,$y);$p=Panel
+  if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p) -and (ResultText $p) -eq $value){return $p}
+ }}
+ throw ('No nested selection with value '+$value)
+}
 function Places($p,$digits){$combo=[MathomirUiProbe]::Child($p,1391);[MathomirUiProbe]::Send($combo,334,($digits+1))|Out-Null;[MathomirUiProbe]::Send($p,273,((1 -shl 16) -bor 1391))|Out-Null;Start-Sleep -Milliseconds 100}
 function ResultText($p){[MathomirUiProbe]::Text([MathomirUiProbe]::Child($p,1393))}
 function Apply($p){$button=[MathomirUiProbe]::Child($p,1390);[MathomirUiProbe]::Mouse($button,512,0,30,12);[MathomirUiProbe]::Mouse($button,513,1,30,12);[MathomirUiProbe]::Mouse($button,514,0,30,12);Start-Sleep -Milliseconds 200;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $file -Raw)}
@@ -43,6 +50,31 @@ try{
  Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2"]') -and $doc.SelectSingleNode('//elm[@tp="1" and @tx="23.14"]') -and !$doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]') -and !$doc.SelectSingleNode('//elm[@tp="3"]')) ('Partial approximation changed surrounding math: '+$doc.OuterXml)
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw;Check ($doc.SelectSingleNode('//elm[@tp="3"]')) 'Partial approximation Undo failed'
  Write-Output 'Selected-part replacement and Undo passed.'
+ # Approximation must replace the selected level, keeping native ancestors and siblings.
+ $ln2='<fun t="ln" E1=""><ex><var t="2" f="00" /></ex></fun>'
+ $ln5='<fun t="ln" E1=""><ex><var t="5" f="00" /></ex></fun>'
+ $nestedPower='<elm tp="3" E1="" E2=""><ex><var t="2" f="00" /></ex><ex>'+$ln2+'</ex></elm>'
+ $nestedCases=@(
+  @{name='fraction numerator';body='<elm tp="4" E1="" E2=""><ex>'+$ln2+'</ex><ex><var t="3" f="00" /></ex></elm>';value='≈ 0.69';container='//elm[@tp="4"]/*[self::ex or self::expr][1]';sibling='//elm[@tp="4"]/*[self::ex or self::expr][2]/elm[@tx="3"]'},
+  @{name='fraction denominator';body='<elm tp="4" E1="" E2=""><ex>'+$ln2+'</ex><ex>'+$ln5+'</ex></elm>';value='≈ 1.61';container='//elm[@tp="4"]/*[self::ex or self::expr][2]';sibling='//elm[@tp="4"]/*[self::ex or self::expr][1]/elm[@tp="6" and @tx="ln"]'},
+  @{name='power exponent';body=$nestedPower;value='≈ 0.69';container='//elm[@tp="3"]/*[self::ex or self::expr][2]';sibling='//elm[@tp="3"]/*[self::ex or self::expr][1]/elm[@tx="2"]'},
+  @{name='root argument';body='<elm tp="8" E1=""><ex>'+$ln2+'</ex></elm>';value='≈ 0.69';container='//elm[@tp="8"]/*[self::ex or self::expr][1]';sibling='//elm[@tp="8"]'},
+  @{name='function argument';body='<fun t="sin" E1=""><ex>'+$ln2+'</ex></fun>';value='≈ 0.69';container='//elm[@tp="6" and @tx="sin"]/*[self::ex or self::expr][1]';sibling='//elm[@tp="6" and @tx="sin"]'},
+  @{name='exponent inside fraction';body='<elm tp="4" E1="" E2=""><ex>'+$nestedPower+'</ex><ex><var t="3" f="00" /></ex></elm>';value='≈ 0.69';container='//elm[@tp="4"]/*[self::ex or self::expr][1]/elm[@tp="3"]/*[self::ex or self::expr][2]';sibling='//elm[@tp="4"]/*[self::ex or self::expr][2]/elm[@tx="3"]'}
+ )
+ foreach($case in $nestedCases){
+  LoadMath $case.body;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$before=Get-Content $file -Raw
+  $p=FindValue $case.value;$doc=Apply $p
+  $container=$doc.SelectSingleNode($case.container);$number=$case.value.Substring(2)
+  Check ($container -and $container.SelectSingleNode('.//elm[@tp="1" and @tx="'+$number+'"]') -and $doc.SelectSingleNode($case.sibling)) ('Nested '+$case.name+' lost its level or sibling: '+$doc.OuterXml)
+  Check (!$doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]')) ('Nested '+$case.name+' inserted equality inside a level')
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$restored=Get-Content $file -Raw
+  Check ($restored.OuterXml -eq $before.OuterXml) ('Nested '+$case.name+' did not Undo exactly')
+  Write-Output ('Nested '+$case.name+' preserved structure, siblings and exact Undo.')
+ }
+ LoadMath '<var t="3" f="00" /><opr s="*" /><fun t="ln" E1=""><ex><var t="0.5" f="00" /></ex></fun>'; $p=FindValue '≈ -0.69';$doc=Apply $p
+ Check ($doc.SelectSingleNode('//elm[@tp="5"]/*[self::ex or self::expr]/elm[@tx="0.69"]')) ('Negative factor lost grouping: '+$doc.OuterXml)
+ Write-Output 'Negative replacement retained grouping and multiplication precedence.'
  LoadMath $power;$p=WholePanel;[MathomirUiProbe]::Send($p,273,1392)|Out-Null;Start-Sleep -Milliseconds 400;Check (![MathomirUiProbe]::IsWindowVisible($p)) 'Dismissed panel reopened'
  LoadMath '<fun t="ln" E1=""><ex><var t="-1" f="00" /></ex></fun>';[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::Mouse($view,512,0,105,126);$p=Panel;Check ($p -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($p)) 'Undefined logarithm showed an approximation'
  # Per-result decimals must not change the normal approximation preference.

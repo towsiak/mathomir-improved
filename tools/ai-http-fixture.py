@@ -1,0 +1,41 @@
+import json
+import sys
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+port_file, record_file = map(Path, sys.argv[1:3])
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+    def do_POST(self):
+        data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))).decode('utf-8'))
+        valid = self.path == '/v1/responses' and self.headers.get('Authorization') == 'Bearer sk-mathomir-ci-only'
+        with record_file.open('a', encoding='utf-8') as f:
+            f.write(json.dumps(dict(input=data.get('input'), model=data.get('model'), store=data.get('store'), stream=data.get('stream'), authenticated=valid), ensure_ascii=False) + '\n')
+        text = data.get('input', '')
+        code = 200
+        body = {'status': 'completed', 'output': [{'type': 'reasoning', 'summary': []}, {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': 'ln(2) ≈ 0.6931\n\nThis is an offline test-server response.'}]}]}
+        if not valid:
+            code = 401
+        if '[rate-limit]' in text:
+            code = 429
+        if '[unavailable-model]' in text:
+            code = 404
+        if '[slow]' in text:
+            time.sleep(2)
+        if '[malformed]' in text:
+            encoded = b'{bad'
+        else:
+            encoded = json.dumps(body, ensure_ascii=False).encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(encoded)))
+        self.end_headers()
+        try:
+            self.wfile.write(encoded)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+port_file.write_text(str(server.server_port))
+server.serve_forever()
