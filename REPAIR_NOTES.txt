@@ -454,3 +454,5 @@ and separate diagnostic-only local HTTP fixtures for successful Unicode replies,
 rate limits, unavailable models, malformed responses and cancellation races.
 Live provider responses require the user's API key and are not covered by the
 offline test fixture. The production EXE has no local test-server override.
+
+Cursor stability: explicit clicks and ending input clear temporary exponent/index modes, arrow-return history and automatic text-detection history. Editing or changing typing mode clears arrow history before shortcut handlers run. Opposite-arrow restoration stays in the current live object and locates the saved run by identity instead of an unchecked old index. Explicit math mode is respected by the text heuristic. Typing shortcuts start at offset zero in their replacement run. Windows interaction checks exercise mixed text/power/fraction lines, mid-word input, timer/hover, arrows, text/math switches, Backspace and another box.
