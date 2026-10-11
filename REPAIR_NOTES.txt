@@ -483,3 +483,4 @@ AI math reply reader (2026-10-11):
 - No browser engine, Office installation, TeX distribution or extra model is bundled. Windows 8 and later supplies the math typesetter; older systems retain readable Unicode fallback. Unsupported commands remain visible instead of silently changing their meaning.
 - Added the reported radians-to-degrees response, nested math, malformed notation and native typesetting regression checks.
 - Cursor check follow-up: an explicit click in a different expression releases the previous caret before hit testing, preventing the next character from staying in the old text box.
+- AI dialog adapts its reply height to the available screen area so connection settings and Close remain visible on small displays.

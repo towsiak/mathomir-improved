@@ -18,15 +18,24 @@
 +    // Otherwise a stale hover selection can leave the next keystroke in the old box.
 +    if(ExplicitTypingRoot&&KeyboardEntryObject&&MouseMode==0&&!TouchMouseMode&&!(nFlags&MK_SHIFT)){
 +        CExpression *active=(CExpression*)KeyboardEntryObject;while(active->m_pPaternalExpression)active=active->m_pPaternalExpression;
-+        if(active!=ExplicitTypingRoot){((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;LastQuickTypeObject=NULL;OnMouseMove(nFlags&~MK_LBUTTON,point);}
++        if((CObject*)active!=ExplicitTypingRoot){((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;LastQuickTypeObject=NULL;OnMouseMove(nFlags&~MK_LBUTTON,point);}
 +    }
      HideQuickActionSearch(); FunctionHelpText.Empty();
      DeleteGripClick=false;
      tDocumentStruct *deleteTarget=ResizeHandleDocument();
-@@ -14130,10 +14139,20 @@
+@@ -14130,10 +14139,29 @@
      HWND replacement=::CreateWindowExW(exStyle,L"EDIT",L"",style,r.left,r.top,r.right-r.left,r.bottom-r.top,dialog->m_hWnd,NULL,AfxGetInstanceHandle(),NULL);if(!replacement)return;
      ::DestroyWindow(old);::SetWindowLongPtr(replacement,GWLP_ID,id);::SendMessage(replacement,WM_SETFONT,(WPARAM)font,TRUE);::SetWindowPos(replacement,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
  }
++// Keep connection controls and Close visible on short laptop screens.
++static void AiFitDialog(CDialog *dialog)
++{
++    MONITORINFO monitor={sizeof(monitor)};if(!GetMonitorInfo(MonitorFromWindow(dialog->m_hWnd,MONITOR_DEFAULTTONEAREST),&monitor))return;
++    RECT window;dialog->GetWindowRect(&window);int available=monitor.rcWork.bottom-monitor.rcWork.top-12;int delta=min(0,available-(window.bottom-window.top));if(!delta)return;
++    HWND reply=::GetDlgItem(dialog->m_hWnd,1407);RECT boundary;::GetWindowRect(reply,&boundary);dialog->ScreenToClient(&boundary);delta=max(delta,100-(boundary.bottom-boundary.top));
++    for(HWND child=::GetWindow(dialog->m_hWnd,GW_CHILD);child;child=::GetWindow(child,GW_HWNDNEXT)){RECT r;::GetWindowRect(child,&r);dialog->ScreenToClient(&r);if(child==reply)::SetWindowPos(child,NULL,0,0,r.right-r.left,r.bottom-r.top+delta,SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE);else if(r.top>=boundary.bottom)::SetWindowPos(child,NULL,r.left,r.top+delta,0,0,SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE);}
++    ::SetWindowPos(dialog->m_hWnd,NULL,window.left,monitor.rcWork.top+6,window.right-window.left,window.bottom-window.top+delta,SWP_NOZORDER|SWP_NOACTIVATE);
++}
 +// Windows supplies the formatted reader; no browser or rendering package is bundled.
 +static bool AiReplyReader(CDialog *dialog)
 +{
@@ -45,7 +54,7 @@
      const char *ModelPreference(){return provider==MathomirAI::Groq?"GroqModel":"Model";}
      void ProviderChanged(){
          Text(1411,L"");CString model=theApp.GetProfileString("AI",ModelPreference(),MathomirAI::DefaultModel(provider));Text(1414,MathomirAI::ToWide((LPCSTR)model));
-@@ -14145,6 +14164,21 @@
+@@ -14145,6 +14173,21 @@
          std::wstring display;if(id==1402||id==1407){for(size_t i=0;i<s.size();i++){if(s[i]==L'\n'&&(i==0||s[i-1]!=L'\r'))display+=L'\r';display+=s[i];}::SetWindowTextW(Control(id),display.c_str());}
          else ::SetWindowTextW(Control(id),s.c_str());
      }
@@ -67,7 +76,7 @@
      void Busy(bool busy){for(int id:{1402,1403,1404,1411,1412,1413,1414,1415,1416})::EnableWindow(Control(id),!busy);::EnableWindow(Control(1405),busy);}
      void Stop(){if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Busy(false);Text(1408,L"Stopped waiting. A request already received by the selected service may still count toward API usage.");}
      void Send(){
-@@ -14154,16 +14188,16 @@
+@@ -14154,16 +14197,16 @@
              auto model=AiText(Control(1414));std::string name=MathomirAI::ToUtf8(model);int task=(int)::SendMessage(Control(1403),CB_GETCURSEL,0,0);extern int TrigDegrees;
              std::string body;try{body=MathomirAI::RequestBody(name,MathomirAI::ToUtf8(math),task,TrigDegrees!=0,provider);}catch(...){MathomirAI::Erase(key);throw;}
              // Model is a harmless preference; keys never enter profiles or .mom files.
@@ -84,11 +93,11 @@
 +    CAiHelpDialog(const std::wstring &selection):CFeatureDialog(IDD_AI_HELP,theApp.m_pMainWnd),initial(selection),closing(false),richReply(false),provider(MathomirAI::Groq){}
      ~CAiHelpDialog(){if(job)job->cancelled.store(true);}
 -    virtual BOOL OnInitDialog(){BOOL result=CFeatureDialog::OnInitDialog();for(int id:{1402,1407,1411,1414})AiUnicodeEdit(this,id);for(int id:{1401,1408})CreateUnicodeReadout(this,id);
-+    virtual BOOL OnInitDialog(){BOOL result=CFeatureDialog::OnInitDialog();for(int id:{1402,1411,1414})AiUnicodeEdit(this,id);richReply=AiReplyReader(this);if(!richReply)AiUnicodeEdit(this,1407);for(int id:{1401,1408})CreateUnicodeReadout(this,id);
++    virtual BOOL OnInitDialog(){BOOL result=CFeatureDialog::OnInitDialog();AiFitDialog(this);for(int id:{1402,1411,1414})AiUnicodeEdit(this,id);richReply=AiReplyReader(this);if(!richReply)AiUnicodeEdit(this,1407);for(int id:{1401,1408})CreateUnicodeReadout(this,id);
          ::SendMessage(Control(1402),EM_LIMITTEXT,8000,0);::SendMessage(Control(1411),EM_LIMITTEXT,4096,0);::SendMessage(Control(1414),EM_LIMITTEXT,128,0);Text(1402,initial);
          CComboBox *task=(CComboBox*)GetDlgItem(1403);task->AddString("Explain");task->AddString("Check working");task->AddString("Graph ideas");task->SetCurSel(0);
          // Fresh setups choose Groq; existing OpenAI setups keep their provider.
-@@ -14177,7 +14211,7 @@
+@@ -14177,7 +14220,7 @@
          return CFeatureDialog::OnCommand(wp,lp);
      }
      virtual void OnCancel(){if(closing)return;closing=true;if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Text(1411,L"");CFeatureDialog::OnCancel();}
