@@ -159,7 +159,7 @@
 +END
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -607,29 +607,30 @@
+@@ -607,29 +607,32 @@
  class CSelectionApproxPanel:public CWnd
  {
  public:
@@ -189,8 +189,11 @@
          tips.Create(m_hWnd);tips.Add(apply.m_hWnd,L"Approximate the highlighted math. Whole expressions keep the original and append an answer; selected parts are replaced. Ctrl+Z restores the original.");
          tips.Add(decimals.m_hWnd,L"Choose decimal places for this result. Auto uses your rounding preference. This does not change other results.");
 -        tips.Add(explain.m_hWnd,L"Explain the highlighted math with the optional OpenAI connection. Nothing is sent until you click Ask AI.");
+-        tips.Add(close.m_hWnd,L"Dismiss the approximation panel (Escape).");return true;
 +        tips.Add(explain.m_hWnd,L"Explain the highlighted math with the optional AI connection. Nothing is sent until you click Ask AI.");
-         tips.Add(close.m_hWnd,L"Dismiss the approximation panel (Escape).");return true;
++        tips.Add(target.m_hWnd,L"The expression captured when this built-in panel opened. Pointer movement does not change it.");
++        tips.Add(readout.m_hWnd,L"Preview of the fixed selection with the chosen rounding. Click Approximate to apply it.");
++        tips.Add(close.m_hWnd,L"Close this built-in panel (Escape).");return true;
      }
      int Digits(){return decimals.GetCurSel()-1;}
      MathDisplay::Rounding Format(){auto settings=MathDisplay::Options();if(Digits()>=0){settings.mode=1;settings.digits=Digits();settings.trailingZeros=true;}return settings;}
@@ -200,7 +203,7 @@
      afx_msg void OnPaint(){CPaintDC dc(this);CRect r;GetClientRect(r);dc.FillSolidRect(r,RGB(255,255,255));dc.Draw3dRect(r,RGB(172,187,201),RGB(172,187,201));auto old=dc.SelectObject(&font);dc.SetBkMode(TRANSPARENT);dc.SetTextColor(RGB(28,39,49));dc.SelectObject(old);}
      afx_msg HBRUSH OnCtlColor(CDC *dc,CWnd *window,UINT kind){dc->SetBkColor(RGB(255,255,255));dc->SetTextColor(RGB(28,39,49));return (HBRUSH)::GetStockObject(WHITE_BRUSH);}
      virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1394){view->OnAiHelp();return TRUE;}if(id==1390){view->ApplySelectionApproximation();return TRUE;}if(id==1391&&HIWORD(wp)==CBN_SELCHANGE){Refresh();return TRUE;}if(id==1392){view->DismissSelectionApproxPanel();view->SetFocus();return TRUE;}return CWnd::OnCommand(wp,lp);}
-@@ -13258,28 +13259,38 @@
+@@ -13258,28 +13261,38 @@
  }
  void CMathomirView::DismissSelectionApproxPanel()
  {
@@ -245,7 +248,7 @@
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("selection-approx-diagnostics.txt","a");if(trace){fprintf(trace,"update: selected=%d keyboard=%d touched=%d zoom=%d point=%d,%d\n",NumSelectedObjects,KeyboardEntryObject!=NULL,prevTouchedObject!=NULL,ViewZoom,point.x,point.y);fclose(trace);}}
      // Document loads and Undo can replace the backing document array.
      // Match saved selection addresses before reading through them.
-@@ -13288,41 +13299,39 @@
+@@ -13288,41 +13301,39 @@
      if(!wanted)for(int i=0;i<NumDocumentElements;i++)if(TheDocument+i==prevTouchedObject){wanted=TheDocument[i].Object;break;}
      tDocumentStruct *object=NULL;
      if(NumSelectedObjects){if(NumSelectedObjects!=1){HideSelectionApproxPanel();return;}for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState==3){if(TheDocument[i].Type!=1){HideSelectionApproxPanel();return;}object=TheDocument+i;break;}}
@@ -298,7 +301,7 @@
      // Replace a selected part only; adding an equality inside a sum would change its meaning.
      auto settings=MathDisplay::Options();MathDisplay::Options()=panel->Format();std::string xml="<ex fh=\""+SymbolicDerivative::Number(parent->m_FontSize)+"\">"+MathDisplay::ApproximationXml(panel->value)+"</ex>";MathDisplay::Options()=settings;
      if(panel->value<0&&(first>0||last+1<parent->m_NumElements)){
-@@ -14117,40 +14126,47 @@
+@@ -14117,40 +14128,47 @@
  static std::wstring AiText(HWND control){int length=::GetWindowTextLengthW(control);if(length>64000)throw std::runtime_error("The text is too long.");std::vector<wchar_t> text(length+1,0);::GetWindowTextW(control,text.data(),length+1);return std::wstring(text.data());}
  class CAiHelpDialog:public CFeatureDialog
  {
@@ -359,7 +362,7 @@
          return CFeatureDialog::OnCommand(wp,lp);
      }
      virtual void OnCancel(){if(closing)return;closing=true;if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Text(1411,L"");CFeatureDialog::OnCancel();}
-@@ -14170,5 +14186,5 @@
+@@ -14170,5 +14188,5 @@
          }
      }
      // Capture the selected math before stopping typing or dismissing its panel.
@@ -369,7 +372,15 @@
 +}
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
-@@ -149,7 +149,8 @@
+@@ -7,6 +7,7 @@
+ 
+ 
+ class CSelectionApproxPanel;
++class CExpression;
+ class CMathomirView : public CView
+ {
+ protected: // create from serialization only
+@@ -149,7 +150,8 @@
      void DismissSelectionApproxPanel();
      void HideSelectionApproxPanel();
      bool KeepSelectionApproxPanel(CPoint point);
