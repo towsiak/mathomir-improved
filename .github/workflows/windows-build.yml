@@ -65,9 +65,6 @@ jobs:
       - name: AI formatted text and native math engine checks
         shell: pwsh
         run: ./tools/ai-presentation-test.ps1
-      - name: Full file path title UI checks
-        shell: pwsh
-        run: ./tools/title-path-smoke.ps1
       - name: Enlarged text placement and selection UI checks
         shell: pwsh
         run: ./tools/enlarged-text-overlap-smoke.ps1
@@ -77,6 +74,9 @@ jobs:
           name: Enlarged-Overlap-Preview
           path: source/build/enlarged-overlap-ui.png
           if-no-files-found: ignore
+      - name: Full file path title UI checks
+        shell: pwsh
+        run: ./tools/title-path-smoke.ps1
       - name: Mixed text and math cursor checks
         shell: pwsh
         run: ./tools/cursor-stability-smoke.ps1
@@ -249,8 +249,8 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
-          ./tools/title-path-smoke.ps1
           ./tools/enlarged-text-overlap-smoke.ps1
+          ./tools/title-path-smoke.ps1
           ./tools/cursor-stability-smoke.ps1
           ./tools/ai-help-smoke.ps1 -OnlineFixture
           ./tools/selection-approx-smoke.ps1
