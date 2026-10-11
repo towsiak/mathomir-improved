@@ -56,15 +56,15 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: AI formatted text and native math engine checks
+        shell: pwsh
+        run: ./tools/ai-presentation-test.ps1
       - name: Mixed text and math cursor checks
         shell: pwsh
         run: ./tools/cursor-stability-smoke.ps1
       - name: AI protocol checks
         shell: pwsh
         run: ./tools/ai-protocol-test.ps1
-      - name: AI formatted text and native math engine checks
-        shell: pwsh
-        run: ./tools/ai-presentation-test.ps1
       - name: AI help and connection setup UI checks
         shell: pwsh
         run: ./tools/ai-help-smoke.ps1
