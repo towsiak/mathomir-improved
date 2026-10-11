@@ -77,6 +77,15 @@ diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
      ON_COMMAND(ID_NUMBER_FORMAT,OnNumberFormat)
      ON_COMMAND(ID_EXECUTE_EXPRESSION,OnExecuteExpression)
      ON_COMMAND(ID_APPROXIMATE_EXPRESSION,OnApproximateExpression)
+@@ -3502,7 +3513,7 @@
+ 
+ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ {
+-    if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point))return;
++    if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point)){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
+     CCanvasHintScope canvasHintScope;
+     if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive)
+     {
 @@ -10536,6 +10547,7 @@
      dialog.Add(ID_NUMBER_FORMAT,"Display > Number rounding...","rounding round decimals significant figures precision trailing zeros approximation display");
      dialog.Add(ID_STATISTICS_REGRESSION,"Statistics > Statistics and regression...","statistics regression linear quadratic cubic polynomial exponential logarithmic power scatter data residual mean median standard deviation correlation");
@@ -93,7 +102,7 @@ diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
 -    if(rect.PtInRect(point))return true;HideSelectionApproxPanel();return false;
 +    // Preserve the selected math while crossing the canvas to its controls.
 +    // The next canvas click resolves a fresh target and dismisses this panel.
-+    SetCursor(::LoadCursor(NULL,IDC_ARROW));return true;
++    return true;
  }
  void CMathomirView::UpdateSelectionApproxPanel(CPoint point,bool force)
  {
