@@ -52,8 +52,8 @@ try{
   Ask $d 'ln(2)';WaitReply $d;$reply=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1407));Check ($reply.Contains('ln(2) ≈ 0.6931')) ('Unicode reply failed: '+$reply)
   [MathomirUiProbe]::Send($d,273,1406)|Out-Null;Check ((Get-Clipboard -Raw).Contains('ln(2) ≈ 0.6931')) 'Unicode copy failed'
   Ask $d '[rate-limit]';WaitReply $d;Check ((Status $d).Contains('quota or rate limit')) ('Rate limit not explained: '+(Status $d))
-  Ask $d '[unavailable-model]';WaitReply $d;Check ((Status $d).Contains('unavailable for this account')) 'Unavailable model not explained'
-  Ask $d '[malformed]';WaitReply $d;Check ((Status $d).Contains('invalid response')) 'Malformed response not rejected'
+  Ask $d '[unavailable-model]';WaitReply $d;Check ((Status $d).Contains('unavailable for this account')) ('Unavailable model not explained: '+(Status $d))
+  Ask $d '[malformed]';WaitReply $d;Check ((Status $d).Contains('invalid response')) ('Malformed response not rejected: '+(Status $d))
   Ask $d '[slow]';[MathomirUiProbe]::Send($d,273,1405)|Out-Null;Check ([AiUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1404))) 'Stop waiting blocked UI';Ask $d 'ln(2)';WaitReply $d;Start-Sleep -Milliseconds 2300;Check ((Status $d).Contains('AI reply received')) 'Old cancelled reply replaced latest status'
   $requests=Get-Content $record|ForEach-Object{$_|ConvertFrom-Json};Check ($requests.Count -ge 5) 'Test HTTP requests missing';foreach($r in $requests){Check ($r.authenticated -and !$r.store -and !$r.stream) 'Request authentication/nonstored flags incorrect'}
  }

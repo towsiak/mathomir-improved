@@ -178,7 +178,7 @@ diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
 +        return CFeatureDialog::OnCommand(wp,lp);
 +    }
 +    virtual void OnCancel(){if(closing)return;closing=true;if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Text(1411,L"");CFeatureDialog::OnCancel();}
-+    virtual LRESULT WindowProc(UINT message,WPARAM wp,LPARAM lp){if(message==WM_TIMER&&wp==161){if(job&&job->done.load(std::memory_order_acquire)){auto finished=job;job.reset();KillTimer(161);Busy(false);if(finished->success){Text(1407,finished->reply);Text(1408,L"AI reply received. Review the mathematical steps before using them.");::EnableWindow(Control(1406),TRUE);}else Text(1408,finished->reply);}return 0;}
++    virtual LRESULT WindowProc(UINT message,WPARAM wp,LPARAM lp){if(message==WM_TIMER&&wp==161){if(job&&job->done.load(std::memory_order_acquire)){auto finished=job;job.reset();KillTimer(161);if(finished->success){Text(1407,finished->reply);Text(1408,L"AI reply received. Review the mathematical steps before using them.");::EnableWindow(Control(1406),TRUE);}else Text(1408,finished->reply);Busy(false);}return 0;}
 +        if(message==WM_CTLCOLORSTATIC||message==WM_CTLCOLOREDIT){HDC dc=(HDC)wp;::SetTextColor(dc,RGB(28,39,49));::SetBkColor(dc,RGB(255,255,255));return (LRESULT)::GetStockObject(WHITE_BRUSH);}return CFeatureDialog::WindowProc(message,wp,lp);
 +    }
 +};
