@@ -7,7 +7,9 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class PageMenuUI {
- [DllImport("user32.dll")] static extern bool EnumWindows(GridUI.Callback c,IntPtr p);
+ public delegate bool Callback(IntPtr h,IntPtr p);
+ [StructLayout(LayoutKind.Sequential)] public struct Rect {public int left,top,right,bottom;}
+ [DllImport("user32.dll")] static extern bool EnumWindows(Callback c,IntPtr p);
  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h,out uint pid);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h,StringBuilder b,int n);
  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
@@ -16,13 +18,13 @@ public static class PageMenuUI {
  [DllImport("user32.dll")] public static extern uint GetMenuItemID(IntPtr m,int p);
  [DllImport("user32.dll")] public static extern uint GetMenuState(IntPtr m,uint id,uint flags);
  [DllImport("user32.dll")] public static extern IntPtr GetSubMenu(IntPtr m,int p);
- [DllImport("user32.dll")] static extern bool GetMenuItemRect(IntPtr owner,IntPtr menu,uint p,out GridUI.Rect r);
+ [DllImport("user32.dll")] static extern bool GetMenuItemRect(IntPtr owner,IntPtr menu,uint p,out Rect r);
  [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] static extern void mouse_event(uint f,uint x,uint y,uint d,UIntPtr extra);
  [DllImport("user32.dll")] static extern void keybd_event(byte key,byte scan,uint flags,UIntPtr extra);
  public static IntPtr Popup(int pid){IntPtr result=IntPtr.Zero;EnumWindows((h,p)=>{uint id;GetWindowThreadProcessId(h,out id);var c=new StringBuilder(100);GetClassName(h,c,100);if(id==pid&&IsWindowVisible(h)&&c.ToString()=="#32768"){result=h;return false;}return true;},IntPtr.Zero);return result;}
  public static IntPtr Menu(IntPtr popup){return SendMessage(popup,0x1e1,IntPtr.Zero,IntPtr.Zero);}
- public static void Choose(IntPtr main,IntPtr menu,int index){GridUI.Rect r;if(!GetMenuItemRect(main,menu,(uint)index,out r))throw new Exception("Cannot locate page menu row");SetCursorPos((r.left+r.right)/2,(r.top+r.bottom)/2);mouse_event(2,0,0,0,UIntPtr.Zero);mouse_event(4,0,0,0,UIntPtr.Zero);}
+ public static void Choose(IntPtr main,IntPtr menu,int index){Rect r;if(!GetMenuItemRect(main,menu,(uint)index,out r))throw new Exception("Cannot locate page menu row");SetCursorPos((r.left+r.right)/2,(r.top+r.bottom)/2);mouse_event(2,0,0,0,UIntPtr.Zero);mouse_event(4,0,0,0,UIntPtr.Zero);}
  public static void Key(byte key){keybd_event(key,0,0,UIntPtr.Zero);keybd_event(key,0,2,UIntPtr.Zero);}
 }
 '@
