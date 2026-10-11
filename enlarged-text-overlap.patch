@@ -147,7 +147,7 @@
  	//********************  the main on-mouse-click loop - clicking on objects ************
  	int five_pixels=5*100/ViewZoom;
  	int is_near_object=0;
-@@ -2266,12 +2351,15 @@
+@@ -2266,12 +2351,16 @@
  	
  	// Match the paint order: annotations are above every graph, regardless of
      // creation order. Within each layer, the most recently added object wins.
@@ -160,11 +160,12 @@
          if(IsGraphObject(ds)!=(layer==1))continue;
 +        if(clickContent && ds!=clickContent)continue;
 +        if(!(nFlags&MK_SHIFT) && !TouchMouseMode && ds->Type==1 && ds->MovingDotState<2 && IsInsertionPointTouched!=ds &&
++            ((CExpression*)ds->Object)->m_MaxNumRows<=1 && ((CExpression*)ds->Object)->m_MaxNumColumns<=1 &&
 +            !ExpressionContentAtPoint((CExpression*)ds->Object,point.x-(ds->absolute_X-ViewX)*ViewZoom/100,point.y-(ds->absolute_Y-ViewY)*ViewZoom/100))continue;
  		if ((ds->MovingDotState==5) && (!AccessLockedObjects)) continue; //ignore locked objects
  
  		int is_expression_found=0;		
-@@ -2312,7 +2400,7 @@
+@@ -2312,7 +2401,7 @@
  					delete e;
  				}
  			}
@@ -173,7 +174,7 @@
  			{
  				MovingStartX=AbsoluteX;
  				MovingStartY=AbsoluteY;
-@@ -2354,7 +2442,7 @@
+@@ -2354,7 +2443,7 @@
  			(AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+2))) || (IsInsertionPointTouched==ds))
  		{
  			//clicked on an object 
@@ -182,7 +183,7 @@
  			{
  				if (nFlags&MK_SHIFT)
  					ds->MovingDotState=3;
-@@ -3530,6 +3618,7 @@
+@@ -3530,6 +3619,7 @@
  {
      if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point)){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
      CCanvasHintScope canvasHintScope;
@@ -190,7 +191,7 @@
      if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive)
      {
          tDocumentStruct *hover=ResizeHandleDocument();
-@@ -3574,12 +3663,12 @@
+@@ -3574,12 +3664,12 @@
  		if (!(nFlags&MK_LBUTTON)) { EndMouseRotation(false); return; }
  		UpdateMouseRotation(point,nFlags); return;
  	}
@@ -206,7 +207,7 @@
          {
              ResizeHandleObject=front->Object;
              RotationHandleObject=CanRotateObject(front)?front->Object:NULL;
-@@ -3587,7 +3676,7 @@
+@@ -3587,7 +3677,7 @@
          }
      }
      tDocumentStruct *moveHover=ResizeHandleDocument();
@@ -215,7 +216,7 @@
      {
          CPoint deleteGrip=DeleteGripPoint(moveHover);
          if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){ShowFeatureCanvasHint(1,"Delete this object. Ctrl+Z restores it.");SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
-@@ -3597,7 +3686,7 @@
+@@ -3597,7 +3687,7 @@
          { ShowFeatureCanvasHint(2,"Move this object by dragging. Escape cancels the move.");SetCursor(::LoadCursor(NULL,IDC_SIZEALL)); return; }
      }
      tDocumentStruct *sizingObject=ResizeHandleDocument();
@@ -224,7 +225,7 @@
      {
          CPoint handle=ResizeHandlePoint(sizingObject);
          if (abs(point.x-handle.x)<=9 && abs(point.y-handle.y)<=9)
-@@ -3605,7 +3694,7 @@
+@@ -3605,7 +3695,7 @@
      }
  
  	tDocumentStruct *rotationObject=RotationHandleDocument();
@@ -233,7 +234,7 @@
  	{
  		CPoint handle=RotationHandlePoint(rotationObject);
  		int dx=point.x-handle.x,dy=point.y-handle.y;
-@@ -3614,11 +3703,11 @@
+@@ -3614,11 +3704,11 @@
  
      // Keep an annotation's controls while crossing the few pixels between the
      // object and a grip. Another foreground annotation still has priority.
@@ -248,7 +249,7 @@
          {
              if(SpecialDrawingHover){SpecialDrawingHover=NULL;Invalidate(FALSE);}
              SetCursor(::LoadCursor(NULL,IDC_ARROW));return;
-@@ -4163,7 +4252,8 @@
+@@ -4163,7 +4253,8 @@
  		
  		tDocumentStruct *ds=TheDocument+NumDocumentElements-1;
  		int ccc=1+100/ViewZoom;
@@ -258,7 +259,7 @@
          for(int layer=0;layer<2;layer++)
          {
          ds=TheDocument+NumDocumentElements-1;
-@@ -4220,6 +4310,8 @@
+@@ -4220,6 +4311,8 @@
  					extends=extends*100/ViewZoom;
  				}
  			}
@@ -267,7 +268,7 @@
  
  			//handling 'add new line' feature - pointing mouse pointer just below a mutli-line object
  			if ((ds->Type==1) && (!IsDrawingMode))
-@@ -4336,6 +4428,10 @@
+@@ -4336,6 +4429,10 @@
  							IsExpression=-1;
  							
  							TouchedSubelement=((CExpression*)(ds->Object))->SelectObjectAtPoint(DC,ViewZoom,X,Y,&IsExpression,&IsParenthese);
@@ -278,7 +279,7 @@
  						
  							if ((TouchedSubelement==NULL) && (IsExpression==-1) && (ds->MovingDotState==0)) continue;
  							if ((ds->MovingDotState==2) && (TouchedSubelement)) 
-@@ -8494,8 +8590,8 @@
+@@ -8494,8 +8591,8 @@
  			for (int i=NumDocumentElements-1;i>=0;i--)
  			{
  				ds=TheDocument+i;
@@ -289,7 +290,7 @@
  				if (IsInsertionPointTouched!=ds)
  				{
  					if (ds->Type!=1) continue;
-@@ -10810,7 +10906,7 @@
+@@ -10810,7 +10907,7 @@
  bool CMathomirView::BeginGripMove(CPoint point)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -298,7 +299,7 @@
      CPoint grip=MoveGripPoint(object);
      CPoint lower=LowerMoveGripPoint(object);
      bool upperHit=abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9;
-@@ -10893,7 +10989,7 @@
+@@ -10893,7 +10990,7 @@
  bool CMathomirView::BeginMouseSizing(CPoint point)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -307,7 +308,7 @@
      if (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object)) return false;
      CPoint handle=ResizeHandlePoint(object);
      if (abs(point.x-handle.x)>9 || abs(point.y-handle.y)>9) return false;
-@@ -11046,7 +11142,7 @@
+@@ -11046,7 +11143,7 @@
  bool CMathomirView::BeginMouseRotation(CPoint point)
  {
      tDocumentStruct *object=RotationHandleDocument();
