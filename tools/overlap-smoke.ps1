@@ -17,6 +17,8 @@ try{
   $end=$all.IndexOf("`n",$end)
   Invoke-Expression $all.Substring($start,$end-$start)
 }finally{
+  if($main -ne [IntPtr]::Zero -and !$appProcess.HasExited){Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($main);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'overlap-ui.png'));$graphics.Dispose();$image.Dispose()}
+
   $trace=Join-Path (Split-Path $exe) 'overlap-diagnostics.txt'
   if(Test-Path $trace){Get-Content $trace -Tail 80|Write-Output}
   $appProcess.Refresh();if(!$appProcess.HasExited){Stop-Process -Id $appProcess.Id -Force}

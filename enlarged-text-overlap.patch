@@ -110,7 +110,7 @@
 +#ifdef MATHOMIR_AI_TESTING
 +    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){
 +        FILE *trace=fopen("enlarged-hit-diagnostics.txt","a");if(trace){
-+            fprintf(trace,"point=%d,%d viewport=%d,%d zoom=%d front=%d\n",point.x,point.y,ViewX,ViewY,ViewZoom,front?(int)(front-TheDocument):-1);
++            fprintf(trace,"point=%d,%d viewport=%d,%d zoom=%d front=%d grip=%d\n",point.x,point.y,ViewX,ViewY,ViewZoom,front?(int)(front-TheDocument):-1,ResizeHandleDocument()?(int)(ResizeHandleDocument()-TheDocument):-1);
 +            for(int n=0;n<NumDocumentElements;n++)fprintf(trace," object=%d type=%d pos=%d,%d size=%d,%d,%d state=%d\n",n,TheDocument[n].Type,TheDocument[n].absolute_X,TheDocument[n].absolute_Y,TheDocument[n].Length,TheDocument[n].Above,TheDocument[n].Below,TheDocument[n].MovingDotState);
 +            fclose(trace);
 +        }
@@ -411,7 +411,20 @@
      if (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object)) return false;
      CPoint handle=ResizeHandlePoint(object);
      if (abs(point.x-handle.x)>9 || abs(point.y-handle.y)>9) return false;
-@@ -11046,7 +11184,7 @@
+@@ -10981,6 +11119,12 @@
+ 
+ void CMathomirView::PaintRotationHandle(CDC *dc)
+ {
++#ifdef MATHOMIR_AI_TESTING
++    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){
++        tDocumentStruct *owner=ResizeHandleDocument();CRect clip;dc->GetClipBox(&clip);
++        FILE *trace=fopen("enlarged-hit-diagnostics.txt","a");if(trace){fprintf(trace,"paint grips=%d free=%d mode=%d draw=%d rop=%d clip=%d,%d,%d,%d\n",owner?(int)(owner-TheDocument):-1,FreePlacementGesture,MouseMode,IsDrawingMode,dc->GetROP2(),clip.left,clip.top,clip.right,clip.bottom);fclose(trace);}
++    }
++#endif
+     if (ViewOnlyMode || IsDrawingMode || FreePlacementGesture) return;
+     tDocumentStruct *hover=ResizeHandleDocument();
+     if(hover && !ViewOnlyMode && !IsDrawingMode && !PrintRendering)
+@@ -11046,7 +11190,7 @@
  bool CMathomirView::BeginMouseRotation(CPoint point)
  {
      tDocumentStruct *object=RotationHandleDocument();

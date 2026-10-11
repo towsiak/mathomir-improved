@@ -153,6 +153,7 @@ jobs:
         with:
           name: Integral-Diagnostics
           path: |
+            source/build/overlap-ui.png
             source/build/graph-diagnostics.txt
             source/build/*integral*.mom
             source/build/integral-ui.png
@@ -167,6 +168,7 @@ jobs:
           path: |
             source/build/selection-approx-ui.png
             source/build/unit-common-coordinates-ui.png
+            source/build/overlap-ui.png
             source/build/enlarged-hit-diagnostics.txt
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom
@@ -266,6 +268,7 @@ jobs:
         with:
           name: Native-Memory-Diagnostics
           path: |
+            source/build/overlap-ui.png
             source/build/enlarged-hit-diagnostics.txt
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom
