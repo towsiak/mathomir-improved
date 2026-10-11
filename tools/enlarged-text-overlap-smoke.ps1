@@ -42,7 +42,7 @@ try {
   Check ((Root $d).OuterXml -eq $rootXml) 'Selecting/moving the small label altered the enlarged expression'
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$d=SaveDoc;Check ((Label $d).X -eq [string]$noteX -and (Label $d).Y -eq '175') 'Label move Undo failed'
   # Grab the thin brace/line independently even while it overlaps the root's box.
-  [MathomirUiProbe]::Mouse($view,512,0,[int](($noteX+15)*$scale),[int](185*$scale));Start-Sleep -Milliseconds 80
+  [MathomirUiProbe]::Mouse($view,512,0,[int](($noteX+15)*$scale),([int](185*$scale)-2));Start-Sleep -Milliseconds 80
   $g=[MathomirUiProbe]::MoveGripNear($view,([int]($noteX*$scale)-12),[int](185*$scale)-12)
   [MathomirUiProbe]::Mouse($view,512,0,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,513,1,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,512,1,($g[0]+[int](30*$scale)),($g[1]+[int](20*$scale)));[MathomirUiProbe]::Mouse($view,514,0,($g[0]+[int](30*$scale)),($g[1]+[int](20*$scale)))
   $d=SaveDoc;$line=$d.SelectSingleNode('/mathomir/*[@t="2" or @type="2"]');Check ($line.X -eq [string]($noteX+30) -and $line.Y -eq '205') "Thin stroke drag failed: $font/$power/$rootLast/$zoom";Check ((Root $d).OuterXml -eq $rootXml) 'Stroke move changed the large equation'
