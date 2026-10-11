@@ -475,3 +475,10 @@ are separate; changing providers clears the typed key. No AI model weights or SD
 are bundled. Approximation itself is local and does not require any AI key.
 Provider integration is checked against official Responses API documentation and
 an offline HTTP fixture; no personal live API key is included in this ZIP.
+
+AI math reply reader (2026-10-11):
+- AI explanations now use a formatted native Windows reader with headings and bold text.
+- Common LaTeX from Groq and OpenAI is converted to native built-up math: stacked fractions, roots, powers, subscripts, Greek letters, degree signs and boxed formulas.
+- Copy reply produces readable Unicode without Markdown or LaTeX delimiters.
+- No browser engine, Office installation, TeX distribution or extra model is bundled. Windows 8 and later supplies the math typesetter; older systems retain readable Unicode fallback. Unsupported commands remain visible instead of silently changing their meaning.
+- Added the reported radians-to-degrees response, nested math, malformed notation and native typesetting regression checks.

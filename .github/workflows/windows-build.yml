@@ -41,6 +41,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../groq-context-approx.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../ai-math-reader.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -60,6 +62,9 @@ jobs:
       - name: AI protocol checks
         shell: pwsh
         run: ./tools/ai-protocol-test.ps1
+      - name: AI formatted text and native math engine checks
+        shell: pwsh
+        run: ./tools/ai-presentation-test.ps1
       - name: AI help and connection setup UI checks
         shell: pwsh
         run: ./tools/ai-help-smoke.ps1
@@ -189,6 +194,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../groq-context-approx.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../ai-math-reader.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -227,3 +234,11 @@ jobs:
             source/build/selection-approx-diagnostics.txt
             source/build/selection-approx-ui.png
           if-no-files-found: warn
+
+      - name: Upload typeset AI reply preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Math-Reader-Preview
+          path: source/build/ai-math-reader-ui.png
+          if-no-files-found: ignore

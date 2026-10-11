@@ -46,6 +46,7 @@ try{
  Start-Sleep -Milliseconds 400;$d=[MathomirUiProbe]::Window($appProcess.Id,'AI math help');Check ($d -ne [IntPtr]::Zero) 'AI Explain button did not open the dialog'
  Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1402)) -eq '2') 'Selected math was not imported'
  foreach($id in @(1402,1407,1411,1414)){Check ([AiUI]::IsWindowUnicode([MathomirUiProbe]::Child($d,$id))) ('ANSI edit control: '+$id)}
+ Check ([MathomirUiProbe]::Class([MathomirUiProbe]::Child($d,1407)) -eq 'RICHEDIT50W') 'Formatted native reply reader missing'
  Check (([AiUI]::GetWindowLong([MathomirUiProbe]::Child($d,1411),-16) -band 32) -ne 0) 'API key field is not masked'
  Provider $d 1;Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1414)) -eq 'openai/gpt-oss-120b') 'Groq default model missing';Ask $d 'ln(2)';Check ((Status $d).Contains('API key')) ('Missing key not explained: '+(Status $d));Check ([AiUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1404))) 'Missing key left panel busy'
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1411),'gsk_mathomir_ci_only');[MathomirUiProbe]::Send($d,273,1412)|Out-Null;Check ([AiUI]::SavedKey('Groq')) 'Windows Credential Manager did not save key'
@@ -61,6 +62,11 @@ try{
   Ask $d '[unavailable-model]';WaitReply $d;Check ((Status $d).Contains('unavailable for this account')) ('Unavailable model not explained: '+(Status $d))
   Ask $d '[malformed]';WaitReply $d;Check ((Status $d).Contains('invalid response')) ('Malformed response not rejected: '+(Status $d))
   Ask $d '[slow]';[MathomirUiProbe]::Send($d,273,1405)|Out-Null;Check ([AiUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1404))) 'Stop waiting blocked UI';Ask $d 'ln(2)';WaitReply $d;Start-Sleep -Milliseconds 2300;Check ((Status $d).Contains('AI reply received')) 'Old cancelled reply replaced latest status'
+  Ask $d '[angle-format]';WaitReply $d;Check ((Status $d).Contains('AI reply received')) 'Angle conversion request failed'
+  [MathomirUiProbe]::Send($d,273,1406)|Out-Null;$formatted=Get-Clipboard -Raw;Check ($formatted.Contains('5π∕6') -and $formatted.Contains('150°') -and $formatted.Contains('180°∕π') -and $formatted.Contains('114.6°')) ('Angle math copy lost values: '+$formatted)
+  Check ($formatted -notmatch '\\frac|\\pi|\\text|\\\[|\\\(|\*\*|###') 'Copied reply still contains LaTeX or Markdown markers'
+  Check ([int](Get-Content (Join-Path (Split-Path $exe) 'ai-math-typeset.txt') -Raw) -ge 7) 'Actual AI panel did not create built-up math zones'
+  Add-Type -AssemblyName System.Drawing;$mathRect=[MathomirUiProbe]::WindowRect($d);$mathImage=New-Object System.Drawing.Bitmap ($mathRect.Right-$mathRect.Left),($mathRect.Bottom-$mathRect.Top);$mathGraphics=[System.Drawing.Graphics]::FromImage($mathImage);$mathGraphics.CopyFromScreen($mathRect.Left,$mathRect.Top,0,0,$mathImage.Size);$mathImage.Save((Join-Path (Split-Path $exe) 'ai-math-reader-ui.png'));$mathGraphics.Dispose();$mathImage.Dispose()
   $requests=Get-Content $record|ForEach-Object{$_|ConvertFrom-Json};Check ($requests.Count -ge 6) 'Test HTTP requests missing';Check (($requests|Where-Object {$_.path -eq '/v1/responses'}).Count -ge 1 -and ($requests|Where-Object {$_.path -eq '/openai/v1/responses'}).Count -ge 5) 'Provider endpoints were not isolated';foreach($r in $requests){Check ($r.authenticated -and !$r.store -and !$r.stream) 'Request authentication/nonstored flags incorrect'}
  }
  Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($d);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'ai-help-ui.png'));$graphics.Dispose();$image.Dispose()

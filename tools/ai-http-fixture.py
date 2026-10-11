@@ -16,6 +16,34 @@ class Handler(BaseHTTPRequestHandler):
         text = data.get('input', '')
         code = 200
         body = {'status': 'completed', 'output': [{'type': 'reasoning', 'summary': []}, {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': 'ln(2) ≈ 0.6931\n\nThis is an offline test-server response.'}]}]}
+        if '[angle-format]' in text:
+            body['output'][1]['content'][0]['text'] = r"""**Goal:** Turn an angle measured in radians into the equivalent number of degrees.
+
+**Why it works:** A full circle is \(2\pi\) radians and also \(360^\circ\).
+Therefore
+\[
+1\text{ rad} = \frac{360^\circ}{2\pi}= \frac{180^\circ}{\pi}
+\]
+### Step-by-step example
+**Convert** \(\displaystyle \frac{5\pi}{6}\) **radians to degrees.**
+1. **Write the conversion factor**
+   \[\frac{180^\circ}{\pi}\]
+2. **Multiply the radian measure by the factor**
+   \[\frac{5\pi}{6}\times\frac{180^\circ}{\pi}\]
+3. **Cancel the pi symbols**
+   \[\frac{5}{6}\times180^\circ\]
+4. **Do the arithmetic**
+   \[180^\circ \times \frac{5}{6}=180^\circ\times0.8333\ldots=150^\circ\]
+5. **Result**
+   \[\frac{5\pi}{6}\text{ rad}=150^\circ\]
+---
+### Another quick check
+Convert \(2\) radians to degrees.
+\[2\times\frac{180}{3.14159}\approx114.5916^\circ\]
+So \(2\) rad is approximately \(114.6^\circ\).
+### Summary formula
+\[\boxed{\text{degrees}=\text{radians}\times\dfrac{180^\circ}{\pi}}\]
+"""
         if not valid:
             code = 401
         if '[rate-limit]' in text:
