@@ -488,3 +488,8 @@ AI math reply reader (2026-10-11):
 PAGE CONFIGURATION TOOLBAR
 - New labeled Page icon beside Grid opens the existing paper/orientation and page-numbering menu directly, with current choices checked and hover help.
 - Available while editing or drawing, including compact toolbars; scalable native icon adds no external dependencies.
+
+ENLARGED TEXT AND ANNOTATION INTERACTIONS
+- Smaller labels and strokes remain selectable inside enlarged text and equations, including nested powers and either creation order. Empty regions below powers no longer act as painted content.
+- Hover/click/release use the same object target; approaching an annotation grip preserves its owner. Thin strokes have a consistent three-pixel selection margin.
+- Pending palette items cannot be consumed by underlying move/resize/rotate/delete controls. Shift-click places a separate text or math object over an existing expression; normal insertion is preserved.

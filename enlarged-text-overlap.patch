@@ -1,0 +1,329 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -514,19 +514,99 @@
+ {
+     CPoint corner=ResizeHandlePoint(object);return CPoint(corner.x+(IsGraphObject(object)?26:22),corner.y+(IsGraphObject(object)?0:12));
+ }
+-static tDocumentStruct *FrontExpressionAtPoint(CPoint point)
+-{
+-    for(int i=NumDocumentElements-1;i>=0;i--)
+-    {
++// Content geometry is read-only: probing a background object must not alter its
++// selection, caret, clipboard or node-edit state. Empty space below a power is
++// not part of either its base or exponent, however large its outer rectangle.
++static bool ExpressionContentAtPoint(CExpression *expression,double x,double y,int tolerance=2,int depth=0)
++{
++    if(!expression || depth>128)return false;
++    if(expression->m_RotationMilliDegrees){
++        double c,s,minX,minY;int width,height;expression->RotationGeometry(&c,&s,&minX,&minY,&width,&height);
++        double rx=x+minX,ry=y+height/2+minY;
++        x=c*rx+s*ry;y=-s*rx+c*ry-expression->m_OverallAbove;
++    }
++    if(expression->m_IsVertical && !expression->m_pPaternalExpression){
++        double oldX=x;x=expression->m_OverallLength/2-y;y=oldX-expression->m_OverallAbove;
++    }
++    bool inside=x>=-tolerance && x<=expression->m_OverallLength+tolerance &&
++        y>=-expression->m_OverallAbove-tolerance && y<=expression->m_OverallBelow+tolerance;
++    if(!inside)return false;
++    if(expression->m_BackgroundColor>=0)return true;
++    if(expression->m_DrawParentheses){
++        int border=expression->m_ParentheseWidth+tolerance;
++        bool horizontal=(expression->m_ParenthesesFlags&4)!=0;
++        if(horizontal){
++            if(!(expression->m_ParenthesesFlags&8) && y<=-expression->m_OverallAbove+border)return true;
++            if(!(expression->m_ParenthesesFlags&16) && y>=expression->m_OverallBelow-border)return true;
++        }else{
++            if(!(expression->m_ParenthesesFlags&8) && x<=border)return true;
++            if(!(expression->m_ParenthesesFlags&16) && x>=expression->m_OverallLength-border)return true;
++        }
++    }
++    for(int i=0;i<expression->m_NumElements;i++){
++        tElementStruct *item=expression->m_pElementList+i;
++        if(x<item->X_pos-tolerance || x>item->X_pos+item->Length+tolerance ||
++            y<item->Y_pos-item->Above-tolerance || y>item->Y_pos+item->Below+tolerance)continue;
++        CElement *element=item->pElementObject;
++        if(item->Type==3 && element){
++            if(ExpressionContentAtPoint((CExpression*)element->Expression1,x-item->X_pos-element->E1_posX,y-item->Y_pos-element->E1_posY,tolerance,depth+1) ||
++               ExpressionContentAtPoint((CExpression*)element->Expression2,x-item->X_pos-element->E2_posX,y-item->Y_pos-element->E2_posY,tolerance,depth+1))return true;
++            if(item->Decoration && (y<=item->Y_pos-item->Above+tolerance || y>=item->Y_pos+item->Below-tolerance))return true;
++            continue;
++        }
++        // Newline/tab spacers have no visible glyph to capture nearby labels.
++        if(item->Type==11 || item->Type==12 || (item->Type==2 && element &&
++            ((unsigned char)element->Data1[0]==255 || element->Data1[0]==9)))continue;
++        return true;
++    }
++    return false;
++}
++static bool DrawingContentAtPoint(CDrawing *drawing,double x,double y,int depth=0)
++{
++    if(!drawing || depth>128)return false;
++    if(drawing->IsSpecialDrawing)return true; // interactive containers retain their interiors
++    double scale=ViewZoom/(100.0*DRWZOOM);
++    for(int i=drawing->NumItems-1;i>=0;i--){
++        tDrawingItem *item=drawing->Items+i;
++        double x1=item->X1*scale,y1=item->Y1*scale,x2=item->X2*scale,y2=item->Y2*scale;
++        if(item->Type==1){
++            double dx=x2-x1,dy=y2-y1,length=dx*dx+dy*dy;
++            double t=length>0?((x-x1)*dx+(y-y1)*dy)/length:0;t=max(0.0,min(1.0,t));
++            double sx=x-x1-t*dx,sy=y-y1-t*dy,tolerance=3.0+item->LineWidth*scale/2;
++            if(sx*sx+sy*sy<=tolerance*tolerance)return true;
++        }else if(item->Type==0 && DrawingContentAtPoint((CDrawing*)item->pSubdrawing,x-x1,y-y1,depth+1))return true;
++        else if(item->Type==2 && ExpressionContentAtPoint((CExpression*)item->pSubdrawing,x-x1,y-y1-item->LineWidth,2,depth+1))return true;
++    }
++    return false;
++}
++static bool AnnotationInsideLargeExpression(tDocumentStruct *annotation,tDocumentStruct *container)
++{
++    if(!annotation || !container || !annotation->Object || !container->Object || container->Type!=1 || ((CExpression*)container->Object)->m_FontSize<200 ||
++       IsGraphObject(annotation) || (annotation->Type==2 && ((CDrawing*)annotation->Object)->IsSpecialDrawing))return false;
++    double smallArea=max(1,annotation->Length)*max(1,annotation->Above+annotation->Below);
++    double largeArea=max(1,container->Length)*max(1,container->Above+container->Below);
++    return smallArea*4<largeArea && annotation->absolute_X>=container->absolute_X &&
++        annotation->absolute_X+annotation->Length<=container->absolute_X+container->Length &&
++        annotation->absolute_Y-annotation->Above>=container->absolute_Y-container->Above &&
++        annotation->absolute_Y+annotation->Below<=container->absolute_Y+container->Below;
++}
++static tDocumentStruct *FrontContentAtPoint(CPoint point)
++{
++    // Graphs form their own background layer. A small contained annotation
++    // remains accessible inside enlarged text, including older annotations.
++    tDocumentStruct *front=NULL;
++    for(int i=NumDocumentElements-1;i>=0;i--){
+         tDocumentStruct *object=TheDocument+i;
+-        if(object->Type!=1 || !object->Object || object->MovingDotState==5)continue;
+-        CRect bounds((object->absolute_X-ViewX)*ViewZoom/100,
+-            (object->absolute_Y-object->Above-ViewY)*ViewZoom/100,
+-            (object->absolute_X+object->Length-ViewX)*ViewZoom/100+1,
+-            (object->absolute_Y+object->Below-ViewY)*ViewZoom/100+1);
+-        if(bounds.PtInRect(point))return object;
++        if(!object->Object || object->MovingDotState==5 || IsGraphObject(object))continue;
++        double x=point.x-(object->absolute_X-ViewX)*ViewZoom/100;
++        double y=point.y-(object->absolute_Y-ViewY)*ViewZoom/100;
++        if(x<-2 || x>object->Length*ViewZoom/100+2 || y<-object->Above*ViewZoom/100-2 || y>object->Below*ViewZoom/100+2)continue;
++        if((object->Type==1 && ExpressionContentAtPoint((CExpression*)object->Object,x,y)) ||
++           (object->Type==2 && DrawingContentAtPoint((CDrawing*)object->Object,x,y))){
++            if(!front || AnnotationInsideLargeExpression(object,front))front=object;
++        }
+     }
+-    return NULL;
++    return front;
+ }
+ static bool InControlApproach(tDocumentStruct *object,CPoint point)
+ {
+@@ -2012,11 +2092,13 @@
+     m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
+     // Resolve the current point even when no preceding mouse-move was delivered.
+     // Placement and an active selection gesture retain their existing state.
+-    if(MouseMode==0 && !IsDrawingMode && !TouchMouseMode && !(nFlags&MK_SHIFT) &&
+-        !ClipboardExpression && !ClipboardDrawing)
++    if(MouseMode==0 && !IsDrawingMode && !TouchMouseMode && !(nFlags&MK_SHIFT))
+         OnMouseMove(nFlags&~MK_LBUTTON,point);
+     ExplicitTypingRoot=NULL;
+-    if(!ViewOnlyMode&&!IsDrawingMode&&!ClipboardExpression&&!ClipboardDrawing)for(int i=NumDocumentElements-1;i>=0;i--){auto d=TheDocument+i;if(d->Type!=1||!d->Object||d->MovingDotState==5)continue;CRect r((d->absolute_X-ViewX)*ViewZoom/100,(d->absolute_Y-d->Above-ViewY)*ViewZoom/100,(d->absolute_X+d->Length-ViewX)*ViewZoom/100+1,(d->absolute_Y+d->Below-ViewY)*ViewZoom/100+1);if(r.PtInRect(point)){ExplicitTypingRoot=d->Object;break;}}
++    if(!ViewOnlyMode && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing){
++        tDocumentStruct *front=FrontContentAtPoint(point);
++        if(front && front->Type==1)ExplicitTypingRoot=front->Object;
++    }
+     // A click in another expression must release the old caret before hit testing.
+     // Otherwise a stale hover selection can leave the next keystroke in the old box.
+     if(ExplicitTypingRoot&&KeyboardEntryObject&&MouseMode==0&&!TouchMouseMode&&!(nFlags&MK_SHIFT)){
+@@ -2026,7 +2108,7 @@
+     HideQuickActionSearch(); FunctionHelpText.Empty();
+     DeleteGripClick=false;
+     tDocumentStruct *deleteTarget=ResizeHandleDocument();
+-    if(deleteTarget && !ViewOnlyMode && !IsDrawingMode && !MouseSizingActive && !MouseMovingActive && !MouseRotationActive){
++    if(deleteTarget && !ClipboardExpression && !ClipboardDrawing && !ViewOnlyMode && !IsDrawingMode && !MouseSizingActive && !MouseMovingActive && !MouseRotationActive){
+         CPoint grip=DeleteGripPoint(deleteTarget);
+         if(abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9){
+             UndoSave("delete with grip");
+@@ -2254,6 +2336,9 @@
+ 		return;
+ 	}
+ 
++    const bool separatePlacement=(nFlags&MK_SHIFT) && (ClipboardExpression || ClipboardDrawing);
++    if(separatePlacement){IsInsertionPointTouched=NULL;NewlineAddObject=-1;GuidlineElement=-2;TouchMouseMode=0;}
++    tDocumentStruct *clickContent=(!(nFlags&MK_SHIFT) && !TouchMouseMode && !IsDrawingMode)?FrontContentAtPoint(point):NULL;
+ 	//********************  the main on-mouse-click loop - clicking on objects ************
+ 	int five_pixels=5*100/ViewZoom;
+ 	int is_near_object=0;
+@@ -2266,12 +2351,15 @@
+ 	
+ 	// Match the paint order: annotations are above every graph, regardless of
+     // creation order. Within each layer, the most recently added object wins.
+-    for(int layer=0;layer<2 && !anything_clicked;layer++)
++    for(int layer=0;layer<2 && !anything_clicked && !separatePlacement;layer++)
+     {
+ 	for (int i=NumDocumentElements-1;i>=0;i--)
+ 	{
+ 		ds=TheDocument+i;
+         if(IsGraphObject(ds)!=(layer==1))continue;
++        if(clickContent && ds!=clickContent)continue;
++        if(!(nFlags&MK_SHIFT) && !TouchMouseMode && ds->Type==1 && ds->MovingDotState<2 && IsInsertionPointTouched!=ds &&
++            !ExpressionContentAtPoint((CExpression*)ds->Object,point.x-(ds->absolute_X-ViewX)*ViewZoom/100,point.y-(ds->absolute_Y-ViewY)*ViewZoom/100))continue;
+ 		if ((ds->MovingDotState==5) && (!AccessLockedObjects)) continue; //ignore locked objects
+ 
+ 		int is_expression_found=0;		
+@@ -2312,7 +2400,7 @@
+ 					delete e;
+ 				}
+ 			}
+-			if ((ds->MovingDotState==3) && (!ViewOnlyMode))//moving selected objects (on moving dot)
++			if ((ds->MovingDotState==3) && (!ViewOnlyMode) && !ClipboardExpression && !pcd)//moving selected objects (on moving dot)
+ 			{
+ 				MovingStartX=AbsoluteX;
+ 				MovingStartY=AbsoluteY;
+@@ -2354,7 +2442,7 @@
+ 			(AbsoluteY>=ds->absolute_Y-ds->Above) && (AbsoluteY<=ds->absolute_Y+ds->Below+2))) || (IsInsertionPointTouched==ds))
+ 		{
+ 			//clicked on an object 
+-			if ((ds->MovingDotState==2) && (ds->Type==1) && (ClipboardDrawing==NULL) && (!ViewOnlyMode))  //moving an object, holding it on moving dot
++			if ((ds->MovingDotState==2) && (ds->Type==1) && (ClipboardDrawing==NULL) && (ClipboardExpression==NULL) && (!ViewOnlyMode))  //moving an object, holding it on moving dot
+ 			{
+ 				if (nFlags&MK_SHIFT)
+ 					ds->MovingDotState=3;
+@@ -3530,6 +3618,7 @@
+ {
+     if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point)){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
+     CCanvasHintScope canvasHintScope;
++    if(ClipboardExpression || ClipboardDrawing)ShowFeatureCanvasHint(5,"Click to place. Hold Shift while clicking to place a separate object over existing text or math.");
+     if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive)
+     {
+         tDocumentStruct *hover=ResizeHandleDocument();
+@@ -3574,12 +3663,12 @@
+ 		if (!(nFlags&MK_LBUTTON)) { EndMouseRotation(false); return; }
+ 		UpdateMouseRotation(point,nFlags); return;
+ 	}
+-    // Graph controls cannot capture a foreground text/equation block.
++    // Foreground content wins over stale controls of an underlying object.
+     if(!IsDrawingMode && MouseMode==0 && !ClipboardExpression && !ClipboardDrawing)
+     {
+         tDocumentStruct *current=ResizeHandleDocument();
+-        tDocumentStruct *front=FrontExpressionAtPoint(point);
+-        if(IsGraphObject(current) && front)
++        tDocumentStruct *front=FrontContentAtPoint(point);
++        if(front && current!=front && !(current && InControlApproach(current,point) && AnnotationInsideLargeExpression(current,front)) && (!current || IsGraphObject(current) || front>current || AnnotationInsideLargeExpression(front,current)))
+         {
+             ResizeHandleObject=front->Object;
+             RotationHandleObject=CanRotateObject(front)?front->Object:NULL;
+@@ -3587,7 +3676,7 @@
+         }
+     }
+     tDocumentStruct *moveHover=ResizeHandleDocument();
+-    if (moveHover && !IsDrawingMode && !ViewOnlyMode)
++    if (moveHover && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
+     {
+         CPoint deleteGrip=DeleteGripPoint(moveHover);
+         if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){ShowFeatureCanvasHint(1,"Delete this object. Ctrl+Z restores it.");SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
+@@ -3597,7 +3686,7 @@
+         { ShowFeatureCanvasHint(2,"Move this object by dragging. Escape cancels the move.");SetCursor(::LoadCursor(NULL,IDC_SIZEALL)); return; }
+     }
+     tDocumentStruct *sizingObject=ResizeHandleDocument();
+-    if (sizingObject && !IsDrawingMode && !ViewOnlyMode)
++    if (sizingObject && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
+     {
+         CPoint handle=ResizeHandlePoint(sizingObject);
+         if (abs(point.x-handle.x)<=9 && abs(point.y-handle.y)<=9)
+@@ -3605,7 +3694,7 @@
+     }
+ 
+ 	tDocumentStruct *rotationObject=RotationHandleDocument();
+-	if (rotationObject && !IsDrawingMode)
++	if (rotationObject && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode)
+ 	{
+ 		CPoint handle=RotationHandlePoint(rotationObject);
+ 		int dx=point.x-handle.x,dy=point.y-handle.y;
+@@ -3614,11 +3703,11 @@
+ 
+     // Keep an annotation's controls while crossing the few pixels between the
+     // object and a grip. Another foreground annotation still has priority.
+-    if(moveHover && !IsGraphObject(moveHover) && !IsDrawingMode && !ViewOnlyMode &&
++    if(moveHover && !ClipboardExpression && !ClipboardDrawing && !IsGraphObject(moveHover) && !IsDrawingMode && !ViewOnlyMode &&
+         MouseMode==0 && !(nFlags&MK_LBUTTON) && InControlApproach(moveHover,point))
+     {
+-        tDocumentStruct *front=FrontExpressionAtPoint(point);
+-        if(!front)
++        tDocumentStruct *front=FrontContentAtPoint(point);
++        if(!front || AnnotationInsideLargeExpression(moveHover,front))
+         {
+             if(SpecialDrawingHover){SpecialDrawingHover=NULL;Invalidate(FALSE);}
+             SetCursor(::LoadCursor(NULL,IDC_ARROW));return;
+@@ -4163,7 +4252,8 @@
+ 		
+ 		tDocumentStruct *ds=TheDocument+NumDocumentElements-1;
+ 		int ccc=1+100/ViewZoom;
+-		
++        tDocumentStruct *hoverContent=(!(nFlags&MK_SHIFT) && !TouchMouseMode && !IsDrawingMode)?FrontContentAtPoint(point):NULL;
++
+         for(int layer=0;layer<2;layer++)
+         {
+         ds=TheDocument+NumDocumentElements-1;
+@@ -4220,6 +4310,8 @@
+ 					extends=extends*100/ViewZoom;
+ 				}
+ 			}
++
++            if(hoverContent && ds!=hoverContent)continue;
+ 
+ 			//handling 'add new line' feature - pointing mouse pointer just below a mutli-line object
+ 			if ((ds->Type==1) && (!IsDrawingMode))
+@@ -4336,6 +4428,10 @@
+ 							IsExpression=-1;
+ 							
+ 							TouchedSubelement=((CExpression*)(ds->Object))->SelectObjectAtPoint(DC,ViewZoom,X,Y,&IsExpression,&IsParenthese);
++                            if(!hoverContent && IsExpression==0 &&
++                                !ExpressionContentAtPoint((CExpression*)ds->Object,X,Y)){
++                                ((CExpression*)ds->Object)->DeselectExpression();TouchedSubelement=NULL;IsExpression=-1;
++                            }
+ 						
+ 							if ((TouchedSubelement==NULL) && (IsExpression==-1) && (ds->MovingDotState==0)) continue;
+ 							if ((ds->MovingDotState==2) && (TouchedSubelement)) 
+@@ -8494,8 +8590,8 @@
+ 			for (int i=NumDocumentElements-1;i>=0;i--)
+ 			{
+ 				ds=TheDocument+i;
+-
+-				
++                if(ExplicitTypingRoot && ds->Object!=ExplicitTypingRoot)continue;
++
+ 				if (IsInsertionPointTouched!=ds)
+ 				{
+ 					if (ds->Type!=1) continue;
+@@ -10810,7 +10906,7 @@
+ bool CMathomirView::BeginGripMove(CPoint point)
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
+-    if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode) return false;
++    if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || ClipboardExpression || ClipboardDrawing) return false;
+     CPoint grip=MoveGripPoint(object);
+     CPoint lower=LowerMoveGripPoint(object);
+     bool upperHit=abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9;
+@@ -10893,7 +10989,7 @@
+ bool CMathomirView::BeginMouseSizing(CPoint point)
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
+-    if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || MouseRotationActive) return false;
++    if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || MouseRotationActive || ClipboardExpression || ClipboardDrawing) return false;
+     if (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object)) return false;
+     CPoint handle=ResizeHandlePoint(object);
+     if (abs(point.x-handle.x)>9 || abs(point.y-handle.y)>9) return false;
+@@ -11046,7 +11142,7 @@
+ bool CMathomirView::BeginMouseRotation(CPoint point)
+ {
+     tDocumentStruct *object=RotationHandleDocument();
+-    if (ViewOnlyMode || IsDrawingMode || !object || object->MovingDotState==5) return false;
++    if (ViewOnlyMode || IsDrawingMode || !object || object->MovingDotState==5 || ClipboardExpression || ClipboardDrawing) return false;
+     CPoint handle=RotationHandlePoint(object);
+     int dx=point.x-handle.x,dy=point.y-handle.y;
+     if (dx*dx+dy*dy>121) return false;
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -2235,7 +2235,7 @@
+ 			if (t<0) t=0;
+ 			if (t>1) t=1;
+ 			double distanceX=X-(x1+t*dx), distanceY=Y-(y1+t*dy);
+-			double tolerance=1.0+((double)di->LineWidth*zoom/100/DRWZOOM)/2.0;
++			double tolerance=3.0+((double)di->LineWidth*zoom/100/DRWZOOM)/2.0;
+ 			if (distanceX*distanceX+distanceY*distanceY<=tolerance*tolerance)
+ 			{
+ 				ret=(CObject*)this;
