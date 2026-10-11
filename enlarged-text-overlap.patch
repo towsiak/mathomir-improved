@@ -373,7 +373,27 @@
  				if (IsInsertionPointTouched!=ds)
  				{
  					if (ds->Type!=1) continue;
-@@ -10810,7 +10937,7 @@
+@@ -10784,7 +10911,18 @@
+ }
+ void CMathomirView::OnMouseLeave()
+ {
+-    FunctionHelpMouseTracking=false; FunctionHelpText.Empty();
++    FunctionHelpMouseTracking=false;
++    if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive){
++        tDocumentStruct *hover=ResizeHandleDocument();POINT screen={};::GetCursorPos(&screen);
++        DWORD process=0;::GetWindowThreadProcessId(::WindowFromPoint(screen),&process);
++        CPoint local(screen);ScreenToClient(&local);CRect client;GetClientRect(&client);
++        if(hover && process==::GetCurrentProcessId() && theApp.m_pMainWnd &&
++            ::GetForegroundWindow()==theApp.m_pMainWnd->GetSafeHwnd() && client.PtInRect(local) &&
++            (ObjectBoundsContain(hover,local) || InControlApproach(hover,local))){
++            ShowFeatureCanvasHint(0,NULL);Invalidate(FALSE);UpdateWindow();return;
++        }
++    }
++    FunctionHelpText.Empty();
+     if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive)
+     {ResizeHandleObject=NULL;RotationHandleObject=NULL;InvalidateRect(NULL,FALSE);}
+ 
+@@ -10810,7 +10948,7 @@
  bool CMathomirView::BeginGripMove(CPoint point)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -382,7 +402,7 @@
      CPoint grip=MoveGripPoint(object);
      CPoint lower=LowerMoveGripPoint(object);
      bool upperHit=abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9;
-@@ -10893,7 +11020,7 @@
+@@ -10893,7 +11031,7 @@
  bool CMathomirView::BeginMouseSizing(CPoint point)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -391,7 +411,7 @@
      if (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object)) return false;
      CPoint handle=ResizeHandlePoint(object);
      if (abs(point.x-handle.x)>9 || abs(point.y-handle.y)>9) return false;
-@@ -11046,7 +11173,7 @@
+@@ -11046,7 +11184,7 @@
  bool CMathomirView::BeginMouseRotation(CPoint point)
  {
      tDocumentStruct *object=RotationHandleDocument();

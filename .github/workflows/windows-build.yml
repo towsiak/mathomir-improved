@@ -62,6 +62,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Overlapping annotations UI checks
+        shell: pwsh
+        run: ./tools/overlap-smoke.ps1
       - name: AI formatted text and native math engine checks
         shell: pwsh
         run: ./tools/ai-presentation-test.ps1
@@ -117,9 +120,6 @@ jobs:
       - name: Signed unit-circle UI checks
         shell: pwsh
         run: ./tools/unit-circle-smoke.ps1
-      - name: Overlapping annotations UI checks
-        shell: pwsh
-        run: ./tools/overlap-smoke.ps1
       - name: Grid styles and snapping UI checks
         shell: pwsh
         run: ./tools/canvas-grid-smoke.ps1
@@ -249,6 +249,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/overlap-smoke.ps1
           ./tools/enlarged-text-overlap-smoke.ps1
           ./tools/title-path-smoke.ps1
           ./tools/cursor-stability-smoke.ps1

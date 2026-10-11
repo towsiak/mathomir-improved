@@ -25,7 +25,7 @@ function Scene($font,$power,$rootLast,$zoom,$suffix){
 function DragAnnotation($x,$y){
  [MathomirUiProbe]::Mouse($view,512,0,[int](($x+12)*$scale),[int](($y-5)*$scale));Start-Sleep -Milliseconds 80
  $grip=[MathomirUiProbe]::MoveGripNear($view,([int]($x*$scale)-12),[int]($y*$scale)-12)
- [MathomirUiProbe]::Mouse($view,512,0,($grip[0]+10),($grip[1]+10));Start-Sleep -Milliseconds 60
+ [MathomirUiProbe]::Mouse($view,512,0,($grip[0]+10),($grip[1]+10));[MathomirUiProbe]::Send($view,675,0)|Out-Null;Start-Sleep -Milliseconds 60
  $stable=[MathomirUiProbe]::MoveGripNear($view,$grip[0],$grip[1]+15)
  Check ($stable[0] -eq $grip[0] -and $stable[1] -eq $grip[1]) 'Large text stole controls in the annotation approach gap'
  [MathomirUiProbe]::Mouse($view,512,0,$grip[0],$grip[1]);[MathomirUiProbe]::Mouse($view,513,1,$grip[0],$grip[1])
