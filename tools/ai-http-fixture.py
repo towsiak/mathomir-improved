@@ -10,9 +10,9 @@ class Handler(BaseHTTPRequestHandler):
         pass
     def do_POST(self):
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))).decode('utf-8'))
-        valid = self.path == '/v1/responses' and self.headers.get('Authorization') == 'Bearer sk-mathomir-ci-only'
+        valid = (self.path == '/v1/responses' and self.headers.get('Authorization') == 'Bearer sk-mathomir-ci-only') or (self.path == '/openai/v1/responses' and self.headers.get('Authorization') == 'Bearer gsk_mathomir_ci_only')
         with record_file.open('a', encoding='utf-8') as f:
-            f.write(json.dumps(dict(input=data.get('input'), model=data.get('model'), store=data.get('store'), stream=data.get('stream'), authenticated=valid), ensure_ascii=False) + '\n')
+            f.write(json.dumps(dict(path=self.path, input=data.get('input'), model=data.get('model'), store=data.get('store'), stream=data.get('stream'), authenticated=valid), ensure_ascii=False) + '\n')
         text = data.get('input', '')
         code = 200
         body = {'status': 'completed', 'output': [{'type': 'reasoning', 'summary': []}, {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': 'ln(2) ≈ 0.6931\n\nThis is an offline test-server response.'}]}]}

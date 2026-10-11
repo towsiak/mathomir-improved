@@ -458,3 +458,20 @@ offline test fixture. The production EXE has no local test-server override.
 Cursor stability: explicit clicks and ending input clear temporary exponent/index modes, arrow-return history and automatic text-detection history. Editing or changing typing mode clears arrow history before shortcut handlers run. Opposite-arrow restoration stays in the current live object and locates the saved run by identity instead of an unchecked old index. Explicit math mode is respected by the text heuristic. Typing shortcuts start at offset zero in their replacement run. Windows interaction checks exercise mixed text/power/fraction lines, mid-word input, timer/hover, arrows, text/math switches, Backspace and another box.
 
 Unit circle: the independent Common point coordinates (exact) checkbox adds coordinate pairs at all 16 standard points. Fractions and radicals remain native math, with correct signs in all quadrants. Ordered label columns and leader lines avoid dense overlapping labels at small radii. Endpoint and extra-point coordinate duplicates are suppressed, including coterminal negative and multi-turn angles.
+
+2026-10-11 - Built-in approximation panel and Groq
+Highlight math and right-click to open the original built-in context panel.
+Approximate, the decimal dropdown, a selected-expression label and live preview
+now belong to that panel. Its target stays fixed while moving over other parts
+of the expression or other objects. Whole expressions retain the exact original;
+nested parts are replaced at their own level, with grouping and Undo preserved.
+The old floating hover panel no longer appears. Escape or its close button dismisses.
+
+AI math help now offers Groq and OpenAI. Fresh setups choose Groq, defaulting to
+Groq-hosted openai/gpt-oss-120b. Get API key opens console.groq.com/keys. Create your
+own Groq key and paste it into the masked field. Groq has a limited free tier;
+requests to Groq do not use OpenAI API credits. Provider keys and model choices
+are separate; changing providers clears the typed key. No AI model weights or SDK
+are bundled. Approximation itself is local and does not require any AI key.
+Provider integration is checked against official Responses API documentation and
+an offline HTTP fixture; no personal live API key is included in this ZIP.

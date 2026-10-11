@@ -22,17 +22,31 @@ function LoadMath($body){
  ('<?xml version="1.0"?><mathomir><o t="1" X="100" Y="130"><ex fh="200">'+$body+'</ex></o></mathomir>')|Set-Content $file -Encoding ascii
  [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 500;[MathomirUiProbe]::Send($main,273,32775)|Out-Null
 }
-function Panel { [MathomirUiProbe]::CaptionChild($view,'Math selection') }
+function Panel {
+ $popup=[MathomirUiProbe]::Window($appProcess.Id,'PopupMenu')
+ if($popup -ne [IntPtr]::Zero){return [MathomirUiProbe]::CaptionChild($popup,'Math selection')}
+ return [MathomirUiProbe]::CaptionChild($view,'Math selection')
+}
+function OpenContext($x,$y){
+ [MathomirUiProbe]::Mouse($view,516,2,$x,$y);[MathomirUiProbe]::Mouse($view,517,0,$x,$y);Start-Sleep -Milliseconds 80
+ $p=Panel;$popup=[MathomirUiProbe]::Window($appProcess.Id,'PopupMenu');Check ($popup -ne [IntPtr]::Zero -and $p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)) 'Built-in popup did not contain approximation controls'
+ return $p
+}
+function Frozen($p){
+ $value=ResultText $p;$label=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($p,1395))
+ [MathSelectionUI]::Hover($view,105,126);[MathSelectionUI]::Hover($view,340,126);[MathSelectionUI]::Hover($view,470,330);Start-Sleep -Milliseconds 200
+ Check ([MathomirUiProbe]::IsWindowVisible($p) -and (ResultText $p) -eq $value -and [MathomirUiProbe]::Text([MathomirUiProbe]::Child($p,1395)) -eq $label) 'Pointer movement changed the pinned approximation target'
+}
 function WholePanel {
  [MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null
  [MathomirUiProbe]::Mouse($view,512,0,105,126);Start-Sleep -Milliseconds 150
- $p=Panel;Check ($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)) 'Highlighting did not show the approximation panel'
+ $p=OpenContext 105 126
  return $p
 }
 function FindValue($value){
  for($y=65;$y -le 180;$y+=2){for($x=98;$x -le 260;$x+=2){
   [MathSelectionUI]::Hover($view,$x,$y);$p=Panel
-  if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p) -and (ResultText $p) -eq $value){return $p}
+  if($p -ne [IntPtr]::Zero -and (ResultText $p) -eq $value){$p=OpenContext $x $y;Check ((ResultText $p) -eq $value) 'Right-click changed the selected level';Frozen $p;return $p}
  }}
  throw ('No nested selection with value '+$value)
 }
@@ -43,21 +57,19 @@ $power='<elm tp="3" E1="" E2=""><ex><var t="e" f="00" /></ex><ex><var t="p" f="6
 try{
  for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 200;$appProcess.Refresh();if($appProcess.MainWindowHandle -ne 0){break}}
  $main=$appProcess.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,59648);Check ($view -ne [IntPtr]::Zero) ('No view: '+[MathomirUiProbe]::AllText($main));Write-Output ('Selection test frame: '+[MathomirUiProbe]::Text($main))
- LoadMath $power;$p=WholePanel;Places $p 2;Check ((ResultText $p) -eq '≈ 23.14') ('Wrong e-to-pi preview: '+(ResultText $p))
+ LoadMath $power;$p=WholePanel;Places $p 2;Frozen $p;Check ((ResultText $p) -eq '≈ 23.14') ('Wrong e-to-pi preview: '+(ResultText $p))
  Write-Output 'Whole-expression panel and live rounded preview passed.'
  # The dropdown remains open and the highlight survives the trip to the panel.
  $combo=[MathomirUiProbe]::Child($p,1391);[MathomirUiProbe]::Send($combo,335,1)|Out-Null;Start-Sleep -Milliseconds 300;Check ([MathomirUiProbe]::IsWindowVisible($p)) 'Panel hid while decimal choices were open';[MathomirUiProbe]::Send($combo,335,0)|Out-Null
  $button=[MathomirUiProbe]::Child($p,1390);[MathomirUiProbe]::Mouse($button,512,0,30,12);Start-Sleep -Milliseconds 150
- Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect($view);$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'selection-approx-ui.png'));$graphics.Dispose();$image.Dispose()
+ Add-Type -AssemblyName System.Drawing;$rect=[MathomirUiProbe]::WindowRect([MathomirUiProbe]::Window($appProcess.Id,'PopupMenu'));$image=New-Object System.Drawing.Bitmap ($rect.Right-$rect.Left),($rect.Bottom-$rect.Top);$graphics=[System.Drawing.Graphics]::FromImage($image);$graphics.CopyFromScreen($rect.Left,$rect.Top,0,0,$image.Size);$image.Save((Join-Path (Split-Path $exe) 'selection-approx-ui.png'));$graphics.Dispose();$image.Dispose()
  $doc=Apply $p;Check ($doc.SelectSingleNode('//elm[@tp="3"]') -and $doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]') -and $doc.SelectSingleNode('//elm[@tp="1" and @tx="23.14"]')) ('Approximate button lost original or result: '+$doc.OuterXml)
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -notmatch '23\.14') 'Undo failed'
  foreach($digits in @(0,4,8)){$p=WholePanel;Places $p $digits;$doc=Apply $p;$want=if($digits -eq 0){'23'}elseif($digits -eq 4){'23.1407'}else{'23.14069263'};Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="'+$want+'"]')) ('Wrong decimal places: '+$digits);[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null}
  LoadMath '<var t="2" f="00" />';$p=WholePanel;Places $p 2;$doc=Apply $p;Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2.00"]')) ('Requested trailing zeroes were lost: '+$doc.OuterXml)
  Write-Output 'Approximate button, 0/2/4/8 places, trailing zeroes and whole-expression Undo passed.'
  # Hover a selected power inside a sum; only the highlighted part is replaced.
- LoadMath ('<var t="2" f="00" /><opr s="+" />'+$power);$found=$false
- for($y=108;$y -le 130 -and !$found;$y+=3){for($x=129;$x -le 185;$x+=3){[MathSelectionUI]::Hover($view,$x,$y);$p=Panel;if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)){Places $p 2;if((ResultText $p) -eq '≈ 23.14'){$found=$true;break}}}}
- Check $found 'Selected subexpression did not show its own approximation';$doc=Apply $p
+ LoadMath ('<var t="2" f="00" /><opr s="+" />'+$power);$p=FindValue '≈ 23.14';$doc=Apply $p
  Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2"]') -and $doc.SelectSingleNode('//elm[@tp="1" and @tx="23.14"]') -and !$doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]') -and !$doc.SelectSingleNode('//elm[@tp="3"]')) ('Partial approximation changed surrounding math: '+$doc.OuterXml)
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw;Check ($doc.SelectSingleNode('//elm[@tp="3"]')) 'Partial approximation Undo failed'
  Write-Output 'Selected-part replacement and Undo passed.'
@@ -91,5 +103,5 @@ try{
  LoadMath '<fun t="ln" E1=""><ex><var t="-1" f="00" /></ex></fun>';[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::Mouse($view,512,0,105,126);$p=Panel;Check ($p -eq [IntPtr]::Zero -or ![MathomirUiProbe]::IsWindowVisible($p)) 'Undefined logarithm showed an approximation'
  # Per-result decimals must not change the normal approximation preference.
  LoadMath $power;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::ExecuteKey($view,$true);[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;Check ((Get-Content $file -Raw) -match '23\.1406926328') 'Panel changed global rounding preferences'
- Write-Output 'Selection approximation passed: automatic panel, live Unicode preview, actual Approximate button, decimal dropdown, 0/2/4/8 places, trailing zeroes, original retention, partial replacement, Undo, dismissal, undefined-domain rejection and unchanged global rounding.'
+ Write-Output 'Selection approximation passed: built-in context panel, locked target across nested parts and canvas, live Unicode preview, actual Approximate button, decimal dropdown, 0/2/4/8 places, trailing zeroes, original retention, partial replacement, Undo, dismissal, undefined-domain rejection and unchanged global rounding.'
 }catch{Write-Output ('Selection process exited: '+$appProcess.HasExited);Get-ChildItem (Split-Path $exe) -Filter 'asan*' -File | ForEach-Object {Get-Content $_.FullName|Write-Output};Write-Output ([MathomirUiProbe]::AllText($main));$trace=Join-Path (Split-Path $exe) 'selection-approx-diagnostics.txt';if(Test-Path $trace){Get-Content $trace|Select-Object -Last 30|Write-Output};throw}finally{if(!$appProcess.HasExited){$appProcess.Kill();$appProcess.WaitForExit()}}
