@@ -1,6 +1,17 @@
 $ErrorActionPreference='Stop'
 $all=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
 Invoke-Expression $all.Substring(0,$all.IndexOf('$exe ='))
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class MathSelectionUI {
+ [StructLayout(LayoutKind.Sequential)] struct Point {public int X,Y;}
+ [DllImport("user32.dll")] static extern bool ClientToScreen(IntPtr window,ref Point point);
+ [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr window,uint message,IntPtr wp,IntPtr lp,uint flags,uint ms,out UIntPtr result);
+ public static void Hover(IntPtr window,int x,int y){Point p=new Point{X=x,Y=y};ClientToScreen(window,ref p);SetCursorPos(p.X,p.Y);UIntPtr result;if(SendMessageTimeout(window,512,IntPtr.Zero,(IntPtr)((y<<16)|x),2,3000,out result)==IntPtr.Zero)throw new Exception("Nested hover stalled");}
+}
+'@
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
 $appProcess=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 $script:fixtureNumber=0;$script:file=$null
@@ -20,7 +31,7 @@ function WholePanel {
 }
 function FindValue($value){
  for($y=65;$y -le 180;$y+=2){for($x=98;$x -le 260;$x+=2){
-  [MathomirUiProbe]::Mouse($view,512,0,$x,$y);$p=Panel
+  [MathSelectionUI]::Hover($view,$x,$y);$p=Panel
   if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p) -and (ResultText $p) -eq $value){return $p}
  }}
  throw ('No nested selection with value '+$value)
@@ -45,7 +56,7 @@ try{
  Write-Output 'Approximate button, 0/2/4/8 places, trailing zeroes and whole-expression Undo passed.'
  # Hover a selected power inside a sum; only the highlighted part is replaced.
  LoadMath ('<var t="2" f="00" /><opr s="+" />'+$power);$found=$false
- for($y=108;$y -le 130 -and !$found;$y+=3){for($x=129;$x -le 185;$x+=3){[MathomirUiProbe]::Mouse($view,512,0,$x,$y);$p=Panel;if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)){Places $p 2;if((ResultText $p) -eq '≈ 23.14'){$found=$true;break}}}}
+ for($y=108;$y -le 130 -and !$found;$y+=3){for($x=129;$x -le 185;$x+=3){[MathSelectionUI]::Hover($view,$x,$y);$p=Panel;if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)){Places $p 2;if((ResultText $p) -eq '≈ 23.14'){$found=$true;break}}}}
  Check $found 'Selected subexpression did not show its own approximation';$doc=Apply $p
  Check ($doc.SelectSingleNode('//elm[@tp="1" and @tx="2"]') -and $doc.SelectSingleNode('//elm[@tp="1" and @tx="23.14"]') -and !$doc.SelectSingleNode('//elm[@tp="2" and @stp="\BB"]') -and !$doc.SelectSingleNode('//elm[@tp="3"]')) ('Partial approximation changed surrounding math: '+$doc.OuterXml)
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$doc=Get-Content $file -Raw;Check ($doc.SelectSingleNode('//elm[@tp="3"]')) 'Partial approximation Undo failed'

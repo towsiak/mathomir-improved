@@ -116,7 +116,7 @@ diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
      CExpression answer(NULL,NULL,parent->m_FontSize);std::vector<char> bytes(xml.begin(),xml.end());bytes.push_back(0);answer.XML_input(&bytes[0]);
      CExpression completed(NULL,NULL,parent->m_FontSize);completed.CopyExpression(parent,0);for(int i=last;i>=first;i--)completed.DeleteElement(i);int offset=first;for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)completed.InsertElement(answer.m_pElementList+i,offset++);
      if(KeyboardEntryObject)((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
-@@ -14056,3 +14072,67 @@
+@@ -14056,3 +14072,70 @@
      MouseMode=0;SetFocus();RepaintTheView();
      POINT cursor;GetCursorPos(&cursor);ScreenToClient(&cursor);UpdateSelectionApproxPanel(CPoint(cursor),true);
  }
@@ -134,7 +134,10 @@ diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
 +{
 +    std::wstring initial;std::shared_ptr<MathomirAI::Job> job;bool closing;
 +    HWND Control(int id){return ::GetDlgItem(m_hWnd,id);}
-+    void Text(int id,const std::wstring &s){::SetWindowTextW(Control(id),s.c_str());}
++    void Text(int id,const std::wstring &s){
++        std::wstring display;if(id==1402||id==1407){for(size_t i=0;i<s.size();i++){if(s[i]==L'\n'&&(i==0||s[i-1]!=L'\r'))display+=L'\r';display+=s[i];}::SetWindowTextW(Control(id),display.c_str());}
++        else ::SetWindowTextW(Control(id),s.c_str());
++    }
 +    void Busy(bool busy){for(int id:{1402,1403,1404,1411,1412,1413,1414,1415})::EnableWindow(Control(id),!busy);::EnableWindow(Control(1405),busy);}
 +    void Stop(){if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Busy(false);Text(1408,L"Stopped waiting. A request already received by OpenAI may still count toward API usage.");}
 +    void Send(){

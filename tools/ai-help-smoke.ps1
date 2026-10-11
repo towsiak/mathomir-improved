@@ -31,7 +31,7 @@ function OpenAI {
  throw 'AI panel did not open'
 }
 function Status($d){[MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1408))}
-function Ask($d,$input){[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1402),$input);[MathomirUiProbe]::Send($d,273,1404)|Out-Null}
+function Ask($d,$mathText){[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1402),$mathText);[MathomirUiProbe]::Send($d,273,1404)|Out-Null}
 function WaitReply($d){for($i=0;$i -lt 60;$i++){Start-Sleep -Milliseconds 100;if([AiUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1404))){return}};throw 'AI worker did not return'}
 try{
  for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 200;$appProcess.Refresh();if($appProcess.MainWindowHandle -ne 0){break}}
