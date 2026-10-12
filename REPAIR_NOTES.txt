@@ -506,3 +506,11 @@ Freehand smoothing now rounds sparse captured bends instead of pinning sharp ver
 Copies now retain authored child font proportions instead of snapping small differences back to defaults, preventing visible superscript changes during resizing and Undo.
 
 Coordinate-axis drawings now offer Grid and axis labels on right-click and in Draw. Edit independent x/y cell spacing and values per cell, minor/major darkness, emphasis frequency, color, solid/dashed/dotted lines and thickness, decimal/fraction/pi/degree/scientific labels, Greek axis names, label frequency/precision/size and overlap avoidance. Includes a live native preview, pi/2 trig preset, existing-grid upgrade, persistence, resizing, rotation and Undo.
+
+OFFLINE FORMULA REFERENCE AND MULTIPLE FREE AI SERVICES
+- New Formulas and AI buttons beneath the left palettes.
+- 215 searchable formula cards in 13 subjects, from algebra through quantum, atomic and nuclear physics, with meanings and conditions.
+- Native typeset reference, saved favorites, readable copying, editable math placement and optional formula-to-AI handoff.
+- Groq and Gemini free-tier options, plus OpenRouter restricted to free models. Each provider uses its own key, Credential Manager target and remembered model.
+- Direct key/limits links and a small connection test that preserves the entered math. Service free plans require your own account/key and have quotas; account eligibility and current provider terms apply.
+- Formula references run offline; no model weights, browser engine or SDK is bundled.

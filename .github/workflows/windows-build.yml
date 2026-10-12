@@ -57,6 +57,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../coordinate-axes-editor.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../formula-reference-ai.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -70,6 +72,11 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Formula reference and free AI UI checks
+        shell: pwsh
+        run: |
+          ./tools/formula-reference-model-test.ps1
+          ./tools/formula-reference-smoke.ps1
       - name: Coordinate axes editor geometry and UI checks
         shell: pwsh
         run: |
@@ -100,6 +107,11 @@ jobs:
             source/build/enlarged-overlap-ui.png
             source/build/large-resize-grip-ui.png
             source/build/sparse-stroke-ui.png
+            source/build/formula-reference-ui.png
+            source/build/formula-free-ai-ui.png
+            source/build/formula-reference-canvas-ui.png
+            source/build/formula-reference-typeset.txt
+            source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
             source/build/coordinate-axes-menu.txt
@@ -175,6 +187,8 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/formula-reference-model-test.ps1
+          ./tools/formula-reference-smoke.ps1 -OnlineFixture
           ./tools/coordinate-axes-editor-smoke.ps1
           ./tools/statistics-smoke.ps1
           ./tools/windows-smoke.ps1
@@ -201,6 +215,11 @@ jobs:
             source/build/overlap-ui.png
             source/build/large-resize-grip-ui.png
             source/build/sparse-stroke-ui.png
+            source/build/formula-reference-ui.png
+            source/build/formula-free-ai-ui.png
+            source/build/formula-reference-canvas-ui.png
+            source/build/formula-reference-typeset.txt
+            source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
             source/build/coordinate-axes-menu.txt
@@ -278,6 +297,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../coordinate-axes-editor.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../formula-reference-ai.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -297,6 +318,8 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/formula-reference-model-test.ps1
+          ./tools/formula-reference-smoke.ps1 -OnlineFixture
           ./tools/coordinate-axes-editor-smoke.ps1
           ./tools/sparse-stroke-smoke.ps1
           ./tools/large-resize-grip-smoke.ps1
@@ -320,6 +343,11 @@ jobs:
             source/build/overlap-ui.png
             source/build/large-resize-grip-ui.png
             source/build/sparse-stroke-ui.png
+            source/build/formula-reference-ui.png
+            source/build/formula-free-ai-ui.png
+            source/build/formula-reference-canvas-ui.png
+            source/build/formula-reference-typeset.txt
+            source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
             source/build/coordinate-axes-menu.txt
