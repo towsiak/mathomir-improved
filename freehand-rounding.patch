@@ -1,0 +1,71 @@
+--- a/Mathomir/SmartStroke.h
++++ b/Mathomir/SmartStroke.h
+@@ -18,36 +18,44 @@
+     }
+     std::vector<Point> out;for(size_t i=0;i<p.size();i++)if(keep[i])out.push_back(p[i]);return out;
+ }
+-// Work in screen pixels. Arc-length sampling avoids depending on mouse-event
+-// frequency. Hard turns split the filter, while each move has a strict bound.
++// Sample by arc length, then filter the entire stroke. Pinning sharp vertices
++// made sparse mouse input keep its polygonal bends. A symmetric Gaussian gives
++// those bends continuous tangents instead; endpoints and straight lines stay put.
+ inline std::vector<Point> Smooth(const std::vector<Point> &input,int strength){
+     if(strength<=0||input.size()<3||input.size()>12000)return input;
+     std::vector<Point> p;for(size_t i=0;i<input.size();i++)if(p.empty()||Distance(p.back(),input[i])>.001)p.push_back(input[i]);
+-    if(p.size()<3)return input;std::vector<double> arc(p.size(),0);for(size_t i=1;i<p.size();i++)arc[i]=arc[i-1]+Distance(p[i-1],p[i]);
+-    if(arc.back()<4||arc.back()>20000)return input;
+-    std::vector<double> turn(p.size(),1);const double look=8;
+-    for(size_t i=1;i+1<p.size();i++){size_t l=i-1,r=i+1;while(l>0&&arc[i]-arc[l]<look)l--;while(r+1<p.size()&&arc[r]-arc[i]<look)r++;
+-        double ax=p[i].x-p[l].x,ay=p[i].y-p[l].y,bx=p[r].x-p[i].x,by=p[r].y-p[i].y;
+-        double lengths=std::sqrt((ax*ax+ay*ay)*(bx*bx+by*by));if(lengths>1)turn[i]=(ax*bx+ay*by)/lengths;
++    if(p.size()<3)return input;
++    std::vector<double> arc(p.size(),0);for(size_t i=1;i<p.size();i++)arc[i]=arc[i-1]+Distance(p[i-1],p[i]);
++    double length=arc.back();if(length<4||length>20000)return input;
++    int count=(int)std::ceil(length);if(count>11999)count=11999;
++    double step=length/count;
++    std::vector<Point> anchor;size_t cursor=0;
++    for(int n=0;n<=count;n++){
++        double target=length*n/count;while(cursor+1<p.size()-1&&arc[cursor+1]<target)cursor++;
++        double segment=arc[cursor+1]-arc[cursor];anchor.push_back(Mix(p[cursor],p[cursor+1],segment>0?(target-arc[cursor])/segment:0));
+     }
+-    std::vector<size_t> pins;pins.push_back(0);
+-    for(size_t i=1;i+1<p.size();i++)if(turn[i]<.35){bool peak=true;for(size_t j=i;j>0&&arc[i]-arc[j-1]<5;j--)if(turn[j-1]<turn[i])peak=false;for(size_t j=i+1;j<p.size()&&arc[j]-arc[i]<5;j++)if(turn[j]<=turn[i])peak=false;if(peak)pins.push_back(i);}
+-    pins.push_back(p.size()-1);std::vector<Point> output;
+-    double bound=strength==1?.8:strength==2?1.6:2.5;int radius=strength==1?2:strength==2?3:4;
+-    for(size_t part=1;part<pins.size();part++){
+-        size_t first=pins[part-1],last=pins[part];double length=arc[last]-arc[first];int count=(int)std::ceil(length/1.5);if(count<1)count=1;
+-        if(count>6000)return input;std::vector<Point> anchor;size_t cursor=first;
+-        for(int n=0;n<=count;n++){double target=arc[first]+length*n/count;while(cursor+1<last&&arc[cursor+1]<target)cursor++;double segment=arc[cursor+1]-arc[cursor];anchor.push_back(Mix(p[cursor],p[cursor+1],segment>0?(target-arc[cursor])/segment:0));}
+-        anchor.front()=p[first];anchor.back()=p[last];std::vector<Point> current=anchor;
+-        for(int pass=0;pass<3;pass++){std::vector<Point> next=current;
+-            for(size_t i=1;i+1<current.size();i++){Point average;double weight=0;
+-                for(int offset=-radius;offset<=radius;offset++){int at=(int)i+offset;if(at<0||at>=(int)current.size())continue;double w=radius+1-std::abs(offset);average.x+=current[at].x*w;average.y+=current[at].y*w;weight+=w;}
+-                average.x/=weight;average.y/=weight;double d=Distance(average,anchor[i]);if(d>bound)average=Mix(anchor[i],average,bound/d);next[i]=average;
+-            }current.swap(next);
++    anchor.front()=input.front();anchor.back()=input.back();
++    bool closed=Distance(input.front(),input.back())<.001;
++    double radius=strength==1?6:strength==2?18:32;
++    int window=(int)std::ceil(radius/step);window=std::min(window,count/2);
++    double sigma=radius/2.5;std::vector<double> weights;
++    for(int k=-window;k<=window;k++)weights.push_back(std::exp(-.5*k*k*step*step/(sigma*sigma)));
++    std::vector<Point> output;
++    for(int i=0;i<=count;i++){
++        Point average;double total=0;
++        for(int k=-window;k<=window;k++){
++            int at=i+k;Point sample;
++            if(closed){at=((at%count)+count)%count;sample=anchor[at];}
++            else if(at<0)sample=Point(2*anchor.front().x-anchor[-at].x,2*anchor.front().y-anchor[-at].y);
++            else if(at>count)sample=Point(2*anchor.back().x-anchor[2*count-at].x,2*anchor.back().y-anchor[2*count-at].y);
++            else sample=anchor[at];
++            double w=weights[k+window];average.x+=sample.x*w;average.y+=sample.y*w;total+=w;
+         }
+-        current=Reduce(current,.12);if(!output.empty())current.erase(current.begin());output.insert(output.end(),current.begin(),current.end());
+-        if(output.size()>12000)return input;
++        output.push_back(Point(average.x/total,average.y/total));
+     }
++    // For a closed loop, retain its start point without introducing a seam.
++    if(closed){Point offset(input.front().x-output.front().x,input.front().y-output.front().y);for(size_t i=0;i<output.size();i++){output[i].x+=offset.x;output[i].y+=offset.y;}}
++    // Do not simplify the filtered result back into long straight chords.
+     output.front()=input.front();output.back()=input.back();return output;
+ }
+ }

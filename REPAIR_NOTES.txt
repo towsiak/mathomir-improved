@@ -498,3 +498,7 @@ FULL FILE PATH IN TITLE BAR
 - The title bar includes the complete current file path beside the filename and application title. Opening another file or using Save As refreshes it; untitled documents keep their normal caption.
 
 Floating placement previews are cancelled on file open/new and Escape, keeping selection controls available in the next document. The system clipboard is retained.
+
+Large-object resize fix: remove the 800% font ceiling from the resize grip and keep the corner control on-screen while the object is partially visible. Resizing still scales nested math together and supports Undo and Escape.
+
+Freehand smoothing now rounds sparse captured bends instead of pinning sharp vertices, retains densely sampled smooth curves after filtering, and preserves endpoints, native editing, and Undo.

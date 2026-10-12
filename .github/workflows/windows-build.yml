@@ -51,6 +51,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../placement-lifecycle.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../large-resize-grip.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../freehand-rounding.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -64,6 +68,14 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Sparse freehand curve geometry and UI checks
+        shell: pwsh
+        run: |
+          ./tools/smart-stroke-test.ps1
+          ./tools/sparse-stroke-smoke.ps1
+      - name: Large object resize grip UI checks
+        shell: pwsh
+        run: ./tools/large-resize-grip-smoke.ps1
       - name: Overlapping annotations UI checks
         shell: pwsh
         run: ./tools/overlap-smoke.ps1
@@ -77,7 +89,10 @@ jobs:
         if: always()
         with:
           name: Enlarged-Overlap-Preview
-          path: source/build/enlarged-overlap-ui.png
+          path: |
+            source/build/enlarged-overlap-ui.png
+            source/build/large-resize-grip-ui.png
+            source/build/sparse-stroke-ui.png
           if-no-files-found: ignore
       - name: Full file path title UI checks
         shell: pwsh
@@ -171,6 +186,9 @@ jobs:
             source/build/selection-approx-ui.png
             source/build/unit-common-coordinates-ui.png
             source/build/overlap-ui.png
+            source/build/large-resize-grip-ui.png
+            source/build/sparse-stroke-ui.png
+            source/build/large-resize-grip-*.mom
             source/build/enlarged-hit-diagnostics.txt
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom
@@ -236,6 +254,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../placement-lifecycle.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../large-resize-grip.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../freehand-rounding.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
       - name: Locate MSBuild and check MFC
         shell: pwsh
@@ -255,6 +277,8 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/sparse-stroke-smoke.ps1
+          ./tools/large-resize-grip-smoke.ps1
           ./tools/overlap-smoke.ps1
           ./tools/enlarged-text-overlap-smoke.ps1
           ./tools/title-path-smoke.ps1
@@ -273,6 +297,9 @@ jobs:
           name: Native-Memory-Diagnostics
           path: |
             source/build/overlap-ui.png
+            source/build/large-resize-grip-ui.png
+            source/build/sparse-stroke-ui.png
+            source/build/large-resize-grip-*.mom
             source/build/enlarged-hit-diagnostics.txt
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom

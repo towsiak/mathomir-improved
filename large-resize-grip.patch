@@ -1,0 +1,36 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -502,8 +502,20 @@
+ static CPoint ResizeHandlePoint(tDocumentStruct *object)
+ {
+     int offset=IsGraphObject(object)?14:0;
+-    return CPoint((object->absolute_X+object->Length-ViewX)*ViewZoom/100+offset,
++    CPoint point((object->absolute_X+object->Length-ViewX)*ViewZoom/100+offset,
+         (object->absolute_Y+object->Below-ViewY)*ViewZoom/100+offset);
++    // A visible object must remain resizable when its far corner is off-screen.
++    int left=(object->absolute_X-ViewX)*ViewZoom/100;
++    int top=(object->absolute_Y-object->Above-ViewY)*ViewZoom/100;
++    int right=(object->absolute_X+object->Length-ViewX)*ViewZoom/100;
++    int bottom=(object->absolute_Y+object->Below-ViewY)*ViewZoom/100;
++    if(TheClientRect.right>28 && TheClientRect.bottom>28 && right>0 && bottom>0 &&
++       left<TheClientRect.right && top<TheClientRect.bottom)
++    {
++        point.x=max(10,min((int)TheClientRect.right-14,point.x));
++        point.y=max(10,min((int)TheClientRect.bottom-14,point.y));
++    }
++    return point;
+ }
+ static CPoint MoveGripPoint(tDocumentStruct *object)
+ {
+@@ -11088,7 +11100,10 @@
+     short length,above=0,below; CClientDC dc(this);
+     if (object->Type==1 && SizingExpressionSnapshot)
+     {
+-        int size=max(40,min(800,(int)floor(SizingFontSize*scale+0.5)));
++        // Keep the legacy signed-short font representation valid, without the
++        // old 800% UI ceiling. Account for the font calculation's integer range.
++        int fontLimit=min(32700,min(16350000/max(1,(int)ViewZoom),2147480000/max(1,(int)ViewZoom)/20));
++        int size=max(40,min(fontLimit,(int)floor(SizingFontSize*scale+0.5)));
+         CExpression *expression=(CExpression*)object->Object;
+         if (size==expression->m_FontSize) return;
+         // CopyExpression preserves root size and scales children relative to it.
