@@ -3,9 +3,10 @@ $all=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
 Invoke-Expression $all.Substring(0,$all.IndexOf('$exe ='))
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
 $env:MATHOMIR_PRINT_GRID_CHECK='1'
+$env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $grip=Get-Content (Join-Path $PSScriptRoot 'large-resize-grip-smoke.ps1') -Raw
 $start=$grip.IndexOf("Add-Type @'")
-Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start)
+Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30','pixels[i+1]<30&&pixels[i+2]<30&&(pixels[i]<30||pixels[i]>220)')
 $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
@@ -58,7 +59,7 @@ try{
  Check ((Object $trig).SelectNodes('.//fra | .//elm[@tp="4"]').Count -gt 0) 'Radians did not generate native fractions'
  Check ((Object $trig).SelectNodes('.//var[@t="q"][@f="60"] | .//elm[@tp="1"][@tx="q"][@fnt="60"]').Count -gt 0) 'Greek theta axis name did not generate native math'
  # Resize a configured grid using the visible native grip, then reopen its settings.
- [MathomirUiProbe]::Mouse($view,512,0,260,240);Start-Sleep -Milliseconds 100;$r=[MathomirUiProbe]::ClientRect($view);$gr=[LargeGripProbe]::Find($view,$r.Right,$r.Bottom)
+ $r=[MathomirUiProbe]::ClientRect($view);$ink=[CoordinateGripProbe]::FindInk($view,$r.Right,$r.Bottom);[MathomirUiProbe]::Mouse($view,512,0,$ink[0],$ink[1]);Start-Sleep -Milliseconds 100;$gr=[CoordinateGripProbe]::Find($view,$r.Right,$r.Bottom)
  [MathomirUiProbe]::Mouse($view,512,0,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,513,1,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,512,1,($gr[0]+65),($gr[1]+45));[MathomirUiProbe]::Mouse($view,514,0,($gr[0]+65),($gr[1]+45));$grown=SaveDoc
  Check ([double](Model $grown).sx -gt 40 -and [double](Model $grown).sy -gt 40) 'Resizing did not scale saved cell spacing'
  Check ((Model $grown).xv -eq (Model $trig).xv) 'Resizing changed numeric values per cell'
@@ -81,5 +82,5 @@ try{
  Write-Output 'Coordinate editor passed: actual context/menu route, preview contrast and styles, independent spacing and units, native negative pi/fraction/scientific labels, Greek names, Cancel, save/reopen, existing-grid editing, no duplicates, Undo, corner axes, legacy grids, native grip resizing and actual print/preview at 100/50 percent.'
 }finally{
  if($main -ne [IntPtr]::Zero -and !$app.HasExited){Capture $main (Join-Path (Split-Path $exe) 'coordinate-axes-canvas-ui.png')}
- $app.Refresh();if(!$app.HasExited){$app.Kill();$app.WaitForExit()};Remove-Item Env:MATHOMIR_PRINT_GRID_CHECK -ErrorAction SilentlyContinue
+ $app.Refresh();if(!$app.HasExited){$app.Kill();$app.WaitForExit()};Remove-Item Env:MATHOMIR_PRINT_GRID_CHECK,Env:MATHOMIR_GRAPH_DIAGNOSTICS -ErrorAction SilentlyContinue
 }
