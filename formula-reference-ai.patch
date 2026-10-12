@@ -310,7 +310,7 @@
 +
 +// Offline formula reference: list selection never contacts an AI provider.
 +static std::wstring ReferenceWide(const char *s){return MathomirAI::ToWide(s);}
-+static std::wstring ReferenceCard(const FormulaReference::Entry &e){return L"# "+ReferenceWide(e.title)+L"\n\n\\["+ReferenceWide(e.tex)+L"\\]\n\n## Symbols and meaning\n"+ReferenceWide(e.meaning)+L"\n\n## Conditions and reminders\n"+ReferenceWide(e.when);}
++static std::wstring ReferenceCard(const FormulaReference::Entry &e){return L"# "+ReferenceWide(e.title)+L"\n\n\\["+ReferenceWide(e.tex)+L"\\]\n\n## Symbols and meaning\n"+MathDisplay::HelpNotation(e.meaning)+L"\n\n## Conditions and reminders\n"+MathDisplay::HelpNotation(e.when);}
 +static std::wstring ReferenceQuery(std::wstring q){for(size_t p=q.find(L'\x03c0');p!=q.npos;p=q.find(L'\x03c0',p+2))q.replace(p,1,L"pi");for(size_t p=q.find(L'\x03b8');p!=q.npos;p=q.find(L'\x03b8',p+5))q.replace(p,1,L"theta");return q;}
 +static bool ReferenceCopy(HWND owner,const std::wstring &text){if(text.empty()||!::OpenClipboard(owner))return false;HGLOBAL data=::GlobalAlloc(GMEM_MOVEABLE,(text.size()+1)*sizeof(wchar_t));bool done=false;if(data){void *p=::GlobalLock(data);if(p){memcpy(p,text.c_str(),(text.size()+1)*sizeof(wchar_t));::GlobalUnlock(data);::EmptyClipboard();done=::SetClipboardData(CF_UNICODETEXT,data)!=NULL;}if(!done)::GlobalFree(data);}::CloseClipboard();return done;}
 +static void ReferenceUnicodeList(CDialog*dialog,int id){HWND old=::GetDlgItem(dialog->m_hWnd,id);RECT r;::GetWindowRect(old,&r);dialog->ScreenToClient(&r);DWORD style=(DWORD)::GetWindowLongPtr(old,GWL_STYLE),ex=(DWORD)::GetWindowLongPtr(old,GWL_EXSTYLE);HFONT font=(HFONT)::SendMessage(old,WM_GETFONT,0,0);HWND previous=::GetWindow(old,GW_HWNDPREV),next=::CreateWindowExW(ex,L"LISTBOX",L"",style,r.left,r.top,r.right-r.left,r.bottom-r.top,dialog->m_hWnd,NULL,AfxGetInstanceHandle(),NULL);if(next){::DestroyWindow(old);::SetWindowLongPtr(next,GWLP_ID,id);::SendMessage(next,WM_SETFONT,(WPARAM)font,TRUE);::SetWindowPos(next,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);}}
@@ -740,7 +740,7 @@
 +     static const std::map<std::string,char> greek={{"alpha",'a'},{"beta",'b'},{"gamma",'g'},{"delta",'d'},{"epsilon",'e'},{"theta",'q'},{"lambda",'l'},{"mu",'m'},{"nu",'n'},{"pi",'p'},{"rho",'r'},{"sigma",'s'},{"tau",'t'},{"phi",'f'},{"psi",'y'},{"omega",'w'},{"eta",'h'},{"Delta",'D'},{"Theta",'Q'},{"Lambda",'L'},{"Pi",'P'},{"Sigma",'S'},{"Phi",'F'},{"Psi",'Y'},{"Omega",'W'},{"infty",(char)0xA5},{"nabla",(char)0xD1},{"partial",(char)0xB6}};
 +     auto g=greek.find(name);if(g!=greek.end())r=Var(std::string(1,g->second),"60");
 +     else if(name=="times")r=Op((char)0xB4);else if(name=="cdot")r=Op((char)0xD7);else if(name=="pm")r=Op((char)0xB1);else if(name=="mp")r=Op((char)0xB2);
-+     else if(name=="prime")r=Op('\'');else if(name=="circ")r=Var(std::string(1,(char)0xB0));else if(name=="to"||name=="rightarrow")r=Op((char)0xAE);
++     else if(name=="prime")r=Var(std::string(1,(char)0xA2),"60");else if(name=="circ")r=Var(std::string(1,(char)0xB0));else if(name=="to"||name=="rightarrow")r=Op((char)0xAE);
 +     else if(name=="ge"||name=="geq")r=Op((char)0xB3);else if(name=="le"||name=="leq")r=Op((char)0xA3);else if(name=="ne"||name=="neq")r=Op((char)0xB9);
 +     else if(name=="approx")r=Op((char)0xBB);else if(name=="langle")r=Op('<');else if(name=="rangle")r=Op('>');else if(name=="ldots"||name=="cdots")r=Var("...");
 +     else throw std::runtime_error("Unsupported formula command: "+name);

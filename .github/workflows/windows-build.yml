@@ -107,6 +107,8 @@ jobs:
             source/build/enlarged-overlap-ui.png
             source/build/large-resize-grip-ui.png
             source/build/sparse-stroke-ui.png
+            source/build/formula-reference-test-result.txt
+            source/build/formula-all-models.mom
             source/build/formula-reference-ui.png
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
@@ -215,6 +217,8 @@ jobs:
             source/build/overlap-ui.png
             source/build/large-resize-grip-ui.png
             source/build/sparse-stroke-ui.png
+            source/build/formula-reference-test-result.txt
+            source/build/formula-all-models.mom
             source/build/formula-reference-ui.png
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
@@ -343,6 +347,8 @@ jobs:
             source/build/overlap-ui.png
             source/build/large-resize-grip-ui.png
             source/build/sparse-stroke-ui.png
+            source/build/formula-reference-test-result.txt
+            source/build/formula-all-models.mom
             source/build/formula-reference-ui.png
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
