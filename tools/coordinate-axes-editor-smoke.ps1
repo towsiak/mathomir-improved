@@ -6,7 +6,7 @@ $env:MATHOMIR_PRINT_GRID_CHECK='1'
 $env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $grip=Get-Content (Join-Path $PSScriptRoot 'large-resize-grip-smoke.ps1') -Raw
 $start=$grip.IndexOf("Add-Type @'")
-Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30','pixels[i+1]<30&&pixels[i+2]<30&&(pixels[i]<30||pixels[i]>220)')
+Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30','((pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)||(pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180))')
 $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
