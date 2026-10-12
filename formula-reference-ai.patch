@@ -430,7 +430,9 @@
  				if (UseToolbar) Toolbox->Toolbar->AdjustPosition();
  		}
  	}
--}+}
+-}
+\ No newline at end of file
++}
 +void CToolbox::UpdateReferenceButtons(){if(!m_IsMain)return;int height=max(22,ToolboxSize/4);CRect client;GetClientRect(&client);int y=client.bottom-2*height-7;if(!m_FormulaButton.GetSafeHwnd()){m_ReferenceFont.CreateFont(-max(11,min(16,ToolboxSize/6)),0,0,0,FW_NORMAL,FALSE,FALSE,0,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,DEFAULT_QUALITY,DEFAULT_PITCH,"Segoe UI");m_FormulaButton.Create("Formulas",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_PUSHBUTTON,CRect(2,y,ToolboxSize-2,y+height),this,1498);m_FreeAiButton.Create("AI",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_PUSHBUTTON,CRect(2,y+height+3,ToolboxSize-2,y+height*2+3),this,1499);m_FormulaButton.SetFont(&m_ReferenceFont);m_FreeAiButton.SetFont(&m_ReferenceFont);m_HoverTips.Create(m_hWnd);m_HoverTips.Add(m_FormulaButton.GetSafeHwnd(),L"Open the offline formula reference: algebra, trig, calculus, differential equations, vectors and physics through atomic/nuclear physics.");m_HoverTips.Add(m_FreeAiButton.GetSafeHwnd(),L"Set up Groq, Gemini or OpenRouter with your own free-tier API key. Get a key, save it securely, and test the connection.");}m_FormulaButton.SetWindowPos(NULL,2,y,ToolboxSize-4,height,SWP_NOZORDER|SWP_NOACTIVATE);m_FreeAiButton.SetWindowPos(NULL,2,y+height+3,ToolboxSize-4,height,SWP_NOZORDER|SWP_NOACTIVATE);}
 +void CToolbox::OnFormulaButton(){if(GetCapture()==this)ReleaseCapture();HideSubtoolbox();m_SelectedElement=-1;m_SelectedColor=-1;m_SelectedTextControl=-1;if(pMainView)pMainView->PostMessage(WM_COMMAND,ID_FORMULA_REFERENCE);}
 +void CToolbox::OnFreeAiButton(){if(GetCapture()==this)ReleaseCapture();HideSubtoolbox();m_SelectedElement=-1;m_SelectedColor=-1;m_SelectedTextControl=-1;if(pMainView)pMainView->PostMessage(WM_COMMAND,ID_FREE_AI_HELP);}
