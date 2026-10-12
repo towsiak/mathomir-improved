@@ -34,3 +34,17 @@
          CExpression *expression=(CExpression*)object->Object;
          if (size==expression->m_FontSize) return;
          // CopyExpression preserves root size and scales children relative to it.
+--- a/Mathomir/Element.cpp
++++ b/Mathomir/Element.cpp
+@@ -2875,8 +2875,9 @@
+ 				int NewFontSize=((CExpression*)(m_pPaternalExpression))->m_FontSize *
+ 					(oexp->m_FontSize) /
+ 					((CExpression*)(Element->m_pPaternalExpression))->m_FontSize;
+-				if ((abs(NewFontSize-FontSize)*100/FontSize)>2)
+-					FontSize=NewFontSize;
++				// Preserve authored proportions during copies, resize snapshots and Undo.
++				// Snapping near-default sizes changed large superscripts visibly.
++				if (NewFontSize>0 && NewFontSize<=32767) FontSize=NewFontSize;
+ 			}
+ 			exp=new CExpression(this,(CExpression*)m_pPaternalExpression,FontSize);
+ 			exp->CopyExpression(oexp,0);

@@ -502,3 +502,5 @@ Floating placement previews are cancelled on file open/new and Escape, keeping s
 Large-object resize fix: remove the 800% font ceiling from the resize grip and keep the corner control on-screen while the object is partially visible. Resizing still scales nested math together and supports Undo and Escape.
 
 Freehand smoothing now rounds sparse captured bends instead of pinning sharp vertices, retains densely sampled smooth curves after filtering, and preserves endpoints, native editing, and Undo.
+
+Copies now retain authored child font proportions instead of snapping small differences back to defaults, preventing visible superscript changes during resizing and Undo.

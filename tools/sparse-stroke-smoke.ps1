@@ -5,7 +5,7 @@ $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
 $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $fixture -Raw)}
 function Points($doc){$prev=$null;foreach($p in (ShaderPoints $doc.mathomir.FirstChild)){if(!$prev -or [Math]::Abs($p.x-$prev.x)+[Math]::Abs($p.y-$prev.y) -gt .00001){$p;$prev=$p}}}
-function MaxTurn($points){$max=0.;for($i=1;$i -lt $points.Count-1;$i++){$ax=$points[$i].x-$points[$i-1].x;$ay=$points[$i].y-$points[$i-1].y;$bx=$points[$i+1].x-$points[$i].x;$by=$points[$i+1].y-$points[$i].y;$den=[Math]::Sqrt(($ax*$ax+$ay*$ay)*($bx*$bx+$by*$by));if($den -gt .00001){$cos=[Math]::Max(-1,[Math]::Min(1,($ax*$bx+$ay*$by)/$den));$max=[Math]::Max($max,[Math]::Acos($cos))}};return $max}
+function MaxTurn($points){[double]$max=0;for($i=1;$i -lt $points.Count-1;$i++){$ax=$points[$i].x-$points[$i-1].x;$ay=$points[$i].y-$points[$i-1].y;$bx=$points[$i+1].x-$points[$i].x;$by=$points[$i+1].y-$points[$i].y;$den=[Math]::Sqrt(($ax*$ax+$ay*$ay)*($bx*$bx+$by*$by));if($den -gt .00001){$cos=[Math]::Max(-1.0,[Math]::Min(1.0,($ax*$bx+$ay*$by)/$den));$max=[Math]::Max($max,[Math]::Acos($cos))}};return $max}
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,0xE900)
  $fixture=Join-Path (Split-Path $exe) 'sparse-rounded-freehand.mom'
@@ -17,7 +17,7 @@ try{
  $raw=SaveDoc;$original=$raw.mathomir.FirstChild.OuterXml;$rp=@(Points $raw);$rawTurn=MaxTurn $rp
  [MathomirUiProbe]::Send($main,273,33092)|Out-Null;[MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null;[MathomirUiProbe]::Send($main,273,33094)|Out-Null
  $smooth=SaveDoc;$sp=@(Points $smooth);$turn=MaxTurn $sp
- if($sp.Count -le $rp.Count -or $turn -gt .3 -or $turn -ge $rawTurn*.3){throw "Sparse bends were not rounded: $($turn*180/[Math]::PI) degrees, raw $($rawTurn*180/[Math]::PI)."}
+ if($sp.Count -le $rp.Count -or $turn -gt .3 -or $turn -ge $rawTurn*.3){Write-Output $smooth.OuterXml;throw "Sparse bends were not rounded: $($turn*180/[Math]::PI) degrees, raw $($rawTurn*180/[Math]::PI)."}
  foreach($end in @(0,-1)){if([Math]::Abs($sp[$end].x-$rp[$end].x) -gt .04 -or [Math]::Abs($sp[$end].y-$rp[$end].y) -gt .04){throw 'Sparse smoothing moved the endpoint'}}
  $saved=$smooth.mathomir.FirstChild.OuterXml
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$undo=SaveDoc;if($undo.mathomir.FirstChild.OuterXml -ne $original){throw 'Sparse smoothing Undo failed'}
