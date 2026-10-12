@@ -496,3 +496,5 @@ ENLARGED TEXT AND ANNOTATION INTERACTIONS
 
 FULL FILE PATH IN TITLE BAR
 - The title bar includes the complete current file path beside the filename and application title. Opening another file or using Save As refreshes it; untitled documents keep their normal caption.
+
+Floating placement previews are cancelled on file open/new and Escape, keeping selection controls available in the next document. The system clipboard is retained.

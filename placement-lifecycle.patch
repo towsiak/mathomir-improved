@@ -1,0 +1,59 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -5421,6 +5421,7 @@
+ 	if (MouseMovingActive && nChar==VK_ESCAPE) { EndGripMove(true); SurpressCharMessage=1; return; }
+ 	if (MouseSizingActive && nChar==VK_ESCAPE) { EndMouseSizing(true); SurpressCharMessage=1; return; }
+ 	if (MouseRotationActive && nChar==VK_ESCAPE) { EndMouseRotation(true); SurpressCharMessage=1; return; }
++    if(nChar==VK_ESCAPE && (ClipboardExpression||ClipboardDrawing)){CancelFloatingPlacement();SurpressCharMessage=1;return;}
+     if (nChar=='B' && (GetKeyState(VK_CONTROL)&0x8000) && !(GetKeyState(VK_MENU)&0x8000))
+     { SurpressCharMessage=1; OnWritingBold(); return; }
+ 	if (nChar=='K' && (GetKeyState(VK_CONTROL)&0x8000))
+@@ -9544,6 +9545,20 @@
+ 	return 0;
+ }
+ 
++// Internal clipboard objects are a floating preview, not the system clipboard.
++// Cancel them before replacing a document so placement mode cannot leak into it.
++void CMathomirView::CancelFloatingPlacement()
++{
++    RestoreClipboardBackground();
++    if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}
++    if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
++    RootObjectCopy=0;
++    ExplicitTypingRoot=NULL;
++    ClipboardBackground.Restored=1;
++    SetCursor(::LoadCursor(NULL,IDC_ARROW));
++    Invalidate(FALSE);
++}
++
+ int CMathomirView::DeleteDocumentObject(tDocumentStruct* object)
+ {
+ 	int i;
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -97,6 +97,7 @@
+ 	//int CheckDocumentMemoryReservations(void);
+ 	int PaintClipboard(int X, int Y);
+ 	int RestoreClipboardBackground(void);
++	void CancelFloatingPlacement();
+ 	void PaintDrawingHotspot(char erase_only=0);
+ 	int DeleteDocumentObject(tDocumentStruct* object);
+ protected:
+--- a/Mathomir/MathomirDoc.cpp
++++ b/Mathomir/MathomirDoc.cpp
+@@ -153,6 +153,7 @@
+ 	DetermineTillensData(0x7FFFFFFF); //to prevend crash when a shell command is used
+ 	if (!SaveModified()) return;
+ 	AutosavePoints=AutosaveTime=0;
++	if(pMainView && pMainView->GetSafeHwnd())pMainView->CancelFloatingPlacement();
+ 	((CMainFrame*)(theApp.m_pMainWnd))->ClearDocument();
+         TrigDegrees=0;
+ 	SetPathName("\\Untitled",0); //ClearPathName does not exist??
+@@ -330,6 +331,7 @@
+ 	if (filename!=NULL)
+ 	{
+ 		//clear the entire documment
++		if(pMainView && pMainView->GetSafeHwnd())pMainView->CancelFloatingPlacement();
+ 		((CMainFrame*)(theApp.m_pMainWnd))->ClearDocument();
+         TrigDegrees=0;
+ 
