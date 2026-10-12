@@ -6,7 +6,7 @@ $env:MATHOMIR_PRINT_GRID_CHECK='1'
 $env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $grip=Get-Content (Join-Path $PSScriptRoot 'large-resize-grip-smoke.ps1') -Raw
 $start=$grip.IndexOf("Add-Type @'")
-Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30','((pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)||(pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180))')
+Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('if(pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)return new int[]{x,y};','if(pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30){bool line=true;for(int k=0;k<20;k++){int j=(y*width+x+k)*4;if(pixels[j]>=30||pixels[j+1]>=30||pixels[j+2]>=30){line=false;break;}}if(line)return new int[]{x,y};}')
 $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
@@ -58,6 +58,8 @@ try{
  Check ((Object $trig).SelectNodes('.//var[@t="p"][@f="60"] | .//elm[@tp="1"][@tx="p"][@fnt="60"]').Count -gt 0) 'Radians did not generate native pi labels'
  Check ((Object $trig).SelectNodes('.//fra | .//elm[@tp="4"]').Count -gt 0) 'Radians did not generate native fractions'
  Check ((Object $trig).SelectNodes('.//var[@t="q"][@f="60"] | .//elm[@tp="1"][@tx="q"][@fnt="60"]').Count -gt 0) 'Greek theta axis name did not generate native math'
+ # Reopen to leave selection mode; hover a long axis stroke rather than an embedded label.
+ [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 250
  # Resize a configured grid using the visible native grip, then reopen its settings.
  $r=[MathomirUiProbe]::ClientRect($view);$ink=[CoordinateGripProbe]::FindInk($view,$r.Right,$r.Bottom);[MathomirUiProbe]::Mouse($view,512,0,$ink[0],$ink[1]);Start-Sleep -Milliseconds 100;$gr=[CoordinateGripProbe]::Find($view,$r.Right,$r.Bottom)
  [MathomirUiProbe]::Mouse($view,512,0,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,513,1,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,512,1,($gr[0]+65),($gr[1]+45));[MathomirUiProbe]::Mouse($view,514,0,($gr[0]+65),($gr[1]+45));$grown=SaveDoc
