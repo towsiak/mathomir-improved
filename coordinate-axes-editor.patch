@@ -1,0 +1,606 @@
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -58,6 +58,31 @@
+ 
+ HPEN GrayThin=NULL;
+ HPEN GrayFat=NULL;
++static std::string AxisHex(const std::string &text){static const char *digits="0123456789abcdef";std::string out;for(unsigned char c:text){out+=digits[c>>4];out+=digits[c&15];}return out;}
++static std::string AxisUnhex(const char *text){std::string out;size_t n=strlen(text);if(n%2 || n>512)return out;for(size_t i=0;i<n;i+=2){char a=text[i],b=text[i+1];int x=a>='0'&&a<='9'?a-'0':a>='a'&&a<='f'?a-'a'+10:-1,y=b>='0'&&b<='9'?b-'0':b>='a'&&b<='f'?b-'a'+10:-1;if(x<0||y<0)return std::string();out+=(char)(x*16+y);}return out;}
++static std::string AxisUtf8(const std::wstring &text){if(text.empty())return std::string();int n=WideCharToMultiByte(CP_UTF8,0,text.data(),(int)text.size(),NULL,0,NULL,NULL);std::string out(n,'\0');if(n)WideCharToMultiByte(CP_UTF8,0,text.data(),(int)text.size(),&out[0],n,NULL,NULL);return out;}
++static std::wstring AxisWide(const std::string &text){if(text.empty())return std::wstring();int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text.data(),(int)text.size(),NULL,0);std::wstring out(n,L'\0');if(n)MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,text.data(),(int)text.size(),&out[0],n);return out;}
++
++bool CDrawing::CoordinateGeometry(CoordinateAxes::Geometry &geometry,int *axesStart) const
++{
++    if(IsSpecialDrawing || AxisGrid.role>=2 || !Items || NumItems<6)return false;
++    int start=NumItems-6;std::vector<CoordinateAxes::Segment> lines;
++    for(int i=start;i<NumItems;i++){const auto &p=Items[i];if(p.Type!=1)return false;lines.push_back(CoordinateAxes::Segment(CoordinateAxes::Point(p.X1/(double)DRWZOOM,p.Y1/(double)DRWZOOM),CoordinateAxes::Point(p.X2/(double)DRWZOOM,p.Y2/(double)DRWZOOM)));}
++    if(!CoordinateAxes::GeometryFromAxes(lines,geometry))return false;
++    double margin=1;for(int k:{start+1,start+2,start+4,start+5})margin=(std::max)(margin,hypot((Items[k].X2-Items[k].X1)/(double)DRWZOOM,(Items[k].Y2-Items[k].Y1)/(double)DRWZOOM));
++    // Old Add grid lines drawings kept their six axis strokes at the end.
++    for(int i=0;i<start;i++){
++        const auto &p=Items[i];if(p.Type==0 && p.pSubdrawing && ((CDrawing*)p.pSubdrawing)->AxisGrid.role==2)continue;
++        if(p.Type!=1)return false;
++        auto a=CoordinateAxes::Sub(CoordinateAxes::Point(p.X1/(double)DRWZOOM,p.Y1/(double)DRWZOOM),geometry.origin),b=CoordinateAxes::Sub(CoordinateAxes::Point(p.X2/(double)DRWZOOM,p.Y2/(double)DRWZOOM),geometry.origin);
++        double ax=CoordinateAxes::Dot(a,geometry.u),ay=CoordinateAxes::Dot(a,geometry.v),bx=CoordinateAxes::Dot(b,geometry.u),by=CoordinateAxes::Dot(b,geometry.v);
++        bool vertical=fabs(ax-bx)<.15&&fabs((std::min)(ay,by)-geometry.ymin)<margin&&fabs((std::max)(ay,by)-geometry.ymax)<margin;
++        bool horizontal=fabs(ay-by)<.15&&fabs((std::min)(ax,bx)-geometry.xmin)<margin&&fabs((std::max)(ax,bx)-geometry.xmax)<margin;
++        if(!vertical&&!horizontal)return false;
++    }
++    if(axesStart)*axesStart=start;return true;
++}
++
+ CDrawing::CDrawing(void)
+ {
+ 	if (GrayThin==NULL)
+@@ -70,6 +95,7 @@
+ 	NumItemsReserved=0;
+ 	IsSelected=0;
+ 	OriginalForm=0;
++    AxisGrid=CoordinateAxes::Settings();
+ 	//IsNodeEdit=0;
+ 	IsSpecialDrawing=0;
+ 	NodeX=-1;
+@@ -1607,6 +1633,7 @@
+ 	IsSpecialDrawing=0;
+ 	IsSelected=0;
+ 	OriginalForm=0;
++    AxisGrid=CoordinateAxes::Settings();
+ 	//IsNodeEdit=0;
+ 	NodeX=NodeY=-1;
+ 	if (Items)
+@@ -1882,6 +1909,8 @@
+ 	if (zoom<0) {zoom=-zoom;no_background=1;}
+ 
+ 	if (m_Color!=-1) color=ImprovedColor(m_Color&0x07);
++    if(AxisGrid.role==3 || AxisGrid.role==4)color=(COLORREF)CoordinateAxes::Ink(AxisGrid,AxisGrid.role==4);
++    if((AxisGrid.role==3 && AxisGrid.minorDarkness==0)||(AxisGrid.role==4 && AxisGrid.majorDarkness==0))return;
+ 
+ 	if (IsSpecialDrawing)
+ 	{
+@@ -1918,13 +1947,19 @@
+ 	{
+ 		if (di->Type==1) //line
+ 		{
++            if((AxisGrid.role==3||AxisGrid.role==4)&&AxisGrid.style==2){
++                int px=X+(int)((di->X1*(long long)zoom+50*DRWZOOM)/(100*DRWZOOM)),py=Y+(int)((di->Y1*(long long)zoom+50*DRWZOOM)/(100*DRWZOOM));
++                int size=max(1,(int)((di->LineWidth*(long long)zoom+50*DRWZOOM)/(100*DRWZOOM)));
++                DC->FillSolidRect(px-size/2,py-size/2,size,size,IsSelected?RGB(0,0,255):color);continue;
++            }
+ 			int width=(int)di->LineWidth;
+ 			int use_shadowed_line=0;
+ 			if (prevwidth!=width)
+ 			{
+ 				prevwidth=width;
+ 				int zwidth=width*zoom;
+-				if (zwidth<(130*DRWZOOM))
++                if(AxisGrid.role==3 || AxisGrid.role==4)DC->SelectObject(GetPenFromPool(max(1,(zwidth+50*DRWZOOM)/(100*DRWZOOM)),IsSelected,color));
++				else if (zwidth<(130*DRWZOOM))
+ 				{
+ 					if (zwidth<(70*DRWZOOM))
+ 						DC->SelectObject(((color==0) && (IsSelected==0))?GrayThin:GetPenFromPool(1,IsSelected,PALE_RGB(color)));
+@@ -2047,7 +2082,7 @@
+ 
+ int CDrawing::CalcChecksum(void)
+ {
+-	int ret=NumItems+m_Color*2;
++	int ret=(NumItems+m_Color*2)^(int)CoordinateAxes::Checksum(AxisGrid);
+ 	tDrawingItem *di=Items;
+ 	for (int i=1;i<=NumItems;i++,di++)
+ 	{
+@@ -2118,6 +2153,7 @@
+ 	IsSpecialDrawing=Original->IsSpecialDrawing;
+ 	m_Color=Original->m_Color;
+ 	OriginalForm=Original->OriginalForm;
++    AxisGrid=Original->AxisGrid;
+ 	if (IsSpecialDrawing)
+ 	{
+ 		if (IsSpecialDrawing==50)
+@@ -2279,6 +2315,15 @@
+ 
+ 	if (num_tabs>16) num_tabs=16;
+ 
++    if(AxisGrid.role || OriginalForm==8 || OriginalForm==9){
++        auto c=AxisGrid;if(!c.role)c.form=OriginalForm;
++        std::ostringstream m;m.imbue(std::locale::classic());m<<std::setprecision(17);
++        m<<"<axesgrid role=\""<<c.role<<"\" form=\""<<c.form<<"\" sx=\""<<c.xSpacing<<"\" sy=\""<<c.ySpacing<<"\" xv=\""<<c.xValue<<"\" yv=\""<<c.yValue
++         <<"\" minor=\""<<c.minorDarkness<<"\" majorDark=\""<<c.majorDarkness<<"\" major=\""<<c.major<<"\" c=\""<<c.color<<"\" st=\""<<c.style<<"\" w=\""<<c.width<<"\" font=\""<<c.labelFont
++         <<"\" every=\""<<c.labelEvery<<"\" dec=\""<<c.decimals<<"\" xf=\""<<c.xFormat<<"\" yf=\""<<c.yFormat<<"\" grid=\""<<c.grid<<"\" xl=\""<<c.xLabels<<"\" yl=\""<<c.yLabels
++         <<"\" zero=\""<<c.origin<<"\" names=\""<<c.names<<"\" avoid=\""<<c.avoidOverlap<<"\" xs=\""<<AxisHex(c.xStepText)<<"\" ys=\""<<AxisHex(c.yStepText)<<"\" xn=\""<<AxisHex(AxisUtf8(c.xName))<<"\" yn=\""<<AxisHex(AxisUtf8(c.yName))<<"\" />\r\n";
++        std::string text=m.str();len+=(int)text.size();if(!only_calculate){memcpy(output,text.data(),text.size());output+=text.size();}
++    }
+ 	int i;
+ 	tDrawingItem *di=Items;
+ 	for (i=0;i<NumItems;i++,di++)
+@@ -2415,6 +2460,23 @@
+ 		file=mf->XML_search("",file); //find anything
+ 		if (file==NULL) return NULL;
+ 
++        if(strncmp(file,"axesgrid",8)==0){
++            file+=8;CoordinateAxes::Settings c;char attribute[64],value[512];
++            do{file=mf->XML_read_attribute(attribute,value,file,512);if(!file)return NULL;int v=atoi(value);double f=atof(value);
++                if(!strcmp(attribute,"role"))c.role=v;else if(!strcmp(attribute,"form"))c.form=v;
++                else if(!strcmp(attribute,"sx"))c.xSpacing=f;else if(!strcmp(attribute,"sy"))c.ySpacing=f;
++                else if(!strcmp(attribute,"xv"))c.xValue=f;else if(!strcmp(attribute,"yv"))c.yValue=f;
++                else if(!strcmp(attribute,"minor"))c.minorDarkness=v;else if(!strcmp(attribute,"majorDark"))c.majorDarkness=v;
++                else if(!strcmp(attribute,"major"))c.major=v;else if(!strcmp(attribute,"c"))c.color=v;else if(!strcmp(attribute,"st"))c.style=v;
++                else if(!strcmp(attribute,"w"))c.width=f;else if(!strcmp(attribute,"font"))c.labelFont=v;
++                else if(!strcmp(attribute,"every"))c.labelEvery=v;else if(!strcmp(attribute,"dec"))c.decimals=v;
++                else if(!strcmp(attribute,"xf"))c.xFormat=v;else if(!strcmp(attribute,"yf"))c.yFormat=v;
++                else if(!strcmp(attribute,"grid"))c.grid=v!=0;else if(!strcmp(attribute,"xl"))c.xLabels=v!=0;else if(!strcmp(attribute,"yl"))c.yLabels=v!=0;
++                else if(!strcmp(attribute,"zero"))c.origin=v!=0;else if(!strcmp(attribute,"names"))c.names=v!=0;else if(!strcmp(attribute,"avoid"))c.avoidOverlap=v!=0;
++                else if(!strcmp(attribute,"xs"))c.xStepText=AxisUnhex(value);else if(!strcmp(attribute,"ys"))c.yStepText=AxisUnhex(value);
++                else if(!strcmp(attribute,"xn"))c.xName=AxisWide(AxisUnhex(value));else if(!strcmp(attribute,"yn"))c.yName=AxisWide(AxisUnhex(value));
++            }while(attribute[0]);std::string error;if(c.role>=0&&c.role<=4&&CoordinateAxes::Valid(c,error)){AxisGrid=c;if(c.role<=1&&(c.form==8||c.form==9))OriginalForm=(char)c.form;}continue;
++        }
+ 		if (file[0]=='/')
+ 		{
+ 			if (strncmp(file,"/obj",4)==0) return file+4;
+@@ -3347,6 +3409,12 @@
+ 
+ int CDrawing::ScaleForFactor(float factorx,float factory)
+ {
++    if(AxisGrid.role==1){CoordinateAxes::Geometry g;if(CoordinateGeometry(g)){
++        AxisGrid.xSpacing*=sqrt(g.u.x*g.u.x*factorx*factorx+g.u.y*g.u.y*factory*factory);
++        AxisGrid.ySpacing*=sqrt(g.v.x*g.v.x*factorx*factorx+g.v.y*g.v.y*factory*factory);
++        AxisGrid.labelFont=max(10,min(32700,(int)floor(AxisGrid.labelFont*sqrt(fabs(factorx*factory))+.5)));
++    }}
++
+     if(IsSpecialDrawing==51){
+         // Resize the frame without changing formulas, interval metadata or axis values.
+         for(int i=0;i<NumItems;i++)if(Items[i].Type==1){
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -4,6 +4,7 @@
+ #include <atomic>
+ #include "Statistics.h"
+ #include "IntegralArea.h"
++#include "CoordinateAxes.h"
+ 
+ //scalling factor that defines drawings inner precision
+ #define DRWZOOM 32
+@@ -23,6 +24,8 @@
+ public:
+ 	tDrawingItem *Items;
+ 	void *SpecialData;
++    CoordinateAxes::Settings AxisGrid;
++    bool CoordinateGeometry(CoordinateAxes::Geometry &geometry, int *axesStart=NULL) const;
+ 	tDrwXY NodeX;
+ 	tDrwXY NodeY;
+ 	unsigned short NumItems;
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -39,6 +39,29 @@
+     }
+ };
+ inline const char *FeatureControlHelp(int dialog,int id){
++    if(dialog==IDD_COORDINATE_GRID_EDIT){
++        if(id==1450||id==1451)return "Physical spacing between grid lines in page units. Independent of the numeric value represented by each cell.";
++        if(id==1452||id==1453)return "Minor or major grid darkness: 0 is white, 100 is full color. The coordinate axes keep their original ink.";
++        if(id==1454)return "Emphasize every Nth grid line, counted from the origin, on both axes.";
++        if(id==1455)return "Neutral gray, blue, green or red. Darkness blends the selected color with the white page.";
++        if(id==1456)return "Solid, dashed or dotted grid lines. These remain part of the saved drawing and print normally.";
++        if(id==1457)return "Minor line thickness in page units; major lines are twice as thick.";
++        if(id==1458||id==1462)return "Decimal numbers, exact rational fractions, radians as pi fractions, degree labels or scientific notation. Each axis has its own format.";
++        if(id==1459||id==1463)return "Numeric value represented by one cell: 1, 1/2, pi/2, pi/6 or 1e-3. Constants and functions are accepted; trig expressions use radians.";
++        if(id==1460||id==1464)return "Show or hide this axis's tick labels independently.";
++        if(id==1461||id==1465)return "Axis name, up to 16 characters. Latin and common Greek symbols such as theta, pi and omega are supported.";
++        if(id==1466)return "Label every Nth cell. The overlap option may skip additional labels to keep them readable.";
++        if(id==1467)return "Decimal places for this drawing's labels only. Auto trims floating-point noise; fractions and pi fractions stay exact when possible.";
++        if(id==1468)return "Native editable math label size, as a percentage of the usual equation size.";
++        if(id==1469)return "Show one zero at the origin, avoiding a duplicate x/y zero.";
++        if(id==1470)return "Show or hide the names near the axis arrowheads.";
++        if(id==1471)return "Preview of this drawing, including grid appearance and native math labels.";
++        if(id==1472)return "Validation and examples. Apply is disabled while any input is invalid or the grid is too dense.";
++        if(id==1473)return "Reset grid and label settings, preserving the original coordinate-axis geometry.";
++        if(id==1474)return "Use pi/2 radians per x cell and ordinary y values. Wider cells leave room for fraction labels.";
++        if(id==1475)return "Automatically leave more space between labels when they would otherwise overlap.";
++        if(id==1476)return "Show or hide the grid without removing the axes or their labels.";
++    }
+     if(dialog==IDD_AI_HELP){
+         if(id==1401)return "Optional AI help from the selected provider. The current angle setting is included; nothing is submitted automatically.";
+         if(id==1402)return "Selected math or working to explain. Nested fractions, powers, roots and function arguments retain explicit grouping. You can edit the text before sending.";
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -488,6 +488,7 @@
+             MENUITEM "Strong", ID_SMOOTH_STRONG
+         END
+         MENUITEM "Smooth selected freehand curves", ID_SMOOTH_SELECTED
++        MENUITEM "Grid and axis labels...", ID_COORDINATE_GRID_EDIT
+     END
+     POPUP "&Calculus"
+     BEGIN
+@@ -1067,3 +1068,62 @@
+     PUSHBUTTON "Get API key",1415,326,380,97,16
+     PUSHBUTTON "Close",IDCANCEL,429,405,81,16
+ END
++
++IDD_COORDINATE_GRID_EDIT DIALOGEX 0, 0, 500, 335
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Coordinate axes: grid and labels"
++FONT 9, "Segoe UI"
++BEGIN
++    GROUPBOX "Grid spacing and contrast", -1, 8, 6, 214, 117
++    LTEXT "Cell gap (page units)", -1, 18, 22, 125, 10
++    LTEXT "x:", -1, 18, 39, 12, 10
++    EDITTEXT 1450, 34, 36, 65, 14, ES_AUTOHSCROLL
++    LTEXT "y:", -1, 115, 39, 12, 10
++    EDITTEXT 1451, 131, 36, 65, 14, ES_AUTOHSCROLL
++    LTEXT "Darkness (%)", -1, 18, 57, 88, 10
++    LTEXT "Minor:", -1, 18, 74, 34, 10
++    EDITTEXT 1452, 54, 71, 40, 14, ES_AUTOHSCROLL | ES_NUMBER
++    LTEXT "Major:", -1, 114, 74, 36, 10
++    EDITTEXT 1453, 151, 71, 45, 14, ES_AUTOHSCROLL | ES_NUMBER
++    LTEXT "Major line every", -1, 18, 94, 80, 10
++    EDITTEXT 1454, 107, 91, 35, 14, ES_AUTOHSCROLL | ES_NUMBER
++    LTEXT "cells", -1, 149, 94, 45, 10
++    LTEXT "0 = white; 100 = full color", -1, 18, 109, 180, 10
++    GROUPBOX "Grid appearance", -1, 8, 127, 214, 68
++    CONTROL "Show grid lines", 1476, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 18, 142, 108, 12
++    COMBOBOX 1455, 130, 140, 82, 75, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    COMBOBOX 1456, 18, 161, 90, 70, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    COMBOBOX 1457, 122, 161, 90, 70, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    LTEXT "Axes keep their original color and thickness.", -1, 18, 179, 195, 10
++    CONTROL "", 1471, "Static", SS_NOTIFY | WS_BORDER, 232, 8, 260, 168
++    LTEXT "", 1472, 232, 180, 260, 20
++    GROUPBOX "Editable axis labels", -1, 8, 201, 484, 99
++    LTEXT "Format", -1, 55, 216, 85, 10
++    LTEXT "Value per cell", -1, 164, 216, 96, 10
++    LTEXT "Labels", -1, 277, 216, 45, 10
++    LTEXT "Axis name", -1, 361, 216, 70, 10
++    LTEXT "x-axis", -1, 18, 233, 35, 10
++    COMBOBOX 1458, 55, 230, 100, 92, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    EDITTEXT 1459, 164, 230, 100, 14, ES_AUTOHSCROLL
++    CONTROL "Show", 1460, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 277, 232, 62, 12
++    EDITTEXT 1461, 361, 230, 65, 14, ES_AUTOHSCROLL
++    LTEXT "y-axis", -1, 18, 253, 35, 10
++    COMBOBOX 1462, 55, 250, 100, 92, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    EDITTEXT 1463, 164, 250, 100, 14, ES_AUTOHSCROLL
++    CONTROL "Show", 1464, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 277, 252, 62, 12
++    EDITTEXT 1465, 361, 250, 65, 14, ES_AUTOHSCROLL
++    LTEXT "Label every", -1, 18, 275, 57, 10
++    EDITTEXT 1466, 75, 272, 25, 14, ES_AUTOHSCROLL | ES_NUMBER
++    LTEXT "cells", -1, 104, 275, 25, 10
++    LTEXT "Decimals", -1, 137, 275, 45, 10
++    COMBOBOX 1467, 185, 272, 48, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    LTEXT "Size (%)", -1, 243, 275, 40, 10
++    EDITTEXT 1468, 286, 272, 37, 14, ES_AUTOHSCROLL | ES_NUMBER
++    CONTROL "Origin 0", 1469, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 332, 274, 64, 12
++    CONTROL "Names", 1470, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 415, 274, 66, 12
++    CONTROL "Avoid label overlap", 1475, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 235, 309, 125, 12
++    PUSHBUTTON "Reset defaults", 1473, 8, 307, 87, 18
++    PUSHBUTTON "Trig preset", 1474, 103, 307, 79, 18
++    DEFPUSHBUTTON "Apply", IDOK, 374, 307, 55, 18
++    PUSHBUTTON "Cancel", IDCANCEL, 437, 307, 55, 18
++END
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -424,6 +424,7 @@
+ }
+ std::wstring FeatureDrawingHelp(CDrawing *drawing,int depth)
+ {
++    if(drawing){CoordinateAxes::Geometry g;if(drawing->CoordinateGeometry(g))return L"Coordinate axes - right-click to edit grid spacing, darkness, labels and numeric or trig formats.";}
+     if(!drawing || depth>16)return L"Drawing object";
+     if(drawing->IsSpecialDrawing==51 && drawing->SpecialData && ((CFunctionPlotter*)drawing->SpecialData)->integral.enabled)return L"Integral area graph - blue positive area, rose negative area. Click f1 or Graph > Integral area shader to edit the formula and bounds. Drag its resize corner to enlarge it.";
+     if(drawing->IsSpecialDrawing==51)return L"Function graph - edit the formulas and coordinate limits; drag its resize corner to enlarge it.";
+@@ -443,8 +444,8 @@
+         case 5:return L"Arrow - draw a straight arrow from its start to its tip.";
+         case 6:return L"Large eraser - drag across drawing strokes to remove them.";
+         case 7:return L"Pencil eraser - remove a small part of a drawing stroke.";
+-        case 8:return L"Coordinate axes - horizontal and vertical axes with an origin.";
+-        case 9:return L"Centered coordinate axes - axes extending in both directions.";
++        case 8:return L"Coordinate axes - right-click to edit grid spacing, darkness and native numeric or trig labels.";
++        case 9:return L"Centered coordinate axes - right-click to edit grid spacing, darkness and native numeric or trig labels.";
+         case 10:return L"Coordinate grid - linear horizontal and vertical scales.";
+         case 11:return L"Coordinate grid - logarithmic horizontal scale; linear vertical scale.";
+         case 12:return L"Coordinate grid - linear horizontal scale; logarithmic vertical scale.";
+@@ -837,6 +838,7 @@
+     ON_COMMAND(ID_NUMBER_FORMAT,OnNumberFormat)
+     ON_COMMAND(ID_EXECUTE_EXPRESSION,OnExecuteExpression)
+     ON_COMMAND(ID_APPROXIMATE_EXPRESSION,OnApproximateExpression)
++    ON_COMMAND(ID_COORDINATE_GRID_EDIT,OnCoordinateAxesGrid)
+     ON_COMMAND_RANGE(ID_SMOOTH_OFF,ID_SMOOTH_STRONG,OnFreehandSmoothing)
+     ON_UPDATE_COMMAND_UI_RANGE(ID_SMOOTH_OFF,ID_SMOOTH_STRONG,OnUpdateFreehandSmoothing)
+     ON_COMMAND(ID_SMOOTH_SELECTED,OnSmoothSelected)
+@@ -10700,6 +10702,7 @@
+     for(int i=0;i<8;i++){CString label="Writing > Color: ";label+=ImprovedColorNames[i];dialog.Add(ID_WRITING_COLOR_BLACK+i,label,"color colour highlighted text writing palette");}
+     dialog.Add(ID_DRAW_PEN,"Draw > Freehand pen","drawing pencil freehand sketch");
+     dialog.Add(ID_DRAW_LINE,"Draw > Line","drawing straight line");
++    dialog.Add(ID_COORDINATE_GRID_EDIT,"Draw > Grid and axis labels","coordinate axes grid spacing darkness labels fractions radians pi trig degrees edit");
+     dialog.Add(ID_DRAW_RECTANGLE,"Draw > Rectangle","drawing box rectangle");
+     dialog.Add(ID_DRAW_ELLIPSE,"Draw > Ellipse","drawing circle ellipse");
+     dialog.Add(ID_RAY_OPEN_RIGHT,"Number line > Open dot to the right","ray semi infinite greater than excluded endpoint palette");
+@@ -13945,6 +13948,89 @@
+ {
+     for(int row=-4;row<=4;row++){double half=sqrt(16.-row*row);IntervalLine(drawing,x-half,y+row,x+half,y+row);}
+ }
++static std::wstring CoordinateControlText(HWND dialog,int id){HWND h=::GetDlgItem(dialog,id);int n=::GetWindowTextLengthW(h);std::vector<wchar_t> text(n+1);::GetWindowTextW(h,text.data(),n+1);return std::wstring(text.data());}
++static bool CoordinateStepText(const std::wstring &input,std::string &text,double &value){text.clear();for(wchar_t c:input){if(c==0x03c0)text+="pi";else if(c==0x2212)text+='-';else if(c<128)text+=(char)c;else return false;}return CoordinateAxes::ReadStep(text,value);}
++static int CoordinateGreek(wchar_t c){const std::wstring greek=L"\x03b1\x03b2\x03b3\x03b4\x03b5\x03b6\x03b7\x03b8\x03b9\x03ba\x03bb\x03bc\x03bd\x03be\x03bf\x03c0\x03c1\x03c3\x03c4\x03c5\x03c6\x03c7\x03c8\x03c9",codes=L"abgdezhqiklmnxoprstufcyw";size_t at=greek.find(c);if(at!=std::wstring::npos)return (char)codes[at];if(c>=0x0391&&c<=0x03a9){at=greek.find(c+32);if(at!=std::wstring::npos)return (char)toupper((char)codes[at]);}return 0;}
++static std::wstring CoordinateName(std::wstring name){if(name==L"theta")return L"\x03b8";if(name==L"omega")return L"\x03c9";if(name==L"pi")return L"\x03c0";if(name==L"phi")return L"\x03c6";return name;}
++static bool CoordinateNameValid(const std::wstring &name){if(name.size()>16)return false;for(wchar_t c:CoordinateName(name))if((c<32||c>255)&&!CoordinateGreek(c))return false;return true;}
++static void CoordinateTextNumber(CExpression *label,const std::string &number){std::string t=number;if(!t.empty()&&t[0]=='-'){UnitAppend(label,2,'-');t.erase(0,1);}int p=UnitAppend(label,1,'0');strncpy(label->m_pElementList[p].pElementObject->Data1,t.c_str(),23);label->m_pElementList[p].pElementObject->Data1[23]=0;}
++static void CoordinateScientific(CExpression *label,double value,int decimals){if(value==0){CoordinateTextNumber(label,"0");return;}if(value<0){UnitAppend(label,2,'-');value=-value;}int exponent=(int)floor(log10(value));double mantissa=value/pow(10.,exponent);std::string m=CoordinateAxes::Number(mantissa,decimals<0?3:decimals);if(atof(m.c_str())>=10){m="1";exponent++;}CoordinateTextNumber(label,m);UnitAppend(label,2,(char)0xd7);int p=UnitAppend(label,3,0);auto base=(CExpression*)label->m_pElementList[p].pElementObject->Expression1,exp=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;base->DeleteElement(0);exp->DeleteElement(0);CoordinateTextNumber(base,"10");CoordinateTextNumber(exp,CoordinateAxes::Number(exponent,0));}
++static void CoordinateNumber(CExpression *label,double value,int decimals){std::string n=CoordinateAxes::Number(value,decimals);if(n.find_first_of("eE")!=std::string::npos)CoordinateScientific(label,value,decimals);else CoordinateTextNumber(label,n);}
++static void CoordinateValueLabel(CExpression *label,double value,int format,int decimals){
++    if(fabs(value)<1e-12){CoordinateTextNumber(label,"0");return;}
++    if(format==CoordinateAxes::Scientific){CoordinateScientific(label,value,decimals);return;}
++    if(format==CoordinateAxes::Fraction || format==CoordinateAxes::PiFraction){long long n,d;bool pi=format==CoordinateAxes::PiFraction;if(CoordinateAxes::Rational(pi?value/CoordinateAxes::pi:value,n,d)){
++        if(n<0){UnitAppend(label,2,'-');n=-n;}CExpression *numerator=label;
++        if(d>1){int p=UnitAppend(label,4,0);numerator=(CExpression*)label->m_pElementList[p].pElementObject->Expression1;auto denominator=(CExpression*)label->m_pElementList[p].pElementObject->Expression2;numerator->DeleteElement(0);denominator->DeleteElement(0);CoordinateTextNumber(denominator,CoordinateAxes::Number((double)d,0));}
++        if(!pi || n!=1)CoordinateTextNumber(numerator,CoordinateAxes::Number((double)n,0));if(pi){int p=UnitAppend(numerator,1,'p');numerator->m_pElementList[p].pElementObject->Data2[0]=0x60;}return;
++    }}
++    CoordinateNumber(label,value,decimals);if(format==CoordinateAxes::Degrees)UnitAppend(label,1,(char)0xb0);
++}
++static void CoordinateNameLabel(CExpression *label,const std::wstring &name){for(wchar_t c:CoordinateName(name)){int greek=CoordinateGreek(c),p=UnitAppend(label,1,(char)(greek?greek:c));if(greek)label->m_pElementList[p].pElementObject->Data2[0]=0x60;}}
++static bool CoordinateLine(CDrawing *d,CoordinateAxes::Segment s,double width,int &count){if(++count>12000)return false;d->InsertItemAt(d->NumItems);auto &p=d->Items[d->NumItems-1];memset(&p,0,sizeof(p));p.Type=1;p.LineWidth=(short)floor(width*DRWZOOM+.5);p.X1=(int)floor(s.a.x*DRWZOOM+.5);p.Y1=(int)floor(s.a.y*DRWZOOM+.5);p.X2=(int)floor(s.b.x*DRWZOOM+.5);p.Y2=(int)floor(s.b.y*DRWZOOM+.5);return true;}
++static void CoordinateExpression(CDrawing *d,CExpression &label,double x,double y,CDC *dc){short l,a,b;label.CalculateSize(dc,100,&l,&a,&b);d->CopyExpressionIntoSubgroup(&label,0,0,0,0);auto &p=d->Items[d->NumItems-1];p.X1=(int)floor(x*DRWZOOM+.5);p.Y1=(int)floor(y*DRWZOOM+.5);p.X2=p.X1+l*DRWZOOM;p.Y2=p.Y1+(a+b)*DRWZOOM;p.LineWidth=a;}
++static void CoordinateGroup(CDrawing *d,CDrawing *child){if(!child->NumItems)return;int x,y,w,h;child->AdjustCoordinates(&x,&y,&w,&h);d->CopyDrawingIntoSubgroup(child,x,y);d->Items[d->NumItems-1].LineWidth=0;}
++static CDrawing *CoordinateBuild(const tDrawingItem axes[6],const CoordinateAxes::Settings &settings,CDC *dc,std::string &error){
++    std::vector<CoordinateAxes::Segment> lines;for(int i=0;i<6;i++)lines.push_back(CoordinateAxes::Segment(CoordinateAxes::Point(axes[i].X1/(double)DRWZOOM,axes[i].Y1/(double)DRWZOOM),CoordinateAxes::Point(axes[i].X2/(double)DRWZOOM,axes[i].Y2/(double)DRWZOOM)));
++    CoordinateAxes::Geometry g;std::vector<int> xs,ys;if(!CoordinateAxes::Valid(settings,error)||!CoordinateAxes::GeometryFromAxes(lines,g))return NULL;
++    if(!CoordinateAxes::Ticks(g.xmin,g.xmax,settings.xSpacing,xs)||!CoordinateAxes::Ticks(g.ymin,g.ymax,settings.ySpacing,ys)){error="The grid is too dense. Increase cell spacing.";return NULL;}
++    CDrawing minor,major,contents;minor.AxisGrid=major.AxisGrid=contents.AxisGrid=settings;minor.AxisGrid.role=3;major.AxisGrid.role=4;contents.AxisGrid.role=2;int count=0;
++    if(settings.grid){for(int axis=0;axis<2;axis++)for(int n:axis==0?xs:ys){if(!n)continue;bool bold=abs(n)%settings.major==0;CoordinateAxes::Segment s=axis==0?CoordinateAxes::Segment(g.At(n*settings.xSpacing,g.ymin),g.At(n*settings.xSpacing,g.ymax)):CoordinateAxes::Segment(g.At(g.xmin,n*settings.ySpacing),g.At(g.xmax,n*settings.ySpacing));auto strokes=CoordinateAxes::Styled(s,settings.style);if(strokes.empty()){error="The grid is too dense. Use larger cells or solid lines.";return NULL;}for(auto line:strokes)if(!CoordinateLine(bold?&major:&minor,line,settings.width*(bold?2:1),count)){error="The dashed grid is too dense. Use larger cells or solid lines.";return NULL;}}}
++    CoordinateGroup(&contents,&minor);CoordinateGroup(&contents,&major);
++    for(int axis=0;axis<2;axis++){
++        if(axis==0?!settings.xLabels:!settings.yLabels)continue;const auto &ticks=axis==0?xs:ys;int format=axis==0?settings.xFormat:settings.yFormat;double value=axis==0?settings.xValue:settings.yValue,spacing=axis==0?settings.xSpacing:settings.ySpacing;int stride=settings.labelEvery;double needed=0;
++        if(settings.avoidOverlap){for(int n:ticks){if(!n||abs(n)%settings.labelEvery)continue;CExpression label(NULL,NULL,(short)settings.labelFont);CoordinateValueLabel(&label,n*value,format,settings.decimals);short l,a,b;label.CalculateSize(dc,100,&l,&a,&b);needed=(std::max)(needed,(double)(axis==0?l:a+b)+6);}while(stride*spacing<needed && stride<1024)stride*=2;}
++        for(int n:ticks){if(!n || abs(n)%stride)continue;CExpression label(NULL,NULL,(short)settings.labelFont);CoordinateValueLabel(&label,n*value,format,settings.decimals);short l,a,b;label.CalculateSize(dc,100,&l,&a,&b);auto point=axis==0?g.At(n*spacing,0):g.At(0,n*spacing);if(axis==0){point=CoordinateAxes::Sub(point,CoordinateAxes::Mul(g.v,7));CoordinateExpression(&contents,label,point.x-l/2.,point.y,dc);}else{point=CoordinateAxes::Sub(point,CoordinateAxes::Mul(g.u,7));CoordinateExpression(&contents,label,point.x-l,point.y-(a+b)/2.,dc);}}
++    }
++    if(settings.origin){CExpression zero(NULL,NULL,(short)settings.labelFont);CoordinateTextNumber(&zero,"0");short l,a,b;zero.CalculateSize(dc,100,&l,&a,&b);CoordinateExpression(&contents,zero,g.origin.x-l-4,g.origin.y+6,dc);}
++    if(settings.names){for(int axis=0;axis<2;axis++){const auto &name=axis==0?settings.xName:settings.yName;if(name.empty())continue;CExpression label(NULL,NULL,(short)settings.labelFont);CoordinateNameLabel(&label,name);short l,a,b;label.CalculateSize(dc,100,&l,&a,&b);auto point=axis==0?g.At(g.xmax+10,8):g.At(8,g.ymax+10);CoordinateExpression(&contents,label,point.x-l/2.,point.y-(a+b)/2.,dc);}}
++    CDrawing *result=new CDrawing();result->AxisGrid=settings;result->AxisGrid.role=1;result->AxisGrid.form=g.form;result->OriginalForm=(char)g.form;CoordinateGroup(result,&contents);
++    int start=result->NumItems;for(int i=0;i<6;i++){result->InsertItemAt(result->NumItems);result->Items[start+i]=axes[i];}
++    error.clear();return result;
++}
++// Appearance-only changes keep manually edited native labels and their positions.
++static bool CoordinateSameLabels(const CoordinateAxes::Settings&a,const CoordinateAxes::Settings&b){return a.role==1&&a.xSpacing==b.xSpacing&&a.ySpacing==b.ySpacing&&a.xValue==b.xValue&&a.yValue==b.yValue&&a.xFormat==b.xFormat&&a.yFormat==b.yFormat&&a.labelFont==b.labelFont&&a.labelEvery==b.labelEvery&&a.decimals==b.decimals&&a.xLabels==b.xLabels&&a.yLabels==b.yLabels&&a.origin==b.origin&&a.names==b.names&&a.avoidOverlap==b.avoidOverlap&&a.xName==b.xName&&a.yName==b.yName;}
++static void CoordinateKeepLabels(CDrawing *source,CDrawing *dest,const CoordinateAxes::Settings &settings){
++    if(!CoordinateSameLabels(source->AxisGrid,settings))return;tDrawingItem *a=NULL,*b=NULL;
++    for(int i=0;i<source->NumItems;i++)if(source->Items[i].Type==0&&source->Items[i].pSubdrawing&&((CDrawing*)source->Items[i].pSubdrawing)->AxisGrid.role==2){a=source->Items+i;break;}
++    for(int i=0;i<dest->NumItems;i++)if(dest->Items[i].Type==0&&dest->Items[i].pSubdrawing&&((CDrawing*)dest->Items[i].pSubdrawing)->AxisGrid.role==2){b=dest->Items+i;break;}
++    if(!a)return;bool labels=false;for(int i=0;i<((CDrawing*)a->pSubdrawing)->NumItems;i++)if(((CDrawing*)a->pSubdrawing)->Items[i].Type==2)labels=true;if(!b&&!labels)return;if(!b){CDrawing empty;empty.AxisGrid=settings;empty.AxisGrid.role=2;dest->InsertItemAt(0);b=dest->Items;memset(b,0,sizeof(*b));b->Type=0;b->pSubdrawing=new CDrawing();((CDrawing*)b->pSubdrawing)->AxisGrid=empty.AxisGrid;}
++    auto old=(CDrawing*)a->pSubdrawing,next=(CDrawing*)b->pSubdrawing;
++    for(int i=0;i<next->NumItems;)if(next->Items[i].Type==2){delete (CExpression*)next->Items[i].pSubdrawing;memmove(next->Items+i,next->Items+i+1,(next->NumItems-i-1)*sizeof(tDrawingItem));next->NumItems--;}else i++;
++    for(int i=0;i<old->NumItems;i++)if(old->Items[i].Type==2){const auto &p=old->Items[i];next->CopyExpressionIntoSubgroup((CExpression*)p.pSubdrawing,0,0,0,0);auto &q=next->Items[next->NumItems-1];q.X1=a->X1+p.X1-b->X1;q.Y1=a->Y1+p.Y1-b->Y1;q.X2=a->X1+p.X2-b->X1;q.Y2=a->Y1+p.Y2-b->Y1;q.LineWidth=p.LineWidth;}
++}
++class CCoordinatePreview:public CStatic {public:CDrawing drawing;bool valid;std::string error;CCoordinatePreview():valid(false){}
++protected:afx_msg void OnPaint(){CPaintDC dc(this);CRect r;GetClientRect(&r);dc.FillSolidRect(r,RGB(255,255,255));int saved=dc.SaveDC();dc.SetBkMode(TRANSPARENT);if(valid){short w,h;drawing.CalculateSize(&dc,100,&w,&h);double fit=(std::min)((r.Width()-20.)/(std::max)(1,(int)w),(r.Height()-20.)/(std::max)(1,(int)h));short zoom=(short)(std::max)(1,(std::min)(300,(int)floor(fit*100)));drawing.CalculateSize(&dc,zoom,&w,&h);RECT clip={0,0,r.Width(),r.Height()};drawing.PaintDrawing(&dc,zoom,(r.Width()-w)/2,(r.Height()-h)/2,0,0,&clip,RGB(0,0,0));}else{r.DeflateRect(15,15);dc.SetTextColor(RGB(140,50,50));dc.DrawText(error.c_str(),r,DT_WORDBREAK|DT_CENTER|DT_VCENTER);}dc.RestoreDC(saved);}
++DECLARE_MESSAGE_MAP()};
++BEGIN_MESSAGE_MAP(CCoordinatePreview,CStatic)
++ ON_WM_PAINT()
++END_MESSAGE_MAP()
++class CCoordinateGridDialog:public CFeatureDialog {
++    bool loading;CCoordinatePreview preview;CDrawing baseline;tDrawingItem axes[6];
++    void UnicodeEdit(int id,int limit){HWND old=::GetDlgItem(m_hWnd,id);RECT r;::GetWindowRect(old,&r);::MapWindowPoints(NULL,m_hWnd,(LPPOINT)&r,2);DWORD style=(DWORD)::GetWindowLongPtr(old,GWL_STYLE);HFONT font=(HFONT)::SendMessage(old,WM_GETFONT,0,0);HWND next=::CreateWindowExW(WS_EX_CLIENTEDGE,L"EDIT",L"",style,r.left,r.top,r.right-r.left,r.bottom-r.top,m_hWnd,(HMENU)(INT_PTR)id,AfxGetInstanceHandle(),NULL);if(next){HWND previous=::GetWindow(old,GW_HWNDPREV);::SetWindowPos(next,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);::DestroyWindow(old);::SendMessage(next,WM_SETFONT,(WPARAM)font,TRUE);::SendMessage(next,EM_SETLIMITTEXT,limit,0);}}
++    void Put(){loading=true;CString t;t.Format("%.12g",settings.xSpacing);SetDlgItemText(1450,t);t.Format("%.12g",settings.ySpacing);SetDlgItemText(1451,t);SetDlgItemInt(1452,settings.minorDarkness);SetDlgItemInt(1453,settings.majorDarkness);SetDlgItemInt(1454,settings.major);SetDlgItemInt(1466,settings.labelEvery);SetDlgItemInt(1468,settings.labelFont);((CComboBox*)GetDlgItem(1455))->SetCurSel(settings.color);((CComboBox*)GetDlgItem(1456))->SetCurSel(settings.style);double widths[]={.25,.5,1,2,4};int best=0;for(int i=1;i<5;i++)if(fabs(settings.width-widths[i])<fabs(settings.width-widths[best]))best=i;((CComboBox*)GetDlgItem(1457))->SetCurSel(best);((CComboBox*)GetDlgItem(1458))->SetCurSel(settings.xFormat);((CComboBox*)GetDlgItem(1462))->SetCurSel(settings.yFormat);((CComboBox*)GetDlgItem(1467))->SetCurSel(settings.decimals+1);::SetDlgItemTextW(m_hWnd,1459,std::wstring(settings.xStepText.begin(),settings.xStepText.end()).c_str());::SetDlgItemTextW(m_hWnd,1463,std::wstring(settings.yStepText.begin(),settings.yStepText.end()).c_str());::SetDlgItemTextW(m_hWnd,1461,settings.xName.c_str());::SetDlgItemTextW(m_hWnd,1465,settings.yName.c_str());CheckDlgButton(1476,settings.grid);CheckDlgButton(1460,settings.xLabels);CheckDlgButton(1464,settings.yLabels);CheckDlgButton(1469,settings.origin);CheckDlgButton(1470,settings.names);CheckDlgButton(1475,settings.avoidOverlap);loading=false;Refresh();}
++    bool Read(std::string &error){CString text;char *end=NULL;GetDlgItemText(1450,text);settings.xSpacing=strtod(text,&end);if(text.IsEmpty()||!end||*end){error="Enter a numeric x cell spacing.";return false;}GetDlgItemText(1451,text);settings.ySpacing=strtod(text,&end);if(text.IsEmpty()||!end||*end){error="Enter a numeric y cell spacing.";return false;}
++        const int ids[]={1452,1453,1454,1466,1468};int *values[]={&settings.minorDarkness,&settings.majorDarkness,&settings.major,&settings.labelEvery,&settings.labelFont};for(int i=0;i<5;i++){BOOL valid;*values[i]=(int)GetDlgItemInt(ids[i],&valid,FALSE);if(!valid){error="Enter whole numbers for contrast, frequency and label size.";return false;}}
++        settings.color=((CComboBox*)GetDlgItem(1455))->GetCurSel();settings.style=((CComboBox*)GetDlgItem(1456))->GetCurSel();double widths[]={.25,.5,1,2,4};int wi=((CComboBox*)GetDlgItem(1457))->GetCurSel();if(wi<0||wi>4)return false;settings.width=widths[wi];settings.xFormat=((CComboBox*)GetDlgItem(1458))->GetCurSel();settings.yFormat=((CComboBox*)GetDlgItem(1462))->GetCurSel();settings.decimals=((CComboBox*)GetDlgItem(1467))->GetCurSel()-1;
++        if(!CoordinateStepText(CoordinateControlText(m_hWnd,1459),settings.xStepText,settings.xValue)||!CoordinateStepText(CoordinateControlText(m_hWnd,1463),settings.yStepText,settings.yValue)){error="Value per cell: use a positive constant, such as 1, 1/2, pi/2 or 1e-3.";return false;}settings.xName=CoordinateControlText(m_hWnd,1461);settings.yName=CoordinateControlText(m_hWnd,1465);if(!CoordinateNameValid(settings.xName)||!CoordinateNameValid(settings.yName)){error="Axis names support Latin letters and common Greek symbols, up to 16 characters.";return false;}
++        settings.grid=IsDlgButtonChecked(1476)==BST_CHECKED;settings.xLabels=IsDlgButtonChecked(1460)==BST_CHECKED;settings.yLabels=IsDlgButtonChecked(1464)==BST_CHECKED;settings.origin=IsDlgButtonChecked(1469)==BST_CHECKED;settings.names=IsDlgButtonChecked(1470)==BST_CHECKED;settings.avoidOverlap=IsDlgButtonChecked(1475)==BST_CHECKED;return CoordinateAxes::Valid(settings,error);
++    }
++    void Refresh(){if(loading)return;std::string error;bool valid=Read(error);CDrawing *next=NULL;CClientDC dc(this);if(valid)next=CoordinateBuild(axes,settings,&dc,error);valid=next!=NULL;if(next){next->m_Color=baseline.m_Color;CoordinateKeepLabels(&baseline,next,settings);int x,y,w,h;next->AdjustCoordinates(&x,&y,&w,&h);preview.drawing.CopyDrawing(next);delete next;}preview.valid=valid;preview.error=error;preview.Invalidate(FALSE);GetDlgItem(IDOK)->EnableWindow(valid);SetDlgItemText(1472,valid?"Ready. Native math labels remain editable. Value per cell accepts 1/2, pi/2, pi/6 and 1e-3.":error.c_str());}
++public:CoordinateAxes::Settings settings;
++    CCoordinateGridDialog(CDrawing *drawing,int start,const CoordinateAxes::Settings &initial):CFeatureDialog(IDD_COORDINATE_GRID_EDIT,theApp.m_pMainWnd),loading(true),settings(initial){baseline.CopyDrawing(drawing);for(int i=0;i<6;i++)axes[i]=drawing->Items[start+i];}
++    virtual BOOL OnInitDialog(){UnicodeEdit(1459,80);UnicodeEdit(1463,80);UnicodeEdit(1461,16);UnicodeEdit(1465,16);CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1471,this);for(const char *name:{"Neutral gray","Blue","Green","Red"})((CComboBox*)GetDlgItem(1455))->AddString(name);for(const char *name:{"Solid lines","Dashed lines","Dotted lines"})((CComboBox*)GetDlgItem(1456))->AddString(name);for(const char *name:{"Hairline (0.25)","Thin (0.5)","Regular (1)","Bold (2)","Heavy (4)"})((CComboBox*)GetDlgItem(1457))->AddString(name);for(int id:{1458,1462})for(const char *name:{"Numbers","Fractions","Radians (pi)","Degrees","Scientific"})((CComboBox*)GetDlgItem(id))->AddString(name);auto decimals=(CComboBox*)GetDlgItem(1467);decimals->AddString("Auto");for(int i=0;i<=8;i++){CString n;n.Format("%d",i);decimals->AddString(n);}Put();return TRUE;}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){if(loading)return CFeatureDialog::OnCommand(wp,lp);int id=LOWORD(wp),code=HIWORD(wp);if(id==1473){settings=CoordinateAxes::Settings();Put();return TRUE;}if(id==1474){settings.xFormat=CoordinateAxes::PiFraction;settings.xStepText="pi/2";settings.xValue=CoordinateAxes::pi/2;settings.yFormat=CoordinateAxes::Decimal;settings.yStepText="1";settings.yValue=1;settings.xSpacing=settings.ySpacing=40;settings.labelEvery=1;Put();return TRUE;}if((id==1458||id==1462)&&code==CBN_SELCHANGE){int format=((CComboBox*)GetDlgItem(id))->GetCurSel(),valueID=id==1458?1459:1463;auto text=CoordinateControlText(m_hWnd,valueID);if(text==L"1"&&format==CoordinateAxes::PiFraction)::SetDlgItemTextW(m_hWnd,valueID,L"pi/2");else if(text==L"1"&&format==CoordinateAxes::Degrees)::SetDlgItemTextW(m_hWnd,valueID,L"30");}
++        if(id>=1450&&id<=1476&&(code==EN_CHANGE||code==CBN_SELCHANGE||code==BN_CLICKED)){Refresh();return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
++    virtual void OnOK(){Refresh();if(GetDlgItem(IDOK)->IsWindowEnabled())CFeatureDialog::OnOK();}
++};
++void CMathomirView::EditCoordinateAxesGrid(tDocumentStruct *object){
++    if(ViewOnlyMode||!object||object->Type!=2||!object->Object)return;int index=(int)(object-TheDocument);if(index<0||index>=NumDocumentElements)return;auto drawing=(CDrawing*)object->Object;CoordinateAxes::Geometry g;int start;if(!drawing->CoordinateGeometry(g,&start))return;
++    CancelFloatingPlacement();if(KeyboardEntryObject){((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;}HideSelectionApproxPanel();if(GetCapture())ReleaseCapture();IsDrawingMode=MouseMode=0;
++    auto settings=drawing->AxisGrid;if(!settings.role){settings=CoordinateAxes::Settings();settings.xSpacing=settings.ySpacing=GRID;settings.form=g.form;if(start){double sx=1e100,sy=1e100;for(int i=0;i<start;i++)if(drawing->Items[i].Type==1){auto p=CoordinateAxes::Sub(CoordinateAxes::Point(drawing->Items[i].X1/(double)DRWZOOM,drawing->Items[i].Y1/(double)DRWZOOM),g.origin);double x=fabs(CoordinateAxes::Dot(p,g.u)),y=fabs(CoordinateAxes::Dot(p,g.v));if(x>.1)sx=(std::min)(sx,x);if(y>.1)sy=(std::min)(sy,y);}if(sx<1e90)settings.xSpacing=sx;if(sy<1e90)settings.ySpacing=sy;}}
++    CCoordinateGridDialog dialog(drawing,start,settings);if(dialog.DoModal()!=IDOK){SetFocus();return;}if(index>=NumDocumentElements||TheDocument[index].Object!=(CObject*)drawing)return;CClientDC dc(this);std::string error;tDrawingItem axes[6];for(int i=0;i<6;i++)axes[i]=drawing->Items[start+i];CDrawing *next=CoordinateBuild(axes,dialog.settings,&dc,error);if(!next){AfxMessageBox(error.c_str());return;}next->m_Color=drawing->m_Color;CoordinateKeepLabels(drawing,next,dialog.settings);char selected=drawing->IsSelected;int x,y,w,h;next->AdjustCoordinates(&x,&y,&w,&h);UndoSave("coordinate grid and labels",20104);drawing->CopyDrawing(next);delete next;drawing->SelectDrawing(selected);object=TheDocument+index;object->absolute_X+=x;object->absolute_Y+=y;object->Length=w;object->Above=0;object->Below=h;prevTouchedObject=NULL;LastQuickTypeObject=NULL;LastCursorPositionExpression=NULL;ExplicitTypingRoot=NULL;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
++}
++void CMathomirView::OnCoordinateAxesGrid(){for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object==SelectedDocumentObject||object->MovingDotState==3)){CoordinateAxes::Geometry g;if(((CDrawing*)object->Object)->CoordinateGeometry(g)){EditCoordinateAxesGrid(object);return;}}}AfxMessageBox("Select or right-click coordinate axes, then choose Grid and axis labels.");}
++
+ class CPolygonPreview : public CStatic
+ {
+ public:
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -97,6 +97,8 @@
+ 	//int CheckDocumentMemoryReservations(void);
+ 	int PaintClipboard(int X, int Y);
+ 	int RestoreClipboardBackground(void);
++    void EditCoordinateAxesGrid(tDocumentStruct *object);
++    afx_msg void OnCoordinateAxesGrid();
+ 	void CancelFloatingPlacement();
+ 	void PaintDrawingHotspot(char erase_only=0);
+ 	int DeleteDocumentObject(tDocumentStruct* object);
+--- a/Mathomir/PopupMenu.cpp
++++ b/Mathomir/PopupMenu.cpp
+@@ -111,6 +111,9 @@
+ 	Options[m_NumOptions].IsChecked=0;
+ 	Options[m_NumOptions].IsEnabled=(Data>=0)?1:0;
+ 	Options[m_NumOptions].Data=Data;
++#ifdef MATHOMIR_AI_TESTING
++    if(Data==594 && getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *f=fopen("coordinate-axes-menu.txt","w");if(f){fprintf(f,"%d %d",X+Cx/2,PopupOption_Y+TSize/8);fclose(f);}}
++#endif
+ 	if (new_line) PopupOption_Y+=Options[m_NumOptions].Cy;
+ 	m_NumOptions++;
+ 	return 0;
+@@ -691,10 +694,10 @@
+ 					//AddMenuOption(TSize/3,TSize*2,"Add radius line ",591,1);
+ 					//AddMenuOption(TSize/3,TSize*2,"Add diameter line ",592,1);
+ 				}
+-				if ((((CDrawing*)(dss->Object))->OriginalForm==9) ||  //xy graph
+-					(((CDrawing*)(dss->Object))->OriginalForm==8))    //xy graph
+-				{
+-					AddMenuOption(TSize/3,TSize*2+TSize_1p2,"Add grid lines ",594,1);
++				CoordinateAxes::Geometry axesGeometry;
++                if (((CDrawing*)dss->Object)->CoordinateGeometry(axesGeometry))
++				{
++					AddMenuOption(TSize/3,TSize*2+TSize_1p2,"Grid and axis labels... ",594,1);
+ 				}
+ 								
+ 				
+@@ -2554,91 +2557,7 @@
+ 						di->Y2=(Popup_CursorY-ds->absolute_Y)*DRWZOOM;
+ 						
+ 					}*/
+-					if (data==594) //add grid lines to coordinate system
+-					{
+-						((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("add grid lines",20104);
+-						CDrawing *drw=(CDrawing*)(ds->Object);
+-						int minx,miny,maxx,maxy;
+-						drw->FindRealCorner(&minx,&miny,&maxx,&maxy);
+-						int cx=(minx+maxx)/2;
+-						int cy=(miny+maxy)/2;
+-						int lx=cx;
+-						int ly=cy;
+-						int form=0x0F;
+-						if (drw->OriginalForm==8)
+-						{
+-							cx=drw->Items->X1;
+-							cy=drw->Items->Y1;
+-							cx/=DRWZOOM;
+-							cy/=DRWZOOM;
+-							if (cx>maxx/2) form&=0x0E; else form&=0x0D;
+-							if (cy>maxy/2) form&=0x0B; else form&=0x07;
+-							lx=maxx-minx;
+-							ly=maxy-miny;
+-						}
+-						drw->OriginalForm=0;
+-
+-						int g=1;
+-						for (int ii=GRID;ii<lx;ii+=GRID)
+-						{				
+-							tDrawingItem *di;
+-							if (form&0x01)
+-							{
+-							drw->InsertItemAt(0);
+-							di=drw->Items;
+-							di->LineWidth=(g%5)?(DRWZOOM/2):DRWZOOM;
+-							di->Type=1;
+-							di->pSubdrawing=NULL;
+-							di->X1=(ii+cx)*DRWZOOM;
+-							di->Y1=miny*DRWZOOM;
+-							di->X2=(ii+cx)*DRWZOOM;
+-							di->Y2=maxy*DRWZOOM;
+-							}
+-							if (form&0x02)
+-							{
+-							drw->InsertItemAt(0);
+-							di=drw->Items;
+-							di->LineWidth=(g%5)?(DRWZOOM/2):DRWZOOM;
+-							di->Type=1;
+-							di->pSubdrawing=NULL;
+-							di->X1=(cx-ii)*DRWZOOM;
+-							di->Y1=miny*DRWZOOM;
+-							di->X2=(cx-ii)*DRWZOOM;
+-							di->Y2=maxy*DRWZOOM;
+-							}
+-							g++;
+-						}
+-						g=1;
+-						for (int ii=GRID;ii<ly;ii+=GRID)
+-						{	
+-							tDrawingItem *di;
+-							if (form&0x04)
+-							{
+-							drw->InsertItemAt(0);
+-							di=drw->Items;
+-							di->LineWidth=(g%5)?(DRWZOOM/2):DRWZOOM;
+-							di->Type=1;
+-							di->pSubdrawing=NULL;
+-							di->X1=minx*DRWZOOM;
+-							di->Y1=(ii+cy)*DRWZOOM;
+-							di->X2=maxx*DRWZOOM;
+-							di->Y2=(ii+cy)*DRWZOOM;
+-							}
+-							if (form&0x08)
+-							{
+-							drw->InsertItemAt(0);
+-							di=drw->Items;
+-							di->LineWidth=(g%5)?(DRWZOOM/2):DRWZOOM;
+-							di->Type=1;
+-							di->pSubdrawing=NULL;
+-							di->X1=minx*DRWZOOM;
+-							di->Y1=(cy-ii)*DRWZOOM;
+-							di->X2=maxx*DRWZOOM;
+-							di->Y2=(cy-ii)*DRWZOOM;
+-							}
+-							g++;
+-						}
+-					}
++                    if(data==594){HidePopupMenu();pMainView->EditCoordinateAxesGrid(ds);return;}
+ 					if (data==593) //close path
+ 					{
+ 						if (found==0) ((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("close path",20105);
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -317,3 +317,6 @@
+ 
+ #define ID_AI_HELP 33102
+ #define IDD_AI_HELP 192
++
++#define ID_COORDINATE_GRID_EDIT 33103
++#define IDD_COORDINATE_GRID_EDIT 193
+--- /dev/null
++++ b/Mathomir/CoordinateAxes.h
+@@ -0,0 +1,62 @@
++#pragma once
++#include "Piecewise.h"
++#include <algorithm>
++#include <cmath>
++#include <cstdio>
++#include <cstring>
++#include <sstream>
++#include <iomanip>
++#include <locale>
++#include <string>
++#include <vector>
++namespace CoordinateAxes {
++const double pi=3.14159265358979323846;
++struct Point {double x,y;Point(double a=0,double b=0):x(a),y(b){}};
++inline Point Add(Point a,Point b){return Point(a.x+b.x,a.y+b.y);}
++inline Point Mul(Point a,double n){return Point(a.x*n,a.y*n);}
++inline Point Sub(Point a,Point b){return Point(a.x-b.x,a.y-b.y);}
++inline double Dot(Point a,Point b){return a.x*b.x+a.y*b.y;}
++inline double Cross(Point a,Point b){return a.x*b.y-a.y*b.x;}
++inline double Length(Point a){return std::sqrt(Dot(a,a));}
++struct Segment {Point a,b;Segment(Point x=Point(),Point y=Point()):a(x),b(y){}};
++struct Geometry {Point origin,u,v;double xmin,xmax,ymin,ymax;int form;Point At(double x,double y)const{return Add(origin,Add(Mul(u,x),Mul(v,y)));}};
++inline bool GeometryFromAxes(const std::vector<Segment>& lines,Geometry &g){
++    if(lines.size()!=6)return false;Point a=Sub(lines[0].b,lines[0].a),b=Sub(lines[3].b,lines[3].a);
++    double la=Length(a),lb=Length(b),cross=Cross(b,a);if(la<.1||lb<.1||std::fabs(cross)<.98*la*lb)return false;
++    for(int first:{1,4}){
++        if(Length(Sub(lines[first].a,lines[first+1].a))>.15)return false;
++        Point c=Sub(lines[first].b,lines[first].a),d=Sub(lines[first+1].b,lines[first].a);double lc=Length(c),ld=Length(d);
++        if(lc<.03||ld<.03||lc>.9*(std::min)(la,lb)||ld>.9*(std::min)(la,lb)||Dot(c,d)<=0)return false;
++        const Segment &shaft=lines[first==1?0:3];
++        if((std::min)(Length(Sub(lines[first].a,shaft.a)),Length(Sub(lines[first].a,shaft.b)))>.2)return false;
++    }
++    Point q=Sub(lines[0].a,lines[3].a);double t=Cross(q,a)/cross;
++    g.origin=Add(lines[3].a,Mul(b,t));g.u=Sub(lines[4].a,g.origin);g.v=Sub(lines[1].a,g.origin);
++    double lu=Length(g.u),lv=Length(g.v);if(lu<.05||lv<.05)return false;g.u=Mul(g.u,1/lu);g.v=Mul(g.v,1/lv);
++    double x1=Dot(Sub(lines[3].a,g.origin),g.u),x2=Dot(Sub(lines[3].b,g.origin),g.u),y1=Dot(Sub(lines[0].a,g.origin),g.v),y2=Dot(Sub(lines[0].b,g.origin),g.v);
++    g.xmin=(std::min)(x1,x2);g.xmax=(std::max)(x1,x2);g.ymin=(std::min)(y1,y2);g.ymax=(std::max)(y1,y2);
++    if(g.xmin>.2||g.xmax<-.2||g.ymin>.2||g.ymax<-.2)return false;
++    g.form=g.xmin<-.2&&g.xmax>.2&&g.ymin<-.2&&g.ymax>.2?9:8;return true;
++}
++enum Format {Decimal,Fraction,PiFraction,Degrees,Scientific};
++struct Settings {
++    int role,form,major,minorDarkness,majorDarkness,color,style,labelFont,labelEvery,decimals,xFormat,yFormat;
++    double xSpacing,ySpacing,xValue,yValue,width;
++    bool grid,xLabels,yLabels,origin,names,avoidOverlap;
++    std::string xStepText,yStepText;std::wstring xName,yName;
++    Settings():role(0),form(8),major(5),minorDarkness(30),majorDarkness(55),color(0),style(0),labelFont(60),labelEvery(1),decimals(-1),xFormat(Decimal),yFormat(Decimal),xSpacing(20),ySpacing(20),xValue(1),yValue(1),width(.5),grid(true),xLabels(true),yLabels(true),origin(true),names(true),avoidOverlap(true),xStepText("1"),yStepText("1"),xName(L"x"),yName(L"y"){}
++};
++inline bool Valid(const Settings&s,std::string &error){
++    if(!std::isfinite(s.xSpacing)||!std::isfinite(s.ySpacing)||s.xSpacing<1e-9||s.xSpacing>1e9||s.ySpacing<1e-9||s.ySpacing>1e9){error="Cell spacing must be a positive finite number.";return false;}
++    if(!std::isfinite(s.xValue)||!std::isfinite(s.yValue)||s.xValue<1e-12||s.yValue<1e-12||s.xValue>1e9||s.yValue>1e9){error="Value per cell must be positive, from 1e-12 to 1e9.";return false;}
++    if(s.major<1||s.major>20||s.labelEvery<1||s.labelEvery>20||s.labelFont<10||s.labelFont>32700||s.decimals<-1||s.decimals>8||s.minorDarkness<0||s.minorDarkness>100||s.majorDarkness<0||s.majorDarkness>100||s.color<0||s.color>3||s.style<0||s.style>2||!std::isfinite(s.width)||s.width<.25||s.width>4||s.xFormat<0||s.xFormat>4||s.yFormat<0||s.yFormat>4||s.xName.size()>16||s.yName.size()>16||s.xStepText.size()>80||s.yStepText.size()>80){error="Check line appearance, label size, precision and label frequency.";return false;}
++    error.clear();return true;
++}
++inline bool ReadStep(std::string text,double &value){for(char &c:text)c=(char)std::tolower((unsigned char)c);Piecewise::Formula f;std::string error;if(text.empty()||text.size()>80||!f.Parse(text,error)||f.usesX)return false;value=f.Value(0,true);return std::isfinite(value)&&value>=1e-12&&value<=1e9;}
++inline bool Ticks(double low,double high,double spacing,std::vector<int>& out){out.clear();if(!std::isfinite(low)||!std::isfinite(high)||!std::isfinite(spacing)||spacing<=0||low>high)return false;double a=std::ceil(low/spacing-1e-9),b=std::floor(high/spacing+1e-9);if(std::fabs(a)>1e7||std::fabs(b)>1e7||b-a>500)return false;for(int n=(int)a;n<=(int)b;n++)out.push_back(n);return true;}
++inline bool Rational(double value,long long &n,long long &d,int limit=4096){if(!std::isfinite(value)||std::fabs(value)>1e12)return false;for(d=1;d<=limit;d++){double scaled=value*d;long long candidate=(long long)std::llround(scaled);if((candidate!=0||value==0)&&std::fabs(value-candidate/(double)d)<1e-9){n=candidate;return true;}}return false;}
++inline std::string Number(double value,int decimals=-1){if(std::fabs(value)<1e-12)value=0;std::ostringstream o;o.imbue(std::locale::classic());if(decimals>=0){double half=.5*std::pow(10.,-decimals);if(std::fabs(value)<half)value=0;o<<std::fixed<<std::setprecision(decimals)<<value;}else o<<std::setprecision(10)<<value;std::string t=o.str();return t=="-0"?"0":t;}
++inline unsigned long Ink(const Settings&s,bool major){int darkness=major?s.majorDarkness:s.minorDarkness;static const int base[4][3]={{0,0,0},{35,85,180},{25,125,75},{175,35,35}};unsigned long c=0;for(int i=0;i<3;i++){int v=(int)std::lround(255+(base[s.color][i]-255)*darkness/100.);c|=(unsigned long)v<<(8*i);}return c;}
++inline std::vector<Segment> Styled(Segment line,int style){std::vector<Segment> out;Point d=Sub(line.b,line.a);double length=Length(d);if(length<.001)return out;if(style==0){out.push_back(line);return out;}double mark=style==1?6.:.8,gap=style==1?4.:3.2;for(double at=0;at<length;at+=mark+gap){if(out.size()>12000){out.clear();return out;}out.push_back(Segment(Add(line.a,Mul(d,at/length)),Add(line.a,Mul(d,(std::min)(length,at+mark)/length))));}return out;}
++inline unsigned Checksum(const Settings&s){if(!s.role)return 0;std::ostringstream o;o.imbue(std::locale::classic());o<<std::setprecision(17)<<s.role<<','<<s.form<<','<<s.major<<','<<s.minorDarkness<<','<<s.majorDarkness<<','<<s.color<<','<<s.style<<','<<s.labelFont<<','<<s.labelEvery<<','<<s.decimals<<','<<s.xFormat<<','<<s.yFormat<<','<<s.xSpacing<<','<<s.ySpacing<<','<<s.xValue<<','<<s.yValue<<','<<s.width<<','<<s.grid<<s.xLabels<<s.yLabels<<s.origin<<s.names<<s.avoidOverlap<<s.xStepText<<','<<s.yStepText;unsigned h=2166136261u;for(unsigned char c:o.str()){h^=c;h*=16777619u;}for(wchar_t c:s.xName+s.yName){h^=(unsigned)c;h*=16777619u;}return h;}
++}

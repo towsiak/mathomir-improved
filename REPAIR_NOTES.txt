@@ -504,3 +504,5 @@ Large-object resize fix: remove the 800% font ceiling from the resize grip and k
 Freehand smoothing now rounds sparse captured bends instead of pinning sharp vertices, retains densely sampled smooth curves after filtering, and preserves endpoints, native editing, and Undo.
 
 Copies now retain authored child font proportions instead of snapping small differences back to defaults, preventing visible superscript changes during resizing and Undo.
+
+Coordinate-axis drawings now offer Grid and axis labels on right-click and in Draw. Edit independent x/y cell spacing and values per cell, minor/major darkness, emphasis frequency, color, solid/dashed/dotted lines and thickness, decimal/fraction/pi/degree/scientific labels, Greek axis names, label frequency/precision/size and overlap avoidance. Includes a live native preview, pi/2 trig preset, existing-grid upgrade, persistence, resizing, rotation and Undo.
