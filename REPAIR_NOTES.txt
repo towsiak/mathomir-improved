@@ -514,3 +514,6 @@ OFFLINE FORMULA REFERENCE AND MULTIPLE FREE AI SERVICES
 - Groq and Gemini free-tier options, plus OpenRouter restricted to free models. Each provider uses its own key, Credential Manager target and remembered model.
 - Direct key/limits links and a small connection test that preserves the entered math. Service free plans require your own account/key and have quotas; account eligibility and current provider terms apply.
 - Formula references run offline; no model weights, browser engine or SDK is bundled.
+
+AI CONVERSATION LAYOUT
+The scrollable conversation is above the question box, as in a standard chat window. Send adds an exchange and clears the composer after a successful reply. Follow-up questions include the visible conversation. New chat clears the history; changing providers also starts a new chat. Failed/cancelled requests preserve the entered question and earlier replies. Test connection preserves both the chat and the question. Copy reply copies the latest completed answer. History stays in this window only, with the latest 12 exchanges retained (160 KB maximum); a visible notice appears if older exchanges are removed. No chat is stored in a .mom file.

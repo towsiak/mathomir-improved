@@ -14,6 +14,8 @@ class Handler(BaseHTTPRequestHandler):
         with record_file.open('a', encoding='utf-8') as f:
             f.write(json.dumps(dict(path=self.path, input=data.get('input'), model=data.get('model'), store=data.get('store'), stream=data.get('stream'), authenticated=valid), ensure_ascii=False) + '\n')
         text = data.get('input', '')
+        if isinstance(text, list):
+            text = text[-1].get('content', '')
         code = 200
         body = {'status': 'completed', 'output': [{'type': 'reasoning', 'summary': []}, {'type': 'message', 'role': 'assistant', 'content': [{'type': 'output_text', 'text': 'ln(2) ≈ 0.6931\n\nThis is an offline test-server response.'}]}]}
         if '[angle-format]' in text:
