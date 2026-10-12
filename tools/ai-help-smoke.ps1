@@ -43,8 +43,11 @@ try{
  [MathomirUiProbe]::Mouse($view,512,0,105,126);[MathomirUiProbe]::Mouse($view,516,2,105,126);[MathomirUiProbe]::Mouse($view,517,0,105,126);Start-Sleep -Milliseconds 100;$popup=[MathomirUiProbe]::Window($appProcess.Id,'PopupMenu');$panel=[MathomirUiProbe]::CaptionChild($popup,'Math selection');Check ($panel -ne [IntPtr]::Zero) 'Selection panel missing'
  [MathomirUiProbe]::Mouse($view,512,0,470,330);Start-Sleep -Milliseconds 350;Check ([MathomirUiProbe]::IsWindowVisible($panel)) 'Approximation panel vanished while crossing the page'
  $button=[MathomirUiProbe]::Child($panel,1394);Check ($button -ne [IntPtr]::Zero) 'AI Explain button missing'
+ # Exercise a real button hover before the posted click; a stationary cursor
+ # elsewhere can cancel native button capture on a slower instrumented run.
+ [MathomirUiProbe]::Mouse($button,512,0,20,12)
  [MathomirUiProbe]::PostMessage($button,513,[IntPtr]1,[IntPtr](12 -shl 16 -bor 20))|Out-Null;[MathomirUiProbe]::PostMessage($button,514,[IntPtr]0,[IntPtr](12 -shl 16 -bor 20))|Out-Null
- Start-Sleep -Milliseconds 400;$d=[MathomirUiProbe]::Window($appProcess.Id,'AI math help');Check ($d -ne [IntPtr]::Zero) 'AI Explain button did not open the dialog'
+ $d=[IntPtr]::Zero;for($attempt=0;$attempt -lt 30;$attempt++){Start-Sleep -Milliseconds 100;$d=[MathomirUiProbe]::Window($appProcess.Id,'AI math help');if($d -ne [IntPtr]::Zero){break}};Check ($d -ne [IntPtr]::Zero) 'AI Explain button did not open the dialog'
  Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1402)) -eq '2') 'Selected math was not imported'
  foreach($id in @(1402,1407,1411,1414)){Check ([AiUI]::IsWindowUnicode([MathomirUiProbe]::Child($d,$id))) ('ANSI edit control: '+$id)}
  $dialogBounds=[MathomirUiProbe]::WindowRect($d);$closeBounds=[MathomirUiProbe]::WindowRect([MathomirUiProbe]::Child($d,2));Check ($closeBounds.Bottom -lt [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Bottom) 'Close button falls off the screen'
