@@ -7,6 +7,14 @@ $env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $grip=Get-Content (Join-Path $PSScriptRoot 'large-resize-grip-smoke.ps1') -Raw
 $start=$grip.IndexOf("Add-Type @'")
 Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('if(pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)return new int[]{x,y};','if((pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)||(pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180)){bool line=true;for(int k=0;k<20;k++){int j=(y*width+x+k)*4;if(!((pixels[j]<30&&pixels[j+1]<30&&pixels[j+2]<30)||(pixels[j]>220&&pixels[j+1]<180&&pixels[j+2]<180))){line=false;break;}}if(line)return new int[]{x,y};}')
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class CoordinatePrintProbe {
+ [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr hwnd,uint msg,IntPtr wparam,IntPtr lparam,uint flags,uint timeout,out UIntPtr result);
+ public static long Send(IntPtr hwnd,uint msg,int w,int l){UIntPtr result;if(SendMessageTimeout(hwnd,msg,(IntPtr)w,(IntPtr)l,2,10000,out result)==IntPtr.Zero)throw new Exception("Coordinate print probe did not respond");return (long)result.ToUInt64();}
+}
+'@
 $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
@@ -81,7 +89,7 @@ try{
  }
  foreach($kind in @(@{name='corner';corner=$true;legacy=$false},@{name='legacy';corner=$false;legacy=$true})){
   Scene $kind.name $kind.corner $kind.legacy;$raw=SaveDoc;$dialog=OpenEditor;SetValue $dialog 1450 '36';SetValue $dialog 1451 '28';Box $dialog 1476 0;CloseEditor $dialog $true;$d=SaveDoc
-  if(!$kind.legacy){SameAxes $raw $d};Check ((Model $d).grid -eq '0') 'Grid could not be hidden';$without=@();foreach($mode in 1..3){$without+=[MathomirUiProbe]::Send($view,32923,$mode,1)};$dialog=OpenEditor;Box $dialog 1476 1;CloseEditor $dialog $true;$d=SaveDoc;Check ((Model $d).grid -eq '1') 'Grid could not be restored after hiding';foreach($mode in 1..3){$printed=[MathomirUiProbe]::Send($view,32923,$mode,1);Check ($printed -gt $without[$mode-1]+100) ('Coordinate grid missing from actual print/preview path '+$mode)}
+  if(!$kind.legacy){SameAxes $raw $d};Check ((Model $d).grid -eq '0') 'Grid could not be hidden';$without=@();foreach($mode in 1..3){$without+=[CoordinatePrintProbe]::Send($view,32923,$mode,1)};$dialog=OpenEditor;Box $dialog 1476 1;CloseEditor $dialog $true;$d=SaveDoc;Check ((Model $d).grid -eq '1') 'Grid could not be restored after hiding';foreach($mode in 1..3){$printed=[CoordinatePrintProbe]::Send($view,32923,$mode,1);Check ($printed -gt $without[$mode-1]+100) ('Coordinate grid missing from actual print/preview path '+$mode)}
  }
  Write-Output 'Coordinate editor passed: actual context/menu route, preview contrast and styles, independent spacing and units, native negative pi/fraction/scientific labels, Greek names, Cancel, save/reopen, existing-grid editing, no duplicates, Undo, corner axes, legacy grids, native grip resizing and actual print/preview at 100/50 percent.'
 }finally{
