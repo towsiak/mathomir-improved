@@ -1,0 +1,135 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -21,6 +21,7 @@
+ 
+ #include "ScalarFunctions.h"
+ #include "stdafx.h"
++#include "UnitCircleGeometry.h"
+ #include "SymbolicDerivative.h"
+ #include "ColorPalette.h"
+ #include "GeometryShapes.h"
+@@ -13321,13 +13322,13 @@
+ class CUnitCircleDialog:public CFeatureDialog
+ {
+ public:
+-    double start,end;int radius;bool radians,clockwise,labels,coordinates,common,triangle,points;std::vector<double> pointAngles;
+-    CUnitCircleDialog():CFeatureDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),radians(false),clockwise(false),labels(true),coordinates(true),common(false),triangle(true),points(true){}
++    double start,end;int radius,direction;bool radians,labels,coordinates,common,triangle,points;std::vector<double> pointAngles;
++    CUnitCircleDialog():CFeatureDialog(IDD_UNIT_CIRCLE,theApp.m_pMainWnd),start(0),end(90),radius(150),direction(0),radians(false),labels(true),coordinates(true),common(false),triangle(true),points(true){}
+     virtual BOOL OnInitDialog()
+     {
+         CFeatureDialog::OnInitDialog();SetDlgItemText(IDC_UNIT_START,"0");SetDlgItemText(IDC_UNIT_END,"90");SetDlgItemInt(IDC_UNIT_RADIUS,radius);
+         CComboBox *unit=(CComboBox*)GetDlgItem(IDC_UNIT_MODE);unit->AddString("Degrees");unit->AddString("Radians (pi/3, 2*pi/3, or decimal)");unit->SetCurSel(0);
+-        CComboBox *direction=(CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION);direction->AddString("Counterclockwise");direction->AddString("Clockwise");direction->SetCurSel(0);
++        CComboBox *direction=(CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION);direction->AddString("Automatic (end minus start)");direction->AddString("Counterclockwise");direction->AddString("Clockwise");direction->SetCurSel(0);
+         CheckDlgButton(IDC_UNIT_POINTS,BST_CHECKED);CheckDlgButton(IDC_UNIT_LABELS,BST_CHECKED);CheckDlgButton(IDC_UNIT_COORDINATES,BST_CHECKED);CheckDlgButton(IDC_UNIT_TRIANGLE,BST_CHECKED);return TRUE;
+     }
+     virtual void OnOK()
+@@ -13350,7 +13351,7 @@
+             }
+         }
+         points=IsDlgButtonChecked(IDC_UNIT_POINTS)==BST_CHECKED;
+-        clockwise=((CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION))->GetCurSel()==1;
++        direction=((CComboBox*)GetDlgItem(IDC_UNIT_DIRECTION))->GetCurSel();
+         labels=IsDlgButtonChecked(IDC_UNIT_LABELS)==BST_CHECKED;coordinates=IsDlgButtonChecked(IDC_UNIT_COORDINATES)==BST_CHECKED;
+         common=IsDlgButtonChecked(IDC_UNIT_COMMON)==BST_CHECKED;triangle=IsDlgButtonChecked(IDC_UNIT_TRIANGLE)==BST_CHECKED;CFeatureDialog::OnOK();
+     }
+@@ -13364,6 +13365,7 @@
+ }
+ static void UnitNumber(CExpression *expression,double value,bool exact=false)
+ {
++    if(value<0){UnitAppend(expression,2,'-');value=-value;}
+     int position=UnitAppend(expression,1,'0');
+     CString number(MathDisplay::AsciiNumber(value).c_str());if(exact)number.Format("%.17g",value);
+     strncpy(expression->m_pElementList[position].pElementObject->Data1,number,23);
+@@ -13539,22 +13541,17 @@
+     double r=setup.radius,c=r+85,pi=3.14159265358979323846;
+     for(int i=0;i<180;i++){double a=i*2*pi/180,b=(i+1)*2*pi/180;IntervalLine(drawing,c+r*cos(a),c-r*sin(a),c+r*cos(b),c-r*sin(b));}
+     IntervalLine(drawing,c-r-15,c,c+r+15,c);IntervalLine(drawing,c,c-r-15,c,c+r+15);
+-    double sweep=fmod(setup.end-setup.start,360.);
+-    if(setup.clockwise){if(sweep>0)sweep-=360;}else if(sweep<0)sweep+=360;
+-    if(fabs(sweep)<1e-8 && fabs(setup.end-setup.start)>1e-8)sweep=setup.clockwise?-360:360;
+-    int segments=max(1,(int)ceil(fabs(sweep)/2));
+-    double arc=r*.7;
+-    for(int i=0;i<segments;i++){double a=(setup.start+sweep*i/segments)*pi/180,b=(setup.start+sweep*(i+1)/segments)*pi/180;IntervalLine(drawing,c+arc*cos(a),c-arc*sin(a),c+arc*cos(b),c-arc*sin(b),3);}
+-    double end=setup.end*pi/180,sign=setup.clockwise?-1:1;
+-    double tipX=c+arc*cos(end),tipY=c-arc*sin(end),tx=-sin(end)*sign,ty=-cos(end)*sign;
+-    IntervalLine(drawing,tipX,tipY,tipX-tx*10+ty*5,tipY-ty*10-tx*5,2);IntervalLine(drawing,tipX,tipY,tipX-tx*10-ty*5,tipY-ty*10+tx*5,2);
++    UnitCircleGeometry::Arc(setup.start,setup.end,setup.direction,r*.7,c,
++        [&](double x1,double y1,double x2,double y2,int width){IntervalLine(drawing,x1,y1,x2,y2,width);});
++    double end=setup.end*pi/180;
+     for(int endpoint=0;endpoint<2;endpoint++)
+     {
+-        if(endpoint && fabs(remainder(setup.end-setup.start,360.))<1e-8)continue;
++        if(endpoint && fabs(setup.end-setup.start)<1e-8)continue;
++        bool sameRay=endpoint && fabs(remainder(setup.end-setup.start,360.))<1e-8;
+         double angle=endpoint?setup.end:setup.start,a=angle*pi/180,x=c+r*cos(a),y=c-r*sin(a);IntervalLine(drawing,c,c,x,y,2);if(setup.points)UnitPoint(drawing,x,y);
+         CExpression label(NULL,NULL,80);
+-        if(setup.labels){UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a),0,0);}
+-        if(setup.coordinates)
++        if(setup.labels){UnitAngleLabel(&label,angle,setup.radians);drawing->CopyExpressionIntoSubgroup(&label,c+(r+35)*cos(a)-15,c-(r+35)*sin(a)+(sameRay?20:0),0,0);}
++        if(setup.coordinates && !sameRay)
+         {
+             CExpression coordinates(NULL,NULL,70);coordinates.InsertEmptyElement(0,2,'(');UnitValue(&coordinates,cos(a));coordinates.InsertEmptyElement(coordinates.m_NumElements,2,',');UnitValue(&coordinates,sin(a));coordinates.InsertEmptyElement(coordinates.m_NumElements,2,')');
+             drawing->CopyExpressionIntoSubgroup(&coordinates,c+(r+65)*cos(a)-25,c-(r+65)*sin(a)+10,0,0);
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -69,7 +69,7 @@
+     if(dialog==IDD_SYMBOLIC_DERIVATIVE){if(id==1300)return "Enter a symbolic formula. Supports products, quotients, chain rules and functions such as sin(x), exp(x), ln(x), sqrt(x) and x^x.";if(id==1301)return "Single differentiation variable. Other variables are treated as constant parameters.";if(id==1302)return "Choose the first through fifth derivative. Higher orders repeatedly differentiate the symbolic result.";if(id==1303)return "Compute and simplify the derivative symbolically, then show rules and domain notes.";if(id==1304)return "Typeset editable result. Exact coefficients and expressions are preserved.";if(id==1305)return "Formula syntax for the derivative, useful for copying or inspecting the expression.";if(id==1306)return "Include the original derivative operation and equals sign when placing the result.";if(id==1307)return "Evaluation point; constants such as 1/2 and pi/3 are accepted. Trigonometric derivatives use radians.";if(id==1308)return "Evaluate the current derivative at the typed point. Unsupported parameters or undefined points are explained.";if(id==1309)return "Numerical derivative value or validation message, using your display-rounding choice.";if(id>=1310&&id<=1313)return "Load and differentiate an editable example.";if(id==1314)return "Rules used and domain limitations. Differentiation does not restore excluded points.";}
+     if(dialog==IDD_STATISTICS_REGRESSION){if(id==1340)return "Paste up to 256 x,y pairs, one per line. Separate columns with commas, tabs, semicolons or spaces. An x,y header is optional; data are kept at full precision.";if(id==1341)return "Linear; polynomial degrees 2-6; exponential; logarithmic; or power fit. Exponential/power least squares fits ln(y); quality statistics use original y. Logarithmic/power require x > 0; exponential/power require y > 0.";if(id==1342)return "Calculate the selected least-squares fit, summaries, residuals and preview. Invalid or singular data produce an explanation.";if(id==1343)return "Replace the dialog data with an example for the selected model, then calculate it.";if(id==1344)return "Blue dots show data; the black curve is the fitted model. Residual mode shows observed minus predicted y with a zero line.";if(id==1345)return "Legend for the current scatter or residual preview.";if(id==1346)return "Column summaries, quartiles, sample/population SD, Pearson r, R-squared, SSE, RMSE and residual standard error. Residuals are observed minus predicted y. Undefined statistics are identified explicitly.";if(id==1347)return "Place or preview residuals instead of observed y. Original data remain saved for editing and refitting.";if(id==1348)return "Fit quality, prediction or validation message. R-squared is undefined for constant responses.";if(id==1349)return "Place the typeset fitted equation with an approximate-equals sign. Logarithmic and power fits show x > 0.";if(id==1350)return "Typeset fitted equation. Rounding controls numerical readouts; the fit itself retains full precision.";if(id==1351)return "Prediction x value, such as 2, 1/2 or pi. Predictions outside the data range are extrapolations.";if(id==1352)return "Evaluate the fitted model at the typed x. Logarithmic/power predictions require x > 0.";}
+     if(dialog==IDD_POLYGON_CONSTRUCTOR){static const char *tips[]={"Construct a regular polygon with equally spaced vertices.","Construct a polygon from typed vertices in boundary order. Concave outlines are allowed; crossings are rejected.","Choose a regular preset; the side count remains editable.","Whole-number side count from 3 to 64.","Interpret the size value as circumradius or side length.","Coordinate-space circumradius or side length; this determines area/perimeter, independently of page size.","Rotation in degrees around the polygon centre.","Reverse the regular polygon's winding direction.","Enter ordered vertices such as (0,0), (4,0), (4,3). Constants and concave outlines are supported.","", "Convert the regular polygon to editable custom coordinates.","Load a custom concave example.","Reverse vertex order without changing the outline.","Page drawing size, 40-1000 units. Resizing the page object does not change coordinate-space measurements.","Outline width, a whole number from 1 to 8.","Show vertex labels.","Show each vertex's coordinate pair.","Draw diagonals between nonadjacent vertices.","Area, perimeter and validation message. Rounding affects displayed measurements only.","Preview uses equal horizontal and vertical scales. Labels and markers update live.","Show interior-angle markers, including reflex angles in concave polygons.","Show numerical interior-angle values in degrees."};if(id>=1280&&id<=1301)return tips[id-1280];}
+-    if(dialog==IDD_UNIT_CIRCLE){if(id==IDC_UNIT_START||id==IDC_UNIT_END)return "Angle measured from the positive x-axis, in the selected units. Negative angles and up to ten turns are allowed; radians accept pi/6.";if(id==IDC_UNIT_MODE)return "Degrees or radians for all angle entries, including extra points. Pi fractions may be entered in radians.";if(id==IDC_UNIT_DIRECTION)return "Choose clockwise or counterclockwise arc direction.";if(id==IDC_UNIT_RADIUS)return "Page radius from 60 to 600. The mathematical unit-circle coordinates remain unchanged when resized.";if(id==IDC_UNIT_LABELS)return "Show start/end and selected point angles.";if(id==IDC_UNIT_COORDINATES)return "Show point coordinates. Common angles keep exact fractions and radicals.";if(id==IDC_UNIT_COMMON)return "Add standard teaching angles and points around the circle.";if(id==IDC_UNIT_TRIANGLE)return "Draw the end-angle right triangle with horizontal and vertical components.";if(id==IDC_UNIT_POINTS)return "Mark start, end, common and extra point locations on the circle.";if(id==IDC_UNIT_POINT_ANGLES)return "Optional comma-separated angles, up to 32, in the selected units. Example: pi/6, pi/4, 2*pi/3.";}
++    if(dialog==IDD_UNIT_CIRCLE){if(id==IDC_UNIT_START||id==IDC_UNIT_END)return "Angle measured from the positive x-axis, in the selected units. Negative angles and up to ten turns are allowed; radians accept pi/6.";if(id==IDC_UNIT_MODE)return "Degrees or radians for all angle entries, including extra points. Pi fractions may be entered in radians.";if(id==IDC_UNIT_DIRECTION)return "Automatic follows end minus start: 0 to -90 is a clockwise quarter-turn. Choose an explicit direction only to override that signed rotation.";if(id==IDC_UNIT_RADIUS)return "Page radius from 60 to 600. The mathematical unit-circle coordinates remain unchanged when resized.";if(id==IDC_UNIT_LABELS)return "Show start/end and selected point angles.";if(id==IDC_UNIT_COORDINATES)return "Show point coordinates. Common angles keep exact fractions and radicals.";if(id==IDC_UNIT_COMMON)return "Add standard teaching angles and points around the circle.";if(id==IDC_UNIT_TRIANGLE)return "Draw the end-angle right triangle with horizontal and vertical components.";if(id==IDC_UNIT_POINTS)return "Mark start, end, common and extra point locations on the circle.";if(id==IDC_UNIT_POINT_ANGLES)return "Optional comma-separated angles, up to 32, in the selected units. Example: pi/6, pi/4, 2*pi/3.";}
+     if(dialog==IDD_TABLE_SETUP){if(id==IDC_TABLE_ROWS)return "Number of table rows, 1-20.";if(id==IDC_TABLE_COLUMNS)return "Number of table columns, 1-12; use at least two cells overall.";if(id==IDC_TABLE_FONT)return "Editable cell font size, 40-800 percent.";if(id==IDC_TABLE_BORDERS)return "All grid lines, outer border, header separator or no borders.";if(id==IDC_TABLE_ALIGN)return "Align each cell's content left, centre or right. Tab moves between editable cells.";}
+     if(dialog==IDD_ROTATE_EQUATION){if(id==IDC_ROTATION_ANGLE)return "Rotation in degrees: positive clockwise, negative counterclockwise. Decimals are accepted; 0 straightens the object.";if(id==IDC_ROTATION_MOUSE)return "Rotate by dragging the object handle. Hold Shift for 15-degree steps; Escape cancels.";}
+     return NULL;
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -750,7 +750,7 @@
+ CAPTION "Unit circle maker"
+ FONT 9,"Segoe UI"
+ BEGIN
+-    LTEXT "Angles measured from the positive x-axis. Click OK, then click to place.",-1,10,8,290,20
++    LTEXT "Signed angles from the positive x-axis. Automatic follows end minus start.",-1,10,8,290,20
+     LTEXT "Start angle",-1,10,35,65,12
+     EDITTEXT IDC_UNIT_START,80,32,85,14,ES_AUTOHSCROLL
+     LTEXT "End angle",-1,175,35,55,12
+--- /dev/null
++++ b/Mathomir/UnitCircleGeometry.h
+@@ -0,0 +1,36 @@
++#pragma once
++#include <cmath>
++
++namespace UnitCircleGeometry {
++// Automatic keeps the signed rotation and its complete turns. Explicit
++// directions only wrap a rotation that disagrees with the chosen direction.
++inline double Sweep(double start,double end,int direction) {
++    double sweep=end-start;
++    if(direction==1 && sweep<0) {
++        sweep=std::fmod(sweep,360.);
++        if(sweep<0)sweep+=360.;
++        if(std::fabs(sweep)<1e-8)sweep=360.;
++    } else if(direction==2 && sweep>0) {
++        sweep=std::fmod(sweep,360.);
++        if(sweep>0)sweep-=360.;
++        if(std::fabs(sweep)<1e-8)sweep=-360.;
++    }
++    return sweep;
++}
++template<class Line> void Arc(double start,double end,int direction,double radius,double center,Line line) {
++    double sweep=Sweep(start,end,direction);
++    if(std::fabs(sweep)<1e-8)return;
++    const double pi=3.14159265358979323846;
++    int segments=(int)std::ceil(std::fabs(sweep)/2.);
++    for(int i=0;i<segments;i++) {
++        double a=(start+sweep*i/segments)*pi/180.,b=(start+sweep*(i+1)/segments)*pi/180.;
++        line(center+radius*std::cos(a),center-radius*std::sin(a),
++             center+radius*std::cos(b),center-radius*std::sin(b),3);
++    }
++    double angle=(start+sweep)*pi/180.,sign=sweep<0?-1.:1.;
++    double x=center+radius*std::cos(angle),y=center-radius*std::sin(angle);
++    double tx=-std::sin(angle)*sign,ty=-std::cos(angle)*sign;
++    line(x,y,x-tx*10+ty*5,y-ty*10-tx*5,2);
++    line(x,y,x-tx*10-ty*5,y-ty*10+tx*5,2);
++}
++}

@@ -1,0 +1,12 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -3525,8 +3525,7 @@
+     // Keep an annotation's controls while crossing the few pixels between the
+     // object and a grip. Another foreground annotation still has priority.
+     if(moveHover && !IsGraphObject(moveHover) && !IsDrawingMode && !ViewOnlyMode &&
+-        MouseMode==0 && !ClipboardExpression && !ClipboardDrawing && !TouchMouseMode &&
+-        InControlApproach(moveHover,point))
++        MouseMode==0 && !(nFlags&MK_LBUTTON) && InControlApproach(moveHover,point))
+     {
+         tDocumentStruct *front=FrontExpressionAtPoint(point);
+         if(!front)

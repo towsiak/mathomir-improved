@@ -1,0 +1,86 @@
+--- a/Mathomir/Toolbox.cpp
++++ b/Mathomir/Toolbox.cpp
+@@ -346,6 +346,7 @@
+ 	{6012,"Eraser","Large eraser (Alt+9)",25},//37
+ 	{6012,"Eraser","Pencil eraser (Alt+6)",25},//38
+ 	{32783,"Present.","Presentation mode (F5)",25},//39
++    {0,"Page","Page setup: paper and numbering",25},//40
+ };
+ 
+ struct
+@@ -354,7 +355,7 @@
+ 	unsigned char IconState; //0=disabled, 1=enabled, 2=active
+ 	unsigned char pixel_len; //
+ 	unsigned char pixel_separator; //length of the separator in pixels
+-} ToolbarConfig[24];
++} ToolbarConfig[32];
+ 
+ int ToolbarNumItems;
+ int ToolbarSelectedItem=-1;
+@@ -1995,6 +1996,28 @@
+ 				//ToolbarEditNodes=0;
+ 				pMainView->SetMousePointer();
+ 			}
++            if(icon==40){
++                // Reuse the existing, translated Page menu and its checked settings.
++                ReleaseCapture();
++                CMainFrame *frame=(CMainFrame*)theApp.m_pMainWnd;
++                frame->AdjustMenu();
++                CMenu *menu=frame->GetMenu(),*page=NULL;
++                if(menu)for(int m=0;m<menu->GetMenuItemCount() && !page;m++){
++                    CMenu *section=menu->GetSubMenu(m);if(!section)continue;
++                    for(int n=0;n<section->GetMenuItemCount();n++){
++                        CMenu *candidate=section->GetSubMenu(n);
++                        if(candidate && candidate->GetMenuState(ID_PAGE_A4PORTRAIT,MF_BYCOMMAND)!=(UINT)-1){page=candidate;break;}
++                    }
++                }
++                if(page){
++                    CPoint anchor(ToolbarItemPos,ToolboxSize/2);ClientToScreen(&anchor);
++                    UINT command=page->TrackPopupMenu(TPM_LEFTALIGN|TPM_TOPALIGN|TPM_RETURNCMD|TPM_NONOTIFY,
++                        anchor.x,anchor.y,frame);
++                    if(command)frame->PostMessage(WM_COMMAND,command);
++                }
++                InvalidateRect(NULL,FALSE);
++                return;
++            }
+             if(icon==7){ReleaseCapture();pMainView->PostMessage(WM_COMMAND,ID_CANVAS_GRID_OPTIONS);return;}
+ 			if (icon==8) pMainView->OnKeyDown(VK_F4,0,0);
+ 			if (((KeyboardEntryBaseObject) && (KeyboardEntryObject)) || ((NumSelectedObjects==1) && (NumSelectedDrawings==0)))
+@@ -3145,8 +3168,25 @@
+ 
+ 		pdc.FillSolidRect(r.right+ToolboxSize/2,0,iconwidth,iconwidth,color);
+ 		int iconposx=icon*(iconwidth+1)+1;
+-		pdc.BitBlt(r.right+ToolboxSize/2,0,iconwidth,iconwidth+1,&mdc,iconposx,0,SRCPAINT);
+-		pdc.TransparentBlt(x+t,y,iconwidth,iconwidth,&pdc,r.right+ToolboxSize/2,0,iconwidth,iconwidth,RGB(255,255,255));
++        if(icon==40){
++            // Scalable paper icon: folded corner, margins and a small settings cog.
++            const int left=x+t+3,top=y+1,w=iconwidth-8,h=iconwidth-3,fold=max(4,iconwidth/5);
++            CPen pen(PS_SOLID,ToolboxSize>110?2:1,color);CPen *oldPen=pdc.SelectObject(&pen);
++            CBrush *oldBrush=(CBrush*)pdc.SelectStockObject(NULL_BRUSH);
++            pdc.MoveTo(left,top);pdc.LineTo(left+w-fold,top);pdc.LineTo(left+w,top+fold);
++            pdc.LineTo(left+w,top+h);pdc.LineTo(left,top+h);pdc.LineTo(left,top);
++            pdc.MoveTo(left+w-fold,top);pdc.LineTo(left+w-fold,top+fold);pdc.LineTo(left+w,top+fold);
++            pdc.MoveTo(left+3,top+fold+3);pdc.LineTo(left+w-3,top+fold+3);
++            pdc.MoveTo(left+3,top+fold+6);pdc.LineTo(left+w-6,top+fold+6);
++            int cx=left+w-4,cy=top+h-5,radius=3;
++            pdc.Ellipse(cx-radius,cy-radius,cx+radius+1,cy+radius+1);
++            pdc.MoveTo(cx-5,cy);pdc.LineTo(cx-3,cy);pdc.MoveTo(cx+3,cy);pdc.LineTo(cx+6,cy);
++            pdc.MoveTo(cx,cy-5);pdc.LineTo(cx,cy-3);pdc.MoveTo(cx,cy+3);pdc.LineTo(cx,cy+6);
++            pdc.SelectObject(oldBrush);pdc.SelectObject(oldPen);
++        }else{
++            pdc.BitBlt(r.right+ToolboxSize/2,0,iconwidth,iconwidth+1,&mdc,iconposx,0,SRCPAINT);
++            pdc.TransparentBlt(x+t,y,iconwidth,iconwidth,&pdc,r.right+ToolboxSize/2,0,iconwidth,iconwidth,RGB(255,255,255));
++        }
+ 		if (ToolbarConfig[i].IconState==2)
+ 			PaintCheckedSign(&pdc, x+t+iconwidth/2-((ToolboxSize>=120)?0:2),y+iconwidth/2+((ToolboxSize>=120)?3:0),14, 1);
+ 		if (ToolbarConfig[i].IconState==3)
+@@ -3287,6 +3327,9 @@
+ 	if (factor>7)
+ 	AddToolbarOption(7,(IsShowGrid)?2:1,pixel_len,ShortSeparator);
+ 	
++    // Page configuration stays available even on a compact toolbar.
++    AddToolbarOption(40,1,pixel_len,LongSeparator);
++
+ 	//adding 'presentation mode' option
+ 	if (factor>7)
+ 	AddToolbarOption(39,(IsHighQualityRendering)?2:1,pixel_len,LongSeparator);

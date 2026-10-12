@@ -1,0 +1,211 @@
+diff --git a/Mathomir/IntegralPaint.h b/Mathomir/IntegralPaint.h
+--- a/Mathomir/IntegralPaint.h
++++ b/Mathomir/IntegralPaint.h
+@@ -9,14 +9,18 @@
+     auto px=[&](double x){return plot.left+(int)((x-xmin)/(xmax-xmin)*(plot.Width()-1));};
+     auto py=[&](double y){double f=(y-ymin)/(ymax-ymin);f=(std::max)(-1.,(std::min)(2.,f));return plot.bottom-1-(int)(f*(plot.Height()-1));};
+     double low=(std::min)(s.a,s.b),high=(std::max)(s.a,s.b);
+-    CBrush positive,negative;positive.CreateHatchBrush(HS_BDIAGONAL,RGB(80,125,185));negative.CreateHatchBrush(HS_BDIAGONAL,RGB(180,95,115));
++    const int patternScale=(std::max)(1,plot.Width()/600),spacing=8*patternScale,stroke=2*patternScale;
+     dc.SetBkMode(OPAQUE);
+     for(int i=0;i<plot.Width();i++){
+         double x=xmin+(xmax-xmin)*(i+.5)/plot.Width();if(x<low||x>high)continue;
+         double y=IntegralArea::Value(s,r,x);if(!SymbolicDerivative::Finite(y))continue;
+         int y0=py(0),yf=py(y);CRect strip(plot.left+i,(std::min)(y0,yf),plot.left+i+1,(std::max)(y0,yf));
+         COLORREF tint=y>=0?RGB(219,234,253):RGB(252,222,229);
+-        if(s.hatch){dc.SetBkColor(tint);dc.FillRect(strip,y>=0?&positive:&negative);}else dc.FillSolidRect(strip,tint);
++        dc.FillSolidRect(strip,tint);
++        // Explicit clipped strokes avoid device-dependent hatch-brush colors.
++        if(s.hatch){int top=(std::max)(strip.top,plot.top),bottom=(std::min)(strip.bottom,plot.bottom);int phase=(plot.left+i+top)%spacing;
++            int start=top-phase;for(int yy=start;yy<bottom;yy+=spacing){int first=(std::max)(top,yy),last=(std::min)(bottom,yy+stroke);if(last>first)dc.FillSolidRect(plot.left+i,first,1,last-first,y>=0?RGB(80,125,185):RGB(180,95,115));}}
++
+     }
+     CPen bounds(PS_DASH,1,RGB(110,115,125)),axis(PS_SOLID,1,RGB(165,170,178)),line(PS_SOLID,2,RGB(25,35,50));
+     dc.SelectObject(&axis);if(ymin<=0&&ymax>=0){dc.MoveTo(plot.left,py(0));dc.LineTo(plot.right,py(0));}
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13422,7 +13422,8 @@
+ static CDrawing *FindIntegralGraph(CDrawing *drawing,int depth=0){if(!drawing||depth>32)return NULL;if(drawing->IsSpecialDrawing==51&&drawing->SpecialData){auto p=(CFunctionPlotter*)drawing->SpecialData;if(p->integral.enabled||(p->pieces.empty()&&p->scatterPoints.empty()))return drawing;}for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0){CDrawing *found=FindIntegralGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1);if(found)return found;}return NULL;}
+ void CMathomirView::OnIntegralShader()
+ {
+-    if(ViewOnlyMode)return;OnChar(27,1,0);CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object->MovingDotState==3)){existing=FindIntegralGraph((CDrawing*)object->Object);if(existing)break;}}
++    if(ViewOnlyMode)return;CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object->MovingDotState==3)){existing=FindIntegralGraph((CDrawing*)object->Object);if(existing)break;}}
++    if(MouseMode==102)existing=NULL;OnChar(27,1,0);
+     CIntegralDialog dialog;if(existing){auto plotter=(CFunctionPlotter*)existing->SpecialData;dialog.settings=plotter->integral;if(!plotter->integral.enabled){try{plotter->EnsureFunctionSlots();auto expression=(CExpression*)existing->Items[8].pSubdrawing;int first=0;for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='=')first=n+1;dialog.settings.formula=NativeSymbolic::Formula(expression,first);}catch(const std::exception &){}double ymin,ymax;plotter->PlotFunctionGetBondaries(&dialog.settings.a,&dialog.settings.b,&ymin,&ymax);dialog.settings.radians=plotter->is_x_pi!=0;}}if(dialog.DoModal()!=IDOK)return;
+     CDrawing *drawing=existing;CFunctionPlotter *plotter;
+     if(existing){plotter=(CFunctionPlotter*)drawing->SpecialData;if(!plotter->StopForZoom()){AfxMessageBox("The graph is still finishing. Try again shortly.");return;}UndoSave("edit integral area");}
+diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
+--- a/Mathomir/FunctionPlotter.cpp
++++ b/Mathomir/FunctionPlotter.cpp
+@@ -1647,9 +1647,9 @@
+ char *CFunctionPlotter::XML_input(char *file)
+ {
+     if(strncmp(file,"integral ",9)==0){
+-        IntegralArea::Settings proposed;char attribute[64],value[384];file+=8;
+-        do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,384);if(!file)return NULL;
+-            if(strcmp(attribute,"f")==0)proposed.formula=Piecewise::Unhex(value);
++        IntegralArea::Settings proposed;char attribute[64],value[2048];file+=8;
++        do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,2048);if(!file)return NULL;
++            if(strcmp(attribute,"f")==0){proposed.formula.clear();size_t length=strlen(value);for(size_t i=0;i+1<length&&proposed.formula.size()<512;i+=2){char pair[3]={value[i],value[i+1],0};proposed.formula+=(char)strtol(pair,NULL,16);}}
+             if(strcmp(attribute,"a")==0)proposed.a=Piecewise::StoredBound(value);
+             if(strcmp(attribute,"b")==0)proposed.b=Piecewise::StoredBound(value);
+             if(strcmp(attribute,"rad")==0)proposed.radians=atoi(value)!=0;
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13407,7 +13407,7 @@
+         preview.Set(settings,result);GetDlgItem(IDOK)->EnableWindow(TRUE);std::wstring report=IntegralArea::Report(settings,result);::SetDlgItemTextW(m_hWnd,1378,report.c_str());return true;
+     }
+     virtual void OnRoundingChanged(){if(result.ready){std::wstring report=IntegralArea::Report(settings,result);::SetDlgItemTextW(m_hWnd,1378,report.c_str());preview.Set(settings,result);}}
+-    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1377,this);CreateUnicodeReadout(this,1378);((CEdit*)GetDlgItem(1370))->LimitText(160);
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1377,this);CreateUnicodeReadout(this,1378);((CEdit*)GetDlgItem(1370))->LimitText(512);
+         SetDlgItemText(1370,settings.formula.c_str());SetDlgItemText(1371,Piecewise::Number(settings.a).c_str());SetDlgItemText(1372,Piecewise::Number(settings.b).c_str());CheckDlgButton(1373,settings.radians?BST_CHECKED:BST_UNCHECKED);CheckDlgButton(1374,settings.hatch?BST_CHECKED:BST_UNCHECKED);CheckDlgButton(1375,settings.labels?BST_CHECKED:BST_UNCHECKED);initializing=false;Calculate();return TRUE;
+     }
+     virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);if(initializing)return CFeatureDialog::OnCommand(wp,lp);
+diff --git a/Mathomir/FunctionPlotter.cpp b/Mathomir/FunctionPlotter.cpp
+--- a/Mathomir/FunctionPlotter.cpp
++++ b/Mathomir/FunctionPlotter.cpp
+@@ -1818,6 +1818,7 @@
+         if(integral.enabled){integralError.clear();
+             try{if(Base->NumItems>8){auto expression=(CExpression*)Base->Items[8].pSubdrawing;int first=0;for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='=')first=n+1;integral.formula=NativeSymbolic::Formula(expression,first);}IntegralArea::Calculate(integral,integralResult,integralError);}
+             catch(const std::exception &e){integralResult.ready=false;integralError=e.what();}
++            GraphDiagnostic("integral ready,hatch,a,b",integralResult.ready,integral.hatch,integral.a,integral.b);
+         }
+ 		if (reset_plot==2) calc_y=1;
+ 
+diff --git a/Mathomir/Drawing.cpp b/Mathomir/Drawing.cpp
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -2069,6 +2069,11 @@
+ 			for(const char *p=bounds;*p;++p)metadata=metadata*33u+(unsigned char)*p;
+ 		}
+ 		if(!plot->pieces.empty())ret^=metadata;
++        if(plot->integral.enabled){
++            const auto &s=plot->integral;std::string text=s.formula+"|"+Piecewise::Number(s.a)+"|"+Piecewise::Number(s.b)+"|"+(s.radians?"1":"0")+(s.hatch?"1":"0")+(s.labels?"1":"0");
++            unsigned int area=5381;for(unsigned char c:text)area=area*33u+c;ret^=(int)area;
++        }
++
+ 	}
+ 	return ret;
+ }
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13219,11 +13219,19 @@
+         if(!changes){AfxMessageBox("No finite calculation was found. Check the real domain and give variables a value. Use Ctrl+Shift+Enter for a decimal approximation.");return;}
+         }
+     }
+-    int index=(int)(object-TheDocument);OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
+-    UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&left,0);
+-    while(source->m_NumElements>0 && source->m_pElementList[source->m_NumElements-1].Type==0)source->DeleteElement(source->m_NumElements-1);
+-    source->InsertEmptyElement(source->m_NumElements,2,approximate?(char)0xBB:'=');
+-    for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)source->InsertElement(answer.m_pElementList+i,source->m_NumElements);
++    CExpression completed(NULL,NULL,source->m_FontSize);completed.CopyExpression(&left,0);
++    while(completed.m_NumElements>0){auto last=completed.m_pElementList+completed.m_NumElements-1;
++        bool empty=last->Type==0 || (last->Type==1 && last->pElementObject && !last->pElementObject->Data1[0] && NativeSymbolic::Empty((CExpression*)last->pElementObject->Expression1) && NativeSymbolic::Empty((CExpression*)last->pElementObject->Expression2));
++        if(!empty)break;completed.DeleteElement(completed.m_NumElements-1);}
++    completed.InsertEmptyElement(completed.m_NumElements,2,approximate?(char)0xBB:'=');
++    for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)completed.InsertElement(answer.m_pElementList+i,completed.m_NumElements);
++    int index=(int)(object-TheDocument);
++    // Stop typing explicitly: Ctrl+Enter still holds Ctrl while executing.
++    if(KeyboardEntryObject)((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
++    OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
++    auto nativeXml=[](CExpression *expression){int size=expression->XML_output(NULL,0,1);std::vector<char> data(size+1,0);expression->XML_output(&data[0],0,0);return std::string(&data[0],size);};
++    if(nativeXml(source)==nativeXml(&completed)){RepaintTheView(1);SetFocus();return;}
++    UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&completed,0);
+     CDC *dc=GetDC();short length,above,below;source->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
+     object->Length=length*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
+ }
+diff --git a/Mathomir/MathomirView.cpp b/Mathomir/MathomirView.cpp
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13188,7 +13188,9 @@
+ void CMathomirView::OnApproximateExpression(){ExecuteExpression(true);}
+ void CMathomirView::ExecuteExpression(bool approximate)
+ {
+-    if(ViewOnlyMode)return;tDocumentStruct *object=NULL;
++    if(ViewOnlyMode)return;
++    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute begin: undo=%d clipboard=%d keyboard=%d\n",UndoNumLevels,ClipboardExpression!=NULL,KeyboardEntryObject!=NULL);fclose(trace);}}
++    tDocumentStruct *object=NULL;
+     if(KeyboardEntryBaseObject && KeyboardEntryBaseObject->Type==1)object=KeyboardEntryBaseObject;
+     if(!object)for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==1 && TheDocument[i].MovingDotState==3){if(object){AfxMessageBox("Select one math object to execute.");return;}object=TheDocument+i;}
+     if(!object && prevTouchedObject && prevTouchedObject->Type==1)object=prevTouchedObject;
+@@ -13226,6 +13228,9 @@
+     completed.InsertEmptyElement(completed.m_NumElements,2,approximate?(char)0xBB:'=');
+     for(int i=0;i<answer.m_NumElements;i++)if(answer.m_pElementList[i].Type>0)completed.InsertElement(answer.m_pElementList+i,completed.m_NumElements);
+     int index=(int)(object-TheDocument);
++    RestoreClipboardBackground();Popup->HidePopupMenu();Toolbox->HideSubtoolbox();
++    if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}
++    if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
+     // Stop typing explicitly: Ctrl+Enter still holds Ctrl while executing.
+     if(KeyboardEntryObject)((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
+     OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
+diff --git a/Mathomir/MainFrm.cpp b/Mathomir/MainFrm.cpp
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -1331,6 +1331,7 @@
+ //saves undo information (saves the current sate of documment)
+ int CMainFrame::UndoSave(char * text,int unique_ID)
+ {
++    if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"undo save: %d disabled=%d %s\n",UndoNumLevels,UndoSavingDisabled,text);fclose(trace);}}
+ 	if (UndoSavingDisabled) return 1; 
+ 
+ 	//if ((UseToolbar) && (Toolbox->Toolbar)) Toolbox->Toolbar->ConfigureToolbar();
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -5164,7 +5164,7 @@
+ 		}
+ 		else
+ 		{
+-			if ((prevChar==nChar) && (nChar!=8))
++			if ((prevChar==nChar) && (nChar>=32) && (nChar<256))
+ 			{
+ 				int i=0;
+ 				while (keystring[i])
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -6447,7 +6447,7 @@
+ 
+ 		if (KeyboardEntryBaseObject==NULL)
+ 		if (!ViewOnlyMode)
+-		if ((nChar>6) && (nChar!=11) && (nChar!=12))
++		if ((nChar>6) && (nChar!=11) && (nChar!=12) && (nChar!=VK_ESCAPE))
+ 		{
+ 			//replacing or inserting individual character/operator into an expression
+ 			//at the point where mouse is pointing
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13233,9 +13233,17 @@
+     if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
+     // Stop typing explicitly: Ctrl+Enter still holds Ctrl while executing.
+     if(KeyboardEntryObject)((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
+-    OnChar(27,1,0);if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
++    if(index<0||index>=NumDocumentElements)return;object=TheDocument+index;source=(CExpression*)object->Object;
++    source->DeselectExpression();
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState==3)TheDocument[i].MovingDotState=0;
++    NumSelectedObjects=0;NumSelectedDrawings=0;MouseMode=0;
++    auto tracePhase=[](const char *phase){if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *trace=fopen("evaluation-diagnostics.txt","a");if(trace){fprintf(trace,"execute phase: %s\n",phase);fclose(trace);}}};
++    tracePhase("stopped typing");
++    CDC *preparedDC=GetDC();short preparedL,preparedA,preparedB;completed.CalculateSize(preparedDC,ViewZoom,&preparedL,&preparedA,&preparedB);source->CalculateSize(preparedDC,ViewZoom,&preparedL,&preparedA,&preparedB);ReleaseDC(preparedDC);
++    tracePhase("prepared layout");
+     auto nativeXml=[](CExpression *expression){int size=expression->XML_output(NULL,0,1);std::vector<char> data(size+1,0);expression->XML_output(&data[0],0,0);return std::string(&data[0],size);};
+-    if(nativeXml(source)==nativeXml(&completed)){RepaintTheView(1);SetFocus();return;}
++    std::string oldXml=nativeXml(source);tracePhase("source serialized");std::string newXml=nativeXml(&completed);tracePhase("result serialized");
++    if(oldXml==newXml){RepaintTheView(1);SetFocus();return;}
+     UndoSave(approximate?"approximate expression":"execute expression");source->CopyExpression(&completed,0);
+     CDC *dc=GetDC();short length,above,below;source->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
+     object->Length=length*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();
+--- a/Mathomir/Element.cpp
++++ b/Mathomir/Element.cpp
+@@ -3507,8 +3507,9 @@
+ 				output+=8;
+ 			}
+ 		}
++		// The child and closing tag already account for every output byte.
++		// Rewriting tmpstr here exceeded the size-only pass for nested elements.
+ 		len+=8+num_tabs;
+-		if (!only_calculate) {strcpy(output,tmpstr);output+=tmp;}
+ 	}
+ 	return len;
+ }

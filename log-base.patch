@@ -1,0 +1,342 @@
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -39,6 +39,17 @@
+     }
+ };
+ inline const char *FeatureControlHelp(int dialog,int id){
++    if(dialog==IDD_LOG_BASE_BUILDER){
++        if(id==1382)return "Logarithm base: a positive constant different from 1. Enter sqrt(3), 2/3, pi, e or another constant expression.";
++        if(id==1383)return "Argument: x, a constant, or a formula such as x+2. A real logarithm requires its argument to be positive.";
++        if(id==1384)return "Preview with the base typeset as a subscript. Radicals and fractions stay editable native math.";
++        if(id==1385)return "Validate the base and argument, update the preview, and check the value at x.";
++        if(id==1386)return "Optional x value for checking a variable argument. It does not replace x in the placed expression.";
++        if(id==1387)return "Domain requirements, formula-input syntax, and numerical check at the chosen x value.";
++        if(id==1388)return "Place this logarithm as a graph. The argument must use only x and constants.";
++        if(id==1389)return "Load the example with base sqrt(3) and argument x.";
++        if(id==IDOK)return "Place the editable logarithm on the page or into an existing math expression.";
++    }
+     if(dialog==IDD_INTEGRAL_SHADER){
+         if(id==1370)return "Formula in x, such as sin(x), x^2, ln(x), floor(x) or exp(-x^2). Proper finite real integrals only.";
+         if(id==1371||id==1372)return "Finite integration bound. Constants such as -2, 1/2 and pi are accepted. Reversing the bounds reverses the signed integral only.";
+--- a/Mathomir/IntegralArea.h
++++ b/Mathomir/IntegralArea.h
+@@ -21,7 +21,7 @@
+     }catch(const std::exception &e){error=e.what();return false;}
+ }
+ inline void Denominators(SymbolicDerivative::Expr n,std::vector<SymbolicDerivative::Expr> &out){
+-    if(!n)return;if(n->op=='/')out.push_back(n->b);
++    if(!n)return;if(n->op=='l')out.push_back(SymbolicDerivative::F("ln",n->b));if(n->op=='/')out.push_back(n->b);
+     if(n->op=='^' && n->b && n->b->op=='n' && n->b->number<0)out.push_back(n->a);
+     if(n->op=='f' && (n->name=="tan"||n->name=="sec"))out.push_back(SymbolicDerivative::F("cos",n->a));
+     if(n->op=='f' && (n->name=="cot"||n->name=="csc"))out.push_back(SymbolicDerivative::F("sin",n->a));
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -499,6 +499,7 @@
+     POPUP "&Graph"
+     BEGIN
+         MENUITEM "Integral area shader...", ID_INTEGRAL_SHADER
++        MENUITEM "Logarithm builder...", ID_LOG_BASE_BUILDER
+         MENUITEM "Piecewise function grapher...", ID_PIECEWISE_GRAPH
+         MENUITEM "Statistics and regression...", ID_STATISTICS_REGRESSION
+         MENUITEM "Number rounding...", ID_NUMBER_FORMAT
+@@ -1015,3 +1016,24 @@
+     DEFPUSHBUTTON "Place shaded graph",IDOK,301,263,111,18
+     PUSHBUTTON "Cancel",IDCANCEL,422,263,66,18
+ END
++
++IDD_LOG_BASE_BUILDER DIALOGEX 0,0,440,237
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Logarithm builder"
++FONT 8,"MS Shell Dlg"
++BEGIN
++    LTEXT "Enter the base and argument separately. Radicals and fractions are accepted.",-1,10,9,420,16
++    LTEXT "Base",-1,10,35,45,12
++    EDITTEXT 1382,62,32,126,16,ES_AUTOHSCROLL
++    LTEXT "Argument",-1,209,35,55,12
++    EDITTEXT 1383,270,32,158,16,ES_AUTOHSCROLL
++    CONTROL "",1384,"Static",SS_BLACKFRAME,10,62,418,70
++    LTEXT "Check at x =",-1,10,149,69,12
++    EDITTEXT 1386,82,146,75,16,ES_AUTOHSCROLL
++    PUSHBUTTON "Update preview / check value",1385,185,145,243,18
++    LTEXT "",1387,10,170,418,34
++    PUSHBUTTON "Square-root base",1389,10,215,94,17
++    PUSHBUTTON "Place graph",1388,118,214,94,18
++    DEFPUSHBUTTON "Place logarithm",IDOK,232,214,119,18
++    PUSHBUTTON "Cancel",IDCANCEL,362,214,66,18
++END
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -433,6 +433,7 @@
+     if(drawing->OriginalForm==65)return L"Unit circle - angles and coordinates";
+     switch(drawing->OriginalForm){
+         case 93:return L"Integral area shader - finite bounds, signed integral and total area; solid tint or diagonal hatch.";
++        case 95:return L"Logarithm builder - separate base and argument fields; radical bases, fractions and native editable notation.";
+         case 94:return L"Evaluate selected or currently typed math - append = or approximate result inline (Ctrl+Enter).";
+         case 5:return L"Arrow - draw a straight arrow from its start to its tip.";
+         case 6:return L"Large eraser - drag across drawing strokes to remove them.";
+@@ -668,6 +669,7 @@
+     ON_COMMAND(ID_SYMBOLIC_DERIVATIVE,OnSymbolicDerivative)
+     ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
+     ON_COMMAND(ID_INTEGRAL_SHADER,OnIntegralShader)
++    ON_COMMAND(ID_LOG_BASE_BUILDER,OnLogBaseBuilder)
+     ON_COMMAND(ID_NUMBER_FORMAT,OnNumberFormat)
+     ON_COMMAND(ID_EXECUTE_EXPRESSION,OnExecuteExpression)
+     ON_COMMAND(ID_APPROXIMATE_EXPRESSION,OnApproximateExpression)
+@@ -10483,6 +10485,7 @@
+     dialog.Add(ID_NUMBER_FORMAT,"Display > Number rounding...","rounding round decimals significant figures precision trailing zeros approximation display");
+     dialog.Add(ID_STATISTICS_REGRESSION,"Statistics > Statistics and regression...","statistics regression linear quadratic cubic polynomial exponential logarithmic power scatter data residual mean median standard deviation correlation");
+     dialog.Add(ID_SYMBOLIC_DERIVATIVE,"Calculus > Symbolic derivative finder...","differentiate derivative calculus symbolic slope chain product quotient higher order");
++    dialog.Add(ID_LOG_BASE_BUILDER,"Graph > Logarithm builder...","log base logarithm radical sqrt custom argument change of base");
+     dialog.Add(ID_INTEGRAL_SHADER,"Graph > Integral area shader...","integral area bounds shade shading calculus hatch signed absolute numerical");
+     dialog.Add(ID_PIECEWISE_GRAPH,"Graph > Piecewise function grapher...","piecewise pieces intervals open closed endpoints domain jumps step graph");
+     dialog.Add(ID_INSERT_UNIT_CIRCLE,"Insert > Unit circle maker","unit circle angle start end arc radians degrees trig triangle coordinates palette");
+@@ -13266,12 +13269,12 @@
+ class CDerivativePreview : public CStatic
+ {
+ public:
+-    CExpression expression;bool ready;
+-    CDerivativePreview():expression(NULL,NULL,100),ready(false){}
++    CExpression expression;bool ready;std::string emptyText;
++    CDerivativePreview():expression(NULL,NULL,100),ready(false),emptyText("Find a derivative to see the typeset result."){}
+     void Set(const std::string &xml){expression.Delete();ready=!xml.empty();if(ready){std::vector<char> data(xml.begin(),xml.end());data.push_back(0);expression.XML_input(&data[0]);}if(m_hWnd)Invalidate();}
+ protected:
+     afx_msg void OnPaint(){CPaintDC dc(this);CRect rect;GetClientRect(&rect);dc.FillSolidRect(rect,RGB(255,255,255));
+-        if(!ready){dc.SetBkMode(TRANSPARENT);dc.SetTextColor(RGB(100,100,100));dc.DrawText("Find a derivative to see the typeset result.",rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE);return;}
++        if(!ready){dc.SetBkMode(TRANSPARENT);dc.SetTextColor(RGB(100,100,100));dc.DrawText(emptyText.c_str(),rect,DT_CENTER|DT_VCENTER|DT_SINGLELINE);return;}
+         short width,above,below,zoom=150;expression.CalculateSize(&dc,zoom,&width,&above,&below);
+         while(zoom>55 && (width>rect.Width()-16 || above+below>rect.Height()-10)){zoom-=5;expression.CalculateSize(&dc,zoom,&width,&above,&below);}
+         expression.PaintExpression(&dc,zoom,max(8,(rect.Width()-width)/2),max(5,(rect.Height()-above-below)/2)+above,&rect);
+@@ -13281,6 +13284,55 @@
+ BEGIN_MESSAGE_MAP(CDerivativePreview,CStatic)
+     ON_WM_PAINT()
+ END_MESSAGE_MAP()
++static bool LogHasParameters(SymbolicDerivative::Expr e,bool allowX=false)
++{
++    if(!e)return false;if(e->op=='v')return e->name!="pi" && e->name!="e" && (!allowX || e->name!="x");
++    return LogHasParameters(e->a,allowX)||LogHasParameters(e->b,allowX);
++}
++class CLogBaseDialog:public CFeatureDialog
++{
++public:
++    CDerivativePreview preview;SymbolicDerivative::Expr logarithm;std::string xml;bool graph,initializing;
++    CLogBaseDialog():CFeatureDialog(IDD_LOG_BASE_BUILDER,theApp.m_pMainWnd),graph(false),initializing(true){preview.emptyText="Enter a valid base and argument to preview.";}
++    CString Text(int id){CString text;GetDlgItemText(id,text);text.Trim();return text;}
++    bool Build(){
++        try{SymbolicDerivative::Parser parser;auto base=parser.Parse((LPCSTR)Text(1382));auto argument=parser.Parse((LPCSTR)Text(1383));
++            double b=SymbolicDerivative::Value(base,"",0);if(LogHasParameters(base)||!SymbolicDerivative::Finite(b)||b<=0||b==1)throw std::runtime_error("The base must be a positive constant different from 1. Examples: sqrt(3), 2/3, pi or e.");
++            logarithm=SymbolicDerivative::Raw('l',argument,base);
++            if(!LogHasParameters(argument)&&!SymbolicDerivative::Finite(SymbolicDerivative::Value(logarithm,"",0)))throw std::runtime_error("The argument must be positive for a real logarithm.");
++            xml="<ex fh=\"100\">"+SymbolicDerivative::Xml(logarithm)+"</ex>";preview.Set(xml);GetDlgItem(IDOK)->EnableWindow(TRUE);GetDlgItem(1388)->EnableWindow(!LogHasParameters(argument,true));
++            std::wstring report=L"Base > 0, base \u2260 1; argument > 0. Formula syntax: log(base, argument).";
++            double x=SymbolicDerivative::NaN();try{auto point=parser.Parse((LPCSTR)Text(1386));if(!LogHasParameters(point))x=SymbolicDerivative::Value(point,"",0);}catch(const std::exception &){}
++            if(!SymbolicDerivative::Finite(x))report+=L"\r\nEnter a finite constant for the optional x check.";
++            else {extern int TrigDegrees;double value=SymbolicDerivative::Value(logarithm,"x",x,TrigDegrees==0);
++                if(SymbolicDerivative::Finite(value))report+=L"\r\nValue at x = "+MathDisplay::Number(x)+L" \u2248 "+MathDisplay::Number(value);
++                else report+=L"\r\nThe value is undefined here, or another parameter needs a value.";}
++            ::SetDlgItemTextW(m_hWnd,1387,report.c_str());return true;
++        }catch(const std::exception &e){logarithm.reset();xml.clear();preview.Set("");GetDlgItem(IDOK)->EnableWindow(FALSE);GetDlgItem(1388)->EnableWindow(FALSE);SetDlgItemText(1387,e.what());return false;}
++    }
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1384,this);CreateUnicodeReadout(this,1387);((CEdit*)GetDlgItem(1382))->LimitText(180);((CEdit*)GetDlgItem(1383))->LimitText(300);
++        SetDlgItemText(1382,"2");SetDlgItemText(1383,"x");SetDlgItemText(1386,"9");initializing=false;Build();return TRUE;}
++    virtual void OnRoundingChanged(){if(!initializing)Build();}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);if(initializing)return CFeatureDialog::OnCommand(wp,lp);
++        if(id==1385){Build();return TRUE;}
++        if(id==1389){initializing=true;SetDlgItemText(1382,"sqrt(3)");SetDlgItemText(1383,"x");SetDlgItemText(1386,"9");initializing=false;Build();return TRUE;}
++        if(id==1388){if(Build()&&!LogHasParameters(logarithm->a,true)){graph=true;CFeatureDialog::OnOK();}return TRUE;}
++        if((id==1382||id==1383||id==1386)&&notification==EN_CHANGE){Build();return TRUE;}
++        return CFeatureDialog::OnCommand(wp,lp);
++    }
++    virtual void OnOK(){if(Build()){graph=false;CFeatureDialog::OnOK();}}
++};
++void CMathomirView::OnLogBaseBuilder()
++{
++    if(ViewOnlyMode)return;OnChar(27,1,0);CLogBaseDialog dialog;if(dialog.DoModal()!=IDOK)return;
++    RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
++    if(dialog.graph){CDrawing drawing;int x,y;drawing.StartCreatingItem(51);drawing.UpdateCreatingItem(6000,4400,0,0);drawing.EndCreatingItem(&x,&y);auto plotter=(CFunctionPlotter*)drawing.SpecialData;plotter->EnsureFunctionSlots();auto function=(CExpression*)drawing.Items[8].pSubdrawing;
++        function->Delete();std::vector<char> buffer(dialog.xml.begin(),dialog.xml.end());buffer.push_back(0);function->XML_input(&buffer[0]);plotter->is_x_pi=plotter->is_x_log=plotter->is_y_log=0;plotter->SetBounds(-.5,10.5,-4,6);
++        ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(&drawing,0,0);
++    }else{ClipboardExpression=new CExpression(NULL,NULL,100);std::vector<char> buffer(dialog.xml.begin(),dialog.xml.end());buffer.push_back(0);ClipboardExpression->XML_input(&buffer[0]);}
++    IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
++}
++
+ class CSymbolicDerivativeDialog : public CFeatureDialog
+ {
+ public:
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -136,6 +136,7 @@
+     void OnSymbolicDerivative();
+     void OnStatisticsRegression();
+     void OnIntegralShader();
++    void OnLogBaseBuilder();
+     void OnNumberFormat();
+     void OnExecuteExpression();
+     void OnApproximateExpression();
+--- a/Mathomir/NativeSymbolic.h
++++ b/Mathomir/NativeSymbolic.h
+@@ -30,11 +30,11 @@
+             }
+         }
+         if(ts->Type==1){if(element->Data1[0]=='p' && !element->Data1[1] && !a && !b && (element->Data2[0]&0xE0)!=0x60 && i+1<end && e->m_pElementList[i+1].Type==1){CElement *next=e->m_pElementList[i+1].pElementObject;if(next && strcmp(next->Data1,"i")==0 && !next->Expression1 && !next->Expression2 && (next->Data2[0]&0xE0)!=0x60){if(previous)result+="*";result+="pi";previous=true;i++;continue;}}if(a||b)throw std::runtime_error("Use plain-letter variables without subscripts in the derivative finder.");term=element->Data1;if((element->Data2[0]&0xE0)==0x60){if(term=="p")term="pi";else throw std::runtime_error("Use plain-letter variables in the derivative finder.");}}
+-        else if(ts->Type==2){char op=element->Data1[0];if(op==(char)0xD7)op='*';if(op!='+'&&op!='-'&&op!='*'&&op!='/')throw std::runtime_error("This operator is not supported by direct execution.");term=std::string(1,op);operand=false;}
++        else if(ts->Type==2){char op=element->Data1[0];if(op==(char)0xD7)op='*';if(op!='+'&&op!='-'&&op!='*'&&op!='/'&&op!=',')throw std::runtime_error("This operator is not supported by direct execution.");term=std::string(1,op);operand=false;}
+         else if(ts->Type==3||ts->Type==4)term="("+Formula(a,0,-1,depth+1)+")"+(ts->Type==3?"^":"/")+"("+Formula(b,0,-1,depth+1)+")";
+         else if(ts->Type==5){char shape=a?a->m_ParentheseShape:0;std::string name=shape=='|'?"abs":shape=='f'?"floor":shape=='c'?"ceil":"";term=name+"("+Formula(a,0,-1,depth+1)+")";}
+         else if(ts->Type==6){std::string name=element->Data1;if(name=="tg")name="tan";if(name=="arctg")name="atan";if(name=="sh")name="sinh";if(name=="ch")name="cosh";if(name=="th")name="tanh";
+-            if(name=="log"&&!Empty(b))term="(ln("+Formula(a,0,-1,depth+1)+")/ln("+Formula(b,0,-1,depth+1)+"))";
++            if(name=="log"&&!Empty(b))term="log("+Formula(b,0,-1,depth+1)+", "+Formula(a,0,-1,depth+1)+")";
+             else{if(!SymbolicDerivative::Known(name)&&name!="arcsin"&&name!="arccos"&&name!="arctan")throw std::runtime_error("Unsupported function: "+name+". Use the derivative finder for supported formulas.");term=name+"("+Formula(a,0,-1,depth+1)+")";if(!Empty(b))term="("+term+")^("+Formula(b,0,-1,depth+1)+")";}
+         }
+         else if(ts->Type==8)term=Empty(b)?"sqrt("+Formula(a,0,-1,depth+1)+")":"("+Formula(a,0,-1,depth+1)+")^(1/("+Formula(b,0,-1,depth+1)+"))";
+--- a/Mathomir/Piecewise.h
++++ b/Mathomir/Piecewise.h
+@@ -34,7 +34,7 @@
+         if(name=="e")return Add(Node('n',2.71828182845904523536));
+         if(name!="sin" && name!="cos" && name!="tan" && name!="sqrt" && name!="ln" && name!="log" && !ScalarFunctions::Known(name.c_str()))throw std::runtime_error("Unknown function. Use sin, cos, tan, sqrt, ln, log, floor, ceil, abs, round, trunc, sgn, fract, cbrt, exp, or sinc.");
+         if(!Take('('))throw std::runtime_error("Functions require parentheses, for example sin(x).");
+-        int a=Sum();if(!Take(')'))throw std::runtime_error("Missing function closing parenthesis.");Node n('f',0,a);n.name=name;return Add(n);
++        int a=Sum();if(name=="log" && Take(',')){int argument=Sum();if(!Take(')'))throw std::runtime_error("Use log(base, argument), with exactly two entries.");return Add(Node('l',0,argument,a));}if(!Take(')'))throw std::runtime_error("Missing function closing parenthesis.");Node n('f',0,a);n.name=name;return Add(n);
+     }
+     std::string Group(int i)const{return "<elm tp=\"5\" E1=\"\"><ex>"+Xml(i)+"</ex></elm>";}
+ public:
+@@ -46,6 +46,7 @@
+         if(i<0)i=root;if(i<0)return std::numeric_limits<double>::quiet_NaN();const Node &n=nodes[i];
+         if(n.op=='x')return x;if(n.op=='n')return n.number;
+         double a=Value(x,radians,n.a),b=n.b>=0?Value(x,radians,n.b):0;
++        if(n.op=='l')return a>0 && b>0 && b!=1?std::log(a)/std::log(b):std::numeric_limits<double>::quiet_NaN();
+         if(n.op=='+')return a+b;if(n.op=='-')return a-b;if(n.op=='*')return a*b;if(n.op=='/')return b==0?std::numeric_limits<double>::quiet_NaN():a/b;if(n.op=='~')return -a;if(n.op=='^')return ScalarFunctions::RealPower(a,b);
+         if(ScalarFunctions::Known(n.name.c_str()))return ScalarFunctions::Value(n.name.c_str(),a);
+         if(n.name=="sqrt")return std::sqrt(a);if(n.name=="abs")return std::fabs(a);if(n.name=="exp")return std::exp(a);if(n.name=="ln")return std::log(a);if(n.name=="log")return std::log10(a);
+@@ -57,6 +58,7 @@
+         if(n.op=='n'){if(n.number<0)return "<opr s=\"-\" /><var t=\""+Number(-n.number)+"\" f=\"00\" />";return "<var t=\""+Number(n.number)+"\" f=\"00\" />";}
+         if(n.op=='~')return "<opr s=\"-\" />"+Group(n.a);
+         if(n.op=='/' || n.op=='^'){std::string tag=n.op=='/'?"fra":"elm tp=\"3\"";std::string close=n.op=='/'?"fra":"elm";return "<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(n.a)+"</ex><ex>"+Xml(n.b)+"</ex></"+close+">";}
++        if(n.op=='l')return "<fun t=\"log\" f=\"20\" E1=\"\" E2=\"\"><ex br=\"2\">"+Xml(n.a)+"</ex><ex>"+Xml(n.b)+"</ex></fun>";
+         if(n.op=='f'){
+             if(n.name=="sqrt")return "<elm tp=\"8\" E1=\"\"><ex>"+Xml(n.a)+"</ex></elm>";
+ 
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -311,3 +311,5 @@
+ #define ID_CANVAS_GRID_OPTIONS 33099
+ #define ID_INTEGRAL_SHADER 33100
+ #define IDD_INTEGRAL_SHADER 190
++#define ID_LOG_BASE_BUILDER 33101
++#define IDD_LOG_BASE_BUILDER 191
+--- a/Mathomir/SymbolicDerivative.h
++++ b/Mathomir/SymbolicDerivative.h
+@@ -131,7 +131,7 @@
+         if(start==pos)throw std::runtime_error("Unexpected character at position "+Number((double)pos+1)+".");
+         std::string s=text.substr(start,pos-start);
+         if(s=="arcsin")s="asin";if(s=="arccos")s="acos";if(s=="arctan")s="atan";if(s=="ceiling")s="ceil";if(s=="sign")s="sgn";
+-        if(Known(s)){if(!Take('('))throw std::runtime_error("Functions need parentheses, for example sin(x).");Expr a=Sum();if(!Take(')'))throw std::runtime_error("Missing function closing parenthesis.");return F(s,a);}
++        if(Known(s)){if(!Take('('))throw std::runtime_error("Functions need parentheses, for example sin(x).");Expr a=Sum();if(s=="log" && Take(',')){Expr argument=Sum();if(!Take(')'))throw std::runtime_error("Use log(base, argument), with exactly two entries.");return Raw('l',argument,a);}if(!Take(')'))throw std::runtime_error("Missing function closing parenthesis. For another log base, use log(base, argument).");return F(s,a);}
+         if(s.size()>1 && s!="pi")throw std::runtime_error("Use single-letter parameters, or a supported function. Write x*y explicitly.");
+         return Name(s);
+     }
+@@ -142,6 +142,7 @@
+ inline double Value(Expr a,const std::string &variable,double x,bool radians=true){
+     if(!a)return NaN();if(a->op=='n')return a->number;if(a->op=='v'){if(a->name==variable)return x;if(a->name=="pi")return 3.14159265358979323846;if(a->name=="e")return 2.71828182845904523536;return NaN();}
+     double u=Value(a->a,variable,x,radians),v=a->b?Value(a->b,variable,x,radians):0;if(!Finite(u)||(a->b&&!Finite(v)))return NaN();
++    if(a->op=='l')return u>0 && v>0 && v!=1?std::log(u)/std::log(v):NaN();
+     if(a->op=='+')return u+v;if(a->op=='-')return u-v;if(a->op=='*')return u*v;if(a->op=='/')return v==0?NaN():u/v;if(a->op=='~')return -u;if(a->op=='^')return u==0&&v==0?NaN():ScalarFunctions::RealPower(u,v);
+     const std::string &s=a->name;double inverseFactor=radians?1:180./3.14159265358979323846;
+     if(!radians&&(s=="sin"||s=="cos"||s=="tan"||s=="cot"||s=="sec"||s=="csc"))u*=3.14159265358979323846/180.;
+@@ -164,6 +165,7 @@
+         if(!Depends(a,variable)){Rule("Constant rule: constants and other variables have derivative 0.");return N(0);}
+         if(a->op=='v')return N(1);
+         Expr u=a->a,v=a->b;
++        if(a->op=='l'){Rule("Change of base: log(base, u) = ln(u)/ln(base).");notes.insert("Real logarithms require a positive argument and a positive base different from 1.");return Differentiate(Raw('/',F("ln",u),F("ln",v)));}
+         if(a->op=='~')return Make('~',Differentiate(u));
+         if(a->op=='+'||a->op=='-'){Rule("Sum rule: differentiate each term, retaining its sign.");return Make(a->op,Differentiate(u),Differentiate(v));}
+         if(a->op=='*'){Rule("Product rule: (uv)' = u'v + uv'.");return Make('+',Make('*',Differentiate(u),v),Make('*',u,Differentiate(v)));}
+@@ -211,7 +213,7 @@
+ };
+ inline int Precedence(Expr a){return a->op=='+'||a->op=='-'?1:a->op=='*'||a->op=='/'?2:a->op=='~'?3:a->op=='^'?4:5;}
+ inline std::string Text(Expr a,int parent=0){
+-    std::string s;if(a->op=='n')s=Number(a->number);else if(a->op=='v')s=a->name;else if(a->op=='f')s=a->name+"("+Text(a->a)+")";else if(a->op=='~')s="-"+Text(a->a,2);else{int level=Precedence(a);s=Text(a->a,a->op=='^'?level+1:level)+std::string(1,a->op)+Text(a->b,a->op=='-'||a->op=='/'?level+1:level);}
++    std::string s;if(a->op=='n')s=Number(a->number);else if(a->op=='v')s=a->name;else if(a->op=='l')s="log("+Text(a->b)+", "+Text(a->a)+")";else if(a->op=='f')s=a->name+"("+Text(a->a)+")";else if(a->op=='~')s="-"+Text(a->a,2);else{int level=Precedence(a);s=Text(a->a,a->op=='^'?level+1:level)+std::string(1,a->op)+Text(a->b,a->op=='-'||a->op=='/'?level+1:level);}
+     if(Precedence(a)<parent || (a->op=='n'&&a->number<0&&parent>2))s="("+s+")";return s;
+ }
+ inline std::string NativeNumber(double n,int digits=15){
+@@ -224,6 +226,7 @@
+     else if(a->op=='v')s=a->name=="pi"?"<var t=\"p\" f=\"60\" />":"<var t=\""+a->name+"\" f=\"00\" />";
+     else if(a->op=='~')s="<opr s=\"-\" />"+Xml(a->a,2,digits);
+     else if(a->op=='/'||a->op=='^'){std::string tag=a->op=='/'?"fra":"elm tp=\"3\"",close=a->op=='/'?"fra":"elm";s="<"+tag+" E1=\"\" E2=\"\"><ex>"+Xml(a->a,a->op=='^'?5:0,digits)+"</ex><ex>"+Xml(a->b,0,digits)+"</ex></"+close+">";}
++    else if(a->op=='l')s="<fun t=\"log\" f=\"20\" E1=\"\" E2=\"\"><ex br=\"2\">"+Xml(a->a,0,digits)+"</ex><ex>"+Xml(a->b,0,digits)+"</ex></fun>";
+     else if(a->op=='f'){
+         if(a->name=="sqrt")s="<elm tp=\"8\" E1=\"\"><ex>"+Xml(a->a,0,digits)+"</ex></elm>";
+         else if(a->name=="abs"||a->name=="floor"||a->name=="ceil")s="<elm tp=\"5\" E1=\"\"><ex br=\"1\" shp=\""+(a->name=="abs"?std::string("|"):a->name=="floor"?std::string("f"):std::string("c"))+"\">"+Xml(a->a,0,digits)+"</ex></elm>";
+--- a/Mathomir/Toolbox.cpp
++++ b/Mathomir/Toolbox.cpp
+@@ -608,6 +608,7 @@
+         AddSubmember(106,48); // cbrt
+         AddSubmember(106,49); // exp
+         AddSubmember(106,50); // sinc
++        AddDrawingSubmember(95,30,20); //log builder with separate base and argument
+ 
+ 		ToolboxNumMembers++;
+ 
+@@ -736,7 +737,7 @@
+         AddDrawingSubmember(93,30,20); //integral shader
+         AddDrawingSubmember(94,30,20); //inline evaluation
+         AddDrawingSubmember(91,30,20);AddDrawingSubmember(92,30,20);
+-        AddDrawingSubmember(51,20,20);AddDrawingSubmember(89,30,20);
++        AddDrawingSubmember(51,20,20);AddDrawingSubmember(89,30,20);AddDrawingSubmember(95,30,20);
+         ToolboxNumMembers++;
+ 
+ 		memset((void*)&ToolboxFontFormating,0,(size_t)sizeof(ToolboxFontFormating));
+@@ -906,11 +907,11 @@
+ 	int member=ToolboxNumMembers;
+ 	ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers]=(CExpression*)new CDrawing();
+ 	CDrawing *icon=(CDrawing*)ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers];
+-    if(form>=60 && form<=94)
++    if(form>=60 && form<=95)
+     {
+         icon->m_Color=0;icon->OriginalForm=(char)form;
+         auto line=[&](double x1,double y1,double x2,double y2,int width=1){int index=icon->NumItems;icon->InsertItemAt(index);tDrawingItem *item=icon->Items+index;item->Type=1;item->pSubdrawing=NULL;item->LineWidth=width*DRWZOOM;item->X1=(int)(x1*DRWZOOM);item->Y1=(int)(y1*DRWZOOM);item->X2=(int)(x2*DRWZOOM);item->Y2=(int)(y2*DRWZOOM);};
+-        if(form==93){line(1,18,29,18);line(1,18,1,1);line(4,15,10,4,2);line(10,4,18,3,2);line(18,3,26,13,2);for(int x=6;x<=24;x+=3)line(x,17,x,x<12?8:10);}
++        if(form==95){line(1,1,1,14,2);line(1,14,6,14,2);for(int i=0;i<16;i++){double a=i*6.283185307179586/16,b=(i+1)*6.283185307179586/16;line(12+4*cos(a),8+6*sin(a),12+4*cos(b),8+6*sin(b));}line(26,3,19,3);line(19,3,19,13);line(19,13,26,13);line(26,3,26,17);line(26,17,19,17);line(9,17,11,19);line(11,19,15,15);line(15,15,29,15);}else if(form==93){line(1,18,29,18);line(1,18,1,1);line(4,15,10,4,2);line(10,4,18,3,2);line(18,3,26,13,2);for(int x=6;x<=24;x+=3)line(x,17,x,x<12?8:10);}
+         else if(form==94){line(2,6,13,6,2);line(2,13,13,13,2);line(18,5,21,7);line(21,7,24,5);line(24,5,28,7);line(18,12,21,14);line(21,14,24,12);line(24,12,28,14);}
+         else if(form==92){line(2,0,2,19);line(2,19,29,19);line(5,16,27,3);line(6,13,8,13);line(11,11,13,11);line(17,7,19,7);line(24,5,26,5);}
+         else if(form==91){line(0,10,12,10);line(3,5,3,1);line(3,1,9,1);line(9,1,9,8);line(9,8,3,8);line(3,13,3,19);line(3,19,9,19);line(9,19,9,13);line(16,16,29,4);line(23,4,29,4);line(29,4,29,10);}
+@@ -4111,6 +4112,7 @@
+ 				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
+ 				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
+ 				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
++                    if(drw->OriginalForm==95){text="Logarithm builder\r\nSeparate base and argument; radicals, fractions and graphs";langid=0;}
+                     if(drw->OriginalForm==93){text="Integral area shader\r\nBounds, signed integral and total area";langid=0;}
+                     if(drw->OriginalForm==94){text="Evaluate expression\r\nAppend = or approximate result (Ctrl+Enter)";langid=0;}
+                     if(drw->OriginalForm==92){text="Statistics and regression\r\nData, fitted curves, residuals and summaries";langid=0;}
+@@ -6145,9 +6147,9 @@
+     if(ToolboxMembers[member].Above[submember]==-1)
+     {
+         int form=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;
+-        if(form>=60 && form<=94)
++        if(form>=60 && form<=95)
+         {
+-            UINT command=form==94?ID_EXECUTE_EXPRESSION:form==93?ID_INTEGRAL_SHADER:form==92?ID_STATISTICS_REGRESSION:form==91?ID_SYMBOLIC_DERIVATIVE:form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
++            UINT command=form==95?ID_LOG_BASE_BUILDER:form==94?ID_EXECUTE_EXPRESSION:form==93?ID_INTEGRAL_SHADER:form==92?ID_STATISTICS_REGRESSION:form==91?ID_SYMBOLIC_DERIVATIVE:form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
+             theApp.m_pMainWnd->SendMessage(WM_COMMAND,command,0); return;
+         }
+     }
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -13296,13 +13296,13 @@
+     CLogBaseDialog():CFeatureDialog(IDD_LOG_BASE_BUILDER,theApp.m_pMainWnd),graph(false),initializing(true){preview.emptyText="Enter a valid base and argument to preview.";}
+     CString Text(int id){CString text;GetDlgItemText(id,text);text.Trim();return text;}
+     bool Build(){
+-        try{SymbolicDerivative::Parser parser;auto base=parser.Parse((LPCSTR)Text(1382));auto argument=parser.Parse((LPCSTR)Text(1383));
+-            double b=SymbolicDerivative::Value(base,"",0);if(LogHasParameters(base)||!SymbolicDerivative::Finite(b)||b<=0||b==1)throw std::runtime_error("The base must be a positive constant different from 1. Examples: sqrt(3), 2/3, pi or e.");
++        try{extern int TrigDegrees;bool radians=TrigDegrees==0;SymbolicDerivative::Parser parser;auto base=parser.Parse((LPCSTR)Text(1382));auto argument=parser.Parse((LPCSTR)Text(1383));
++            double b=SymbolicDerivative::Value(base,"",0,radians);if(LogHasParameters(base)||!SymbolicDerivative::Finite(b)||b<=0||b==1)throw std::runtime_error("The base must be a positive constant different from 1. Examples: sqrt(3), 2/3, pi or e.");
+             logarithm=SymbolicDerivative::Raw('l',argument,base);
+-            if(!LogHasParameters(argument)&&!SymbolicDerivative::Finite(SymbolicDerivative::Value(logarithm,"",0)))throw std::runtime_error("The argument must be positive for a real logarithm.");
++            if(!LogHasParameters(argument)&&!SymbolicDerivative::Finite(SymbolicDerivative::Value(logarithm,"",0,radians)))throw std::runtime_error("The argument must be positive for a real logarithm.");
+             xml="<ex fh=\"100\">"+SymbolicDerivative::Xml(logarithm)+"</ex>";preview.Set(xml);GetDlgItem(IDOK)->EnableWindow(TRUE);GetDlgItem(1388)->EnableWindow(!LogHasParameters(argument,true));
+             std::wstring report=L"Base > 0, base \u2260 1; argument > 0. Formula syntax: log(base, argument).";
+-            double x=SymbolicDerivative::NaN();try{auto point=parser.Parse((LPCSTR)Text(1386));if(!LogHasParameters(point))x=SymbolicDerivative::Value(point,"",0);}catch(const std::exception &){}
++            double x=SymbolicDerivative::NaN();try{auto point=parser.Parse((LPCSTR)Text(1386));if(!LogHasParameters(point))x=SymbolicDerivative::Value(point,"",0,radians);}catch(const std::exception &){}
+             if(!SymbolicDerivative::Finite(x))report+=L"\r\nEnter a finite constant for the optional x check.";
+             else {extern int TrigDegrees;double value=SymbolicDerivative::Value(logarithm,"x",x,TrigDegrees==0);
+                 if(SymbolicDerivative::Finite(value))report+=L"\r\nValue at x = "+MathDisplay::Number(x)+L" \u2248 "+MathDisplay::Number(value);
