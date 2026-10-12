@@ -6,7 +6,7 @@ $env:MATHOMIR_PRINT_GRID_CHECK='1'
 $env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $grip=Get-Content (Join-Path $PSScriptRoot 'large-resize-grip-smoke.ps1') -Raw
 $start=$grip.IndexOf("Add-Type @'")
-Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('if(pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)return new int[]{x,y};','if((pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)||(pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180)){bool line=true;for(int k=0;k<20;k++){int j=(y*width+x+k)*4;if(!((pixels[j]<30&&pixels[j+1]<30&&pixels[j+2]<30)||(pixels[j]>220&&pixels[j+1]<180&&pixels[j+2]<180))){line=false;break;}}if(line)return new int[]{x,y};}')
+Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start).Replace('LargeGripProbe','CoordinateGripProbe').Replace('if((pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)||(pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180))return new int[]{x,y};','if((pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)||(pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180)){bool line=true;for(int k=0;k<20;k++){int j=(y*width+x+k)*4;if(!((pixels[j]<30&&pixels[j+1]<30&&pixels[j+2]<30)||(pixels[j]>220&&pixels[j+1]<180&&pixels[j+2]<180))){line=false;break;}}if(line)return new int[]{x,y};}')
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;

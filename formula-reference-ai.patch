@@ -129,7 +129,7 @@
 +        if(message.Get("role").text!="assistant"||message.Get("content").kind!=Json::Text||message.Get("content").text.empty())throw std::runtime_error("The AI service returned no explanation. Try again.");
 +        std::string text=message.Get("content").text;if(text.size()>64000)throw std::runtime_error("The AI reply was too long. Ask for a shorter explanation.");
 +        if(choice.Get("finish_reason").text=="length")text="This response was cut short. Ask a shorter question for a complete explanation.\n\n"+text;
-+        else if(choice.Get("finish_reason").text!="stop")throw std::runtime_error("The AI request did not complete. Try again.");return text;
++        else if(choice.Get("finish_reason").text!="stop")throw std::runtime_error("The AI request did not complete. Try again.");if(text.size()>64000)throw std::runtime_error("The AI reply was too long. Ask for a shorter explanation.");return text;
 +    }
      std::string result;bool refused=false;
      for(const auto &item:root.Get("output").items){if(item.Get("type").text!="message"||item.Get("role").text!="assistant")continue;
@@ -158,9 +158,12 @@
      if(dialog==IDD_COORDINATE_GRID_EDIT){
          if(id==1450||id==1451)return "Physical spacing between grid lines in page units. Independent of the numeric value represented by each cell.";
          if(id==1452||id==1453)return "Minor or major grid darkness: 0 is white, 100 is full color. The coordinate axes keep their original ink.";
-@@ -66,16 +81,19 @@
+@@ -64,18 +79,21 @@
+     }
+     if(dialog==IDD_AI_HELP){
          if(id==1401)return "Optional AI help from the selected provider. The current angle setting is included; nothing is submitted automatically.";
-         if(id==1402)return "Selected math or working to explain. Nested fractions, powers, roots and function arguments retain explicit grouping. You can edit the text before sending.";
+-        if(id==1402)return "Selected math or working to explain. Nested fractions, powers, roots and function arguments retain explicit grouping. You can edit the text before sending.";
++        if(id==1402)return "Selected math or working to explain. Nested fractions, powers, roots and function arguments retain explicit grouping. You can edit the text before sending. Enter sends your question; Shift+Enter starts a new line.";
          if(id==1403)return "Choose an explanation, a check of your working, or suggestions for graphing.";
 -        if(id==1404)return "Submit only the text shown above to the selected provider. Groq supports a limited free tier; OpenAI uses your API account.";
 +        if(id==1404)return "Send your question and the visible conversation to the selected provider. Follow-up questions can refer to previous answers.";
@@ -214,7 +217,7 @@
 +    LTEXT "Conversation",-1,10,28,390,10
 +    PUSHBUTTON "New chat",1419,429,24,81,18
 +    EDITTEXT 1407,10,46,500,154,ES_MULTILINE | ES_AUTOVSCROLL | ES_READONLY | WS_VSCROLL | WS_TABSTOP
-+    LTEXT "Your question",-1,10,208,500,10
++    LTEXT "Your question (Enter to send, Shift+Enter for a new line)",-1,10,208,500,10
 +    EDITTEXT 1402,10,220,500,54,ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
 +    COMBOBOX 1403,10,283,170,65,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 +    PUSHBUTTON "Send",1404,190,281,90,19
@@ -324,7 +327,7 @@
 -        AiPresentation::Document document;try{document=AiPresentation::Format(raw);}catch(...){document.text=raw;document.unsupported=true;}
 -        readableReply=document.text;auto display=document.text;for(auto &c:display)if(c==L'\n')c=L'\r';HWND reader=Control(1407);::SendMessage(reader,WM_SETREDRAW,FALSE,0);::SendMessage(reader,EM_SETREADONLY,FALSE,0);::SetWindowTextW(reader,display.c_str());
 +        AiPresentation::Document document;
-+        auto append=[&](const AiPresentation::Document &part){size_t offset=document.text.size();document.text+=part.text;for(auto run:part.runs){run.first+=offset;run.last+=offset;document.runs.push_back(run);}document.unsupported=document.unsupported||part.unsupported;};
++        auto append=[&](const AiPresentation::Document &part){size_t offset=document.text.size();document.text+=part.text;if(document.runs.size()+part.runs.size()>8000){document.unsupported=true;return;}for(auto run:part.runs){run.first+=offset;run.last+=offset;document.runs.push_back(run);}document.unsupported=document.unsupported||part.unsupported;};
 +        auto format=[&](const std::wstring &text){try{return AiPresentation::Format(text);}catch(...){AiPresentation::Document plain;plain.text=text;plain.unsupported=true;return plain;}};
 +        if(conversation.Trimmed())AiPresentation::Add(document,L"Earlier exchanges have been removed to keep this chat manageable.\n\n");
 +        for(const auto &exchange:conversation.Exchanges()){
@@ -364,7 +367,7 @@
          }catch(const std::exception &e){Text(1408,MathomirAI::ToWide(e.what()));}
      }
      void Copy(){std::wstring text;for(wchar_t c:readableReply){if(c==L'\n')text+=L'\r';text+=c;}if(text.empty())return;if(!::OpenClipboard(m_hWnd)){Text(1408,L"The clipboard is busy. Try Copy reply again.");return;}
-@@ -14471,16 +14485,22 @@
+@@ -14471,16 +14485,24 @@
          CComboBox *task=(CComboBox*)GetDlgItem(1403);task->AddString("Explain");task->AddString("Check working");task->AddString("Graph ideas");task->SetCurSel(0);
          // Fresh setups choose Groq; existing OpenAI setups keep their provider.
          int preferred=theApp.GetProfileInt("AI","Provider",-1);if(preferred<0){auto oldKey=MathomirAI::StoredKey(MathomirAI::OpenAI);preferred=oldKey.empty()&&theApp.GetProfileString("AI","Model","").IsEmpty()?1:0;MathomirAI::Erase(oldKey);}
@@ -372,6 +375,8 @@
 +        provider=preferred==0?MathomirAI::OpenAI:preferred==2?MathomirAI::Gemini:preferred==3?MathomirAI::OpenRouter:MathomirAI::Groq;auto providers=(CComboBox*)GetDlgItem(1416);providers->AddString("OpenAI");providers->AddString("Groq (free tier available)");providers->AddString("Gemini (free tier available)");providers->AddString("OpenRouter (free models only)");providers->SetCurSel((int)provider);ProviderChanged();Busy(false);Reply(L"");::EnableWindow(Control(1406),FALSE);return result;
      }
 -    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1416&&HIWORD(wp)==CBN_SELCHANGE){if(!job){provider=::SendMessage(Control(1416),CB_GETCURSEL,0,0)==0?MathomirAI::OpenAI:MathomirAI::Groq;theApp.WriteProfileInt("AI","Provider",(int)provider);ProviderChanged();}return TRUE;}if(id==1404){if(!job)Send();return TRUE;}if(id==1405){Stop();return TRUE;}if(id==1406){Copy();return TRUE;}
++    virtual BOOL PreTranslateMessage(MSG *message){if(message->message==WM_KEYDOWN&&message->wParam==VK_RETURN&&message->hwnd==Control(1402)&&!(::GetKeyState(VK_SHIFT)&0x8000)){if(!job)Send();return TRUE;}return CFeatureDialog::PreTranslateMessage(message);}
++    virtual void OnOK(){if(!job&&::GetFocus()==Control(1402))Send();}
 +    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1416&&HIWORD(wp)==CBN_SELCHANGE){if(!job){int choice=(int)::SendMessage(Control(1416),CB_GETCURSEL,0,0);provider=choice==0?MathomirAI::OpenAI:choice==2?MathomirAI::Gemini:choice==3?MathomirAI::OpenRouter:MathomirAI::Groq;theApp.WriteProfileInt("AI","Provider",(int)provider);conversation.Clear();pendingQuestion.clear();readableReply.clear();Reply(L"");::EnableWindow(Control(1406),FALSE);ProviderChanged();}return TRUE;}if(id==1404){if(!job)Send();return TRUE;}if(id==1405){Stop();return TRUE;}if(id==1406){Copy();return TRUE;}
          if(id==1412){auto key=AiText(Control(1411));bool valid=MathomirAI::KeyValid(key),saved=valid&&MathomirAI::SaveKey(key,provider);MathomirAI::Erase(key);if(saved)Text(1411,L"");Text(1408,saved?L"Key saved in Windows Credential Manager for this Windows account.":valid?L"Windows could not save the key. You can use it for this session without saving.":L"Enter a valid API key in the masked field first.");return TRUE;}
          if(id==1413){bool forgotten=MathomirAI::ForgetKey(provider);Text(1411,L"");Text(1408,forgotten?L"Saved key removed for this provider. Its environment key, if set, remains available.":L"Windows could not remove the saved key. Check Credential Manager.");return TRUE;}
@@ -391,7 +396,7 @@
          if(message==WM_CTLCOLORSTATIC||message==WM_CTLCOLOREDIT){HDC dc=(HDC)wp;::SetTextColor(dc,RGB(28,39,49));::SetBkColor(dc,RGB(255,255,255));return (LRESULT)::GetStockObject(WHITE_BRUSH);}return CFeatureDialog::WindowProc(message,wp,lp);
      }
  };
-@@ -14498,3 +14518,47 @@
+@@ -14498,3 +14520,47 @@
      // Capture the selected math before stopping typing or dismissing its panel.
      Popup->HidePopupMenu();HideSelectionApproxPanel();OnChar(27,1,0);if(GetCapture()==this)ReleaseCapture();CAiHelpDialog dialog(selection);dialog.DoModal();SetFocus();
  }
