@@ -2,6 +2,10 @@ $ErrorActionPreference='Stop'
 $all=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
 Invoke-Expression $all.Substring(0,$all.IndexOf('$exe ='))
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
+$env:MATHOMIR_PRINT_GRID_CHECK='1'
+$grip=Get-Content (Join-Path $PSScriptRoot 'large-resize-grip-smoke.ps1') -Raw
+$start=$grip.IndexOf("Add-Type @'")
+Invoke-Expression $grip.Substring($start,$grip.IndexOf('$exe=')-$start)
 $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
@@ -53,6 +57,13 @@ try{
  Check ((Object $trig).SelectNodes('.//var[@t="p"][@f="60"] | .//elm[@tp="1"][@tx="p"][@fnt="60"]').Count -gt 0) 'Radians did not generate native pi labels'
  Check ((Object $trig).SelectNodes('.//fra | .//elm[@tp="4"]').Count -gt 0) 'Radians did not generate native fractions'
  Check ((Object $trig).SelectNodes('.//var[@t="q"][@f="60"] | .//elm[@tp="1"][@tx="q"][@fnt="60"]').Count -gt 0) 'Greek theta axis name did not generate native math'
+ # Resize a configured grid using the visible native grip, then reopen its settings.
+ [MathomirUiProbe]::Mouse($view,512,0,260,240);Start-Sleep -Milliseconds 100;$r=[MathomirUiProbe]::ClientRect($view);$gr=[LargeGripProbe]::Find($view,$r.Right,$r.Bottom)
+ [MathomirUiProbe]::Mouse($view,512,0,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,513,1,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,512,1,($gr[0]+65),($gr[1]+45));[MathomirUiProbe]::Mouse($view,514,0,($gr[0]+65),($gr[1]+45));$grown=SaveDoc
+ Check ([double](Model $grown).sx -gt 40 -and [double](Model $grown).sy -gt 40) 'Resizing did not scale saved cell spacing'
+ Check ((Model $grown).xv -eq (Model $trig).xv) 'Resizing changed numeric values per cell'
+ $dialog=OpenEditor;Check ([Math]::Abs([double][MathomirUiProbe]::Text([MathomirUiProbe]::Child($dialog,1450))-[double](Model $grown).sx) -lt .001) 'Resized spacing did not load into the editor';CloseEditor $dialog $false
+ [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$restored=SaveDoc;Check ((Object $restored).OuterXml -eq (Object $trig).OuterXml) 'Resize Undo did not restore the configured grid'
  $saved=(Object $trig).OuterXml;[MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 250;$reload=SaveDoc;Check ((Object $reload).OuterXml -eq $saved) 'Grid and labels changed after reopening'
  $dialog=OpenEditor;Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($dialog,1461)) -eq [string][char]0x03b8) 'Greek name did not reload into the editor';Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($dialog,1459)) -eq 'pi/2') 'Trig step was lost on reopening';SetValue $dialog 1450 '32';SetValue $dialog 1451 '24';SetValue $dialog 1452 '40';CloseEditor $dialog $true;$edited=SaveDoc;SameAxes $trig $edited;Check ((Model $edited).sx -eq '32' -and (Model $edited).sy -eq '24') 'Existing grid spacing could not be changed'
  Check ((Object $edited).SelectNodes('./group | ./gr').Count -eq 1) 'Editing duplicated the generated grid'
@@ -65,10 +76,10 @@ try{
  }
  foreach($kind in @(@{name='corner';corner=$true;legacy=$false},@{name='legacy';corner=$false;legacy=$true})){
   Scene $kind.name $kind.corner $kind.legacy;$raw=SaveDoc;$dialog=OpenEditor;SetValue $dialog 1450 '36';SetValue $dialog 1451 '28';Box $dialog 1476 0;CloseEditor $dialog $true;$d=SaveDoc
-  if(!$kind.legacy){SameAxes $raw $d};Check ((Model $d).grid -eq '0') 'Grid could not be hidden';$dialog=OpenEditor;Box $dialog 1476 1;CloseEditor $dialog $true;$d=SaveDoc;Check ((Model $d).grid -eq '1') 'Grid could not be restored after hiding'
+  if(!$kind.legacy){SameAxes $raw $d};Check ((Model $d).grid -eq '0') 'Grid could not be hidden';$without=@();foreach($mode in 1..3){$without+=[MathomirUiProbe]::Send($view,32923,$mode,1)};$dialog=OpenEditor;Box $dialog 1476 1;CloseEditor $dialog $true;$d=SaveDoc;Check ((Model $d).grid -eq '1') 'Grid could not be restored after hiding';foreach($mode in 1..3){$printed=[MathomirUiProbe]::Send($view,32923,$mode,1);Check ($printed -gt $without[$mode-1]+100) ('Coordinate grid missing from actual print/preview path '+$mode)}
  }
- Write-Output 'Coordinate editor passed: actual context/menu route, preview contrast and styles, independent spacing and units, native negative pi/fraction/scientific labels, Greek names, Cancel, save/reopen, existing-grid editing, no duplicates, Undo, corner axes and legacy grids.'
+ Write-Output 'Coordinate editor passed: actual context/menu route, preview contrast and styles, independent spacing and units, native negative pi/fraction/scientific labels, Greek names, Cancel, save/reopen, existing-grid editing, no duplicates, Undo, corner axes, legacy grids, native grip resizing and actual print/preview at 100/50 percent.'
 }finally{
  if($main -ne [IntPtr]::Zero -and !$app.HasExited){Capture $main (Join-Path (Split-Path $exe) 'coordinate-axes-canvas-ui.png')}
- $app.Refresh();if(!$app.HasExited){$app.Kill();$app.WaitForExit()}
+ $app.Refresh();if(!$app.HasExited){$app.Kill();$app.WaitForExit()};Remove-Item Env:MATHOMIR_PRINT_GRID_CHECK -ErrorAction SilentlyContinue
 }

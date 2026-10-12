@@ -79,7 +79,6 @@ jobs:
         shell: pwsh
         run: |
           ./tools/smart-stroke-test.ps1
-          ./tools/coordinate-axes-editor-smoke.ps1
           ./tools/sparse-stroke-smoke.ps1
       - name: Large object resize grip UI checks
         shell: pwsh
@@ -176,6 +175,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/coordinate-axes-editor-smoke.ps1
           ./tools/statistics-smoke.ps1
           ./tools/windows-smoke.ps1
       - uses: actions/upload-artifact@v4
@@ -297,6 +297,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/coordinate-axes-editor-smoke.ps1
           ./tools/sparse-stroke-smoke.ps1
           ./tools/large-resize-grip-smoke.ps1
           ./tools/overlap-smoke.ps1
