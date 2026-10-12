@@ -61,6 +61,8 @@ try{
  # Reopen to leave selection mode; hover a long axis stroke rather than an embedded label.
  [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 250
  # Resize a configured grid using the visible native grip, then reopen its settings.
+ [MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null
+ [MathomirUiProbe]::Mouse($view,512,0,40,40);[MathomirUiProbe]::Mouse($view,513,1,40,40);[MathomirUiProbe]::Mouse($view,514,0,40,40);Start-Sleep -Milliseconds 150
  $r=[MathomirUiProbe]::ClientRect($view);$ink=[CoordinateGripProbe]::FindInk($view,$r.Right,$r.Bottom);[MathomirUiProbe]::Mouse($view,512,0,$ink[0],$ink[1]);Start-Sleep -Milliseconds 100;$gr=[CoordinateGripProbe]::Find($view,$r.Right,$r.Bottom)
  [MathomirUiProbe]::Mouse($view,512,0,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,513,1,$gr[0],$gr[1]);[MathomirUiProbe]::Mouse($view,512,1,($gr[0]+65),($gr[1]+45));[MathomirUiProbe]::Mouse($view,514,0,($gr[0]+65),($gr[1]+45));$grown=SaveDoc
  Check ([double](Model $grown).sx -gt 40 -and [double](Model $grown).sy -gt 40) 'Resizing did not scale saved cell spacing'
