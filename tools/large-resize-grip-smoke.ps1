@@ -16,10 +16,13 @@ public static class LargeGripProbe {
  [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
  [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
  static bool Blue(byte[] p,int w,int x,int y){int i=(y*w+x)*4;return p[i]==155&&p[i+1]==95&&p[i+2]==45;}
- public static int[] Find(IntPtr h,int width,int height){IntPtr dc=GetDC(h),mem=CreateCompatibleDC(dc),bmp=CreateCompatibleBitmap(dc,width,height),old=SelectObject(mem,bmp);try{
+ public static int[] Find(IntPtr h,int width,int height){return FindInternal(h,width,height,false);}
+ public static int[] FindInk(IntPtr h,int width,int height){return FindInternal(h,width,height,true);}
+ static int[] FindInternal(IntPtr h,int width,int height,bool ink){IntPtr dc=GetDC(h),mem=CreateCompatibleDC(dc),bmp=CreateCompatibleBitmap(dc,width,height),old=SelectObject(mem,bmp);try{
   BitBlt(mem,0,0,width,height,dc,0,0,0x00cc0020);SelectObject(mem,old);old=IntPtr.Zero;
   byte[] pixels=new byte[width*height*4];BitmapInfo info=new BitmapInfo{Size=40,Width=width,Height=-height,Planes=1,BitCount=32};
   if(GetDIBits(dc,bmp,0,(uint)height,pixels,ref info,0)==0)throw new Exception("Could not capture the canvas.");
+  if(ink){for(int y=40;y<height-20;y++)for(int x=40;x<width-30;x++){int i=(y*width+x)*4;if(pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)return new int[]{x,y};}throw new Exception("No visible equation ink for hover.");}
   for(int y=8;y<height-12;y++)for(int x=8;x<width-12;x++){if(!Blue(pixels,width,x,y))continue;bool square=true;for(int k=0;k<13;k++)if(!Blue(pixels,width,x+k,y)||!Blue(pixels,width,x,y+k)||!Blue(pixels,width,x+12,y+k)){square=false;break;}if(square)return new int[]{x+6,y+6};}
   throw new Exception("Visible resize grip was not found.");
  }finally{if(old!=IntPtr.Zero)SelectObject(mem,old);DeleteObject(bmp);DeleteDC(mem);ReleaseDC(h,dc);}}
@@ -30,6 +33,7 @@ $app=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
 function Font($doc){$e=$doc.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]');if($e.HasAttribute('fh')){return [int]$e.fh};return [int]$e.fnt_h}
 function Grip {Start-Sleep -Milliseconds 70;$r=[MathomirUiProbe]::ClientRect($view);return [LargeGripProbe]::Find($view,$r.Right,$r.Bottom)}
+function HoverObject {$r=[MathomirUiProbe]::ClientRect($view);$p=[LargeGripProbe]::FindInk($view,$r.Right,$r.Bottom);[MathomirUiProbe]::Mouse($view,512,0,$p[0],$p[1])}
 function Drag($g,$dx,$dy,$release=$true){
  [MathomirUiProbe]::Mouse($view,512,0,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,513,1,$g[0],$g[1]);
  for($i=0;$i -lt 8;$i++){[MathomirUiProbe]::Mouse($view,512,1,($g[0]+$dx),($g[1]+$dy))}
@@ -51,6 +55,10 @@ try {
   $g=Grip;Drag $g 45 25;$d=SaveDoc;$again=Font $d;if($again -le $grown){throw 'Could not re-grab and enlarge the large equation a second time'}
   $g=Grip;Drag $g -65 -35;$d=SaveDoc;if((Font $d) -ge $again){throw 'Could not shrink the enlarged equation'}
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$d=SaveDoc;if((Font $d) -ne $again){throw 'Undo did not restore the large font'}
+  # Undo replaces document objects and clears their old hover handles. Reacquire
+  # the real visible glyph before testing the next drag, rather than a blank
+  # corner inside the oversized expression's bounding rectangle.
+  HoverObject
   $g=Grip;Drag $g 80 45 $false;[MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null;$d=SaveDoc;if((Font $d) -ne $again){throw 'Escape did not cancel the large resize'}
   Write-Output "Large grip passed: $font% -> $grown% -> $again%, power=$power, zoom=$zoom; repeated events, re-grab, shrink, Undo, Escape."
  }}}
