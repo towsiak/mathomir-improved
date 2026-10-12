@@ -45,7 +45,7 @@
 +    anchor.front()=input.front();anchor.back()=input.back();
 +    bool closed=Distance(input.front(),input.back())<.001;
 +    double radius=strength==1?6:strength==2?18:32;
-+    int window=(int)std::ceil(radius/step);window=std::min(window,count/2);
++    int window=(int)std::ceil(radius/step);window=(std::min)(window,count/2);
 +    double sigma=radius/2.5;std::vector<double> weights;
 +    for(int k=-window;k<=window;k++)weights.push_back(std::exp(-.5*k*k*step*step/(sigma*sigma)));
 +    std::vector<Point> output;
