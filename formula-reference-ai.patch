@@ -350,6 +350,17 @@
 +};
 +void CMathomirView::OnFormulaReference(){Popup->HidePopupMenu();HideSelectionApproxPanel();if(GetCapture())ReleaseCapture();CFormulaSheetDialog dialog;int result=dialog.DoModal();if(result==1489){OnChar(27,1,0);CAiHelpDialog ai(dialog.aiText);ai.DoModal();SetFocus();return;}if(result!=IDOK){SetFocus();return;}if(ViewOnlyMode)return;OnChar(27,1,0);CancelFloatingPlacement();RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardExpression=new CExpression(NULL,NULL,100);std::vector<char> data(dialog.xml.begin(),dialog.xml.end());data.push_back(0);if(!ClipboardExpression->XML_input(data.data())){delete ClipboardExpression;ClipboardExpression=NULL;AfxMessageBox("This formula could not be inserted.");return;}RootObjectCopy=-1;RootObjectFontSize=100;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));}
 +void CMathomirView::OnFreeAiHelp(){int p=theApp.GetProfileInt("AI","Provider",1);if(p!=1&&p!=2&&p!=3)theApp.WriteProfileInt("AI","Provider",1);OnAiHelp();}
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -144,6 +144,8 @@
+     void OnIntegralShader();
+     void OnLogBaseBuilder();
+     void OnAiHelp();
++    afx_msg void OnFormulaReference();
++    afx_msg void OnFreeAiHelp();
+     void OnNumberFormat();
+     void OnExecuteExpression();
+     void OnApproximateExpression();
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
 @@ -320,3 +320,7 @@
