@@ -345,7 +345,7 @@
  #endif
          ::SendMessage(reader,EM_SETREADONLY,TRUE,0);
 -        ::SendMessage(reader,EM_SETSEL,0,0);::SendMessage(reader,EM_SCROLL,SB_TOP,0);::SendMessage(reader,WM_SETREDRAW,TRUE,0);::InvalidateRect(reader,NULL,TRUE);return document.unsupported;
-+        ::SendMessage(reader,EM_SETSEL,-1,-1);::SendMessage(reader,EM_SCROLLCARET,0,0);::SendMessage(reader,WM_SETREDRAW,TRUE,0);::InvalidateRect(reader,NULL,TRUE);return document.unsupported;
++        int end=::GetWindowTextLengthW(reader);::SendMessage(reader,EM_SETSEL,end,end);::SendMessage(reader,WM_SETREDRAW,TRUE,0);::SendMessage(reader,EM_SCROLLCARET,0,0);::InvalidateRect(reader,NULL,TRUE);return document.unsupported;
      }
 -    void Busy(bool busy){for(int id:{1402,1403,1404,1411,1412,1413,1414,1415,1416})::EnableWindow(Control(id),!busy);::EnableWindow(Control(1405),busy);}
 -    void Stop(){if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Busy(false);Text(1408,L"Stopped waiting. A request already received by the selected service may still count toward API usage.");}
