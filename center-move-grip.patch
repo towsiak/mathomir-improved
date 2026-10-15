@@ -10,10 +10,11 @@
  static int MoveStartX,MoveStartY;
  static CObject *MoveGripObject=NULL;
  static CExpression *SizingExpressionSnapshot=NULL;
-@@ -643,8 +644,59 @@
+@@ -643,8 +644,60 @@
          (object->absolute_Y+object->Below-ViewY)*ViewZoom/100+1);
      return bounds.PtInRect(point)!=FALSE;
  }
++extern int NumSelectedObjects;
 +// A fixed screen-size control near the visible center. Prefer whitespace and
 +// never cover a foreground annotation; layout is deterministic while hovering.
 +static bool CenterMoveGripPoint(tDocumentStruct *object,CPoint &point)
@@ -70,7 +71,7 @@
      const CPoint controls[]={MoveGripPoint(object),LowerMoveGripPoint(object),
          ResizeHandlePoint(object),DeleteGripPoint(object)};
      for(int i=0;i<4;i++)
-@@ -2101,6 +2153,7 @@
+@@ -2101,6 +2154,7 @@
  {
  	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
  	if (nFlags & (MK_CONTROL|MK_SHIFT)) { OnLButtonDown(nFlags,point); return; }
@@ -78,7 +79,7 @@
  	RestoreClipboardBackground();
  	if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
  	if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
-@@ -2134,11 +2187,16 @@
+@@ -2134,11 +2188,16 @@
  static CObject *ExplicitTypingRoot=NULL;
  void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  {
@@ -95,7 +96,7 @@
      ExplicitTypingRoot=NULL;
      if(!ViewOnlyMode && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing){
          tDocumentStruct *front=FrontContentAtPoint(point);
-@@ -2165,7 +2223,7 @@
+@@ -2165,7 +2224,7 @@
              GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();return;
          }
      }
@@ -104,7 +105,7 @@
  	if (BeginMouseSizing(point)) return;
  	if (BeginMouseRotation(point)) return;
  	RotationHandleObject=NULL;
-@@ -3728,6 +3786,7 @@
+@@ -3728,6 +3787,7 @@
      {
          CPoint deleteGrip=DeleteGripPoint(moveHover);
          if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){ShowFeatureCanvasHint(1,"Delete this object. Ctrl+Z restores it.");SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
@@ -112,7 +113,7 @@
          CPoint grip=MoveGripPoint(moveHover);
          CPoint lower=LowerMoveGripPoint(moveHover);
          if ((abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9) || (abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9))
-@@ -4602,7 +4661,7 @@
+@@ -4602,7 +4662,7 @@
                      !nextFunctionHelp.IsEmpty()?std::wstring((LPCWSTR)nextFunctionHelp):L"Mathematical object - click to edit its numbers, symbols and expressions. Use the Background color toolbar button to highlight it.";
              }else if(TouchedObject->Type==2)help=FeatureDrawingHelp((CDrawing*)TouchedObject->Object);
              if(!help.empty()){
@@ -121,7 +122,7 @@
                  CPoint cursor;::GetCursorPos(&cursor);ScreenToClient(&cursor);CRect area(cursor.x-12,cursor.y-12,cursor.x+13,cursor.y+13);
                  CanvasHints.Hover(GetSafeHwnd(),(int)(INT_PTR)TouchedObject->Object,area,help);CanvasHintVersion++;
              }
-@@ -5435,6 +5494,7 @@
+@@ -5435,6 +5495,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -129,7 +130,7 @@
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
      if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
      if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
-@@ -8596,6 +8656,7 @@
+@@ -8596,6 +8657,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -137,7 +138,7 @@
      if(DeleteGripClick){DeleteGripClick=false;return;}
      if (MouseMovingActive) { UpdateGripMove(point); EndGripMove(false); return; }
      if (MouseSizingActive) { UpdateMouseSizing(point,nFlags); EndMouseSizing(false); return; }
-@@ -10981,7 +11042,55 @@
+@@ -10981,7 +11043,55 @@
          if (TheDocument[i].Object==MoveGripObject) return TheDocument+i;
      return NULL;
  }
@@ -194,7 +195,7 @@
  {
      tDocumentStruct *object=ResizeHandleDocument();
      if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || ClipboardExpression || ClipboardDrawing) return false;
-@@ -10989,14 +11098,17 @@
+@@ -10989,14 +11099,17 @@
      CPoint lower=LowerMoveGripPoint(object);
      bool upperHit=abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9;
      bool lowerHit=abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9;
@@ -215,7 +216,7 @@
      FreePlacementGesture=false; SetCapture(); SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
      return true;
  }
-@@ -11004,19 +11116,29 @@
+@@ -11004,19 +11117,29 @@
  {
      tDocumentStruct *object=MoveGripDocument();
      if (!object) { EndGripMove(true); return; }
@@ -250,7 +251,7 @@
      if (GetCapture()==this) ReleaseCapture();
      RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
  }
-@@ -11024,9 +11146,9 @@
+@@ -11024,9 +11147,9 @@
  {
      tDocumentStruct *object=ResizeHandleDocument();
      if (!object || object->MovingDotState==5) return;
