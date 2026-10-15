@@ -6,13 +6,18 @@ Add-Type @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Drawing;
-using System.Drawing.Imaging;
 public static class CenterGripProbe {
+ [StructLayout(LayoutKind.Sequential)] struct BitmapInfo {public uint Size;public int Width,Height;public ushort Planes,BitCount;public uint Compression,SizeImage;public int XPels,YPels;public uint Used,Important;}
  [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
  [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h,IntPtr d);
+ [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr d);
+ [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleBitmap(IntPtr d,int w,int h);
+ [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr d,IntPtr o);
+ [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr o);
+ [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr d);
+ [DllImport("gdi32.dll")] static extern int GetDIBits(IntPtr d,IntPtr bmp,uint start,uint lines,int[] data,ref BitmapInfo info,uint use);
  [DllImport("gdi32.dll")] static extern bool BitBlt(IntPtr d,int x,int y,int w,int h,IntPtr s,int sx,int sy,uint rop);
- public static int[][] Centers(IntPtr h,int w,int height){using(var bmp=new Bitmap(w,height,PixelFormat.Format32bppArgb)){using(var g=Graphics.FromImage(bmp)){var screen=GetDC(h);var target=g.GetHdc();try{BitBlt(target,0,0,w,height,screen,0,0,0x00CC0020);}finally{g.ReleaseHdc(target);ReleaseDC(h,screen);}}var rect=new Rectangle(0,0,w,height);var bits=bmp.LockBits(rect,ImageLockMode.ReadOnly,PixelFormat.Format32bppArgb);var pixels=new int[w*height];try{Marshal.Copy(bits.Scan0,pixels,0,pixels.Length);}finally{bmp.UnlockBits(bits);}var found=new List<int[]>();for(int y=8;y<height-8;y++)for(int x=8;x<w-8;x++){if((pixels[y*w+x]&0xffffff)!=0x2d5f9b)continue;bool cross=true;for(int k=-6;k<=6;k++)if((pixels[y*w+x+k]&0xffffff)!=0x2d5f9b||(pixels[(y+k)*w+x]&0xffffff)!=0x2d5f9b){cross=false;break;}if(cross)found.Add(new[]{x,y});}found.Sort((a,b)=>a[0].CompareTo(b[0]));return found.ToArray();}}
+ public static int[][] Centers(IntPtr h,int w,int height){IntPtr screen=GetDC(h),target=CreateCompatibleDC(screen),bmp=CreateCompatibleBitmap(screen,w,height),old=SelectObject(target,bmp);try{BitBlt(target,0,0,w,height,screen,0,0,0x00CC0020);SelectObject(target,old);old=IntPtr.Zero;var info=new BitmapInfo{Size=40,Width=w,Height=-height,Planes=1,BitCount=32};var pixels=new int[w*height];if(GetDIBits(screen,bmp,0,(uint)height,pixels,ref info,0)==0)throw new Exception("Could not read canvas pixels");var found=new List<int[]>();for(int y=8;y<height-8;y++)for(int x=8;x<w-8;x++){if((pixels[y*w+x]&0xffffff)!=0x2d5f9b)continue;bool cross=true;for(int k=-6;k<=6;k++)if((pixels[y*w+x+k]&0xffffff)!=0x2d5f9b||(pixels[(y+k)*w+x]&0xffffff)!=0x2d5f9b){cross=false;break;}if(cross)found.Add(new[]{x,y});}found.Sort((a,b)=>a[0].CompareTo(b[0]));return found.ToArray();}finally{if(old!=IntPtr.Zero)SelectObject(target,old);DeleteObject(bmp);DeleteDC(target);ReleaseDC(h,screen);}}
 }
 '@
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path;$folder=Split-Path $exe
@@ -62,7 +67,7 @@ try{
  Scene 'graph' $graph;$original=SaveDoc;$g=Grip 300 260;Capture 'center-move-grip-ui.png';Drag $g 35 25;$d=SaveDoc;Check ((Drawing $d).X -eq '135' -and (Drawing $d).Y -eq '125') 'Graph center drag did not move the graph';Check ((Get-GraphRange $d)-join ',' -eq '-5,5,-5,5') 'Center drag zoomed the graph'
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$g=Grip 300 260;Double $g;[MathomirUiProbe]::Send($view,256,0x23)|Out-Null;[MathomirUiProbe]::Send($view,258,[int][char]'Z')|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null;$d=SaveDoc;Check ($d.mathomir.ChildNodes.Count -eq 1) 'Graph double-click created a canvas object';Check ((Drawing $d).OuterXml.Contains('Z')) 'Graph double-click did not enter its formula'
  # The middle of an unfilled shape is a valid move target, with native node editing on double-click.
- $shape='<o t="2" X="150" Y="160"><dw d="64|0,0;6400,0;:,3200;0,:;:,0" /></o>'
- Scene 'shape' $shape;$shapeBaseline=(Drawing (SaveDoc)).OuterXml;$g=Grip 250 210;Drag $g 30 20;$d=SaveDoc;Check ((Drawing $d).X -eq '180' -and (Drawing $d).Y -eq '180') 'Hollow shape center move failed';[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$g=Grip 250 210;Double $g;[MathomirUiProbe]::Mouse($view,512,0,350,260);[MathomirUiProbe]::Mouse($view,513,1,350,260);[MathomirUiProbe]::Mouse($view,512,1,375,280);[MathomirUiProbe]::Mouse($view,514,0,375,280);$d=SaveDoc;Check ((Drawing $d).X -eq '150' -and (Drawing $d).Y -eq '160') 'Node editing translated the whole shape';Check ((Drawing $d).OuterXml -ne $shapeBaseline) 'Shape double-click did not enable node editing'
+ $shape='<o t="2" X="150" Y="160"><dw d="64|0,0;3200,0;6400,3200;1600,2400;0,0" /></o>'
+ Scene 'shape' $shape;$shapeBaseline=(Drawing (SaveDoc)).OuterXml;$g=Grip 250 210;Drag $g 30 20;$d=SaveDoc;Check ((Drawing $d).X -eq '180' -and (Drawing $d).Y -eq '180') 'Hollow shape center move failed';[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$g=Grip 250 210;Double $g;[MathomirUiProbe]::Mouse($view,512,0,350,260);[MathomirUiProbe]::Mouse($view,513,1,350,260);[MathomirUiProbe]::Mouse($view,512,1,375,280);[MathomirUiProbe]::Mouse($view,514,0,375,280);$d=SaveDoc;Check ((Drawing $d).X -eq '150' -and (Drawing $d).Y -eq '160') 'Node editing translated the whole shape';Check ((Drawing $d).OuterXml -ne $shapeBaseline) 'Shape double-click did not enable node editing';$vertices=@(ShaderPoints (Drawing $d));Check (@($vertices|Where-Object{[math]::Abs($_.x-250)-lt .1 -and [math]::Abs($_.y-160)-lt .1}).Count -gt 0 -and @($vertices|Where-Object{[math]::Abs($_.x-200)-lt .1 -and [math]::Abs($_.y-235)-lt .1}).Count -gt 0) 'Editing a node resized unrelated vertices'
  Write-Output 'Center grips passed: text/math over graphs in both creation orders at 60/100/200 percent, no-jump clicks, Undo, Escape, exact object editing, unchanged graph bounds, graph formula entry, hollow shape dragging and node editing.'
 }catch{Capture 'center-move-grip-failure.png';($_|Out-String)|Set-Content (Join-Path $folder 'center-move-grip-result.txt');throw}finally{if(!$app.HasExited){$app.Kill();$app.WaitForExit()}}
