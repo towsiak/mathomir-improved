@@ -59,7 +59,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../formula-reference-ai.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../latex-rendering.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
+          ./tools/setup-math-renderer.ps1
       - name: Locate MSBuild and check MFC
         shell: pwsh
         run: |
@@ -113,6 +116,7 @@ jobs:
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
             source/build/formula-reference-typeset.txt
+            source/build/math-web-*.json
             source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
@@ -223,6 +227,7 @@ jobs:
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
             source/build/formula-reference-typeset.txt
+            source/build/math-web-*.json
             source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
@@ -240,6 +245,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force package | Out-Null
           Copy-Item source/build/Mathomir.exe package/
+          Copy-Item source/build/MathomirMath package/MathomirMath -Recurse
           Copy-Item source/ReadMe.txt package/LICENSE.txt
           Copy-Item REPAIR_NOTES.txt package/
           Copy-Item source/Mathomir/res/MathomirHandyHelp.chm package/
@@ -303,7 +309,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../formula-reference-ai.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../latex-rendering.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
+          ./tools/setup-math-renderer.ps1
       - name: Locate MSBuild and check MFC
         shell: pwsh
         run: |
@@ -353,6 +362,7 @@ jobs:
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
             source/build/formula-reference-typeset.txt
+            source/build/math-web-*.json
             source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png

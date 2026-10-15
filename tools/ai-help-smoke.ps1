@@ -1,4 +1,4 @@
-param([switch]$OnlineFixture)
+﻿param([switch]$OnlineFixture)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 $all=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
@@ -51,7 +51,7 @@ try{
  Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1402)) -eq '2') 'Selected math was not imported'
  foreach($id in @(1402,1407,1411,1414)){Check ([AiUI]::IsWindowUnicode([MathomirUiProbe]::Child($d,$id))) ('ANSI edit control: '+$id)}
  $dialogBounds=[MathomirUiProbe]::WindowRect($d);$closeBounds=[MathomirUiProbe]::WindowRect([MathomirUiProbe]::Child($d,2));Check ($closeBounds.Bottom -lt [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea.Bottom) 'Close button falls off the screen'
- Check ([MathomirUiProbe]::Class([MathomirUiProbe]::Child($d,1407)) -eq 'RICHEDIT50W') 'Formatted native reply reader missing'
+ Check ([MathomirUiProbe]::Class([MathomirUiProbe]::Child($d,1407)) -eq 'MathomirMathReader') 'LaTeX reply reader missing'
  Check (([AiUI]::GetWindowLong([MathomirUiProbe]::Child($d,1411),-16) -band 32) -ne 0) 'API key field is not masked'
  Provider $d 1;Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1414)) -eq 'openai/gpt-oss-120b') 'Groq default model missing';Ask $d 'ln(2)';Check ((Status $d).Contains('API key')) ('Missing key not explained: '+(Status $d));Check ([AiUI]::IsWindowEnabled([MathomirUiProbe]::Child($d,1404))) 'Missing key left panel busy'
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1411),'gsk_mathomir_ci_only');[MathomirUiProbe]::Send($d,273,1412)|Out-Null;Check ([AiUI]::SavedKey('Groq')) 'Windows Credential Manager did not save key'
@@ -70,7 +70,10 @@ try{
   Ask $d '[angle-format]';WaitReply $d;Check ((Status $d).Contains('AI reply received')) 'Angle conversion request failed'
   [MathomirUiProbe]::Send($d,273,1406)|Out-Null;$formatted=Get-Clipboard -Raw;Check ($formatted.Contains('5π∕6') -and $formatted.Contains('150°') -and $formatted.Contains('180°∕π') -and $formatted.Contains('114.6°')) ('Angle math copy lost values: '+$formatted)
   Check ($formatted -notmatch '\\frac|\\pi|\\text|\\\[|\\\(|\*\*|###') 'Copied reply still contains LaTeX or Markdown markers'
-  Check ([int](Get-Content (Join-Path (Split-Path $exe) 'ai-math-typeset.txt') -Raw) -ge 7) 'Actual AI panel did not create built-up math zones'
+  $statsPath=Join-Path (Split-Path $exe) 'math-web-1407.json'
+  for($n=0;$n -lt 200;$n++){Start-Sleep -Milliseconds 30;if(Test-Path $statsPath){try{$render=Get-Content $statsPath -Raw|ConvertFrom-Json;if($render.math -ge 7 -and $render.fractions -gt 0){break}}catch{}}}
+  Check ($render.math -ge 7 -and $render.fractions -gt 0 -and $render.errors -eq 0) 'Actual AI panel did not render its LaTeX fractions'
+
   [MathomirUiProbe]::Mouse($view,512,0,980,15);Start-Sleep -Milliseconds 500
   Add-Type -AssemblyName System.Drawing;$mathRect=[MathomirUiProbe]::WindowRect($d);$mathImage=New-Object System.Drawing.Bitmap ($mathRect.Right-$mathRect.Left),($mathRect.Bottom-$mathRect.Top);$mathGraphics=[System.Drawing.Graphics]::FromImage($mathImage);$mathGraphics.CopyFromScreen($mathRect.Left,$mathRect.Top,0,0,$mathImage.Size);$mathImage.Save((Join-Path (Split-Path $exe) 'ai-math-reader-ui.png'));$mathGraphics.Dispose();$mathImage.Dispose()
   $requests=Get-Content $record|ForEach-Object{$_|ConvertFrom-Json};Check ($requests.Count -ge 6) 'Test HTTP requests missing';Check (($requests|Where-Object {$_.path -eq '/v1/responses'}).Count -ge 1 -and ($requests|Where-Object {$_.path -eq '/openai/v1/responses'}).Count -ge 5) 'Provider endpoints were not isolated';foreach($r in $requests){Check ($r.authenticated -and !$r.store -and !$r.stream) 'Request authentication/nonstored flags incorrect'}

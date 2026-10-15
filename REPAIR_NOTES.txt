@@ -517,3 +517,9 @@ OFFLINE FORMULA REFERENCE AND MULTIPLE FREE AI SERVICES
 
 AI CONVERSATION LAYOUT
 The scrollable conversation is above the question box, as in a standard chat window. Enter sends; Shift+Enter adds a new line. Send adds an exchange and clears the composer after a successful reply. Follow-up questions include the visible conversation. New chat clears the history; changing providers also starts a new chat. Failed/cancelled requests preserve the entered question and earlier replies. Test connection preserves both the chat and the question. Copy reply copies the latest completed answer. History stays in this window only, with the latest 12 exchanges retained (160 KB maximum); a visible notice appears if older exchanges are removed. No chat is stored in a .mom file.
+
+Proper LaTeX display and expanded trigonometry (2026-10-15)
+- Both AI answers and reference cards now use bundled MathJax SVG typesetting, including stacked fractions, true limits, roots and aligned equations. Original LaTeX is passed directly to the renderer.
+- 286 reference cards, including 91 trigonometry cards with domain, principal-range and half-angle sign restrictions.
+- Extract the whole ZIP and keep MathomirMath beside Mathomir.exe. Math typesetting is offline. It uses the Microsoft Edge WebView2 Runtime normally supplied with Windows; if missing, the panel offers Microsoft's official installer page. No model or browser runtime is bundled.
+- The question composer stays below the conversation. API keys stay in the native Windows controls and are never passed to the math renderer. Model text is treated as text, and external links, active HTML and TeX package downloads are disabled.

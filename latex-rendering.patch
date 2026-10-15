@@ -1,0 +1,295 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -38,6 +38,7 @@
+ #include <set>
+ #include <richedit.h>
+ #include "AiNativePresentation.h"
++#include "MathWebRenderer.h"
+ 
+ #include "MathomirDoc.h"
+ #include "MathomirView.h"
+@@ -14413,16 +14414,8 @@
+     for(HWND child=::GetWindow(dialog->m_hWnd,GW_CHILD);child;child=::GetWindow(child,GW_HWNDNEXT)){RECT r;::GetWindowRect(child,&r);dialog->ScreenToClient(&r);if(child==reply)::SetWindowPos(child,NULL,0,0,r.right-r.left,r.bottom-r.top+delta,SWP_NOMOVE|SWP_NOZORDER|SWP_NOACTIVATE);else if(r.top>=boundary.bottom)::SetWindowPos(child,NULL,r.left,r.top+delta,0,0,SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE);}
+     ::SetWindowPos(dialog->m_hWnd,NULL,window.left,monitor.rcWork.top+6,window.right-window.left,window.bottom-window.top+delta,SWP_NOZORDER|SWP_NOACTIVATE);
+ }
+-// Windows supplies the formatted reader; no browser or rendering package is bundled.
+-static bool AiReplyReader(CDialog *dialog,int id=1407)
+-{
+-    static HMODULE richEdit=LoadLibraryExW(L"msftedit.dll",NULL,LOAD_LIBRARY_SEARCH_SYSTEM32);if(!richEdit)return false;
+-    HWND old=::GetDlgItem(dialog->m_hWnd,id);RECT r;::GetWindowRect(old,&r);dialog->ScreenToClient(&r);
+-    DWORD style=(DWORD)::GetWindowLong(old,GWL_STYLE);HFONT font=(HFONT)::SendMessage(old,WM_GETFONT,0,0);HWND previous=::GetWindow(old,GW_HWNDPREV);
+-    HWND reader=::CreateWindowExW(WS_EX_CLIENTEDGE,L"RICHEDIT50W",L"",style,r.left,r.top,r.right-r.left,r.bottom-r.top,dialog->m_hWnd,NULL,AfxGetInstanceHandle(),NULL);if(!reader)return false;
+-    ::DestroyWindow(old);::SetWindowLongPtr(reader,GWLP_ID,id);::SendMessage(reader,WM_SETFONT,(WPARAM)font,TRUE);::SetWindowPos(reader,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+-    ::SendMessage(reader,EM_EXLIMITTEXT,0,256000);::SendMessage(reader,EM_SETBKGNDCOLOR,0,RGB(255,255,255));RECT margin={10,8,r.right-r.left-22,r.bottom-r.top-8};::SendMessage(reader,EM_SETRECT,0,(LPARAM)&margin);return true;
+-}
++// MathJax renders the original LaTeX in a local, isolated math reader.
++static bool AiReplyReader(CDialog *dialog,int id=1407){return MathWebRenderer::Attach(dialog->m_hWnd,id);}
+ static std::wstring AiText(HWND control){int length=::GetWindowTextLengthW(control);if(length>64000)throw std::runtime_error("The text is too long.");std::vector<wchar_t> text(length+1,0);::GetWindowTextW(control,text.data(),length+1);return std::wstring(text.data());}
+ class CAiHelpDialog:public CFeatureDialog
+ {
+@@ -14439,28 +14432,12 @@
+         else ::SetWindowTextW(Control(id),s.c_str());
+     }
+     bool Reply(const std::wstring &raw){
+-        AiPresentation::Document document;
+-        auto append=[&](const AiPresentation::Document &part){size_t offset=document.text.size();document.text+=part.text;if(document.runs.size()+part.runs.size()>8000){document.unsupported=true;return;}for(auto run:part.runs){run.first+=offset;run.last+=offset;document.runs.push_back(run);}document.unsupported=document.unsupported||part.unsupported;};
+-        auto format=[&](const std::wstring &text){try{return AiPresentation::Format(text);}catch(...){AiPresentation::Document plain;plain.text=text;plain.unsupported=true;return plain;}};
+-        if(conversation.Trimmed())AiPresentation::Add(document,L"Earlier exchanges have been removed to keep this chat manageable.\n\n");
+-        for(const auto &exchange:conversation.Exchanges()){
+-            AiPresentation::Add(document,L"You\n",true,false,false,2);append(format(MathomirAI::ToWide(exchange.question)));AiPresentation::Add(document,L"\n\n");
+-            AiPresentation::Add(document,std::wstring(MathomirAI::ProviderName(provider))+L"\n",true,false,false,2);append(format(MathomirAI::ToWide(exchange.answer)));AiPresentation::Add(document,L"\n\n");
+-        }
+-        if(!pendingQuestion.empty()){AiPresentation::Add(document,L"You\n",true,false,false,2);append(format(pendingQuestion));AiPresentation::Add(document,L"\n\n");AiPresentation::Add(document,std::wstring(MathomirAI::ProviderName(provider))+L"\n",true,false,false,2);AiPresentation::Add(document,raw.empty()?L"Thinking...":raw);}
+-        if(document.text.empty())AiPresentation::Add(document,L"Ask a question below. Your conversation will appear here, with formulas typeset as math.");
+-        auto display=document.text;for(auto &c:display)if(c==L'\n')c=L'\r';HWND reader=Control(1407);::SendMessage(reader,WM_SETREDRAW,FALSE,0);::SendMessage(reader,EM_SETREADONLY,FALSE,0);::SetWindowTextW(reader,display.c_str());
+-        if(richReply){
+-            CHARFORMAT2W format={};format.cbSize=sizeof(format);format.dwMask=CFM_FACE|CFM_SIZE|CFM_COLOR|CFM_BOLD|CFM_ITALIC;format.yHeight=210;format.crTextColor=RGB(28,39,49);wcscpy_s(format.szFaceName,L"Segoe UI");::SendMessage(reader,EM_SETSEL,0,-1);::SendMessageW(reader,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&format);
+-            PARAFORMAT2 paragraph={};paragraph.cbSize=sizeof(paragraph);paragraph.dwMask=PFM_ALIGNMENT|PFM_SPACEAFTER;paragraph.wAlignment=PFA_LEFT;paragraph.dySpaceAfter=70;::SendMessage(reader,EM_SETPARAFORMAT,0,(LPARAM)&paragraph);
+-            for(const auto &run:document.runs){::SendMessage(reader,EM_SETSEL,(WPARAM)run.first,(LPARAM)run.last);format.dwEffects=run.bold?CFE_BOLD:0;format.yHeight=run.heading?240:run.math?230:210;wcscpy_s(format.szFaceName,run.math?L"Cambria":L"Segoe UI");::SendMessageW(reader,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&format);if(run.display){paragraph.wAlignment=PFA_CENTER;::SendMessage(reader,EM_SETPARAFORMAT,0,(LPARAM)&paragraph);paragraph.wAlignment=PFA_LEFT;}}
+-        }
+-        int typesetCount=richReply?AiPresentation::BuildMath(reader,document):0;
+-#ifdef MATHOMIR_AI_TESTING
+-        FILE *diagnostic=fopen("ai-math-typeset.txt","w");if(diagnostic){fprintf(diagnostic,"%d",typesetCount);fclose(diagnostic);}
+-#endif
+-        ::SendMessage(reader,EM_SETREADONLY,TRUE,0);
+-        int end=::GetWindowTextLengthW(reader);::SendMessage(reader,EM_SETSEL,end,end);::SendMessage(reader,WM_SETREDRAW,TRUE,0);::SendMessage(reader,EM_SCROLLCARET,0,0);::SendMessage(reader,WM_VSCROLL,SB_BOTTOM,0);::InvalidateRect(reader,NULL,TRUE);return document.unsupported;
++        std::string messages;std::wstring plain;
++        auto add=[&](const char*role,const std::wstring &label,const std::wstring &text){if(!messages.empty())messages+=",";messages+="{\"role\":"+MathomirAI::Quote(role)+",\"label\":"+MathomirAI::Quote(MathomirAI::ToUtf8(label))+",\"text\":"+MathomirAI::Quote(MathomirAI::ToUtf8(text))+"}";try{plain+=label+L"\n"+AiPresentation::Format(text).text+L"\n\n";}catch(...){plain+=label+L"\n"+text+L"\n\n";}};
++        for(const auto&e:conversation.Exchanges()){add("user",L"You",MathomirAI::ToWide(e.question));add("assistant",MathomirAI::ProviderName(provider),MathomirAI::ToWide(e.answer));}
++        if(!pendingQuestion.empty()){add("user",L"You",pendingQuestion);add("assistant",MathomirAI::ProviderName(provider),raw.empty()?L"Thinking...":raw);}
++        std::string notice=conversation.Trimmed()?"Earlier exchanges have been removed to keep this chat manageable.":"";
++        MathWebRenderer::Show(Control(1407),"{\"kind\":\"chat\",\"messages\":["+messages+"],\"notice\":"+MathomirAI::Quote(notice)+"}",plain);return false;
+     }
+     void Busy(bool busy){for(int id:{1402,1403,1404,1411,1412,1413,1414,1415,1416,1418,1419})::EnableWindow(Control(id),!busy);::EnableWindow(Control(1405),busy);}
+     void Stop(){pendingQuestion.clear();Reply(L"");if(job){job->cancelled.store(true);job.reset();}KillTimer(161);Busy(false);Text(1408,L"Stopped waiting. A request already received by the selected service may still count toward API usage.");}
+@@ -14534,15 +14511,7 @@
+  void Text(int id,const std::wstring&s){::SetWindowTextW(Control(id),s.c_str());}
+  int Selected(){int row=(int)::SendMessage(Control(1482),LB_GETCURSEL,0,0);return row>=0&&row<(int)shown.size()?shown[row]:-1;}
+  bool Favorite(const FormulaReference::Entry&e){return favorites.count(e.title)!=0;}
+- void FillReader(const std::wstring &raw){auto document=AiPresentation::Format(raw);std::wstring text=document.text;for(auto &c:text)if(c==L'\n')c=L'\r';HWND reader=Control(1484);::SendMessage(reader,WM_SETREDRAW,FALSE,0);::SendMessage(reader,EM_SETREADONLY,FALSE,0);::SetWindowTextW(reader,text.c_str());
+-  if(rich){CHARFORMAT2W f={};f.cbSize=sizeof(f);f.dwMask=CFM_FACE|CFM_SIZE|CFM_COLOR|CFM_BOLD|CFM_ITALIC;f.yHeight=220;f.crTextColor=RGB(28,39,49);wcscpy_s(f.szFaceName,L"Segoe UI");::SendMessage(reader,EM_SETSEL,0,-1);::SendMessageW(reader,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&f);PARAFORMAT2 p={};p.cbSize=sizeof(p);p.dwMask=PFM_ALIGNMENT|PFM_SPACEAFTER;p.wAlignment=PFA_LEFT;p.dySpaceAfter=140;::SendMessage(reader,EM_SETPARAFORMAT,0,(LPARAM)&p);
+-   for(const auto &run:document.runs){::SendMessage(reader,EM_SETSEL,(WPARAM)run.first,(LPARAM)run.last);f.dwEffects=run.bold?CFE_BOLD:0;f.yHeight=run.heading==1?280:run.heading?230:run.math?290:220;wcscpy_s(f.szFaceName,run.math?L"Cambria Math":L"Segoe UI");::SendMessageW(reader,EM_SETCHARFORMAT,SCF_SELECTION,(LPARAM)&f);if(run.display){p.wAlignment=PFA_CENTER;::SendMessage(reader,EM_SETPARAFORMAT,0,(LPARAM)&p);p.wAlignment=PFA_LEFT;}}
+-  }int built=rich?AiPresentation::BuildMath(reader,document):0;
+-#ifdef MATHOMIR_AI_TESTING
+-  if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *f=fopen("formula-reference-typeset.txt","w");if(f){fprintf(f,"%d %d %d",Selected(),built,document.unsupported?1:0);fclose(f);}}
+-#endif
+-  ::SendMessage(reader,EM_SETREADONLY,TRUE,0);::SendMessage(reader,EM_SETSEL,0,0);::SendMessage(reader,EM_SCROLL,SB_TOP,0);::SendMessage(reader,WM_SETREDRAW,TRUE,0);::InvalidateRect(reader,NULL,TRUE);
+- }
++ void FillReader(const std::wstring &raw){MathWebRenderer::Show(Control(1484),"{\"kind\":\"card\",\"serial\":"+std::to_string(Selected())+",\"text\":"+MathomirAI::Quote(MathomirAI::ToUtf8(raw))+"}",AiPresentation::Format(raw).text);}
+  void ShowCard(){int n=Selected();for(int id:{1486,1487,1488,1489,1493})::EnableWindow(Control(id),n>=0);::EnableWindow(Control(1486),n>=0&&!ViewOnlyMode);if(n<0){FillReader(L"# No matching formulas\n\nTry a shorter search, another subject, or clear Favorites only.");return;}const auto&e=FormulaReference::Entries()[n];FillReader(ReferenceCard(e));Text(1493,Favorite(e)?L"Remove favorite":L"Save favorite");Text(1485,L"Offline reference. Place formula creates editable native math; AI is optional.");theApp.WriteProfileInt("FormulaReference","LastCard",n);}
+  void Filter(){if(loading)return;int previous=Selected(),category=(int)::SendMessage(Control(1481),CB_GETCURSEL,0,0)-1;bool only=IsDlgButtonChecked(1492)==BST_CHECKED;std::string query;try{query=MathomirAI::ToUtf8(ReferenceQuery(AiText(Control(1480))));}catch(...){query="";}
+   ::SendMessage(Control(1482),WM_SETREDRAW,FALSE,0);::SendMessage(Control(1482),LB_RESETCONTENT,0,0);shown.clear();int selected=0;const auto &entries=FormulaReference::Entries();for(size_t i=0;i<entries.size();i++){const auto &e=entries[i];if((category<0||category==e.category)&&(!only||Favorite(e))&&FormulaReference::Match(e,query)){shown.push_back((int)i);if((int)i==previous)selected=(int)shown.size()-1;std::wstring title=(Favorite(e)?L"\x2605 ":L"")+ReferenceWide(e.title);::SendMessageW(Control(1482),LB_ADDSTRING,0,(LPARAM)title.c_str());}}
+--- a/Mathomir/FormulaReference.h
++++ b/Mathomir/FormulaReference.h
+@@ -49,11 +49,82 @@
+     {1,"Law of cosines","c^2=a^2+b^2-2ab\\cos C","C is the angle between sides a and b.","A nondegenerate triangle.","triangle"},
+     {1,"Triangle area from two sides","K=\\frac{1}{2}ab\\sin C","K is area; C is the included angle.","Positive side lengths and interior angle.","triangle"},
+     {1,"Sine and cosine phase symmetry","\\sin(-x)=-\\sin x,\\quad\\cos(-x)=\\cos x","Sine is odd; cosine is even.","All real x.","even odd"},
+-    {2,"Derivative definition","f\\prime(x)=\\lim_{h\\to0}{\\frac{f(x+h)-f(x)}{h}}","Instantaneous rate of change is a limit of difference quotients.","The limit must exist as a finite number.","first principles tangent slope"},
++    {1,"Tangent quotient identity","\\tan x=\\frac{\\sin x}{\\cos x}","Express tangent using sine and cosine.","cos x is nonzero.","quotient identity"},
++    {1,"Cotangent quotient identity","\\cot x=\\frac{\\cos x}{\\sin x}","This form remains valid when tangent itself is undefined.","sin x is nonzero.","quotient identity"},
++    {1,"Sine and cosine from a point","\\cos\\theta=\\frac{x}{r},\\quad\\sin\\theta=\\frac{y}{r},\\quad r=\\sqrt{x^2+y^2}","A point (x,y) on the terminal ray determines sine and cosine.","r>0; theta is measured from the positive x-axis.","unit circle coordinates signs"},
++    {1,"Tangent subtraction","\\tan(a-b)=\\frac{\\tan a-\\tan b}{1+\\tan a\\tan b}","The numerator subtracts; the denominator adds.","cos a, cos b, and 1+tan a tan b are nonzero.","difference identity"},
++    {1,"Tan parity","\\tan(-x)=-\\tan x","Odd symmetry under reflection of the angle.","Both sides are taken where the function is defined.","even odd negative angle identity"},
++    {1,"Cot parity","\\cot(-x)=-\\cot x","Odd symmetry under reflection of the angle.","Both sides are taken where the function is defined.","even odd negative angle identity"},
++    {1,"Sec parity","\\sec(-x)=\\sec x","Even symmetry under reflection of the angle.","Both sides are taken where the function is defined.","even odd negative angle identity"},
++    {1,"Csc parity","\\csc(-x)=-\\csc x","Odd symmetry under reflection of the angle.","Both sides are taken where the function is defined.","even odd negative angle identity"},
++    {1,"Sin cofunction","\\sin\\left(\\frac{\\pi}{2}-x\\right)=\\cos x","Complementary angles exchange the corresponding cofunctions.","Radians; both displayed functions must be defined.","complementary cofunction identity"},
++    {1,"Cos cofunction","\\cos\\left(\\frac{\\pi}{2}-x\\right)=\\sin x","Complementary angles exchange the corresponding cofunctions.","Radians; both displayed functions must be defined.","complementary cofunction identity"},
++    {1,"Tan cofunction","\\tan\\left(\\frac{\\pi}{2}-x\\right)=\\cot x","Complementary angles exchange the corresponding cofunctions.","Radians; both displayed functions must be defined.","complementary cofunction identity"},
++    {1,"Cot cofunction","\\cot\\left(\\frac{\\pi}{2}-x\\right)=\\tan x","Complementary angles exchange the corresponding cofunctions.","Radians; both displayed functions must be defined.","complementary cofunction identity"},
++    {1,"Sec cofunction","\\sec\\left(\\frac{\\pi}{2}-x\\right)=\\csc x","Complementary angles exchange the corresponding cofunctions.","Radians; both displayed functions must be defined.","complementary cofunction identity"},
++    {1,"Csc cofunction","\\csc\\left(\\frac{\\pi}{2}-x\\right)=\\sec x","Complementary angles exchange the corresponding cofunctions.","Radians; both displayed functions must be defined.","complementary cofunction identity"},
++    {1,"Sin half-turn shift","\\sin(x+\\pi)=-\\sin x","Track the sign when the angle advances by half a turn.","Radians; exclude poles of the displayed functions.","pi shift reduction identity"},
++    {1,"Cos half-turn shift","\\cos(x+\\pi)=-\\cos x","Track the sign when the angle advances by half a turn.","Radians; exclude poles of the displayed functions.","pi shift reduction identity"},
++    {1,"Tan half-turn shift","\\tan(x+\\pi)=\\tan x","Track the sign when the angle advances by half a turn.","Radians; exclude poles of the displayed functions.","pi shift reduction identity"},
++    {1,"Cot half-turn shift","\\cot(x+\\pi)=\\cot x","Track the sign when the angle advances by half a turn.","Radians; exclude poles of the displayed functions.","pi shift reduction identity"},
++    {1,"Sec half-turn shift","\\sec(x+\\pi)=-\\sec x","Track the sign when the angle advances by half a turn.","Radians; exclude poles of the displayed functions.","pi shift reduction identity"},
++    {1,"Csc half-turn shift","\\csc(x+\\pi)=-\\csc x","Track the sign when the angle advances by half a turn.","Radians; exclude poles of the displayed functions.","pi shift reduction identity"},
++    {1,"Sine and cosine periodicity","\\sin(x+2k\\pi)=\\sin x,\\quad\\cos(x+2k\\pi)=\\cos x","Add whole periods without changing the function value.","k is any integer; radians.","period identity"},
++    {1,"Tangent and cotangent periodicity","\\tan(x+k\\pi)=\\tan x,\\quad\\cot(x+k\\pi)=\\cot x","Add whole periods without changing the function value.","k is any integer; radians; exclude poles.","period identity"},
++    {1,"Secant and cosecant periodicity","\\sec(x+2k\\pi)=\\sec x,\\quad\\csc(x+2k\\pi)=\\csc x","Add whole periods without changing the function value.","k is any integer; radians; exclude poles.","period identity"},
++    {1,"Tangent double angle","\\tan(2x)=\\frac{2\\tan x}{1-\\tan^2x}","Double the angle using tangent alone.","cos x and cos(2x) are nonzero.","double angle identity"},
++    {1,"Cotangent double angle","\\cot(2x)=\\frac{\\cot^2x-1}{2\\cot x}","Double the angle using cotangent alone.","sin x, cos x, and sin(2x) are nonzero.","double angle identity"},
++    {1,"Sine triple angle","\\sin(3x)=3\\sin x-4\\sin^3x","Write a triple-angle sine as a cubic in sine.","All real angles; use one consistent angle unit.","triple angle identity"},
++    {1,"Cosine triple angle","\\cos(3x)=4\\cos^3x-3\\cos x","Write a triple-angle cosine as a cubic in cosine.","All real angles; use one consistent angle unit.","triple angle identity"},
++    {1,"Tangent triple angle","\\tan(3x)=\\frac{3\\tan x-\\tan^3x}{1-3\\tan^2x}","Write a triple-angle tangent as a rational expression.","cos x and cos(3x) are nonzero.","triple angle identity"},
++    {1,"Sine half angle","\\sin\\frac{x}{2}=\\pm\\sqrt{\\frac{1-\\cos x}{2}}","Choose the sign from the quadrant of x/2, not the quadrant of x.","The sign is positive or zero where sin(x/2)>=0, and negative where sin(x/2)<0.","half angle square root sign quadrant"},
++    {1,"Cosine half angle","\\cos\\frac{x}{2}=\\pm\\sqrt{\\frac{1+\\cos x}{2}}","Choose the sign from the quadrant of x/2.","The sign is positive or zero where cos(x/2)>=0, and negative where cos(x/2)<0.","half angle square root sign quadrant"},
++    {1,"Tangent half angle using sine","\\tan\\frac{x}{2}=\\frac{\\sin x}{1+\\cos x}","A half-angle form with no square-root sign choice.","1+cos x is nonzero.","half angle identity"},
++    {1,"Tangent half angle using cosine","\\tan\\frac{x}{2}=\\frac{1-\\cos x}{\\sin x}","An equivalent half-angle form on its stated domain.","sin x is nonzero; this form omits even multiples of pi where tangent itself is zero.","half angle identity"},
++    {1,"Tangent half angle square root","\\tan\\frac{x}{2}=\\pm\\sqrt{\\frac{1-\\cos x}{1+\\cos x}}","Choose the sign using tan(x/2).","1+cos x is nonzero; sign follows the quadrant of x/2.","half angle square root sign quadrant"},
++    {1,"Product-to-sum: sine times sine","\\sin a\\sin b=\\frac{\\cos(a-b)-\\cos(a+b)}{2}","Replace a product with a sum or difference; useful in integration and waves.","All real angles; use one consistent angle unit.","product to sum identity integration"},
++    {1,"Product-to-sum: cosine times cosine","\\cos a\\cos b=\\frac{\\cos(a-b)+\\cos(a+b)}{2}","Replace a product with a sum or difference; useful in integration and waves.","All real angles; use one consistent angle unit.","product to sum identity integration"},
++    {1,"Product-to-sum: sine times cosine","\\sin a\\cos b=\\frac{\\sin(a+b)+\\sin(a-b)}{2}","Replace a product with a sum or difference; useful in integration and waves.","All real angles; use one consistent angle unit.","product to sum identity integration"},
++    {1,"Product-to-sum: cosine times sine","\\cos a\\sin b=\\frac{\\sin(a+b)-\\sin(a-b)}{2}","Replace a product with a sum or difference; useful in integration and waves.","All real angles; use one consistent angle unit.","product to sum identity integration"},
++    {1,"Sum-to-product: sum of sines","\\sin a+\\sin b=2\\sin\\frac{a+b}{2}\\cos\\frac{a-b}{2}","Factor the sum or difference using average and half-difference angles.","All real angles; use one consistent angle unit.","sum to product identity factoring waves beats"},
++    {1,"Sum-to-product: difference of sines","\\sin a-\\sin b=2\\cos\\frac{a+b}{2}\\sin\\frac{a-b}{2}","Factor the sum or difference using average and half-difference angles.","All real angles; use one consistent angle unit.","sum to product identity factoring waves beats"},
++    {1,"Sum-to-product: sum of cosines","\\cos a+\\cos b=2\\cos\\frac{a+b}{2}\\cos\\frac{a-b}{2}","Factor the sum or difference using average and half-difference angles.","All real angles; use one consistent angle unit.","sum to product identity factoring waves beats"},
++    {1,"Sum-to-product: difference of cosines","\\cos a-\\cos b=-2\\sin\\frac{a+b}{2}\\sin\\frac{a-b}{2}","Factor the sum or difference using average and half-difference angles.","All real angles; use one consistent angle unit.","sum to product identity factoring waves beats"},
++    {1,"Power reduction: sine cubed","\\sin^3x=\\frac{3\\sin x-\\sin(3x)}{4}","Lower the powers before integrating or averaging a periodic expression.","All real angles; use one consistent angle unit.","power reduction integration identity"},
++    {1,"Power reduction: cosine cubed","\\cos^3x=\\frac{3\\cos x+\\cos(3x)}{4}","Lower the powers before integrating or averaging a periodic expression.","All real angles; use one consistent angle unit.","power reduction integration identity"},
++    {1,"Power reduction: sine fourth power","\\sin^4x=\\frac{3-4\\cos(2x)+\\cos(4x)}{8}","Lower the powers before integrating or averaging a periodic expression.","All real angles; use one consistent angle unit.","power reduction integration identity"},
++    {1,"Power reduction: cosine fourth power","\\cos^4x=\\frac{3+4\\cos(2x)+\\cos(4x)}{8}","Lower the powers before integrating or averaging a periodic expression.","All real angles; use one consistent angle unit.","power reduction integration identity"},
++    {1,"Power reduction: squared sine times squared cosine","\\sin^2x\\cos^2x=\\frac{1-\\cos(4x)}{8}","Lower the powers before integrating or averaging a periodic expression.","All real angles; use one consistent angle unit.","power reduction integration identity"},
++    {1,"Pythagorean rearrangements","\\tan^2x=\\sec^2x-1,\\quad\\cot^2x=\\csc^2x-1","Useful for rewriting integrands.","Exclude the poles of each displayed pair.","pythagorean identity integration"},
++    {1,"Sin of its principal inverse","\\sin(\\arcsin x)=x","The inverse returns an angle in [-pi/2,pi/2].","x lies in [-1,1].","inverse principal range composition"},
++    {1,"Principal inverse of sin","\\arcsin(\\sin x)=x","Cancellation in this order needs a principal-range restriction.","x must be in [-pi/2,pi/2]; radians. Outside this interval the result may be a different coterminal or reflected angle.","inverse principal range composition"},
++    {1,"Cos of its principal inverse","\\cos(\\arccos x)=x","The inverse returns an angle in [0,pi].","x lies in [-1,1].","inverse principal range composition"},
++    {1,"Principal inverse of cos","\\arccos(\\cos x)=x","Cancellation in this order needs a principal-range restriction.","x must be in [0,pi]; radians. Outside this interval the result may be a different coterminal or reflected angle.","inverse principal range composition"},
++    {1,"Tan of its principal inverse","\\tan(\\arctan x)=x","The inverse returns an angle in (-pi/2,pi/2).","All real x; the inverse angle is strictly between -pi/2 and pi/2.","inverse principal range composition"},
++    {1,"Principal inverse of tan","\\arctan(\\tan x)=x","Cancellation in this order needs a principal-range restriction.","x must be in (-pi/2,pi/2); radians. Outside this interval the result may be a different coterminal or reflected angle.","inverse principal range composition"},
++    {1,"Complementary inverse sine and cosine","\\arcsin x+\\arccos x=\\frac{\\pi}{2}","The principal inverse angles are complementary.","-1<=x<=1; radians.","inverse complementary identity"},
++    {1,"Cosine of inverse sine","\\cos(\\arcsin x)=\\sqrt{1-x^2}","Evaluate a composition using a reference triangle and the principal-angle signs.","-1<=x<=1. The nonnegative root follows from the principal arcsine range.","inverse composition reference triangle identity"},
++    {1,"Sine of inverse cosine","\\sin(\\arccos x)=\\sqrt{1-x^2}","Evaluate a composition using a reference triangle and the principal-angle signs.","-1<=x<=1. The nonnegative root follows from the principal arccosine range.","inverse composition reference triangle identity"},
++    {1,"Sine of inverse tangent","\\sin(\\arctan x)=\\frac{x}{\\sqrt{1+x^2}}","Evaluate a composition using a reference triangle and the principal-angle signs.","All real x.","inverse composition reference triangle identity"},
++    {1,"Cosine of inverse tangent","\\cos(\\arctan x)=\\frac{1}{\\sqrt{1+x^2}}","Evaluate a composition using a reference triangle and the principal-angle signs.","All real x; cosine is positive in the principal arctangent range.","inverse composition reference triangle identity"},
++    {1,"Tangent of inverse sine","\\tan(\\arcsin x)=\\frac{x}{\\sqrt{1-x^2}}","Evaluate a composition using a reference triangle and the principal-angle signs.","-1<x<1; the endpoints make tangent undefined.","inverse composition reference triangle identity"},
++    {1,"Tangent of inverse cosine","\\tan(\\arccos x)=\\frac{\\sqrt{1-x^2}}{x}","Evaluate a composition using a reference triangle and the principal-angle signs.","-1<=x<=1 and x is nonzero.","inverse composition reference triangle identity"},
++    {1,"Reciprocal arctangent for positive x","\\arctan x+\\arctan\\frac{1}{x}=\\frac{\\pi}{2}","Both principal angles are positive.","x>0; radians. For x<0 the sum is -pi/2, not pi/2.","inverse reciprocal branch identity"},
++    {1,"Tangent-half-angle substitution: sine","\\sin x=\\frac{2t}{1+t^2}","Set t=tan(x/2) to obtain a rational expression.","x is not an odd multiple of pi. Angles are in radians.","weierstrass rational parametrization substitution"},
++    {1,"Tangent-half-angle substitution: cosine","\\cos x=\\frac{1-t^2}{1+t^2}","Set t=tan(x/2) to obtain a rational expression.","x is not an odd multiple of pi. Angles are in radians.","weierstrass rational parametrization substitution"},
++    {1,"Tangent-half-angle substitution: tangent","\\tan x=\\frac{2t}{1-t^2}","Set t=tan(x/2) to obtain a rational expression.","x is not an odd multiple of pi, and t is not 1 or -1. Angles are in radians.","weierstrass rational parametrization substitution"},
++    {1,"Combining sine and cosine into one sine","a\\sin x+b\\cos x=R\\sin(x+\\phi)","R=sqrt(a^2+b^2). Choose phi so cos(phi)=a/R and sin(phi)=b/R.","R>0. Use both coefficient equations to choose the correct quadrant for phi.","amplitude phase harmonic addition identity"},
++    {1,"Combining cosine and sine into one cosine","a\\cos x+b\\sin x=R\\cos(x-\\phi)","R=sqrt(a^2+b^2). Choose phi so cos(phi)=a/R and sin(phi)=b/R.","R>0. Use both coefficient equations to choose the correct quadrant for phi.","amplitude phase harmonic addition identity"},
++    {1,"Exact values at 0","\\sin(0)=0,\\quad\\cos(0)=1,\\quad\\tan(0)=0","Reference-angle values on the unit circle.","Radians.","exact common values special angles unit circle"},
++    {1,"Exact values at pi/6","\\sin(\\frac{\\pi}{6})=\\frac{1}{2},\\quad\\cos(\\frac{\\pi}{6})=\\frac{\\sqrt{3}}{2},\\quad\\tan(\\frac{\\pi}{6})=\\frac{\\sqrt{3}}{3}","Reference-angle values on the unit circle.","Radians.","exact common values special angles unit circle"},
++    {1,"Exact values at pi/4","\\sin(\\frac{\\pi}{4})=\\frac{\\sqrt{2}}{2},\\quad\\cos(\\frac{\\pi}{4})=\\frac{\\sqrt{2}}{2},\\quad\\tan(\\frac{\\pi}{4})=1","Reference-angle values on the unit circle.","Radians.","exact common values special angles unit circle"},
++    {1,"Exact values at pi/3","\\sin(\\frac{\\pi}{3})=\\frac{\\sqrt{3}}{2},\\quad\\cos(\\frac{\\pi}{3})=\\frac{1}{2},\\quad\\tan(\\frac{\\pi}{3})=\\sqrt{3}","Reference-angle values on the unit circle.","Radians.","exact common values special angles unit circle"},
++    {1,"Exact values at pi/2","\\sin(\\frac{\\pi}{2})=1,\\quad\\cos(\\frac{\\pi}{2})=0","Reference-angle values on the unit circle.","Radians. Tangent is undefined at pi/2.","exact common values special angles unit circle"},
++    {2,"Derivative definition","f^{\\prime}(x)=\\lim_{h\\to0}{\\frac{f(x+h)-f(x)}{h}}","Instantaneous rate of change is a limit of difference quotients.","The limit must exist as a finite number.","first principles tangent slope"},
+     {2,"Power rule","\\frac{d}{dx}{x^n}=nx^{n-1}","Bring the exponent in front and reduce it by one.","Where x^n is real and differentiable; use x>0 for arbitrary real n.","derivative"},
+-    {2,"Product rule","\\frac{d}{dx}{uv}=u\\prime v+uv\\prime","Differentiate one factor at a time and add.","Both factors are differentiable.","derivative"},
+-    {2,"Quotient rule","\\frac{d}{dx}{\\frac{u}{v}}=\\frac{u\\prime v-uv\\prime}{v^2}","Numerator: denominator times derivative of numerator, minus numerator times derivative of denominator.","v is nonzero and u,v are differentiable.","derivative"},
+-    {2,"Chain rule","\\frac{d}{dx}{f(g(x))}=f\\prime(g(x))g\\prime(x)","Differentiate the outer function at the inner value, then multiply by the inner derivative.","Both required derivatives exist.","composition derivative"},
++    {2,"Product rule","\\frac{d}{dx}{uv}=u^{\\prime} v+uv^{\\prime}","Differentiate one factor at a time and add.","Both factors are differentiable.","derivative"},
++    {2,"Quotient rule","\\frac{d}{dx}{\\frac{u}{v}}=\\frac{u^{\\prime} v-uv^{\\prime}}{v^2}","Numerator: denominator times derivative of numerator, minus numerator times derivative of denominator.","v is nonzero and u,v are differentiable.","derivative"},
++    {2,"Chain rule","\\frac{d}{dx}{f(g(x))}=f^{\\prime}(g(x))g^{\\prime}(x)","Differentiate the outer function at the inner value, then multiply by the inner derivative.","Both required derivatives exist.","composition derivative"},
+     {2,"Exponential derivatives","\\frac{d}{dx}{e^x}=e^x,\\quad\\frac{d}{dx}{a^x}=a^x\\ln a","Differentiate exponential functions.","a>0.","derivative"},
+     {2,"Natural-log derivative","\\frac{d}{dx}{\\ln|x|}=\\frac{1}{x}","The absolute-value form covers positive and negative x.","x is nonzero.","derivative logarithm"},
+     {2,"Sine and cosine derivatives","\\frac{d}{dx}{\\sin x}=\\cos x,\\quad\\frac{d}{dx}{\\cos x}=-\\sin x","Basic trig derivatives.","x is in radians. For degrees, include a pi/180 factor.","derivative trig"},
+@@ -61,21 +132,21 @@
+     {2,"Secant and cosecant derivatives","\\frac{d}{dx}{\\sec x}=\\sec x\\tan x,\\quad\\frac{d}{dx}{\\csc x}=-\\csc x\\cot x","Basic reciprocal-trig derivatives.","Radians; exclude poles.","derivative trig"},
+     {2,"Inverse sine and tangent derivatives","\\frac{d}{dx}{\\arcsin x}=\\frac{1}{\\sqrt{1-x^2}},\\quad\\frac{d}{dx}{\\arctan x}=\\frac{1}{1+x^2}","Derivatives of inverse trig functions, not reciprocal functions.","arcsin derivative requires -1<x<1; arctan accepts all real x.","derivative inverse trig"},
+     {2,"Implicit derivative","\\frac{dy}{dx}=-\\frac{F_x}{F_y}","Use when a curve is defined by F(x,y)=0. Subscripts denote partial derivatives.","F is differentiable and F_y is nonzero locally.","implicit"},
+-    {2,"Tangent line","y=f(a)+f\\prime(a)(x-a)","Line through (a,f(a)) with slope f prime at a.","f is differentiable at a.","linearization"},
+-    {2,"Mean Value Theorem","f\\prime(c)=\\frac{f(b)-f(a)}{b-a}","At some interior c, the tangent slope equals the secant slope.","f is continuous on [a,b], differentiable on (a,b), and a<b.","MVT"},
++    {2,"Tangent line","y=f(a)+f^{\\prime}(a)(x-a)","Line through (a,f(a)) with slope f prime at a.","f is differentiable at a.","linearization"},
++    {2,"Mean Value Theorem","f^{\\prime}(c)=\\frac{f(b)-f(a)}{b-a}","At some interior c, the tangent slope equals the secant slope.","f is continuous on [a,b], differentiable on (a,b), and a<b.","MVT"},
+     {2,"Fundamental Theorem, accumulation","\\frac{d}{dx}{\\int_a^x{f(t)\\,dt}}=f(x)","The derivative of an accumulation integral is its integrand.","f is continuous near x.","FTC integral derivative"},
+     {2,"Fundamental Theorem, evaluation","\\int_a^b{f(x)\\,dx}=F(b)-F(a)","Evaluate an antiderivative at the upper and lower bounds.","F prime equals f; f is continuous on [a,b].","FTC definite integral"},
+     {2,"Power antiderivative","\\int{x^n\\,dx}=\\frac{x^{n+1}}{n+1}+C","Reverse the power rule. C is an arbitrary constant.","n is not -1; restrict to a real interval where the power is defined.","integral"},
+     {2,"Reciprocal antiderivative","\\int{\\frac{1}{x}\\,dx}=\\ln|x|+C","The n=-1 case has a logarithmic antiderivative.","Use an interval that does not contain 0.","integral logarithm"},
+     {2,"Exponential antiderivative","\\int{e^{kx}\\,dx}=\\frac{e^{kx}}{k}+C","Compensate for the derivative of kx.","k is a nonzero constant; k=0 gives x+C.","integral"},
+     {2,"Sine and cosine antiderivatives","\\int{\\sin x\\,dx}=-\\cos x+C,\\quad\\int{\\cos x\\,dx}=\\sin x+C","Reverse the basic trig derivatives.","x is in radians.","integral trig"},
+-    {2,"Substitution","\\int{f(g(x))g\\prime(x)\\,dx}=\\int{f(u)\\,du}","Set u=g(x) and du=g prime(x) dx.","Transform every factor and, for definite integrals, the limits.","u substitution integration"},
++    {2,"Substitution","\\int{f(g(x))g^{\\prime}(x)\\,dx}=\\int{f(u)\\,du}","Set u=g(x) and du=g prime(x) dx.","Transform every factor and, for definite integrals, the limits.","u substitution integration"},
+     {2,"Integration by parts","\\int{u\\,dv}=uv-\\int{v\\,du}","Choose u to differentiate and dv to integrate.","Functions are sufficiently differentiable and integrable.","integral product"},
+     {2,"Average value of a function","f_{avg}=\\frac{1}{b-a}\\int_a^b{f(x)\\,dx}","Integral accumulation divided by interval length.","a<b and f is integrable.","mean integral"},
+     {2,"Area between curves","A=\\int_a^b{|f(x)-g(x)|\\,dx}","Integrate vertical distance between the graphs.","Split at crossings if removing the absolute value.","area integral"},
+     {2,"Disk/washer volume","V=\\pi\\int_a^b{(R(x)^2-r(x)^2)\\,dx}","R is outer radius; r is inner radius, measured from the rotation axis.","0<=r<=R; slices are perpendicular to the axis.","volume revolution"},
+     {2,"Shell volume","V=2\\pi\\int_a^b{r(x)h(x)\\,dx}","Radius times shell height, integrated over shell thickness.","Nonnegative r,h; slices are parallel to the rotation axis.","volume revolution"},
+-    {2,"Arc length of a graph","L=\\int_a^b{\\sqrt{1+(f\\prime(x))^2}\\,dx}","Length of y=f(x) between a and b.","f is continuously differentiable, or split into such pieces.","curve length"},
++    {2,"Arc length of a graph","L=\\int_a^b{\\sqrt{1+(f^{\\prime}(x))^2}\\,dx}","Length of y=f(x) between a and b.","f is continuously differentiable, or split into such pieces.","curve length"},
+     {2,"Squeeze trig limit","\\lim_{x\\to0}{\\frac{\\sin x}{x}}=1","Foundation of many trig limits and derivatives.","x is in radians.","sine limit"},
+     {2,"Exponential and logarithmic limits","\\lim_{x\\to0}{\\frac{e^x-1}{x}}=1,\\quad\\lim_{x\\to0}{\\frac{\\ln(1+x)}{x}}=1","Two standard limits near zero.","For the log expression, 1+x>0.","limit"},
+     {2,"Taylor series","f(x)=\\sum_{n=0}^{\\infty}{\\frac{f^{(n)}(a)}{n!}(x-a)^n}","An expansion around x=a.","Equality requires the Taylor remainder to tend to zero; smoothness alone is insufficient.","power series Maclaurin"},
+@@ -84,17 +155,17 @@
+     {2,"Gradient and directional derivative","D_{\\mathbf{u}}f=\\nabla f\\cdot\\mathbf{u}","The gradient contains the partial derivatives; u is the chosen direction.","u is a unit vector and f is differentiable.","multivariable"},
+     {2,"Total differential","df=f_x\\,dx+f_y\\,dy+f_z\\,dz","First-order change in a function of several variables.","f is differentiable; approximation error shrinks relative to the displacement.","multivariable approximation"},
+     {3,"Separable equation","\\frac{dy}{dx}=g(x)h(y),\\quad\\int{\\frac{dy}{h(y)}}=\\int{g(x)\\,dx}+C","Move the y-dependent factor to the y side and integrate.","Division assumes h(y) is nonzero. Check h(y)=0 for equilibrium solutions separately.","ODE"},
+-    {3,"First-order linear integrating factor","y\\prime+P(x)y=Q(x),\\quad\\mu(x)=e^{\\int{P(x)\\,dx}}","Multiply the differential equation by the integrating factor.","P,Q are continuous on the interval.","ODE"},
++    {3,"First-order linear integrating factor","y^{\\prime}+P(x)y=Q(x),\\quad\\mu(x)=e^{\\int{P(x)\\,dx}}","Multiply the differential equation by the integrating factor.","P,Q are continuous on the interval.","ODE"},
+     {3,"First-order linear solution","y=\\frac{\\int{\\mu(x)Q(x)\\,dx}+C}{\\mu(x)}","mu is the integrating factor for y prime+P y=Q.","Use one interval where P,Q are continuous.","ODE integrating factor"},
+-    {3,"Exponential growth and decay","y\\prime=ky,\\quad y(t)=y_0e^{kt}","k>0 gives growth; k<0 gives decay.","k is constant; y(0)=y_0.","ODE population"},
++    {3,"Exponential growth and decay","y^{\\prime}=ky,\\quad y(t)=y_0e^{kt}","k>0 gives growth; k<0 gives decay.","k is constant; y(0)=y_0.","ODE population"},
+     {3,"Logistic growth","P(t)=\\frac{K}{1+Ae^{-rt}},\\quad A=\\frac{K-P_0}{P_0}","Solves P prime=rP(1-P/K). K is carrying capacity.","r,K>0 and P_0>0; handle P_0=0 as an equilibrium.","ODE population"},
+     {3,"Newton cooling solution","T(t)=T_s+(T_0-T_s)e^{-kt}","T_s is surrounding temperature; k is the positive cooling constant.","Constant ambient temperature and constant k; lumped-temperature model.","ODE temperature"},
+-    {3,"Second-order characteristic equation","ay\\prime\\prime+by\\prime+cy=0,\\quad ar^2+br+c=0","Solve the characteristic polynomial for r.","Constant coefficients and a is nonzero.","ODE homogeneous"},
++    {3,"Second-order characteristic equation","ay^{\\prime\\prime}+by^{\\prime}+cy=0,\\quad ar^2+br+c=0","Solve the characteristic polynomial for r.","Constant coefficients and a is nonzero.","ODE homogeneous"},
+     {3,"Distinct real characteristic roots","y=C_1e^{r_1x}+C_2e^{r_2x}","General homogeneous solution for distinct real roots.","r_1 and r_2 solve the characteristic equation and differ.","ODE"},
+     {3,"Repeated characteristic root","y=(C_1+C_2x)e^{rx}","The second independent solution gains a factor x.","The characteristic equation has a repeated real root r.","ODE"},
+     {3,"Complex characteristic roots","y=e^{\\alpha x}(C_1\\cos(\\beta x)+C_2\\sin(\\beta x))","Roots are alpha plus or minus i beta.","beta is nonzero; radians.","ODE oscillation"},
+     {3,"Euler numerical step","y_{n+1}=y_n+h f(x_n,y_n),\\quad x_{n+1}=x_n+h","Approximate y prime=f(x,y) by short tangent-line steps.","Choose small enough h; this is a first-order approximation, not an exact solution.","ODE numerical"},
+-    {3,"Laplace derivative rule","\\mathcal{L}(y\\prime)=sY(s)-y(0)","Y is the Laplace transform of y.","One-sided Laplace transform; y has suitable growth and regularity.","ODE transform"},
++    {3,"Laplace derivative rule","\\mathcal{L}(y^{\\prime})=sY(s)-y(0)","Y is the Laplace transform of y.","One-sided Laplace transform; y has suitable growth and regularity.","ODE transform"},
+     {4,"Vector magnitude","|\\mathbf{v}|=\\sqrt{v_x^2+v_y^2+v_z^2}","Euclidean length of a Cartesian vector.","Use an orthonormal coordinate system.","norm length"},
+     {4,"Unit vector","\\mathbf{u}=\\frac{\\mathbf{v}}{|\\mathbf{v}|}","Divide a vector by its length to retain direction with length one.","v is not the zero vector.","normalize direction"},
+     {4,"Vector addition","\\mathbf{a}+\\mathbf{b}=\\langle a_x+b_x,a_y+b_y,a_z+b_z\\rangle","Add matching components. Bold letters denote vectors.","Use the same coordinate basis.","components"},
+@@ -196,7 +267,7 @@
+     {11,"Photon energy","E=hf=\\frac{hc}{\\lambda}","h is Planck constant; f is frequency.","lambda is the vacuum wavelength.","quantum light atomic"},
+     {11,"Photoelectric equation","K_{max}=hf-\\phi,\\quad f_0=\\frac{\\phi}{h}","phi is the work function; f_0 is threshold frequency.","Emission requires hf>=phi; K_max is the largest emitted-electron kinetic energy.","quantum atomic"},
+     {11,"de Broglie wavelength","\\lambda=\\frac{h}{p}","Associate wavelength with particle momentum magnitude.","Use relativistic momentum when required; p>0.","quantum atomic"},
+-    {11,"Compton wavelength shift","\\lambda\\prime-\\lambda=\\frac{h}{m_ec}(1-\\cos\\theta)","theta is the photon scattering angle.","Scattering from a free electron initially at rest.","quantum atomic"},
++    {11,"Compton wavelength shift","\\lambda^{\\prime}-\\lambda=\\frac{h}{m_ec}(1-\\cos\\theta)","theta is the photon scattering angle.","Scattering from a free electron initially at rest.","quantum atomic"},
+     {11,"Position-momentum uncertainty","\\Delta x\\Delta p_x\\ge\\frac{h}{4\\pi}","Delta x and Delta p_x are standard deviations in the same quantum state.","This is an intrinsic quantum spread, not merely instrument error.","Heisenberg quantum"},
+     {11,"Hydrogen-like energy levels","E_n=-\\frac{13.6Z^2}{n^2}\\ \\mathrm{eV}","n is a positive principal quantum number; Z is nuclear charge number.","One-electron ion; nonrelativistic Coulomb approximation with heavy nucleus. 13.6 is rounded.","Bohr atomic"},
+     {11,"Hydrogen-like orbital radii","r_n=\\frac{a_0n^2}{Z}","a_0 is the Bohr radius.","Bohr-model circular-orbit radius; one-electron ion; heavy nucleus approximation.","Bohr atomic"},
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -1139,7 +1139,7 @@
+ CAPTION "Formula reference"
+ FONT 9,"Segoe UI"
+ BEGIN
+-    LTEXT "215 formulas. Search, choose a subject, then select a card. Works offline.",-1,10,8,540,18
++    LTEXT "286 formulas. Search, choose a subject, then select a card. Works offline.",-1,10,8,540,18
+     LTEXT "Search",-1,10,32,35,12
+     EDITTEXT 1480,48,29,335,17,ES_AUTOHSCROLL | WS_TABSTOP
+     PUSHBUTTON "Clear search",1490,392,29,83,17
+--- /dev/null
++++ b/Mathomir/MathWebRenderer.h
+@@ -0,0 +1,54 @@
++#pragma once
++#include <WebView2.h>
++#include <wrl.h>
++#include <shlobj.h>
++// Local MathJax assets are the only content this reader can navigate to.
++namespace MathWebRenderer {
++using Microsoft::WRL::ComPtr;
++using Microsoft::WRL::Callback;
++struct State:std::enable_shared_from_this<State>{
++ HWND host=NULL; bool alive=true,ready=false,com=false; unsigned serial=0;
++ std::wstring payload,error,assets; ComPtr<ICoreWebView2Controller> controller; ComPtr<ICoreWebView2> web;
++ ~State(){if(com)CoUninitialize();}
++ void Fail(const wchar_t*message){error=message;if(alive)::InvalidateRect(host,NULL,TRUE);}
++ void Resize(){if(controller){RECT r;::GetClientRect(host,&r);controller->put_Bounds(r);}}
++ void Display(){if(ready&&web&&!payload.empty()){std::wstring script=L"window.Mathomir.render("+payload+L").catch(function(){document.getElementById('content').textContent='The mathematics could not be displayed. Close and reopen this panel.';});";web->ExecuteScript(script.c_str(),NULL);}}
++ void Start(){
++  HRESULT hr=CoInitializeEx(NULL,COINIT_APARTMENTTHREADED);com=SUCCEEDED(hr);if(FAILED(hr)){Fail(L"The math display could not initialize. Restart Mathomir.");return;}
++  wchar_t path[32768]={};GetModuleFileNameW(NULL,path,32768);assets=path;size_t end=assets.find_last_of(L"\\/");assets.resize(end);assets+=L"\\MathomirMath";
++  if(GetFileAttributesW((assets+L"\\reader.html").c_str())==INVALID_FILE_ATTRIBUTES){Fail(L"Math display files are missing. Extract the entire ZIP before running Mathomir.");return;}
++  wchar_t local[MAX_PATH]={};if(FAILED(SHGetFolderPathW(NULL,CSIDL_LOCAL_APPDATA,NULL,SHGFP_TYPE_CURRENT,local))){Fail(L"The math display could not access your local application folder.");return;}
++  std::wstring user=std::wstring(local)+L"\\Mathomir\\MathDisplay";SHCreateDirectoryExW(NULL,user.c_str(),NULL);auto state=shared_from_this();
++  hr=CreateCoreWebView2EnvironmentWithOptions(NULL,user.c_str(),NULL,Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([state](HRESULT result,ICoreWebView2Environment*environment)->HRESULT{
++   if(!state->alive)return S_OK;if(FAILED(result)||!environment){state->Fail(L"Microsoft Edge WebView2 Runtime is needed for the math display. Click here to install it, then reopen Mathomir.");return S_OK;}
++   HRESULT created=environment->CreateCoreWebView2Controller(state->host,Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>([state](HRESULT result,ICoreWebView2Controller*controller)->HRESULT{
++    if(!state->alive){if(controller)controller->Close();return S_OK;}if(FAILED(result)||!controller){state->Fail(L"The math display could not open. Restart Mathomir.");return S_OK;}
++    state->controller=controller;controller->get_CoreWebView2(&state->web);if(!state->web){state->Fail(L"The math display could not open.");return S_OK;}
++    ComPtr<ICoreWebView2Settings> settings;state->web->get_Settings(&settings);if(settings){settings->put_AreDevToolsEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);settings->put_AreDefaultScriptDialogsEnabled(FALSE);settings->put_IsWebMessageEnabled(TRUE);}
++    ComPtr<ICoreWebView2_3> local;if(FAILED(state->web.As(&local))||FAILED(local->SetVirtualHostNameToFolderMapping(L"mathomir.local",state->assets.c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS))){state->Fail(L"Update Microsoft Edge WebView2 Runtime to display mathematics.");return S_OK;}
++    std::weak_ptr<State> weak=state;EventRegistrationToken token;
++    state->web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs*args)->HRESULT{auto s=weak.lock();if(!s||!s->alive)return S_OK;LPWSTR uri=NULL;args->get_Uri(&uri);if(!uri||wcscmp(uri,L"https://mathomir.local/reader.html"))args->put_Cancel(TRUE);CoTaskMemFree(uri);return S_OK;}).Get(),&token);
++    state->web->add_NewWindowRequested(Callback<ICoreWebView2NewWindowRequestedEventHandler>([](ICoreWebView2*,ICoreWebView2NewWindowRequestedEventArgs*args)->HRESULT{args->put_Handled(TRUE);return S_OK;}).Get(),&token);
++    state->web->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationCompletedEventArgs*args)->HRESULT{auto s=weak.lock();if(!s||!s->alive)return S_OK;BOOL success=FALSE;args->get_IsSuccess(&success);if(success){s->ready=true;s->Display();}else s->Fail(L"The local math display could not load. Extract the complete ZIP again.");return S_OK;}).Get(),&token);
++    state->web->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>([weak](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs*args)->HRESULT{auto s=weak.lock();if(!s||!s->alive)return S_OK;LPWSTR json=NULL;args->get_WebMessageAsJson(&json);if(json){try{auto value=MathomirAI::JsonReader(MathomirAI::ToUtf8(json)).Read();for(const char*key:{"serial","math","errors","fractions","limits","tables","scrollTop"}){const auto &v=value.Get(key);std::wstring prop=L"MathomirMath_"+MathomirAI::ToWide(key);SetPropW(s->host,prop.c_str(),(HANDLE)(INT_PTR)(atoi(v.text.c_str())+1));}
++#ifdef MATHOMIR_AI_TESTING
++      char name[80];sprintf_s(name,"math-web-%d.json",GetDlgCtrlID(s->host));FILE*f=fopen(name,"w");if(f){auto text=MathomirAI::ToUtf8(json);fwrite(text.data(),1,text.size(),f);fclose(f);}
++      if(GetDlgCtrlID(s->host)==1407){FILE*f=fopen("ai-math-typeset.txt","w");if(f){fprintf(f,"%d",atoi(value.Get("math").text.c_str()));fclose(f);}}
++      if(GetDlgCtrlID(s->host)==1484){FILE*f=fopen("formula-reference-typeset.txt","w");if(f){fprintf(f,"%d %d %d",atoi(value.Get("serial").text.c_str()),atoi(value.Get("math").text.c_str()),atoi(value.Get("errors").text.c_str()));fclose(f);}}
++#endif
++     }catch(...){}CoTaskMemFree(json);}return S_OK;}).Get(),&token);
++    state->Resize();controller->put_IsVisible(TRUE);state->web->Navigate(L"https://mathomir.local/reader.html");return S_OK;
++   }).Get());if(FAILED(created))state->Fail(L"The math display could not start.");return S_OK;
++  }).Get());if(FAILED(hr))Fail(L"Microsoft Edge WebView2 Runtime is needed. Click here to install it, then reopen Mathomir.");
++ }
++};
++inline LRESULT CALLBACK Procedure(HWND window,UINT message,WPARAM wp,LPARAM lp){auto box=(std::shared_ptr<State>*)GetWindowLongPtrW(window,GWLP_USERDATA);if(message==WM_NCCREATE){box=(std::shared_ptr<State>*)((CREATESTRUCTW*)lp)->lpCreateParams;SetWindowLongPtrW(window,GWLP_USERDATA,(LONG_PTR)box);(*box)->host=window;}if(!box)return DefWindowProcW(window,message,wp,lp);auto state=*box;
++ if(message==WM_SIZE){state->Resize();return 0;}if(message==WM_SETFOCUS&&state->controller){state->controller->MoveFocus(COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);return 0;}
++ if(message==WM_PAINT){PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);RECT r;GetClientRect(window,&r);FillRect(dc,&r,(HBRUSH)GetStockObject(WHITE_BRUSH));if(!state->ready){InflateRect(&r,-16,-16);SetBkMode(dc,TRANSPARENT);DrawTextW(dc,state->error.empty()?L"Loading mathematics...":state->error.c_str(),-1,&r,DT_WORDBREAK);}EndPaint(window,&ps);return 0;}
++ if(message==WM_LBUTTONUP&&!state->error.empty()){ShellExecuteW(window,L"open",L"https://developer.microsoft.com/microsoft-edge/webview2/",NULL,NULL,SW_SHOWNORMAL);return 0;}
++ if(message==WM_DESTROY){state->alive=false;if(state->controller)state->controller->Close();state->web.Reset();state->controller.Reset();return 0;}
++ if(message==WM_NCDESTROY){SetWindowLongPtrW(window,GWLP_USERDATA,0);delete box;return DefWindowProcW(window,message,wp,lp);}return DefWindowProcW(window,message,wp,lp);
++}
++inline bool Attach(HWND parent,int id){static bool registered=false;if(!registered){WNDCLASSW c={};c.lpfnWndProc=Procedure;c.hInstance=GetModuleHandle(NULL);c.lpszClassName=L"MathomirMathReader";c.hCursor=LoadCursor(NULL,IDC_ARROW);registered=RegisterClassW(&c)!=0;if(!registered)return false;}HWND old=GetDlgItem(parent,id);if(!old)return false;RECT r;GetWindowRect(old,&r);MapWindowPoints(NULL,parent,(POINT*)&r,2);HWND previous=GetWindow(old,GW_HWNDPREV);auto state=std::make_shared<State>();auto box=new std::shared_ptr<State>(state);HWND host=CreateWindowExW(WS_EX_CLIENTEDGE,L"MathomirMathReader",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP,r.left,r.top,r.right-r.left,r.bottom-r.top,parent,NULL,GetModuleHandle(NULL),box);if(!host){delete box;return false;}DestroyWindow(old);SetWindowLongPtrW(host,GWLP_ID,id);SetWindowPos(host,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);state->Start();return true;}
++inline void Show(HWND host,const std::string &json,const std::wstring &plain){auto box=(std::shared_ptr<State>*)GetWindowLongPtrW(host,GWLP_USERDATA);if(!box||!(*box)->alive)return;SetWindowTextW(host,plain.c_str());(*box)->payload=MathomirAI::ToWide(json);(*box)->Display();}
++}

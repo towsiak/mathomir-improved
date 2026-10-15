@@ -10,9 +10,9 @@
   <PropertyGroup><OutDir>$(MSBuildProjectDirectory)\..\build\</OutDir><IntDir>$(MSBuildProjectDirectory)\..\build\obj\</IntDir><TargetName>Mathomir</TargetName></PropertyGroup>
   <PropertyGroup Condition="'$(MathomirAiTesting)'=='true'"><AiTestDefine>MATHOMIR_AI_TESTING;</AiTestDefine></PropertyGroup>
   <ItemDefinitionGroup>
-    <ClCompile><Optimization>MaxSpeed</Optimization><PreprocessorDefinitions>$(AiTestDefine)WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;WINVER=0x0601;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions><RuntimeLibrary>MultiThreaded</RuntimeLibrary><PrecompiledHeader>NotUsing</PrecompiledHeader><WarningLevel>Level3</WarningLevel><ExceptionHandling>Sync</ExceptionHandling><ConformanceMode>false</ConformanceMode></ClCompile>
+    <ClCompile><AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\..\..\tools\.webview2\build\native\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><Optimization>MaxSpeed</Optimization><PreprocessorDefinitions>$(AiTestDefine)WIN32;_WINDOWS;NDEBUG;_CRT_SECURE_NO_WARNINGS;WINVER=0x0601;_WIN32_WINNT=0x0601;%(PreprocessorDefinitions)</PreprocessorDefinitions><RuntimeLibrary>MultiThreaded</RuntimeLibrary><PrecompiledHeader>NotUsing</PrecompiledHeader><WarningLevel>Level3</WarningLevel><ExceptionHandling>Sync</ExceptionHandling><ConformanceMode>false</ConformanceMode></ClCompile>
     <ResourceCompile><PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ResourceCompile>
-    <Link><SubSystem>Windows</SubSystem><TargetMachine>MachineX86</TargetMachine><AdditionalDependencies>msimg32.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+    <Link><SubSystem>Windows</SubSystem><TargetMachine>MachineX86</TargetMachine><AdditionalDependencies>msimg32.lib;$(MSBuildProjectDirectory)\..\..\tools\.webview2\build\native\x86\WebView2LoaderStatic.lib;version.lib;shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BitmapImage.cpp" />
