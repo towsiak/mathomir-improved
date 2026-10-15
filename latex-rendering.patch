@@ -238,7 +238,7 @@
      PUSHBUTTON "Clear search",1490,392,29,83,17
 --- /dev/null
 +++ b/Mathomir/MathWebRenderer.h
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,58 @@
 +#pragma once
 +#include <WebView2.h>
 +#include <wrl.h>
@@ -253,7 +253,11 @@
 + ~State(){if(com)CoUninitialize();}
 + void Fail(const wchar_t*message){error=message;if(alive)::InvalidateRect(host,NULL,TRUE);}
 + void Resize(){if(controller){RECT r;::GetClientRect(host,&r);controller->put_Bounds(r);}}
-+ void Display(){if(ready&&web&&!payload.empty()){std::wstring script=L"window.Mathomir.render("+payload+L").catch(function(){document.getElementById('content').textContent='The mathematics could not be displayed. Close and reopen this panel.';});";web->ExecuteScript(script.c_str(),NULL);}}
++ void Display(){if(ready&&web&&!payload.empty()){std::wstring script=L"window.Mathomir.render("+payload+L").catch(function(){document.getElementById('content').textContent='The mathematics could not be displayed. Close and reopen this panel.';});";web->ExecuteScript(script.c_str(),Callback<ICoreWebView2ExecuteScriptCompletedHandler>([](HRESULT result,LPCWSTR value)->HRESULT{
++#ifdef MATHOMIR_AI_TESTING
++ FILE*f=fopen("math-web-script.txt","w");if(f){fprintf(f,"%08lx ",result);if(value){auto text=MathomirAI::ToUtf8(value);fwrite(text.data(),1,text.size(),f);}fclose(f);}
++#endif
++ return S_OK;}).Get());}}
 + void Start(){
 +  HRESULT hr=CoInitializeEx(NULL,COINIT_APARTMENTTHREADED);com=SUCCEEDED(hr);if(FAILED(hr)){Fail(L"The math display could not initialize. Restart Mathomir.");return;}
 +  wchar_t path[32768]={};GetModuleFileNameW(NULL,path,32768);assets=path;size_t end=assets.find_last_of(L"\\/");assets.resize(end);assets+=L"\\MathomirMath";

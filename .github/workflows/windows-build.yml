@@ -116,7 +116,9 @@ jobs:
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
             source/build/formula-reference-typeset.txt
-            source/build/math-web-*.json
+            source/build/math-web-*
+            source/build/math-reader-failure.png
+            source/build/derivative-definition-ui.png
             source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
@@ -227,7 +229,9 @@ jobs:
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
             source/build/formula-reference-typeset.txt
-            source/build/math-web-*.json
+            source/build/math-web-*
+            source/build/math-reader-failure.png
+            source/build/derivative-definition-ui.png
             source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
@@ -362,7 +366,9 @@ jobs:
             source/build/formula-free-ai-ui.png
             source/build/formula-reference-canvas-ui.png
             source/build/formula-reference-typeset.txt
-            source/build/math-web-*.json
+            source/build/math-web-*
+            source/build/math-reader-failure.png
+            source/build/derivative-definition-ui.png
             source/build/formula-ai-fixture.jsonl
             source/build/coordinate-axes-editor-ui.png
             source/build/coordinate-axes-canvas-ui.png
