@@ -523,3 +523,8 @@ Proper LaTeX display and expanded trigonometry (2026-10-15)
 - 286 reference cards, including 91 trigonometry cards with domain, principal-range and half-angle sign restrictions.
 - Extract the whole ZIP and keep MathomirMath beside Mathomir.exe. Math typesetting is offline. It uses the Microsoft Edge WebView2 Runtime normally supplied with Windows; if missing, the panel offers Microsoft's official installer page. No model or browser runtime is bundled.
 - The question composer stays below the conversation. API keys stay in the native Windows controls and are never passed to the math renderer. Model text is treated as text, and external links, active HTML and TeX package downloads are disabled.
+
+Center move grip (2026-10-15 evening)
+- Active objects show a small center move grip as well as their existing corner grips. It searches nearby central space to avoid foreground annotations, stays a fixed usable size at any zoom, and hides while editing.
+- Drag past the small movement threshold to move; small clicks do not nudge objects or consume Undo. Escape cancels a drag.
+- Double-click the center grip to edit the existing text/math, open a graph formula, or expose drawing nodes. Double-clicking elsewhere retains free-space annotation placement.

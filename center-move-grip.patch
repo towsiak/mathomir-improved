@@ -1,0 +1,321 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -481,7 +481,8 @@
+ CObject *ResizeHandleObject=NULL;
+ static bool MouseSizingActive=false;
+ static bool MouseMovingActive=false;
+-static CPoint MoveStartPoint,SizingStartPoint;
++static bool CenterMovePending=false,GripMoveStarted=false,CenterEditRelease=false;
++static CPoint MoveStartPoint,SizingStartPoint,CenterGripOffset;
+ static int MoveStartX,MoveStartY;
+ static CObject *MoveGripObject=NULL;
+ static CExpression *SizingExpressionSnapshot=NULL;
+@@ -643,8 +644,59 @@
+         (object->absolute_Y+object->Below-ViewY)*ViewZoom/100+1);
+     return bounds.PtInRect(point)!=FALSE;
+ }
++// A fixed screen-size control near the visible center. Prefer whitespace and
++// never cover a foreground annotation; layout is deterministic while hovering.
++static bool CenterMoveGripPoint(tDocumentStruct *object,CPoint &point)
++{
++    if(!object || !object->Object || object->MovingDotState==5 || PrintRendering)return false;
++    if(MouseMovingActive && CenterMovePending && MoveGripObject==object->Object){
++        point=CPoint((object->absolute_X-ViewX)*ViewZoom/100+CenterGripOffset.x,
++            (object->absolute_Y-ViewY)*ViewZoom/100+CenterGripOffset.y);return true;
++    }
++    if(KeyboardEntryObject && KeyboardEntryBaseObject==object)return false;
++    if(object->Type==2 && ((CDrawing*)object->Object)->GripNodeEditing)return false;
++    int left=(object->absolute_X-ViewX)*ViewZoom/100;
++    int right=(object->absolute_X+object->Length-ViewX)*ViewZoom/100;
++    int top=(object->absolute_Y-object->Above-ViewY)*ViewZoom/100;
++    int bottom=(object->absolute_Y+object->Below-ViewY)*ViewZoom/100;
++    if(right<14 || bottom<14 || left>TheClientRect.right-14 || top>TheClientRect.bottom-14)return false;
++    left=max(14,left);right=min((int)TheClientRect.right-14,right);
++    top=max(14,top);bottom=min((int)TheClientRect.bottom-14,bottom);
++    int cx=(left+right)/2,cy=(top+bottom)/2;
++    int dx=min(30,max(0,(right-left)/3)),dy=min(26,max(0,(bottom-top)/3));
++    const int offsets[9][2]={{0,0},{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
++    int best=INT_MAX;bool found=false;
++    for(int k=0;k<9;k++){
++        CPoint candidate(cx+offsets[k][0]*dx,cy+offsets[k][1]*dy);
++        CRect handle(candidate.x-10,candidate.y-10,candidate.x+11,candidate.y+11);
++        bool covered=false;
++        for(int i=NumDocumentElements-1;i>=0;i--){
++            tDocumentStruct *other=TheDocument+i;
++            if(other==object || !other->Object || other->MovingDotState==5 || IsGraphObject(other))continue;
++            if(!IsGraphObject(object) && !AnnotationInsideLargeExpression(other,object) &&
++                (other<object || AnnotationInsideLargeExpression(object,other)))continue;
++            CRect bounds((other->absolute_X-ViewX)*ViewZoom/100,
++                (other->absolute_Y-other->Above-ViewY)*ViewZoom/100,
++                (other->absolute_X+other->Length-ViewX)*ViewZoom/100+1,
++                (other->absolute_Y+other->Below-ViewY)*ViewZoom/100+1),intersection;
++            if(intersection.IntersectRect(handle,bounds)){covered=true;break;}
++        }
++        if(covered)continue;
++        int score=k; // center wins ties; move off a glyph when space allows.
++        if(object->Type==1 && ExpressionContentAtPoint((CExpression*)object->Object,
++            candidate.x-(object->absolute_X-ViewX)*ViewZoom/100,
++            candidate.y-(object->absolute_Y-ViewY)*ViewZoom/100,5))score+=20;
++        if(score<best){best=score;point=candidate;found=true;}
++    }
++    return found;
++}
++static bool CenterMoveGripHit(tDocumentStruct *object,CPoint point)
++{
++    CPoint center;return CenterMoveGripPoint(object,center) && abs(point.x-center.x)<=9 && abs(point.y-center.y)<=9;
++}
+ static bool InControlApproach(tDocumentStruct *object,CPoint point)
+ {
++    CPoint center; if(CenterMoveGripPoint(object,center) && abs(point.x-center.x)<=15 && abs(point.y-center.y)<=15)return true;
+     const CPoint controls[]={MoveGripPoint(object),LowerMoveGripPoint(object),
+         ResizeHandlePoint(object),DeleteGripPoint(object)};
+     for(int i=0;i<4;i++)
+@@ -2101,6 +2153,7 @@
+ {
+ 	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
+ 	if (nFlags & (MK_CONTROL|MK_SHIFT)) { OnLButtonDown(nFlags,point); return; }
++    if(!ClipboardExpression && !ClipboardDrawing && CenterMoveGripHit(ResizeHandleDocument(),point)){EditFromCenterGrip(point);return;}
+ 	RestoreClipboardBackground();
+ 	if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
+ 	if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
+@@ -2134,11 +2187,15 @@
+ static CObject *ExplicitTypingRoot=NULL;
+ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ {
++    CenterEditRelease=false;
+     m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
+     // Resolve the current point even when no preceding mouse-move was delivered.
+     // Placement and an active selection gesture retain their existing state.
+     if(MouseMode==0 && !IsDrawingMode && !TouchMouseMode && !(nFlags&MK_SHIFT))
+         OnMouseMove(nFlags&~MK_LBUTTON,point);
++    tDocumentStruct *clickedContent=FrontContentAtPoint(point);
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object &&
++        TheDocument+i!=clickedContent)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);
+     ExplicitTypingRoot=NULL;
+     if(!ViewOnlyMode && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing){
+         tDocumentStruct *front=FrontContentAtPoint(point);
+@@ -2165,7 +2222,7 @@
+             GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();return;
+         }
+     }
+-	if (BeginGripMove(point)) return;
++	if (BeginGripMove(point,(nFlags&(MK_CONTROL|MK_SHIFT))==0)) return;
+ 	if (BeginMouseSizing(point)) return;
+ 	if (BeginMouseRotation(point)) return;
+ 	RotationHandleObject=NULL;
+@@ -3728,6 +3785,7 @@
+     {
+         CPoint deleteGrip=DeleteGripPoint(moveHover);
+         if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){ShowFeatureCanvasHint(1,"Delete this object. Ctrl+Z restores it.");SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
++        if(!(nFlags&(MK_CONTROL|MK_SHIFT)) && CenterMoveGripHit(moveHover,point)){ShowFeatureCanvasHint(6,"Drag the center grip to move this object. Double-click it to edit. Escape cancels a move.");SetCursor(::LoadCursor(NULL,IDC_SIZEALL));return;}
+         CPoint grip=MoveGripPoint(moveHover);
+         CPoint lower=LowerMoveGripPoint(moveHover);
+         if ((abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9) || (abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9))
+@@ -4602,7 +4660,7 @@
+                     !nextFunctionHelp.IsEmpty()?std::wstring((LPCWSTR)nextFunctionHelp):L"Mathematical object - click to edit its numbers, symbols and expressions. Use the Background color toolbar button to highlight it.";
+             }else if(TouchedObject->Type==2)help=FeatureDrawingHelp((CDrawing*)TouchedObject->Object);
+             if(!help.empty()){
+-                help+=L"\nObject controls: drag the top-left grip to move; drag the bottom-right grip to resize; click the lower-left cross to delete. Ctrl+Z undoes changes.";
++                help+=L"\nObject controls: drag a move grip (including the center) to move; double-click the center grip to edit; drag the bottom-right grip to resize; click the lower-left cross to delete. Ctrl+Z undoes changes.";
+                 CPoint cursor;::GetCursorPos(&cursor);ScreenToClient(&cursor);CRect area(cursor.x-12,cursor.y-12,cursor.x+13,cursor.y+13);
+                 CanvasHints.Hover(GetSafeHwnd(),(int)(INT_PTR)TouchedObject->Object,area,help);CanvasHintVersion++;
+             }
+@@ -5435,6 +5493,7 @@
+ #pragma optimize("s",on)
+ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+ {
++    if(nChar==VK_ESCAPE){CenterEditRelease=false;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);}
+     m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
+     if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
+     if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
+@@ -8596,6 +8655,7 @@
+ #pragma optimize("s",on)
+ void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
+ {
++    if(CenterEditRelease){CenterEditRelease=false;return;}
+     if(DeleteGripClick){DeleteGripClick=false;return;}
+     if (MouseMovingActive) { UpdateGripMove(point); EndGripMove(false); return; }
+     if (MouseSizingActive) { UpdateMouseSizing(point,nFlags); EndMouseSizing(false); return; }
+@@ -10981,7 +11041,55 @@
+         if (TheDocument[i].Object==MoveGripObject) return TheDocument+i;
+     return NULL;
+ }
+-bool CMathomirView::BeginGripMove(CPoint point)
++void CMathomirView::EditFromCenterGrip(CPoint point)
++{
++    tDocumentStruct *object=ResizeHandleDocument();if(!object || !object->Object)return;
++    if(MouseMovingActive)EndGripMove(true);
++    HideSelectionApproxPanel();Popup->HidePopupMenu();HideQuickActionSearch();
++    if(KeyboardEntryObject){((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;}
++    for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *other=TheDocument+i;if(other->MovingDotState!=5)other->MovingDotState=0;
++        if(other->Type==1 && other->Object)((CExpression*)other->Object)->DeselectExpression();
++        if(other->Type==2 && other->Object){((CDrawing*)other->Object)->SelectDrawing(0);((CDrawing*)other->Object)->SetGripNodeEditing(false);}
++    }
++    NumSelectedObjects=0;SelectedDocumentObject=SelectedDocumentObject2=NULL;
++    IsInsertionPointTouched=NULL;MouseTouchingSelection=0;SpecialDrawingHover=NULL;
++    FreePlacementGesture=false;MouseMode=0;LastQuickTypeObject=NULL;ExplicitTypingRoot=NULL;
++    CenterEditRelease=true;SetFocus();
++    if(object->Type==1){
++        CExpression *root=(CExpression*)object->Object;CClientDC dc(this);
++        short length,above,below;root->CalculateSize(&dc,ViewZoom,&length,&above,&below);
++        root->m_IsColumnInsertion=root->m_IsRowInsertion=0;root->m_Selection=0;
++        KeyboardEntryBaseObject=object;KeyboardEntryObject=root;root->KeyboardStart(&dc,ViewZoom);
++        // Search the existing expression's real caret positions, including text
++        // characters and nested boxes, rather than creating a new canvas object.
++        int x=point.x-(object->absolute_X-ViewX)*ViewZoom/100;
++        int y=point.y-(object->absolute_Y-ViewY)*ViewZoom/100;
++        if(!root->KeyboardStartAt(x,y,-1,2))root->KeyboardStartAt(x,y,1,2);
++    }else if(object->Type==2){
++        CDrawing *drawing=(CDrawing*)object->Object;SpecialDrawingHover=object;
++        if(IsGraphObject(object) && drawing->SpecialData){
++            CFunctionPlotter *plot=(CFunctionPlotter*)drawing->SpecialData;
++            if(!plot->StopForZoom()){CenterEditRelease=false;return;}
++            prevTouchedObject=object;
++            if(plot->integral.enabled)PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER);
++            else if(!plot->pieces.empty())PostMessage(WM_COMMAND,ID_PIECEWISE_GRAPH);
++            else if(!plot->scatterPoints.empty())PostMessage(WM_COMMAND,ID_STATISTICS_REGRESSION);
++            else{
++                plot->EnsureFunctionSlots();CExpression *formula=(CExpression*)drawing->Items[8].pSubdrawing;
++                formula->DeselectExpression();formula->m_Selection=formula->m_pElementList->Type?formula->m_NumElements+1:1;
++                KeyboardEntryBaseObject=object;KeyboardEntryObject=formula;plot->TheState=108;
++                CClientDC dc(this);formula->KeyboardStart(&dc,ViewZoom);formula->m_Selection=0;
++            }
++        }else{
++            drawing->SelectDrawing(1);drawing->SetGripNodeEditing(!drawing->IsSpecialDrawing);
++            prevTouchedObject=object;SelectedDocumentObject=object;
++        }
++    }
++    RepaintTheView(1);
++}
++
++bool CMathomirView::BeginGripMove(CPoint point,bool allowCenter)
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
+     if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || ClipboardExpression || ClipboardDrawing) return false;
+@@ -10989,14 +11097,17 @@
+     CPoint lower=LowerMoveGripPoint(object);
+     bool upperHit=abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9;
+     bool lowerHit=abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9;
+-    if (!upperHit && !lowerHit) return false;
++    bool centerHit=allowCenter && CenterMoveGripHit(object,point);
++    if (!upperHit && !lowerHit && !centerHit) return false;
++    CenterMovePending=centerHit && !upperHit && !lowerHit;GripMoveStarted=!CenterMovePending;
++    if(CenterMovePending){CPoint center;CenterMoveGripPoint(object,center);CenterGripOffset=CPoint(center.x-(object->absolute_X-ViewX)*ViewZoom/100,center.y-(object->absolute_Y-ViewY)*ViewZoom/100);}
+     RestoreClipboardBackground();
+     if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
+     if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
+-    if (KeyboardEntryObject) { ((CExpression*)KeyboardEntryObject)->KeyboardStop(); KeyboardEntryObject=NULL; KeyboardEntryBaseObject=NULL; }
++    if (!CenterMovePending && KeyboardEntryObject) { ((CExpression*)KeyboardEntryObject)->KeyboardStop(); KeyboardEntryObject=NULL; KeyboardEntryBaseObject=NULL; }
+     LastQuickTypeObject=NULL; FunctionHelpText.Empty();
+     MoveGripObject=object->Object; MoveStartX=object->absolute_X; MoveStartY=object->absolute_Y; MoveStartPoint=point;
+-    UndoSave("move with grip",20507); MouseMovingActive=true; MouseMode=105;
++    if(!CenterMovePending)UndoSave("move with grip",20507); MouseMovingActive=true; MouseMode=105;
+     FreePlacementGesture=false; SetCapture(); SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
+     return true;
+ }
+@@ -11004,19 +11115,29 @@
+ {
+     tDocumentStruct *object=MoveGripDocument();
+     if (!object) { EndGripMove(true); return; }
+-    object->absolute_X=MoveStartX+(point.x-MoveStartPoint.x)*100/ViewZoom;
+-    object->absolute_Y=MoveStartY+(point.y-MoveStartPoint.y)*100/ViewZoom;
++    if(CenterMovePending && !GripMoveStarted &&
++        abs(point.x-MoveStartPoint.x)<max(4,::GetSystemMetrics(SM_CXDRAG)) &&
++        abs(point.y-MoveStartPoint.y)<max(4,::GetSystemMetrics(SM_CYDRAG)))return;
++    int nextX=MoveStartX+(point.x-MoveStartPoint.x)*100/ViewZoom;
++    int nextY=MoveStartY+(point.y-MoveStartPoint.y)*100/ViewZoom;
+     if(IsCanvasGridSnapActive() && !(GetKeyState(VK_MENU)&0x8000)){
+         int ox=0,oy=0;if(object->Type==2)((CDrawing*)object->Object)->FindRealCorner(&ox,&oy);else ox=3;
+-        int x=object->absolute_X+ox,y=object->absolute_Y+oy;SnapCanvasGridPoint(x,y);object->absolute_X=x-ox;object->absolute_Y=y-oy;
+-    }
++        int x=nextX+ox,y=nextY+oy;SnapCanvasGridPoint(x,y);nextX=x-ox;nextY=y-oy;
++    }
++    if(nextX==object->absolute_X && nextY==object->absolute_Y)return;
++    if(!GripMoveStarted){
++        if(KeyboardEntryObject){((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;}
++        UndoSave("move with center grip",20507);GripMoveStarted=true;
++    }
++    if(object->Type==2)((CDrawing*)object->Object)->SetGripNodeEditing(false);
++    object->absolute_X=nextX;object->absolute_Y=nextY;
+     GetDocument()->SetModifiedFlag(); InvalidateRect(NULL,FALSE); UpdateWindow();
+ }
+ void CMathomirView::EndGripMove(bool cancel)
+ {
+     tDocumentStruct *object=MoveGripDocument();
+     if (cancel && object) { object->absolute_X=MoveStartX; object->absolute_Y=MoveStartY; }
+-    MouseMovingActive=false; MouseMode=0; MoveGripObject=NULL;
++    MouseMovingActive=false;CenterMovePending=false;GripMoveStarted=false; MouseMode=0; MoveGripObject=NULL;
+     if (GetCapture()==this) ReleaseCapture();
+     RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
+ }
+@@ -11024,9 +11145,9 @@
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
+     if (!object || object->MovingDotState==5) return;
+-    for(int grip=0;grip<2;grip++)
++    for(int grip=0;grip<3;grip++)
+     {
+-    CPoint p=grip==0?MoveGripPoint(object):LowerMoveGripPoint(object);
++    CPoint p;if(grip==2){if(!CenterMoveGripPoint(object,p))continue;}else p=grip==0?MoveGripPoint(object):LowerMoveGripPoint(object);
+     int saved=dc->SaveDC(); CPen pen(PS_SOLID,1,RGB(45,95,155));
+     dc->SelectObject(&pen); dc->FillSolidRect(p.x-8,p.y-8,17,17,RGB(255,255,255));
+     dc->MoveTo(p.x-6,p.y); dc->LineTo(p.x+7,p.y);
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -169,7 +169,8 @@
+     afx_msg void OnDrawingTool(UINT command);
+ 	void PaintSizeHandle(CDC *dc);
+ 	void PaintMoveGrip(CDC *dc);
+-	bool BeginGripMove(CPoint point);
++	void EditFromCenterGrip(CPoint point);
++    bool BeginGripMove(CPoint point,bool allowCenter=true);
+ 	void UpdateGripMove(CPoint point);
+ 	void EndGripMove(bool cancel);
+ 	bool BeginMouseSizing(CPoint point);
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -94,6 +94,7 @@
+ 	NumItems=0;
+ 	NumItemsReserved=0;
+ 	IsSelected=0;
++    GripNodeEditing=false;
+ 	OriginalForm=0;
+     AxisGrid=CoordinateAxes::Settings();
+ 	//IsNodeEdit=0;
+@@ -2148,6 +2149,7 @@
+ 
+ int CDrawing::CopyDrawing(CDrawing* Original)
+ {
++    GripNodeEditing=false;
+ 	Delete();
+ 	Items=(tDrawingItem*)malloc(sizeof(tDrawingItem)*Original->NumItems);
+ 	IsSpecialDrawing=Original->IsSpecialDrawing;
+@@ -3728,8 +3730,16 @@
+ }
+ 
+ //returns 1 if it is ok to allow quick node editing (while menu/toolbar option for quick node editing is on)
++void CDrawing::SetGripNodeEditing(bool enabled)
++{
++    GripNodeEditing=enabled && !IsSpecialDrawing;
++    for(int i=0;i<NumItems;i++)if(Items[i].Type==0 && Items[i].pSubdrawing)
++        ((CDrawing*)Items[i].pSubdrawing)->SetGripNodeEditing(GripNodeEditing);
++}
++
+ int CDrawing::AllowQuickEditNodes(void)
+ {
++    if(GripNodeEditing && !IsSpecialDrawing)return 1;
+ 	if (ToolbarEditNodes) 
+ 	{
+ 		if (!IsSelected) return 1;
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -32,6 +32,8 @@
+ 	unsigned short NumItemsReserved;
+ 
+ 	char IsSelected;
++    void SetGripNodeEditing(bool enabled);
++    bool GripNodeEditing; // transient center-grip edit mode; never saved/copied
+ 	char m_Color;
+ 	char OriginalForm; //used from toolbox (to store the purpose of this drawing)
+ 	char IsSpecialDrawing;
