@@ -238,7 +238,7 @@
      PUSHBUTTON "Clear search",1490,392,29,83,17
 --- /dev/null
 +++ b/Mathomir/MathWebRenderer.h
-@@ -0,0 +1,58 @@
+@@ -0,0 +1,63 @@
 +#pragma once
 +#include <WebView2.h>
 +#include <wrl.h>
@@ -251,30 +251,35 @@
 + HWND host=NULL; bool alive=true,ready=false,com=false; unsigned serial=0;
 + std::wstring payload,error,assets; ComPtr<ICoreWebView2Controller> controller; ComPtr<ICoreWebView2> web;
 + ~State(){if(com)CoUninitialize();}
++ void Trace(const char*stage,HRESULT result=S_OK){
++#ifdef MATHOMIR_AI_TESTING
++ FILE*f=fopen("math-web-startup.txt","a");if(f){fprintf(f,"%lu reader=%d %s %08lx\n",GetTickCount(),GetDlgCtrlID(host),stage,result);fclose(f);}
++#endif
++ }
 + void Fail(const wchar_t*message){error=message;if(alive)::InvalidateRect(host,NULL,TRUE);}
 + void Resize(){if(controller){RECT r;::GetClientRect(host,&r);controller->put_Bounds(r);}}
-+ void Display(){if(ready&&web&&!payload.empty()){std::wstring script=L"window.Mathomir.render("+payload+L").catch(function(){document.getElementById('content').textContent='The mathematics could not be displayed. Close and reopen this panel.';});";web->ExecuteScript(script.c_str(),Callback<ICoreWebView2ExecuteScriptCompletedHandler>([](HRESULT result,LPCWSTR value)->HRESULT{
++ void Display(){Trace("display");if(ready&&web&&!payload.empty()){std::wstring script=L"window.Mathomir.render("+payload+L").catch(function(){document.getElementById('content').textContent='The mathematics could not be displayed. Close and reopen this panel.';});";web->ExecuteScript(script.c_str(),Callback<ICoreWebView2ExecuteScriptCompletedHandler>([](HRESULT result,LPCWSTR value)->HRESULT{
 +#ifdef MATHOMIR_AI_TESTING
 + FILE*f=fopen("math-web-script.txt","w");if(f){fprintf(f,"%08lx ",result);if(value){auto text=MathomirAI::ToUtf8(value);fwrite(text.data(),1,text.size(),f);}fclose(f);}
 +#endif
 + return S_OK;}).Get());}}
-+ void Start(){
++ void Start(){Trace("start");
 +  HRESULT hr=CoInitializeEx(NULL,COINIT_APARTMENTTHREADED);com=SUCCEEDED(hr);if(FAILED(hr)){Fail(L"The math display could not initialize. Restart Mathomir.");return;}
 +  wchar_t path[32768]={};GetModuleFileNameW(NULL,path,32768);assets=path;size_t end=assets.find_last_of(L"\\/");assets.resize(end);assets+=L"\\MathomirMath";
 +  if(GetFileAttributesW((assets+L"\\reader.html").c_str())==INVALID_FILE_ATTRIBUTES){Fail(L"Math display files are missing. Extract the entire ZIP before running Mathomir.");return;}
 +  wchar_t local[MAX_PATH]={};if(FAILED(SHGetFolderPathW(NULL,CSIDL_LOCAL_APPDATA,NULL,SHGFP_TYPE_CURRENT,local))){Fail(L"The math display could not access your local application folder.");return;}
 +  std::wstring user=std::wstring(local)+L"\\Mathomir\\MathDisplay";SHCreateDirectoryExW(NULL,user.c_str(),NULL);auto state=shared_from_this();
 +  hr=CreateCoreWebView2EnvironmentWithOptions(NULL,user.c_str(),NULL,Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([state](HRESULT result,ICoreWebView2Environment*environment)->HRESULT{
-+   if(!state->alive)return S_OK;if(FAILED(result)||!environment){state->Fail(L"Microsoft Edge WebView2 Runtime is needed for the math display. Click here to install it, then reopen Mathomir.");return S_OK;}
++   state->Trace("environment",result);if(!state->alive)return S_OK;if(FAILED(result)||!environment){state->Fail(L"Microsoft Edge WebView2 Runtime is needed for the math display. Click here to install it, then reopen Mathomir.");return S_OK;}
 +   HRESULT created=environment->CreateCoreWebView2Controller(state->host,Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>([state](HRESULT result,ICoreWebView2Controller*controller)->HRESULT{
-+    if(!state->alive){if(controller)controller->Close();return S_OK;}if(FAILED(result)||!controller){state->Fail(L"The math display could not open. Restart Mathomir.");return S_OK;}
++    state->Trace("controller",result);if(!state->alive){if(controller)controller->Close();return S_OK;}if(FAILED(result)||!controller){state->Fail(L"The math display could not open. Restart Mathomir.");return S_OK;}
 +    state->controller=controller;controller->get_CoreWebView2(&state->web);if(!state->web){state->Fail(L"The math display could not open.");return S_OK;}
 +    ComPtr<ICoreWebView2Settings> settings;state->web->get_Settings(&settings);if(settings){settings->put_AreDevToolsEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);settings->put_AreDefaultScriptDialogsEnabled(FALSE);settings->put_IsWebMessageEnabled(TRUE);}
 +    ComPtr<ICoreWebView2_3> local;if(FAILED(state->web.As(&local))||FAILED(local->SetVirtualHostNameToFolderMapping(L"mathomir.local",state->assets.c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS))){state->Fail(L"Update Microsoft Edge WebView2 Runtime to display mathematics.");return S_OK;}
 +    std::weak_ptr<State> weak=state;EventRegistrationToken token;
 +    state->web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs*args)->HRESULT{auto s=weak.lock();if(!s||!s->alive)return S_OK;LPWSTR uri=NULL;args->get_Uri(&uri);if(!uri||wcscmp(uri,L"https://mathomir.local/reader.html"))args->put_Cancel(TRUE);CoTaskMemFree(uri);return S_OK;}).Get(),&token);
 +    state->web->add_NewWindowRequested(Callback<ICoreWebView2NewWindowRequestedEventHandler>([](ICoreWebView2*,ICoreWebView2NewWindowRequestedEventArgs*args)->HRESULT{args->put_Handled(TRUE);return S_OK;}).Get(),&token);
-+    state->web->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationCompletedEventArgs*args)->HRESULT{auto s=weak.lock();if(!s||!s->alive)return S_OK;BOOL success=FALSE;args->get_IsSuccess(&success);if(success){s->ready=true;s->Display();}else s->Fail(L"The local math display could not load. Extract the complete ZIP again.");return S_OK;}).Get(),&token);
++    state->web->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationCompletedEventArgs*args)->HRESULT{auto s=weak.lock();if(!s||!s->alive)return S_OK;BOOL success=FALSE;args->get_IsSuccess(&success);s->Trace("navigation completed");if(success){s->ready=true;s->Display();}else s->Fail(L"The local math display could not load. Extract the complete ZIP again.");return S_OK;}).Get(),&token);
 +    state->web->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>([weak](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs*args)->HRESULT{auto s=weak.lock();if(!s||!s->alive)return S_OK;LPWSTR json=NULL;args->get_WebMessageAsJson(&json);if(json){try{auto value=MathomirAI::JsonReader(MathomirAI::ToUtf8(json)).Read();for(const char*key:{"serial","math","errors","fractions","limits","tables","scrollTop"}){const auto &v=value.Get(key);std::wstring prop=L"MathomirMath_"+MathomirAI::ToWide(key);SetPropW(s->host,prop.c_str(),(HANDLE)(INT_PTR)(atoi(v.text.c_str())+1));}
 +#ifdef MATHOMIR_AI_TESTING
 +      char name[80];sprintf_s(name,"math-web-%d.json",GetDlgCtrlID(s->host));FILE*f=fopen(name,"w");if(f){auto text=MathomirAI::ToUtf8(json);fwrite(text.data(),1,text.size(),f);fclose(f);}
@@ -282,7 +287,7 @@
 +      if(GetDlgCtrlID(s->host)==1484){FILE*f=fopen("formula-reference-typeset.txt","w");if(f){fprintf(f,"%d %d %d",atoi(value.Get("serial").text.c_str()),atoi(value.Get("math").text.c_str()),atoi(value.Get("errors").text.c_str()));fclose(f);}}
 +#endif
 +     }catch(...){}CoTaskMemFree(json);}return S_OK;}).Get(),&token);
-+    state->Resize();controller->put_IsVisible(TRUE);state->web->Navigate(L"https://mathomir.local/reader.html");return S_OK;
++    state->Resize();controller->put_IsVisible(TRUE);state->Trace("navigate",state->web->Navigate(L"https://mathomir.local/reader.html"));return S_OK;
 +   }).Get());if(FAILED(created))state->Fail(L"The math display could not start.");return S_OK;
 +  }).Get());if(FAILED(hr))Fail(L"Microsoft Edge WebView2 Runtime is needed. Click here to install it, then reopen Mathomir.");
 + }
@@ -294,6 +299,6 @@
 + if(message==WM_DESTROY){state->alive=false;if(state->controller)state->controller->Close();state->web.Reset();state->controller.Reset();return 0;}
 + if(message==WM_NCDESTROY){SetWindowLongPtrW(window,GWLP_USERDATA,0);delete box;return DefWindowProcW(window,message,wp,lp);}return DefWindowProcW(window,message,wp,lp);
 +}
-+inline bool Attach(HWND parent,int id){static bool registered=false;if(!registered){WNDCLASSW c={};c.lpfnWndProc=Procedure;c.hInstance=GetModuleHandle(NULL);c.lpszClassName=L"MathomirMathReader";c.hCursor=LoadCursor(NULL,IDC_ARROW);registered=RegisterClassW(&c)!=0;if(!registered)return false;}HWND old=GetDlgItem(parent,id);if(!old)return false;RECT r;GetWindowRect(old,&r);MapWindowPoints(NULL,parent,(POINT*)&r,2);HWND previous=GetWindow(old,GW_HWNDPREV);auto state=std::make_shared<State>();auto box=new std::shared_ptr<State>(state);HWND host=CreateWindowExW(WS_EX_CLIENTEDGE,L"MathomirMathReader",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP,r.left,r.top,r.right-r.left,r.bottom-r.top,parent,NULL,GetModuleHandle(NULL),box);if(!host){delete box;return false;}DestroyWindow(old);SetWindowLongPtrW(host,GWLP_ID,id);SetWindowPos(host,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);state->Start();return true;}
++inline bool Attach(HWND parent,int id){static bool registered=false;if(!registered){WNDCLASSW c={};c.lpfnWndProc=Procedure;c.hInstance=GetModuleHandle(NULL);c.lpszClassName=L"MathomirMathReader";c.hCursor=LoadCursor(NULL,IDC_ARROW);registered=RegisterClassW(&c)!=0;if(!registered)return false;}HWND old=GetDlgItem(parent,id);if(!old)return false;RECT r;GetWindowRect(old,&r);MapWindowPoints(NULL,parent,(POINT*)&r,2);HWND previous=GetWindow(old,GW_HWNDPREV);auto state=std::make_shared<State>();auto box=new std::shared_ptr<State>(state);HWND host=CreateWindowExW(WS_EX_CLIENTEDGE,L"MathomirMathReader",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|WS_CLIPCHILDREN,r.left,r.top,r.right-r.left,r.bottom-r.top,parent,NULL,GetModuleHandle(NULL),box);if(!host){delete box;return false;}DestroyWindow(old);SetWindowLongPtrW(host,GWLP_ID,id);SetWindowPos(host,previous?previous:HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);state->Start();return true;}
 +inline void Show(HWND host,const std::string &json,const std::wstring &plain){auto box=(std::shared_ptr<State>*)GetWindowLongPtrW(host,GWLP_USERDATA);if(!box||!(*box)->alive)return;SetWindowTextW(host,plain.c_str());(*box)->payload=MathomirAI::ToWide(json);(*box)->Display();}
 +}

@@ -4,7 +4,7 @@ window.addEventListener('error',event=>mathDisplayFailure(event.message));
 window.addEventListener('unhandledrejection',event=>mathDisplayFailure(String(event.reason)));
 
 // Text enters only through text nodes. MathJax receives TeX, never model HTML.
-window.MathJax={loader:{paths:{mathjax:new URL('.',location.href).href.replace(/\/$/,'')},load:['ui/safe']},tex:{packages:{'[-]':['require','autoload','noundefined']},maxMacros:1000,maxBuffer:16000},svg:{fontCache:'local'},options:{enableMenu:false,safeOptions:{allow:{URLs:'none',classes:'none',cssIDs:'none',styles:'none'}}},startup:{typeset:false}};
+window.MathJax={loader:{paths:{mathjax:new URL('.',location.href).href.replace(/\/$/,'')},load:['ui/safe','[tex]/boldsymbol']},tex:{packages:{'[+]':['boldsymbol'],'[-]':['require','autoload','noundefined']},maxMacros:1000,maxBuffer:16000},svg:{fontCache:'local'},options:{enableMenu:false,safeOptions:{allow:{URLs:'none',classes:'none',cssIDs:'none',styles:'none'}}},startup:{typeset:false}};
 (()=>{
 let generation=0;
 const content=document.getElementById('content');

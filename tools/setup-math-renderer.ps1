@@ -13,3 +13,5 @@ Pinned 'https://raw.githubusercontent.com/mathjax/MathJax/3.2.2/es5/tex-svg.js' 
 New-Item -ItemType Directory -Force source/build/MathomirMath/ui | Out-Null
 Pinned 'https://raw.githubusercontent.com/mathjax/MathJax/3.2.2/es5/ui/safe.js' 'source/build/MathomirMath/ui/safe.js' '9fef48d868277a8bc1852f7ba796b33ead812d38916a7131b0a29ea48961a6a4'
 Pinned 'https://raw.githubusercontent.com/mathjax/MathJax/3.2.2/LICENSE' 'source/build/MathomirMath/MathJax-LICENSE.txt' 'cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30'
+New-Item -ItemType Directory -Force source/build/MathomirMath/input/tex/extensions | Out-Null
+Pinned 'https://raw.githubusercontent.com/mathjax/MathJax/3.2.2/es5/input/tex/extensions/boldsymbol.js' 'source/build/MathomirMath/input/tex/extensions/boldsymbol.js' 'd6771fee0772db2657796c8d0e20e1878bb3237f6d3ed1e828e1834a4ff743ca'
