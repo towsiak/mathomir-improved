@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 public static class PaletteProbe {
  [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h,uint m,IntPtr w,IntPtr l,uint flags,uint ms,out UIntPtr result);
  public static int Query(IntPtr h,int kind,int index){UIntPtr result;if(SendMessageTimeout(h,0x8000+156,(IntPtr)kind,(IntPtr)index,2,5000,out result)==IntPtr.Zero)throw new Exception("Palette did not respond");return unchecked((int)result.ToUInt64());}
- public static int Ink(PlacementSnapshot image,int left,int top,int right,int bottom){int count=0;for(int y=Math.Max(0,top);y<Math.Min(image.Height,bottom);y++)for(int x=Math.Max(0,left);x<Math.Min(image.Width,right);x++){int c=image.Pixels[y*image.Width+x];if((c&255)<180&&((c>>8)&255)<180&&((c>>16)&255)<180)count++;}return count;}
+ public static int Ink(int[] pixels,int width,int height,int left,int top,int right,int bottom){int count=0;for(int y=Math.Max(0,top);y<Math.Min(height,bottom);y++)for(int x=Math.Max(0,left);x<Math.Min(width,right);x++){int c=pixels[y*width+x];if((c&255)<180&&((c>>8)&255)<180&&((c>>16)&255)<180)count++;}return count;}
 }
 '@
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path;$folder=Split-Path $exe
@@ -26,7 +26,7 @@ function AssertPreview($kind,$index){
  Check ([PlacementProbe]::Stat($view,'Kind') -eq $(if($kind -gt 100){4}else{1})) "Wrong preview route: index=$index kind=$kind"
  $left=[PlacementProbe]::Stat($view,'Left');$top=[PlacementProbe]::Stat($view,'Top');$right=[PlacementProbe]::Stat($view,'Right');$bottom=[PlacementProbe]::Stat($view,'Bottom')
  $shot=Snapshot
- try{Check ([PaletteProbe]::Ink($shot,$left,$top,$right,$bottom) -gt 0) "Preview has no object ink: index=$index kind=$kind"}finally{$shot.Dispose()}
+ try{Check ([PaletteProbe]::Ink($shot.Pixels,$shot.Width,$shot.Height,$left,$top,$right,$bottom) -gt 0) "Preview has no object ink: index=$index kind=$kind"}finally{$shot.Dispose()}
 }
 function SaveShot($image,$name){
  $bitmap=New-Object System.Drawing.Bitmap $image.Width,$image.Height;$rect=New-Object System.Drawing.Rectangle 0,0,$image.Width,$image.Height
