@@ -22,6 +22,7 @@ public static class CenterGripProbe {
 }
 '@
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path;$folder=Split-Path $exe
+$env:MATHOMIR_GRAPH_DIAGNOSTICS="1"
 $app=Start-Process $exe -WorkingDirectory $folder -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
@@ -47,7 +48,7 @@ try{
   $note='<o t="1" X="210" Y="220"><ex fh="160"'+$(if($text){' stxt="1"'}else{''})+'><var t="overlaynote" f="00" color="1" /></ex></o>'
   Scene "overlay-$text-$last-$zoom" $(if($last){$note+$graph}else{$graph+$note}) $zoom
   $initial=SaveDoc;$graphXml=(Drawing $initial).OuterXml;$g=Grip 225 212
-  Drag $g ([int](30*$scale)) ([int](20*$scale));$d=SaveDoc;Check ((Label $d).X -eq '240' -and (Label $d).Y -eq '240') 'Center grip moved the wrong object or jumped';Check ((Drawing $d).OuterXml -eq $graphXml) 'Dragging a label changed its graph'
+  Drag $g ([int](30*$scale)) ([int](20*$scale));$d=SaveDoc;Check ((Label $d).X -eq '240' -and (Label $d).Y -eq '240') ('Center grip moved the wrong object or jumped: grip='+($g -join ',')+' XML='+$d.OuterXml);Check ((Drawing $d).OuterXml -eq $graphXml) 'Dragging a label changed its graph'
   # A click/jitter must not create a second Undo record or move the object.
   $g=Grip 255 232;Drag $g 2 1;$d=SaveDoc;Check ((Label $d).X -eq '240' -and (Label $d).Y -eq '240') 'A small click moved the object'
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$d=SaveDoc;Check ((Label $d).X -eq '210' -and (Label $d).Y -eq '220') 'Clicking the center consumed Undo'

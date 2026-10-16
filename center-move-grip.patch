@@ -136,7 +136,19 @@
      {
          CPoint handle=ResizeHandlePoint(sizingObject);
          if (abs(point.x-handle.x)<=9 && abs(point.y-handle.y)<=9)
-@@ -4602,7 +4677,7 @@
+@@ -4591,7 +4666,10 @@
+                 tDocumentStruct *candidate=TheDocument+i;
+                 if(!candidate->Object || candidate->MovingDotState==5 || (candidate->Type!=1 && candidate->Type!=2))continue;
+                 if(AbsoluteX>=candidate->absolute_X && AbsoluteX<=candidate->absolute_X+candidate->Length &&
+-                    AbsoluteY>=candidate->absolute_Y-candidate->Above && AbsoluteY<=candidate->absolute_Y+candidate->Below){TouchedObject=candidate;break;}
++                    AbsoluteY>=candidate->absolute_Y-candidate->Above && AbsoluteY<=candidate->absolute_Y+candidate->Below){
++                    if(!TouchedObject || (IsGraphObject(TouchedObject) && !IsGraphObject(candidate)) ||
++                        AnnotationInsideLargeExpression(candidate,TouchedObject))TouchedObject=candidate;
++                }
+             }
+         }
+         if(TouchedObject && TouchedObject->Object && canvasHintScope.version==CanvasHintVersion && MouseMode==0 && !IsDrawingMode){
+@@ -4602,7 +4680,7 @@
                      !nextFunctionHelp.IsEmpty()?std::wstring((LPCWSTR)nextFunctionHelp):L"Mathematical object - click to edit its numbers, symbols and expressions. Use the Background color toolbar button to highlight it.";
              }else if(TouchedObject->Type==2)help=FeatureDrawingHelp((CDrawing*)TouchedObject->Object);
              if(!help.empty()){
@@ -145,7 +157,7 @@
                  CPoint cursor;::GetCursorPos(&cursor);ScreenToClient(&cursor);CRect area(cursor.x-12,cursor.y-12,cursor.x+13,cursor.y+13);
                  CanvasHints.Hover(GetSafeHwnd(),(int)(INT_PTR)TouchedObject->Object,area,help);CanvasHintVersion++;
              }
-@@ -5348,6 +5423,7 @@
+@@ -5348,6 +5426,7 @@
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -153,7 +165,7 @@
      if(KeyboardEntryObject||nChar==27)ExplicitTypingRoot=NULL;
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
      if(nChar==1 && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))return;
-@@ -5435,6 +5511,7 @@
+@@ -5435,6 +5514,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -161,7 +173,7 @@
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
      if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
      if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
-@@ -8596,6 +8673,7 @@
+@@ -8596,6 +8676,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -169,7 +181,7 @@
      if(DeleteGripClick){DeleteGripClick=false;return;}
      if (MouseMovingActive) { UpdateGripMove(point); EndGripMove(false); return; }
      if (MouseSizingActive) { UpdateMouseSizing(point,nFlags); EndMouseSizing(false); return; }
-@@ -10981,7 +11059,55 @@
+@@ -10981,7 +11062,55 @@
          if (TheDocument[i].Object==MoveGripObject) return TheDocument+i;
      return NULL;
  }
@@ -226,7 +238,7 @@
  {
      tDocumentStruct *object=ResizeHandleDocument();
      if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || ClipboardExpression || ClipboardDrawing) return false;
-@@ -10989,14 +11115,17 @@
+@@ -10989,14 +11118,17 @@
      CPoint lower=LowerMoveGripPoint(object);
      bool upperHit=abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9;
      bool lowerHit=abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9;
@@ -247,7 +259,7 @@
      FreePlacementGesture=false; SetCapture(); SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
      return true;
  }
-@@ -11004,19 +11133,30 @@
+@@ -11004,19 +11136,30 @@
  {
      tDocumentStruct *object=MoveGripDocument();
      if (!object) { EndGripMove(true); return; }
@@ -283,7 +295,7 @@
      if (GetCapture()==this) ReleaseCapture();
      RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
  }
-@@ -11024,9 +11164,9 @@
+@@ -11024,9 +11167,9 @@
  {
      tDocumentStruct *object=ResizeHandleDocument();
      if (!object || object->MovingDotState==5) return;
@@ -295,7 +307,7 @@
      int saved=dc->SaveDC(); CPen pen(PS_SOLID,1,RGB(45,95,155));
      dc->SelectObject(&pen); dc->FillSolidRect(p.x-8,p.y-8,17,17,RGB(255,255,255));
      dc->MoveTo(p.x-6,p.y); dc->LineTo(p.x+7,p.y);
-@@ -11045,6 +11185,7 @@
+@@ -11045,6 +11188,7 @@
  void CMathomirView::PaintSizeHandle(CDC *dc)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -303,7 +315,7 @@
      if (!object || object->MovingDotState==5 || (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object))) return;
      CPoint point=ResizeHandlePoint(object);
      CPen pen(PS_SOLID,1,RGB(45,95,155)); CBrush brush(RGB(255,255,255));
-@@ -11067,6 +11208,7 @@
+@@ -11067,6 +11211,7 @@
  bool CMathomirView::BeginMouseSizing(CPoint point)
  {
      tDocumentStruct *object=ResizeHandleDocument();
