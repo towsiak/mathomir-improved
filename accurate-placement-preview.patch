@@ -547,7 +547,16 @@
  	if (Original->IsSpecialDrawing!=51) return 0;
  	CFunctionPlotter *org=(CFunctionPlotter*)Original->SpecialData;
  	if (!org) return 0;
-@@ -1880,7 +1882,7 @@
+@@ -196,6 +198,8 @@
+ CRITICAL_SECTION section2;
+ int CFunctionPlotter::Paint(CDC * DC, short zoom, short X, short Y,int absX,int absY,RECT *ClipReg)
+ {
++    // Axis labels must not inherit opaque text backgrounds from a fresh preview DC.
++    DC->SetBkMode(TRANSPARENT);DC->SetBkColor(RGB(255,255,255));
+     if(GetCurrentThreadId()!=ThreadID)EnsureFunctionSlots();
+ 	MX=(PrintRendering?50:max(50,2*ToolboxSize/5+20));
+ 	MY=MX/2;
+@@ -1880,7 +1884,7 @@
  
  
  	//find this object (function plotter) in the main document
@@ -556,7 +565,7 @@
  	tDocumentStruct *ds=TheDocument;
  	int i_cnt;
  	for (i_cnt=0;i_cnt<NumDocumentElements;i_cnt++,ds++)
-@@ -1890,7 +1892,10 @@
+@@ -1890,7 +1894,10 @@
              absX=ds->absolute_X+dx;absY=ds->absolute_Y+dy;break;
          }
      }
@@ -568,7 +577,7 @@
  
  
  	//getting bittmap dimensions
-@@ -2336,7 +2341,8 @@
+@@ -2336,7 +2343,8 @@
                  CRect region((absX-ViewX)*ViewZoom/100,(absY-ViewY)*ViewZoom/100,
                      (absX-ViewX)*ViewZoom/100+Xlen+MX*ViewZoom/100+4,
                      (absY-ViewY)*ViewZoom/100+Ylen+MY*ViewZoom/100+4);

@@ -102,7 +102,7 @@ try {
  $cases=@(
   @{name='fraction-power';objects='<o t="1" X="80" Y="120"><ex fh="100">'+$power+'</ex></o>';kind=1},
   @{name='large-math';objects='<o t="1" X="80" Y="160"><ex fh="500">'+$power+'</ex></o>';kind=1},
-  @{name='oversized';objects='<o t="1" X="80" Y="240"><ex fh="1200" stxt="1"><var t="PreviewClippingTest" f="00" /></ex></o>';kind=1},
+  @{name='oversized';objects='<o t="1" X="80" Y="-800"><ex fh="1200" stxt="1"><var t="PreviewClippingTest" f="00" /></ex></o>';kind=1},
   @{name='rotated';objects='<o t="1" X="80" Y="150"><ex fh="300" rot_mdeg="17500"><var t="rotation" f="00" /></ex></o>';kind=1},
   @{name='text';objects='<o t="1" X="80" Y="120"><ex fh="300" stxt="1"><var t="Preview" f="00" /></ex></o>';kind=1},
   @{name='shape';objects=$shape;kind=2},
