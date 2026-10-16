@@ -587,3 +587,4 @@ Center move grip (2026-10-15 evening)
 - Drag-sized samples are labeled with the tool name and Drag to size, distinct from actual prepared-object placement previews.
 - Palette selection clears stale carried state and font identity; Escape and pointer departure clear previews.
 - Native tests enumerate palette math/drawing entries, use the actual pickup function and a real left-tile click, check visible ink while moving, then verify drawing gestures and Undo.
+- Small carried formulas and narrow symbols also get an enlarged native thumbnail beside their exact landing preview.

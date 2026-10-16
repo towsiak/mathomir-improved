@@ -79,11 +79,31 @@
          // The same copy operation as commit preserves nested sizes, rotation,
          // colors and table formatting without modifying the held source.
          expression.CopyExpression(ClipboardExpression,0,1,0);expression.DeselectExpression();
-@@ -9726,7 +9756,15 @@
+@@ -9726,14 +9756,44 @@
      }
      if(items.empty() || bounds.IsRectEmpty())return 0;
  
 -    const char *label=compact?"Insert into math":"Preview   Click to place   Esc to cancel";
++    // Small native math remains at its exact drop position, with a readable
++    // enlarged payload beside it. Use a separate copy to preserve layout caches.
++    CExpression carriedMath(NULL,NULL,font);CRect carryCard;carryCard.SetRectEmpty();
++    int carryZoom=0,carryX=0,carryY=0;
++    if(ClipboardExpression && !compact && (bounds.Width()<40 || bounds.Height()<32)){
++        carriedMath.CopyExpression(ClipboardExpression,0,1,0);carriedMath.DeselectExpression();
++        carryZoom=min(500,max(180,ViewZoom*2));short l=0,a=0,b=0;
++        carriedMath.CalculateSize(&dc,(short)carryZoom,&l,&a,&b,0,0);
++        double factor=min(1.0,min(160.0/max(1,(int)l),90.0/max(1,(int)a+b)));
++        carryZoom=max(5,(int)(carryZoom*factor));carriedMath.CalculateSize(&dc,(short)carryZoom,&l,&a,&b,0,0);
++        int width=max(132,(int)l+24),height=max(60,(int)a+b+38);
++        int left=bounds.right+18,top=max(Y+28,bounds.bottom+18);
++        if(left+width>client.right-4)left=bounds.left-width-18;
++        if(left<4)left=max(4,min(X+20,client.right-width-4));
++        if(top+height>client.bottom-4)top=bounds.top-height-18;
++        top=max(4,min(top,client.bottom-height-4));
++        carryCard=CRect(left,top,left+width,top+height);
++        carryX=left+(width-l)/2;carryY=top+26+a;
++    }
++
 +    static const char *toolNames[]={"Drawing","Rectangle","Line","Freehand","Circle","Arrow","Large eraser","Eraser",
 +        "Coordinate axes","Centered axes","Linear grid","Log X grid","Log Y grid","Log grid","Freehand arrow",
 +        "Pentagon","Hexagon","Centered circle","Section line","Brace","Check mark","Exclamation mark","Question mark",
@@ -96,7 +116,17 @@
      CFont *oldFont=dc.SelectObject((CFont*)CFont::FromHandle((HFONT)::GetStockObject(DEFAULT_GUI_FONT)));
      CSize text=dc.GetTextExtent(label,(int)strlen(label));dc.SelectObject(oldFont);
      int badgeX=max(3,min(bounds.left,client.right-text.cx-12));
-@@ -9756,17 +9794,23 @@
+     int badgeY=bounds.top-text.cy-11;if(badgeY<3)badgeY=min(client.bottom-text.cy-9,bounds.bottom+8);
+     CRect badge(badgeX,badgeY,badgeX+text.cx+10,badgeY+text.cy+6);
+     CRect footprint=bounds;footprint.InflateRect(4,4);
+-    CRect region;region.UnionRect(footprint,badge);region.InflateRect(2,2);region.IntersectRect(region,client);
++    CRect region;region.UnionRect(footprint,badge);
++    if(!carryCard.IsRectEmpty())region.UnionRect(region,carryCard);
++    region.InflateRect(2,2);region.IntersectRect(region,client);
+     if(region.IsRectEmpty())return 0;
+ 
+     // Save only visible canvas pixels: very large objects never require a
+@@ -9756,25 +9816,40 @@
      CBitmap *oldBitmap=buffer.SelectObject(&image);
      buffer.BitBlt(0,0,region.Width(),region.Height(),ClipboardBackground.DC,0,0,SRCCOPY);
      int state=buffer.SaveDC();buffer.SetViewportOrg(-region.left,-region.top);
@@ -121,8 +151,17 @@
 +    }
      buffer.FillSolidRect(badge,RGB(255,255,255));buffer.Draw3dRect(badge,RGB(204,214,222),RGB(204,214,222));
      buffer.SelectStockObject(DEFAULT_GUI_FONT);buffer.SetTextAlign(TA_LEFT|TA_TOP);buffer.SetBkMode(TRANSPARENT);buffer.SetTextColor(RGB(45,55,65));buffer.TextOut(badge.left+5,badge.top+3,label);
++    if(!carryCard.IsRectEmpty()){
++        int cardState=buffer.SaveDC();buffer.FillSolidRect(carryCard,RGB(255,255,255));
++        buffer.Draw3dRect(carryCard,RGB(204,214,222),RGB(204,214,222));
++        buffer.SelectStockObject(DEFAULT_GUI_FONT);buffer.SetTextAlign(TA_LEFT|TA_TOP);
++        buffer.SetBkMode(TRANSPARENT);buffer.SetTextColor(RGB(45,55,65));
++        buffer.TextOut(carryCard.left+7,carryCard.top+5,"Carrying (enlarged)");
++        carriedMath.PaintExpression(&buffer,(short)carryZoom,(short)carryX,(short)carryY);
++        buffer.RestoreDC(cardState);
++    }
      buffer.RestoreDC(state);
-@@ -9774,7 +9818,7 @@
+     dc.BitBlt(region.left,region.top,region.Width(),region.Height(),&buffer,0,0,SRCCOPY);
      buffer.SelectObject(oldBitmap);ClipboardBackground.Restored=0;
      if(getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS")){
          const char *names[]={"Active","Left","Top","Right","Bottom","X","Y","Zoom","Kind"};
@@ -131,7 +170,7 @@
          for(int i=0;i<9;i++){CString key="MathomirPlacement_";key+=names[i];::SetProp(GetSafeHwnd(),key,(HANDLE)(INT_PTR)(values[i]+1));}
      }
      return 1;
-@@ -9783,9 +9827,12 @@
+@@ -9783,9 +9858,12 @@
  
  // Opt-in Windows regression probe. Use the real clipboard-copy paths while
  // keeping test setup independent of the native click-to-copy selection gesture.

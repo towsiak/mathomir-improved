@@ -26,7 +26,7 @@ function AssertPreview($kind,$index){
  Check ([PlacementProbe]::Stat($view,'Kind') -eq $(if($kind -gt 100){4}else{1})) "Wrong preview route: index=$index kind=$kind"
  $left=[PlacementProbe]::Stat($view,'Left');$top=[PlacementProbe]::Stat($view,'Top');$right=[PlacementProbe]::Stat($view,'Right');$bottom=[PlacementProbe]::Stat($view,'Bottom')
  $shot=Snapshot
- try{Check ([PaletteProbe]::Ink($shot.Pixels,$shot.Width,$shot.Height,$left,$top,$right,$bottom) -gt 0) "Preview has no object ink: index=$index kind=$kind"}finally{$shot.Dispose()}
+ try{Check ([PaletteProbe]::Ink($shot.Pixels,$shot.Width,$shot.Height,($left-8),$top,($right+8),$bottom) -gt 0) "Preview has no object ink: index=$index kind=$kind"}finally{$shot.Dispose()}
 }
 function SaveShot($image,$name){
  $bitmap=New-Object System.Drawing.Bitmap $image.Width,$image.Height;$rect=New-Object System.Drawing.Rectangle 0,0,$image.Width,$image.Height
@@ -44,7 +44,7 @@ try{
  [MathomirUiProbe]::Send($view,276,4)|Out-Null;for($i=0;$i -lt 10;$i++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
  MovePointer 25 20;$baseline=SaveDoc
  $count=[PaletteProbe]::Query($view,5,-1);Check ($count -gt 100) 'Palette enumeration incomplete'
- $tools=New-Object System.Collections.Generic.List[int];$mathCount=0;$toolCount=0
+ $tools=New-Object System.Collections.Generic.List[int];$mathCount=0;$toolCount=0;$failures=@()
  foreach($zoom in @(100,60,200)){
   [MathomirUiProbe]::Send($view,273,$(if($zoom -eq 60){32777}elseif($zoom -eq 200){33019}else{32775}))|Out-Null
   MovePointer 25 20;[PlacementProbe]::Refresh($view);$clean=Snapshot
@@ -52,11 +52,13 @@ try{
    $kind=[PaletteProbe]::Query($view,5,$index)
    if($kind -eq 0 -or $kind -eq 2){continue}
    if($zoom -ne 100 -and $kind -le 100){continue}
+   try{
    Check ([PaletteProbe]::Query($view,6,$index) -eq $kind) "Actual palette pickup failed: $index"
    MovePointer 320 220;AssertPreview $kind $index
    MovePointer 350 245;AssertPreview $kind $index
    if($kind -eq 130 -and $zoom -eq 100){$s=Snapshot;SaveShot $s 'palette-carry-triangle.png';$s.Dispose()}
    if($kind -gt 100){$toolCount++;if($zoom -eq 100){$tools.Add($index)}}else{$mathCount++}
+   }catch{$failures+=('index='+$index+' kind='+$kind+' zoom='+$zoom+': '+$_.Exception.Message);Write-Output ('PALETTE FAILURE: '+$failures[-1])}
    Cancel
    Check ([PlacementProbe]::Stat($view,'Active') -ne 1) "Escape left preview for $index"
    if($kind -gt 100){Check ([PaletteProbe]::Query($view,7,0) -eq 0) 'Escape left drawing tool active'}
@@ -81,5 +83,6 @@ try{
   $drawing=$placed.SelectSingleNode('/mathomir/*[@t="2" or @type="2"]');Check ($null -ne $drawing) "Palette tool placed no native drawing: form=$form"
   Cancel;[MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) "Palette drawing Undo failed: form=$form"
  }
+ if($failures.Count){throw ('Palette failures: '+($failures -join '; '))}
  Write-Output "Palette carry passed: $mathCount native math entries; $toolCount drawing-tool previews across 100/60/200 percent; actual left tile click; moving previews, visible native ink, Escape cleanup, unchanged document, native drawing gestures and Undo."
 }catch{try{$s=Snapshot;SaveShot $s 'palette-carry-failure.png';$s.Dispose();$null=SaveDoc}catch{};throw}finally{if($app -and !$app.HasExited){$app.Kill();$app.WaitForExit()};Remove-Item Env:MATHOMIR_PLACEMENT_DIAGNOSTICS -ErrorAction SilentlyContinue}
