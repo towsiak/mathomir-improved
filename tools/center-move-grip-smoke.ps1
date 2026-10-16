@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 public static class CenterGripProbe {
  [StructLayout(LayoutKind.Sequential)] struct BitmapInfo {public uint Size;public int Width,Height;public ushort Planes,BitCount;public uint Compression,SizeImage;public int XPels,YPels;public uint Used,Important;}
+ [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int command);
  [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
  [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr h,IntPtr d);
  [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr d);
@@ -28,13 +29,13 @@ function Label($d){return $d.SelectSingleNode('/mathomir/*[@t="1" or @type="1"]'
 function Drawing($d){return $d.SelectSingleNode('/mathomir/*[@t="2" or @type="2"]')}
 function Scene($name,$objects,$zoom=100){
  $script:fixture=Join-Path $folder ('center-grip-'+$name+'.mom');('<?xml version="1.0"?><mathomir>'+$objects+'</mathomir>')|Set-Content $fixture -Encoding ascii
- [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 180
+ [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 180;[CenterGripProbe]::ShowWindow($main,3)|Out-Null
  [MathomirUiProbe]::Send($view,273,$(if($zoom -eq 60){32777}elseif($zoom -eq 200){33019}else{32775}))|Out-Null
  [MathomirUiProbe]::Send($view,276,4)|Out-Null;for($i=0;$i -lt 10;$i++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
  $script:scale=$zoom/100.0;Start-Sleep -Milliseconds 100
 }
 function Grip($x,$y){[MathomirUiProbe]::Mouse($view,512,0,[int]($x*$scale),[int]($y*$scale));Start-Sleep -Milliseconds 80;$r=[MathomirUiProbe]::ClientRect($view);$points=[CenterGripProbe]::Centers($view,$r.Right,$r.Bottom);Check ($points.Length -eq 3) ('Expected three move grips; found '+$points.Length);return ,$points[1]}
-function Drag($p,$dx,$dy,[switch]$Cancel){[MathomirUiProbe]::Mouse($view,512,0,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,513,1,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,512,1,($p[0]+$dx),($p[1]+$dy));if($Cancel){[MathomirUiProbe]::Send($view,256,27)|Out-Null};[MathomirUiProbe]::Mouse($view,514,0,($p[0]+$dx),($p[1]+$dy))}
+function Drag($p,$dx,$dy,[switch]$Cancel){[MathomirUiProbe]::Mouse($view,512,0,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,513,1,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,512,1,($p[0]+$dx),($p[1]+$dy));if($Cancel){[MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null};[MathomirUiProbe]::Mouse($view,514,0,($p[0]+$dx),($p[1]+$dy))}
 function Double($p){[MathomirUiProbe]::Mouse($view,512,0,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,513,1,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,514,0,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,515,1,$p[0],$p[1]);[MathomirUiProbe]::Mouse($view,514,0,$p[0],$p[1])}
 function Capture($name){$r=[MathomirUiProbe]::WindowRect($main);$im=New-Object System.Drawing.Bitmap ($r.Right-$r.Left),($r.Bottom-$r.Top);$g=[System.Drawing.Graphics]::FromImage($im);$g.CopyFromScreen($r.Left,$r.Top,0,0,$im.Size);$im.Save((Join-Path $folder $name));$g.Dispose();$im.Dispose()}
 try{
@@ -42,6 +43,7 @@ try{
  $bounds=@('-5','5','-5','5')|ForEach-Object{'<subexp d="0,0;2000,704"><ex fh="100"><var t="'+$_+'" f="00" /></ex></subexp>'}
  $graph='<o t="2" X="100" Y="100"><dw spec="51" d="32|32,32;12800,32;:,10240;32,:;:,32" />'+($bounds-join '')+'<subexp d="0,0;4000,1000"><ex fh="100"><var t="x" f="00" /></ex></subexp></o>'
  foreach($text in @($false,$true)){foreach($last in @($false,$true)){foreach($zoom in @(60,100,200)){
+  Write-Output ("Center grip case: text="+$text+", graphLast="+$last+", zoom="+$zoom)
   $note='<o t="1" X="210" Y="220"><ex fh="160"'+$(if($text){' stxt="1"'}else{''})+'><var t="overlaynote" f="00" color="1" /></ex></o>'
   Scene "overlay-$text-$last-$zoom" $(if($last){$note+$graph}else{$graph+$note}) $zoom
   $initial=SaveDoc;$graphXml=(Drawing $initial).OuterXml;$g=Grip 225 212
@@ -52,7 +54,7 @@ try{
   $g=Grip 225 212;Drag $g ([int](24*$scale)) ([int](15*$scale)) -Cancel;$d=SaveDoc;Check ((Label $d).X -eq '210' -and (Label $d).Y -eq '220') 'Escape did not cancel the center move'
   $g=Grip 225 212;Double $g;[MathomirUiProbe]::Send($view,258,[int][char]'Z')|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null;$d=SaveDoc
   Check ($d.mathomir.ChildNodes.Count -eq 2 -and (Drawing $d).OuterXml -eq $graphXml) 'Double-click created another object or edited the graph'
-  $letters=((Label $d).SelectNodes('.//var | .//elm[@tp="1"]')|ForEach-Object{if($_.HasAttribute('t')){$_.t}else{$_.tx}})-join '';Check ($letters.Contains('Z')) 'Double-click did not enter the original text/math object'
+  $letters=((Label $d).SelectNodes('.//var | .//elm[@tp="1"]')|ForEach-Object{if($_.HasAttribute('t')){$_.t}else{$_.tx}})-join '';Check ($letters.Contains('Z')) ('Double-click did not enter the original text/math object: letters='+$letters+' XML='+$d.OuterXml)
  }}}
  # A graph grip must avoid an annotation occupying its exact center.
  $centerNote='<o t="1" X="290" Y="270"><ex fh="160" stxt="1"><var t="overlaynote" f="00" /></ex></o>'
@@ -60,6 +62,7 @@ try{
  # Older annotations remain independently movable over enlarged text.
  foreach($last in @($false,$true)){
   $big='<o t="1" X="100" Y="220"><ex fh="500"><var t="MMMMMMMM" f="00" /></ex></o>'
+  Write-Output ("Center grip case: text="+$text+", graphLast="+$last+", zoom="+$zoom)
   $note='<o t="1" X="210" Y="210"><ex fh="160" stxt="1"><var t="overlaynote" f="00" /></ex></o>'
   Scene ('large-text-'+$last) $(if($last){$note+$big}else{$big+$note});$before=SaveDoc;$rootXml=$before.SelectSingleNode('/mathomir/*[.//var[@t="MMMMMMMM"] or .//elm[@tx="MMMMMMMM"]]').OuterXml;$g=Grip 225 202;Drag $g 30 20;$d=SaveDoc;$small=$d.SelectSingleNode('/mathomir/*[.//var[@t="overlaynote"] or .//elm[@tx="overlaynote"]]');Check ($small.X -eq '240' -and $small.Y -eq '230') 'Enlarged text stole the label center grip';Check ($d.SelectSingleNode('/mathomir/*[.//var[@t="MMMMMMMM"] or .//elm[@tx="MMMMMMMM"]]').OuterXml -eq $rootXml) 'Moving the label altered enlarged text'
  }

@@ -113,6 +113,7 @@ jobs:
           name: Enlarged-Overlap-Preview
           path: |
             source/build/center-move-grip*
+            source/build/center-grip-*.mom
             source/build/enlarged-overlap-ui.png
             source/build/large-resize-grip-ui.png
             source/build/sparse-stroke-ui.png
@@ -248,6 +249,7 @@ jobs:
             source/build/large-resize-grip-*.mom
             source/build/enlarged-hit-diagnostics.txt
             source/build/center-move-grip*
+            source/build/center-grip-*.mom
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom
             source/build/ai-help-ui.png
@@ -389,6 +391,7 @@ jobs:
             source/build/large-resize-grip-*.mom
             source/build/enlarged-hit-diagnostics.txt
             source/build/center-move-grip*
+            source/build/center-grip-*.mom
             source/build/enlarged-overlap-ui.png
             source/build/enlarged-overlap-*.mom
             source/build/ai-help-ui.png
