@@ -76,6 +76,15 @@
      delete SizingDrawingSnapshot; SizingDrawingSnapshot=NULL;
      RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
  }
+@@ -13688,7 +13685,7 @@
+     if(first<0||last<first||(!forContext&&KeyboardEntryObject&&!keyboardSelection)){HideSelectionApproxPanel();return;}
+     CExpression input(NULL,NULL,selected->m_FontSize);input.Delete();for(int i=first;i<=last;i++)input.InsertElement(selected->m_pElementList+i,input.m_NumElements);
+     // A saved equation is evaluated from its original left side.
+-    if(selected==root&&first==0)for(int i=0;i<input.m_NumElements;i++)if(input.m_pElementList[i].Type==2&&(input.m_pElementList[i].pElementObject->Data1[0]=='='||input.m_pElementList[i].pElementObject->Data1[0]==(char)0xBB)){while(input.m_NumElements>i)input.DeleteElement(i);break;}
++    if(selected==root&&first==0)for(int i=0;i<input.m_NumElements;i++)if(input.m_pElementList[i].Type==2&&(input.m_pElementList[i].pElementObject->Data1[0]=='='||input.m_pElementList[i].pElementObject->Data1[0]==(char)0xBB)){if(i==0){HideSelectionApproxPanel();return;}while(input.m_NumElements>i)input.DeleteElement(i);break;}
+     try{std::string formula=NativeSymbolic::Formula(&input);SymbolicDerivative::Parser parser;auto parsed=parser.Parse(formula);extern int TrigDegrees;double value=SymbolicDerivative::Value(parsed,"",0,TrigDegrees==0);if(!SymbolicDerivative::Finite(value)){HideSelectionApproxPanel();return;}
+         ShowFeatureCanvasHint(0,NULL);if(CanvasHints.Handle())::SendMessage(CanvasHints.Handle(),TTM_POP,0,0);
+         
 --- /dev/null
 +++ b/Mathomir/MouseResizeFonts.h
 @@ -0,0 +1,48 @@
