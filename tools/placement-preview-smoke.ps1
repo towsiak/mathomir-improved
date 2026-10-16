@@ -22,6 +22,9 @@ public static class PlacementProbe {
  [StructLayout(LayoutKind.Sequential)] struct Info {public uint Size;public int Width,Height;public ushort Planes,BitCount;public uint Compression,SizeImage;public int XPels,YPels;public uint Used,Important;}
  [DllImport("gdi32.dll")] static extern int GetDIBits(IntPtr d,IntPtr bmp,uint start,uint lines,int[] data,ref Info info,uint use);
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int command);
+ [DllImport("user32.dll")] static extern bool RedrawWindow(IntPtr h,IntPtr rect,IntPtr region,uint flags);
+ public static void Refresh(IntPtr h){if(!RedrawWindow(h,IntPtr.Zero,IntPtr.Zero,0x121))throw new Exception("Canvas refresh failed");}
+
  public static int Stat(IntPtr h,string key){return GetPropA(h,"MathomirPlacement_"+key).ToInt32()-1;}
  public static PlacementSnapshot Capture(IntPtr h,int w,int height){
   IntPtr screen=GetDC(h),buffer=CreateCompatibleDC(screen),bitmap=CreateCompatibleBitmap(screen,w,height),old=SelectObject(buffer,bitmap);
@@ -44,6 +47,15 @@ function Check($ok,$message){if(!$ok){throw $message}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $script:fixture -Raw)}
 function Click($x,$y){[MathomirUiProbe]::Mouse($view,512,0,$x,$y);[MathomirUiProbe]::Mouse($view,513,1,$x,$y);[MathomirUiProbe]::Mouse($view,514,0,$x,$y)}
 function Capture {return [PlacementProbe]::Capture($view,$width,$height)}
+function WaitRender {
+ for($wait=0;$wait -lt 150;$wait++){
+  [PlacementProbe]::Refresh($view)
+  if([MathomirUiProbe]::Send($view,(0x8000+156),3) -eq 0){[PlacementProbe]::Refresh($view);return}
+  Start-Sleep -Milliseconds 30
+ }
+ throw 'Native graph rendering did not finish'
+}
+
 function SaveShot($snapshot,$path){
  $bitmap=New-Object System.Drawing.Bitmap $snapshot.Width,$snapshot.Height
  $rectangle=New-Object System.Drawing.Rectangle 0,0,$snapshot.Width,$snapshot.Height
@@ -94,6 +106,7 @@ try {
   @{name='rotated';objects='<o t="1" X="80" Y="150"><ex fh="300" rot_mdeg="17500"><var t="rotation" f="00" /></ex></o>';kind=1},
   @{name='text';objects='<o t="1" X="80" Y="120"><ex fh="300" stxt="1"><var t="Preview" f="00" /></ex></o>';kind=1},
   @{name='shape';objects=$shape;kind=2},
+  @{name='thick-strokes';objects=$shape.Replace('32|','1024|');kind=2},
   @{name='graph';objects=$graph;kind=2},
   @{name='mixed-group';objects=$shape+'<o t="1" X="85" Y="160"><ex fh="180">'+$power+'</ex></o>';kind=2}
  )
@@ -107,33 +120,38 @@ try {
   Scene $case $zoom;$baseline=SaveDoc;$originalCount=$baseline.SelectNodes('/mathomir/*').Count
   Grab $case.kind
   $x=570;$y=350
-  [MathomirUiProbe]::Mouse($view,512,0,$x,$y);Start-Sleep -Milliseconds 100
+  [MathomirUiProbe]::Mouse($view,512,0,$x,$y);WaitRender
   Check ([PlacementProbe]::Stat($view,'Active') -eq 1) ('No live preview after grabbing '+$case.name+' at '+$zoom)
   Check ([PlacementProbe]::Stat($view,'Kind') -eq $case.kind) ('Unexpected preview mode for '+$case.name)
   Check ([PlacementProbe]::Stat($view,'Zoom') -eq $zoom) 'Preview silently changed zoom'
   $left=[PlacementProbe]::Stat($view,'Left');$top=[PlacementProbe]::Stat($view,'Top');$right=[PlacementProbe]::Stat($view,'Right');$bottom=[PlacementProbe]::Stat($view,'Bottom')
   $docX=[PlacementProbe]::Stat($view,'X');$docY=[PlacementProbe]::Stat($view,'Y')
   Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) ('Hover changed the document: '+$case.name)
-  $before=Capture
+  WaitRender;$before=Capture
   if($case.name -eq 'large-math' -and $zoom -eq 200){SaveShot $before (Join-Path $folder 'placement-preview-before.png')}
   Click $x $y
   [MathomirUiProbe]::Mouse($view,512,0,25,20);Start-Sleep -Milliseconds 100
-  $placed=SaveDoc;$after=Capture
+  $placed=SaveDoc;WaitRender;$after=Capture
   try{
    Check ($placed.SelectNodes('/mathomir/*').Count -eq 2*$originalCount) ('Placement changed object count: '+$case.name+' '+$placed.OuterXml)
    if($case.kind -eq 1){$last=$placed.mathomir.LastChild;Check ([int]$last.X -eq $docX -and [int]$last.Y -eq $docY) ('Preview and committed anchors differ: '+$placed.OuterXml)}
    $comparison=[PlacementProbe]::Compare($before,$after,$left,$top,$right,$bottom)
    Check ($comparison[0] -gt 15) ('Preview has no useful ink: '+$case.name)
+   if($comparison[1] -gt [Math]::Max(3,0.05*$comparison[0])){SaveShot $before (Join-Path $folder ('placement-preview-before-'+$case.name+'-'+$zoom+'.png'));SaveShot $after (Join-Path $folder ('placement-preview-after-'+$case.name+'-'+$zoom+'.png'))}
    Check ($comparison[1] -le [Math]::Max(3,0.05*$comparison[0])) ('Preview differs from placed pixels: '+$case.name+' zoom='+$zoom+' ink='+$comparison[0]+' mismatch='+$comparison[1])
    if($case.name -eq 'large-math' -and $zoom -eq 200){SaveShot $after (Join-Path $folder 'placement-preview-after.png')}
   }finally{$before.Dispose();$after.Dispose()}
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
   Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) ('Undo did not restore placement: '+$case.name)
+  WaitRender;$cancelBase=Capture
   Grab $case.kind;[MathomirUiProbe]::Mouse($view,512,0,$x,$y)
   [MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null
   [MathomirUiProbe]::Mouse($view,512,0,25,20)
   Check ([PlacementProbe]::Stat($view,'Active') -ne 1) 'Escape left a live preview'
   Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) 'Cancel inserted or changed an object'
+  WaitRender;$cancelled=Capture
+  try{$clean=[PlacementProbe]::Compare($cancelBase,$cancelled,0,0,$width,$height);Check ($clean[1] -le 3) ('Cancelled preview left ink or changed the canvas: '+$case.name+' pixels='+$clean[1])}finally{$cancelBase.Dispose();$cancelled.Dispose()}
+
   Write-Output ('Placement preview passed: '+$case.name+' at '+$zoom+'%, native pixel match, unchanged hover, Undo and Escape.')
   }catch{
    $failure=$case.name+' at '+$zoom+': '+$_.Exception.Message;$failures+=$failure;Write-Output ('PREVIEW FAILURE: '+$failure)
@@ -143,7 +161,7 @@ try {
  }}
  Grid 0 0;Scene $originalCases[0] 100;$baseline=SaveDoc
  $sourceImage=Capture;try{$ink=[PlacementProbe]::FirstInk($sourceImage)}finally{$sourceImage.Dispose()}
- Grab 1;[MathomirUiProbe]::Mouse($view,512,0,$ink[0],$ink[1]);Start-Sleep -Milliseconds 100
+ Grab 1;[MathomirUiProbe]::Mouse($view,512,0,$ink[0],$ink[1]);WaitRender
  Check ([PlacementProbe]::Stat($view,'Kind') -eq 3) 'Existing math did not get a labelled compact insertion preview'
  Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) 'Insertion preview changed native math'
  [MathomirUiProbe]::Send($view,256,27)|Out-Null
