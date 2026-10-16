@@ -9,7 +9,23 @@
  static CDrawing *SizingDrawingSnapshot=NULL;
  static int SizingStartX,SizingStartY,SizingFontSize;
  static double SizingAnchorX,SizingAnchorY,SizingVectorX,SizingVectorY,SizingScale;
-@@ -11255,6 +11255,7 @@
+@@ -670,6 +670,15 @@
+     int best=INT_MAX;bool found=false;
+     for(int k=0;k<9;k++){
+         CPoint candidate(cx+offsets[k][0]*dx,cy+offsets[k][1]*dy);
++        // Tiny symbols must keep distinct resize/delete/rotate hit areas. If
++        // the center has no room, retain the existing outer move controls.
++        CPoint controls[]={ResizeHandlePoint(object),DeleteGripPoint(object),
++            MoveGripPoint(object),LowerMoveGripPoint(object),
++            CPoint((object->absolute_X+object->Length-ViewX)*ViewZoom/100+10,
++                (object->absolute_Y-object->Above-ViewY)*ViewZoom/100-10)};
++        bool controlOverlap=false;
++        for(int n=0;n<5;n++)if(abs(candidate.x-controls[n].x)<=20 && abs(candidate.y-controls[n].y)<=20){controlOverlap=true;break;}
++        if(controlOverlap)continue;
+         CRect handle(candidate.x-10,candidate.y-10,candidate.x+11,candidate.y+11);
+         bool covered=false;
+         for(int i=NumDocumentElements-1;i>=0;i--){
+@@ -11255,6 +11264,7 @@
      if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
      if (KeyboardEntryObject) { ((CExpression*)KeyboardEntryObject)->KeyboardStop(); KeyboardEntryObject=NULL; KeyboardEntryBaseObject=NULL; }
      FunctionHelpText.Empty(); LastQuickTypeObject=NULL;
@@ -17,7 +33,7 @@
      if(IsGraphObject(object) && !((CFunctionPlotter*)((CDrawing*)object->Object)->SpecialData)->StopForZoom())return false;
      SizingStartX=object->absolute_X; SizingStartY=object->absolute_Y;
      SizingAnchorX=object->absolute_X; SizingAnchorY=object->absolute_Y-object->Above;
-@@ -11265,9 +11266,7 @@
+@@ -11265,9 +11275,7 @@
      {
          CExpression *expression=(CExpression*)object->Object;
          SizingFontSize=expression->m_FontSize;
@@ -28,7 +44,7 @@
      }
      else { SizingDrawingSnapshot=new CDrawing(); SizingDrawingSnapshot->CopyDrawing((CDrawing*)object->Object); }
      UndoSave("resize with grip",20506);
-@@ -11286,19 +11285,18 @@
+@@ -11286,19 +11294,18 @@
      if(flags&MK_SHIFT)delta/=4.0;
      double scale=max(0.05,min(8.0,1.0+delta));
      short length,above=0,below; CClientDC dc(this);
@@ -54,7 +70,7 @@
          expression->CalculateSize(&dc,ViewZoom,&length,&above,&below);
          object->absolute_Y=(int)SizingAnchorY+above*100/ViewZoom;
      }
-@@ -11319,18 +11317,17 @@
+@@ -11319,18 +11326,17 @@
      tDocumentStruct *object=ResizeHandleDocument();
      if (cancel && object)
      {
@@ -76,7 +92,7 @@
      delete SizingDrawingSnapshot; SizingDrawingSnapshot=NULL;
      RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
  }
-@@ -13688,7 +13685,7 @@
+@@ -13688,7 +13694,7 @@
      if(first<0||last<first||(!forContext&&KeyboardEntryObject&&!keyboardSelection)){HideSelectionApproxPanel();return;}
      CExpression input(NULL,NULL,selected->m_FontSize);input.Delete();for(int i=first;i<=last;i++)input.InsertElement(selected->m_pElementList+i,input.m_NumElements);
      // A saved equation is evaluated from its original left side.
