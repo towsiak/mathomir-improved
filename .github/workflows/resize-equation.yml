@@ -94,6 +94,7 @@ jobs:
           name: Equation-Resize-Diagnostics-${{ matrix.resize_patch }}
           path: |
             source/build/resize-equation-*.mom
+            source/build/resize-equation-ui.png
             source/build/center-move-grip-trace.txt
             source/build/Mathomir.exe
           if-no-files-found: warn

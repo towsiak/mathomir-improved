@@ -35,7 +35,7 @@ try{
   $body=$case.body
   # Scale all authored child fonts together, retaining radical/power proportions.
   $body=[regex]::Replace($body,'fh="(\d+)"',{param($m)'fh="'+[int]([int]$m.Groups[1].Value*$font/100)+'"'})
-  ('<?xml version="1.0"?><mathomir><o t="1" X="40" Y="180"><ex fh="'+$font+'">'+$body+'</ex></o></mathomir>')|Set-Content $fixture -Encoding ascii
+  ('<?xml version="1.0"?><mathomir><o t="1" X="100" Y="180"><ex fh="'+$font+'">'+$body+'</ex></o></mathomir>')|Set-Content $fixture -Encoding ascii
   [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 150
   [MathomirUiProbe]::Send($view,273,$(if($zoom -eq 60){32777}elseif($zoom -eq 200){33019}else{32775}))|Out-Null
   [MathomirUiProbe]::Send($view,276,4)|Out-Null;for($i=0;$i -lt 10;$i++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
@@ -53,4 +53,12 @@ try{
   Write-Output ('Passed resize: '+$case.name+' font='+$font+' zoom='+$zoom)
  }}}
  Write-Output 'Equation resizing passed: equals, equations, roots/powers/primes, operator labels; 36 cases; grow/shrink/Undo/Escape/content preservation.'
-}finally{if(!$app.HasExited){$app.Kill();$app.WaitForExit()}}
+ }finally{
+ if($main -and !$app.HasExited){
+  Add-Type -AssemblyName System.Drawing
+  $r=[MathomirUiProbe]::WindowRect($main);$image=New-Object System.Drawing.Bitmap ($r.Right-$r.Left),($r.Bottom-$r.Top)
+  $graphics=[System.Drawing.Graphics]::FromImage($image)
+  try{$graphics.CopyFromScreen($r.Left,$r.Top,0,0,$image.Size);$image.Save((Join-Path $folder 'resize-equation-ui.png'))}finally{$graphics.Dispose();$image.Dispose()}
+ }
+ if(!$app.HasExited){$app.Kill();$app.WaitForExit()}
+}
