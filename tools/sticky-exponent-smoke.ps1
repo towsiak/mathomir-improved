@@ -1,6 +1,14 @@
 $ErrorActionPreference='Stop'
 $all=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
 Invoke-Expression $all.Substring(0,$all.IndexOf('$exe ='))
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class ExponentKeys {
+ [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr w,uint m,IntPtr wp,IntPtr lp,uint f,uint ms,out UIntPtr result);
+ public static void Right(IntPtr w){UIntPtr result;if(SendMessageTimeout(w,256,(IntPtr)39,(IntPtr)0x01000001,2,3000,out result)==IntPtr.Zero)throw new Exception("Right arrow stalled");}
+}
+'@
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
 $appProcess=Start-Process $exe -WorkingDirectory (Split-Path $exe) -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
@@ -69,7 +77,7 @@ try {
  [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 400
  [MathomirUiProbe]::Mouse($view,512,0,250,180);[MathomirUiProbe]::Mouse($view,513,1,250,180);[MathomirUiProbe]::Mouse($view,514,0,250,180)
  TypeMath 'x^2';$null=AssertExponent (SavedRoot) '2'
- [MathomirUiProbe]::Send($view,256,39)|Out-Null;TypeMath '+7'
+ [ExponentKeys]::Right($view);TypeMath '+7'
  $root=SavedRoot
  Check ((Variables $root.SelectSingleNode('./elm[@tp="3"]/*[self::ex or self::expr][2]')) -eq '2') ('Right arrow did not leave the exponent: '+$root.OuterXml)
  Check ($null -ne $root.SelectSingleNode('./opr[@s="+"] | ./elm[@tp="2"][@stp="+"]')) ('Right arrow did not resume baseline operators: '+$root.OuterXml)
