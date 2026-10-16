@@ -22,7 +22,7 @@ public static class LargeGripProbe {
   BitBlt(mem,0,0,width,height,dc,0,0,0x00cc0020);SelectObject(mem,old);old=IntPtr.Zero;
   byte[] pixels=new byte[width*height*4];BitmapInfo info=new BitmapInfo{Size=40,Width=width,Height=-height,Planes=1,BitCount=32};
   if(GetDIBits(dc,bmp,0,(uint)height,pixels,ref info,0)==0)throw new Exception("Could not capture the canvas.");
-  if(ink){for(int y=40;y<height-20;y++)for(int x=40;x<width-30;x++){int i=(y*width+x)*4;if((pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)||(pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180))return new int[]{x,y};}throw new Exception("No visible equation ink for hover.");}
+  if(ink){int[] blue=null;for(int y=40;y<height-20;y++)for(int x=40;x<width-30;x++){int i=(y*width+x)*4;if(pixels[i]<30&&pixels[i+1]<30&&pixels[i+2]<30)return new int[]{x,y};if(blue==null&&pixels[i]>220&&pixels[i+1]<180&&pixels[i+2]<180)blue=new int[]{x,y};}if(blue!=null)return blue;throw new Exception("No visible equation ink for hover.");}
   for(int y=8;y<height-12;y++)for(int x=8;x<width-12;x++){if(!Blue(pixels,width,x,y))continue;bool square=true;for(int k=0;k<13;k++)if(!Blue(pixels,width,x+k,y)||!Blue(pixels,width,x,y+k)||!Blue(pixels,width,x+12,y+k)){square=false;break;}if(square)return new int[]{x+6,y+6};}
   throw new Exception("Visible resize grip was not found.");
  }finally{if(old!=IntPtr.Zero)SelectObject(mem,old);DeleteObject(bmp);DeleteDC(mem);ReleaseDC(h,dc);}}
