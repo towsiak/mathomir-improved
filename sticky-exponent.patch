@@ -1,0 +1,23 @@
+--- a/Mathomir/Expression.cpp
++++ b/Mathomir/Expression.cpp
+@@ -8948,18 +8948,8 @@
+ 				return 1;
+ 			}
+ 
+-            // In typed caret notation, an operator after a simple exponent
+-            // resumes the baseline. Group longer exponents explicitly: ^(...).
+-            if((ch=='+' || ch=='-' || ch=='*' || ch=='/') && m_pPaternalElement &&
+-                m_pPaternalElement->m_Type==3 && m_pPaternalElement->Expression2==(CObject*)this &&
+-                m_pPaternalExpression && !m_DrawParentheses && !IsEditedVariableEmpty){
+-                double exponentValue;int exponentPrecision;
+-                bool simple=IsPureNumber(0,m_NumElements,&exponentValue,&exponentPrecision)!=0;
+-                if(m_NumElements==1 && m_pElementList[0].Type==1 && m_pElementList[0].pElementObject &&
+-                    strlen(m_pElementList[0].pElementObject->Data1)==1 && !m_pElementList[0].pElementObject->Expression1 && !m_pElementList[0].pElementObject->Expression2)simple=true;
+-                if(simple){CExpression *baseline=m_pPaternalExpression;for(int j=0;j<baseline->m_NumElements;j++)
+-                    if(baseline->m_pElementList[j].pElementObject==m_pPaternalElement){KeyboardRefocus(baseline,j+1);return baseline->KeyboardKeyHit(DC,zoom,nChar,nRptCnt,nFlags,fcolor,0);}}
+-            }
++            // Operators stay in the active exponent. Enter, navigation or a
++            // deliberate click changes the editing level.
+ 			if ((m_pPaternalElement) && (m_pPaternalElement->IsDifferential(1)))
+ 			{
+ 				//inside differentials, any operator automatically exits the differential argument //BABA2

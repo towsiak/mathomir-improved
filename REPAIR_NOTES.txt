@@ -1,3 +1,11 @@
+EXPONENT TYPING (2026-10-16)
+- Arithmetic operators no longer leave a simple exponent automatically. After
+  typing x^1, /2 stays in the exponent, as do +, - and *. Press Enter, navigate
+  out, or click elsewhere to change the editing level. Closing an explicit
+  exponent group such as x^(1/2) retains its existing exit behavior.
+- Windows tests check fractional and multi-term exponents, idle/hover, Enter
+  and right-arrow exits, and subsequent baseline typing.
+
 CENTER MOVE GRIPS AND EQUATION RESIZING (2026-10-15)
 - A fixed-size central move compass appears on hovered objects. It seeks nearby
   whitespace and avoids foreground annotations. Existing corner grips remain.

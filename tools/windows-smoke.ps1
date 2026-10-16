@@ -595,9 +595,9 @@ try {
   if(($approxUndo.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]').OuterXml) -match '20\.422410804'){throw 'Undo did not remove the appended approximation.'}
   Write-Output 'Direct operations passed: Ctrl+Enter derivative with original = result, no duplicate result on re-execution, Ctrl+Shift+Enter e^pi-e approximation, and Undo.'
 
-  # Enter the user's literal examples through WM_CHAR while editing.
+  # Type native math through WM_CHAR; Enter explicitly leaves the x^2 exponent.
   $typedFailures=@()
-  foreach($typedCase in @(@{input='e^(pi)-e';approx=$true},@{input='d/dx(x^2+sin(x)+ln(x))';approx=$false})) {
+  foreach($typedCase in @(@{input='e^(pi)-e';approx=$true},@{input="d/dx(x^2`r+sin(x)+ln(x))";approx=$false})) {
     $typedFixture=Join-Path (Split-Path $exe) ('typed-operation-'+$typedCase.approx+'-smoke.mom')
     '<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $typedFixture -Encoding ascii
     [MathomirUiProbe]::OpenFile($main,$typedFixture);Start-Sleep -Milliseconds 400
@@ -612,7 +612,7 @@ try {
     else{if(!$typedRoot.SelectSingleNode('./opr[@s="="] | ./elm[@tp="2"][@stp="="]') -or !$typedRoot.SelectSingleNode('.//fun[@t="cos"] | .//elm[@tp="6"][@tx="cos"]')){Write-Output $typedRoot.OuterXml;$typedFailures+=$typedCase.input;continue}}
   }
   if($typedFailures.Count){throw ('Literal keyboard failures: '+($typedFailures -join '; '))}
-  Write-Output 'Literal keyboard input passed: e^(pi)-e and d/dx(x^2+sin(x)+ln(x)) execute directly while editing.'
+  Write-Output 'Keyboard input passed: e^(pi)-e and d/dx(x^2[Enter]+sin(x)+ln(x)) execute directly while editing.'
   if($autoStrokeFailed){throw 'Automatic smart smoothing failed to create a native saved curve.'}
 
 
