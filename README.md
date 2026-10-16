@@ -115,3 +115,20 @@ Click **Grid…** on the toolbar or choose **Options > Grid and Guidelines > Gri
 Horizontal ruling snaps only the vertical coordinate; vertical ruling snaps only the horizontal coordinate. Isometric mode snaps to the nearest triangle vertex. Hold **Alt** for temporary free placement. Hiding the grid temporarily disables snapping, while preserving each style’s checkbox. The grid is a screen guide; it is not inserted into the document or printed.
 
 Graph/text interaction repair (2026-10-09): annotations take click and hover priority above all graphs, including graphs created later. Clicks refresh their current target. A small approach area keeps annotation handles available while crossing to them. Graph grips do not capture overlying text blocks. Direct updates to graphs or overlapping objects use the document compositor, preserving labels and drawing layers. Native Windows checks cover math/text, both creation orders, 60/100/200 percent zoom, drag/save/Undo, approach-gap stability, and clicks over covered graph controls.
+
+
+## Central move grip and equation resize update
+
+Hovered objects now have a central move compass that avoids nearby foreground
+annotations. Drag it to move, or double-click to edit that exact object. A small
+click or jitter does not move it or create an Undo record. Existing corner grips,
+Escape cancellation, native graph formula editing and shape node editing remain.
+
+Equation resizing now changes the live font tree in place rather than deleting
+and copying nested expressions on every mouse event. This preserves internal
+editing references and exact authored child sizes. The added native Windows
+checks cover equals signs, roots, powers, prime marks and operator labels across
+three font sizes and three zoom levels. The new test reproduced an infinite
+approximation-helper deletion loop on a standalone equals sign; an empty left
+side is now rejected before deletion. Small symbols also keep their resize,
+delete and rotation controls clear of the central move grip.

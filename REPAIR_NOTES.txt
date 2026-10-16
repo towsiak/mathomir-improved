@@ -1,3 +1,23 @@
+CENTER MOVE GRIPS AND EQUATION RESIZING (2026-10-15)
+- A fixed-size central move compass appears on hovered objects. It seeks nearby
+  whitespace and avoids foreground annotations. Existing corner grips remain.
+- The center control also avoids resize, delete and rotation controls. Tiny
+  symbols with no free central space retain their existing outer move grips.
+- Drag beyond the normal click threshold to move; a click or small jitter does
+  not move the object or consume Undo. Escape restores its starting position.
+- Double-click the center compass to edit that exact math/text object, a graph's
+  formula, or a shape's native nodes. Overlaid labels retain independent controls.
+- Equation resizing now changes the existing font tree in place. It no longer
+  deletes and reconstructs roots, powers, fractions and operators per mouse event.
+  Exact authored sizes are retained for repeated updates and Escape cancellation;
+  old caret/long-click references are cleared before starting a size gesture.
+- Added Windows regression cases for equals alone, x=2, the radical/power/prime
+  form shown in the report, and an equals sign carrying an upper label, at three
+  font sizes and three zoom levels. The screenshot establishes a Windows hang;
+  hovering a standalone equals sign reproduced an endless approximation-helper
+  loop before resizing. An empty left side is now rejected before deletion.
+  These tests do not prove every possible cause of the reported hang is covered.
+
 Page grids in print preview and printing — 2026-10-10
 - Visible dots, square grids, graph paper, ruling and isometric grids now render
   behind page content in both print preview and printed output.

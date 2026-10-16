@@ -1,6 +1,5 @@
-name: Equation resize reproduction
+name: Equation resize regression
 on:
-  push:
   workflow_dispatch:
 permissions:
   contents: read
