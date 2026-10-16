@@ -204,7 +204,7 @@
                  CPoint cursor;::GetCursorPos(&cursor);ScreenToClient(&cursor);CRect area(cursor.x-12,cursor.y-12,cursor.x+13,cursor.y+13);
                  CanvasHints.Hover(GetSafeHwnd(),(int)(INT_PTR)TouchedObject->Object,area,help);CanvasHintVersion++;
              }
-@@ -4941,6 +5040,13 @@
+@@ -4941,6 +5040,14 @@
  
  	this->ReleaseDC(DC);
  	if(!(nFlags&MK_LBUTTON))UpdateSelectionApproxPanel(point);
@@ -212,13 +212,14 @@
 +    // math (for example an exponent). Only its click/drag owns the gesture.
 +    if(MouseMode==0 && !ViewOnlyMode && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing &&
 +        !(nFlags&(MK_LBUTTON|MK_RBUTTON|MK_CONTROL|MK_SHIFT)) && CenterMoveGripHit(ResizeHandleDocument(),point)){
-+        ShowFeatureCanvasHint(6,"Drag the center grip to move this object. Double-click it to edit. Escape cancels a move.");
++        // Keep the native object's help (including nested function names). Its
++        // controls paragraph already explains center dragging and double-click.
 +        SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
 +    }
  	CView::OnMouseMove(nFlags, point);
  	}
  	catch(...)
-@@ -5348,6 +5454,7 @@
+@@ -5348,6 +5455,7 @@
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -226,7 +227,7 @@
      if(KeyboardEntryObject||nChar==27)ExplicitTypingRoot=NULL;
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
      if(nChar==1 && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000))return;
-@@ -5435,6 +5542,7 @@
+@@ -5435,6 +5543,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -234,7 +235,7 @@
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
      if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
      if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
-@@ -8596,7 +8704,13 @@
+@@ -8596,7 +8705,13 @@
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -248,7 +249,7 @@
      if (MouseMovingActive) { UpdateGripMove(point); EndGripMove(false); return; }
      if (MouseSizingActive) { UpdateMouseSizing(point,nFlags); EndMouseSizing(false); return; }
  
-@@ -10981,7 +11095,55 @@
+@@ -10981,7 +11096,55 @@
          if (TheDocument[i].Object==MoveGripObject) return TheDocument+i;
      return NULL;
  }
@@ -305,7 +306,7 @@
  {
      tDocumentStruct *object=ResizeHandleDocument();
      if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || ClipboardExpression || ClipboardDrawing) return false;
-@@ -10989,14 +11151,17 @@
+@@ -10989,14 +11152,17 @@
      CPoint lower=LowerMoveGripPoint(object);
      bool upperHit=abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9;
      bool lowerHit=abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9;
@@ -326,7 +327,7 @@
      FreePlacementGesture=false; SetCapture(); SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
      return true;
  }
-@@ -11004,19 +11169,30 @@
+@@ -11004,19 +11170,30 @@
  {
      tDocumentStruct *object=MoveGripDocument();
      if (!object) { EndGripMove(true); return; }
@@ -362,7 +363,7 @@
      if (GetCapture()==this) ReleaseCapture();
      RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
  }
-@@ -11024,9 +11200,9 @@
+@@ -11024,9 +11201,9 @@
  {
      tDocumentStruct *object=ResizeHandleDocument();
      if (!object || object->MovingDotState==5) return;
@@ -374,7 +375,7 @@
      int saved=dc->SaveDC(); CPen pen(PS_SOLID,1,RGB(45,95,155));
      dc->SelectObject(&pen); dc->FillSolidRect(p.x-8,p.y-8,17,17,RGB(255,255,255));
      dc->MoveTo(p.x-6,p.y); dc->LineTo(p.x+7,p.y);
-@@ -11045,6 +11221,7 @@
+@@ -11045,6 +11222,7 @@
  void CMathomirView::PaintSizeHandle(CDC *dc)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -382,7 +383,7 @@
      if (!object || object->MovingDotState==5 || (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object))) return;
      CPoint point=ResizeHandlePoint(object);
      CPen pen(PS_SOLID,1,RGB(45,95,155)); CBrush brush(RGB(255,255,255));
-@@ -11067,6 +11244,7 @@
+@@ -11067,6 +11245,7 @@
  bool CMathomirView::BeginMouseSizing(CPoint point)
  {
      tDocumentStruct *object=ResizeHandleDocument();
