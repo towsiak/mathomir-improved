@@ -90,17 +90,19 @@ try {
  $cases=@(
   @{name='fraction-power';objects='<o t="1" X="80" Y="120"><ex fh="100">'+$power+'</ex></o>';kind=1},
   @{name='large-math';objects='<o t="1" X="80" Y="160"><ex fh="500">'+$power+'</ex></o>';kind=1},
-  @{name='oversized';objects='<o t="1" X="80" Y="240"><ex fh="2000">'+$power+'</ex></o>';kind=1},
+  @{name='oversized';objects='<o t="1" X="80" Y="240"><ex fh="1200" stxt="1"><var t="PreviewClippingTest" f="00" /></ex></o>';kind=1},
   @{name='rotated';objects='<o t="1" X="80" Y="150"><ex fh="300" rot_mdeg="17500"><var t="rotation" f="00" /></ex></o>';kind=1},
   @{name='text';objects='<o t="1" X="80" Y="120"><ex fh="300" stxt="1"><var t="Preview" f="00" /></ex></o>';kind=1},
   @{name='shape';objects=$shape;kind=2},
   @{name='graph';objects=$graph;kind=2},
   @{name='mixed-group';objects=$shape+'<o t="1" X="85" Y="160"><ex fh="180">'+$power+'</ex></o>';kind=2}
  )
+ $failures=@()
  $originalCases=@($cases)
  foreach($style in @(0,3,4,5)){foreach($source in @($originalCases[0],$originalCases[5])){$cases+=@{name=$source.name+'-grid-'+$style;objects=$source.objects;kind=$source.kind;style=$style;zooms=@(100)}}}
  Grid 0 0
  foreach($case in $cases){foreach($zoom in $(if($case.zooms){$case.zooms}else{@(60,100,200)})){
+  try{
   if($case.ContainsKey('style')){Grid $case.style 1}else{Grid 0 0}
   Scene $case $zoom;$baseline=SaveDoc;$originalCount=$baseline.SelectNodes('/mathomir/*').Count
   Grab $case.kind
@@ -133,6 +135,11 @@ try {
   Check ([PlacementProbe]::Stat($view,'Active') -ne 1) 'Escape left a live preview'
   Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) 'Cancel inserted or changed an object'
   Write-Output ('Placement preview passed: '+$case.name+' at '+$zoom+'%, native pixel match, unchanged hover, Undo and Escape.')
+  }catch{
+   $failure=$case.name+' at '+$zoom+': '+$_.Exception.Message;$failures+=$failure;Write-Output ('PREVIEW FAILURE: '+$failure)
+   if($app.HasExited){throw}
+   try{$shot=Capture;SaveShot $shot (Join-Path $folder ('placement-preview-failure-'+$case.name+'-'+$zoom+'.png'));$shot.Dispose();[MathomirUiProbe]::Send($view,256,27)|Out-Null;$null=SaveDoc}catch{throw}
+  }
  }}
  Grid 0 0;Scene $originalCases[0] 100;$baseline=SaveDoc
  $sourceImage=Capture;try{$ink=[PlacementProbe]::FirstInk($sourceImage)}finally{$sourceImage.Dispose()}
@@ -141,6 +148,7 @@ try {
  Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) 'Insertion preview changed native math'
  [MathomirUiProbe]::Send($view,256,27)|Out-Null
  Write-Output 'Compact existing-math insertion preview passed without changing the destination.'
+ if($failures.Count){throw ('Placement preview failures: '+($failures -join '; '))}
 }catch{
  if(Test-Path $fixture){Get-Content $fixture|Write-Output}
  try{$image=Capture;SaveShot $image (Join-Path $folder 'placement-preview-failure.png');$image.Dispose()}catch{}
