@@ -1,0 +1,91 @@
+name: Equation resize reproduction
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch original source and apply repair
+        shell: pwsh
+        run: |
+          git clone https://github.com/mathomir/Mathomir_GIT.git source
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source checkout 0300c13e5108fb6112403b20f576d977db3309f9
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../interaction-repair.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../graph-overlap-followup.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../unit-circle-signed-arc.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../print-grid.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../integral-evaluation.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../integral-followup.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../log-base.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../selection-approx.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../ai-help.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../cursor-stability.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../unit-common-coordinates.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../groq-context-approx.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../ai-math-reader.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../page-toolbar.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../enlarged-text-overlap.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../title-file-path.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../placement-lifecycle.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../large-resize-grip.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../freehand-rounding.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../coordinate-axes-editor.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../formula-reference-ai.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../latex-rendering.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../center-move-grip.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item Mathomir.vcxproj source/Mathomir/
+          ./tools/setup-math-renderer.ps1
+      - name: Locate MSBuild and check MFC
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.ATLMFC -property installationPath
+          if (!$vs) { throw 'Visual Studio with MFC is required on the runner.' }
+          "MSBUILD=$vs\MSBuild\Current\Bin\MSBuild.exe" >> $env:GITHUB_ENV
+      - name: Build Release Win32
+        shell: pwsh
+        run: |
+          & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Reproduce equation resize freeze
+        shell: pwsh
+        run: ./tools/resize-equation-smoke.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Equation-Resize-Diagnostics
+          path: |
+            source/build/resize-equation-*.mom
+            source/build/center-move-grip-trace.txt
+            source/build/Mathomir.exe
+          if-no-files-found: warn
