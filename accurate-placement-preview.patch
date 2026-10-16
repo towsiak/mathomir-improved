@@ -72,7 +72,7 @@
  	CView::OnMouseMove(nFlags, point);
  	}
  	catch(...)
-@@ -9536,151 +9542,162 @@
+@@ -9536,151 +9542,167 @@
  #pragma optimize("",on)
  
  
@@ -262,6 +262,8 @@
 +    bool compact=false;
 +    int font=ClipboardPlacementFont();
 +    if(ClipboardExpression && !separate){
++        tDocumentStruct *target=FrontContentAtPoint(CPoint(X,Y));
++        if(target && target->Type==1){compact=true;font=((CExpression*)target->Object)->m_FontSize;}
 +        // Insertion may reflow an existing equation. Show a labelled payload
 +        // thumbnail beside its native insertion marker, not a false drop site.
 +        for(int i=0;i<NumDocumentElements;i++)if(TheDocument+i==IsInsertionPointTouched && TheDocument[i].Type==1){
@@ -337,7 +339,10 @@
 +        if(ClipboardBackground.DC){ClipboardBackground.DC->DeleteDC();delete ClipboardBackground.DC;ClipboardBackground.DC=NULL;}
 +        if(ClipboardBackground.bmp){delete ClipboardBackground.bmp;ClipboardBackground.bmp=NULL;}
 +        ClipboardBackground.bmp=new CBitmap();ClipboardBackground.DC=new CDC();
-+        if(!ClipboardBackground.bmp->CreateCompatibleBitmap(&dc,region.Width(),region.Height()) || !ClipboardBackground.DC->CreateCompatibleDC(&dc))return 0;
++        if(!ClipboardBackground.bmp->CreateCompatibleBitmap(&dc,region.Width(),region.Height()) || !ClipboardBackground.DC->CreateCompatibleDC(&dc)){
++            delete ClipboardBackground.DC;ClipboardBackground.DC=NULL;
++            delete ClipboardBackground.bmp;ClipboardBackground.bmp=NULL;return 0;
++        }
 +        ClipboardBackground.DC->SelectObject(ClipboardBackground.bmp);
 +    }
 +    ClipboardBackground.X=region.left;ClipboardBackground.Y=region.top;
@@ -377,7 +382,7 @@
  	if (ClipboardBackground.Restored) return 0;
  	if (ClipboardBackground.bmp==NULL) return 0;
  	CDC *DC=GetDC();
-@@ -11074,6 +11091,7 @@
+@@ -11074,6 +11096,7 @@
  }
  void CMathomirView::OnMouseLeave()
  {
@@ -385,7 +390,7 @@
      FunctionHelpMouseTracking=false;
      if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive){
          tDocumentStruct *hover=ResizeHandleDocument();POINT screen={};::GetCursorPos(&screen);
-@@ -11095,6 +11113,7 @@
+@@ -11095,6 +11118,7 @@
  
  void CMathomirView::OnCaptureChanged(CWnd *window)
  {
@@ -393,7 +398,7 @@
      if (MouseMovingActive && window!=this) EndGripMove(true);
      if (MouseSizingActive && window!=this) EndMouseSizing(true);
      if (MouseRotationActive && window!=this) EndMouseRotation(true);
-@@ -12050,39 +12069,8 @@
+@@ -12050,39 +12074,8 @@
  	CDrawing *mydrw=(CDrawing*)drawing;
  	if (mydrw==NULL) mydrw=ClipboardDrawing;
  	if (mydrw==NULL) return 0;
