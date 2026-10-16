@@ -11,7 +11,7 @@ function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml
 function Font($doc){$e=$doc.SelectSingleNode('/mathomir/*[1]/*[self::ex or self::expr]');if($e.HasAttribute('fh')){return [int]$e.fh};return [int]$e.fnt_h}
 function HoverObject {$r=[MathomirUiProbe]::ClientRect($view);$p=[LargeGripProbe]::FindInk($view,$r.Right,$r.Bottom);[MathomirUiProbe]::Mouse($view,512,0,$p[0],$p[1]);Start-Sleep -Milliseconds 80}
 function Grip {$r=[MathomirUiProbe]::ClientRect($view);return [LargeGripProbe]::Find($view,$r.Right,$r.Bottom)}
-function Drag($g,$dx,$dy,$release=$true){
+function Drag([int[]]$g,[int]$dx,[int]$dy,[bool]$release=$true){
  [MathomirUiProbe]::Mouse($view,512,0,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,513,1,$g[0],$g[1]);
  for($i=1;$i -le 12;$i++){[MathomirUiProbe]::Mouse($view,512,1,($g[0]+[int]($dx*$i/12)),($g[1]+[int]($dy*$i/12)));Start-Sleep -Milliseconds 25}
  if($release){[MathomirUiProbe]::Mouse($view,514,0,($g[0]+$dx),($g[1]+$dy))}
