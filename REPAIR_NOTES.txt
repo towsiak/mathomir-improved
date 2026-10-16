@@ -580,3 +580,10 @@ Center move grip (2026-10-15 evening)
 - Enclosing hollow bounds no longer suppress a child's own center grip.
 - Hovering through the sum's whitespace or toward its move controls retains the inner target.
 - Eighteen native nested sigma/text/shape scenes cover both creation orders at 60/100/200 percent zoom, approach stability, child/enclosure drags, exact Undo and Escape restoration.
+
+2026-10-16: Palette in-transit previews
+- Built-in drawing tools now show a native sample beside the pointer immediately after selection and before dragging.
+- Samples use copies of existing palette geometry and never run the live drawing creator or alter its gesture state.
+- Drag-sized samples are labeled with the tool name and Drag to size, distinct from actual prepared-object placement previews.
+- Palette selection clears stale carried state and font identity; Escape and pointer departure clear previews.
+- Native tests enumerate palette math/drawing entries, use the actual pickup function and a real left-tile click, check visible ink while moving, then verify drawing gestures and Undo.

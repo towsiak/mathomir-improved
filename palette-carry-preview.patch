@@ -1,0 +1,237 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -3813,6 +3813,7 @@
+ 
+ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ {
++    if(IsDrawingMode)RestoreClipboardBackground();
+     if(MouseMode==8 && getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *t=fopen("center-move-grip-trace.txt","a");if(t){fprintf(t,"node move %d,%d flags=%u node=%d,%d\n",point.x,point.y,nFlags,tmpDrawing2?tmpDrawing2->NodeX:-999,tmpDrawing2?tmpDrawing2->NodeY:-999);fclose(t);}}
+     if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point)){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
+     CCanvasHintScope canvasHintScope;
+@@ -5113,7 +5114,7 @@
+         // controls paragraph already explains center dragging and double-click.
+         SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
+     }
+-    if(ClipboardExpression || ClipboardDrawing)PaintClipboard(point.x,point.y);
++    if(ClipboardExpression || ClipboardDrawing || IsDrawingMode)PaintClipboard(point.x,point.y);
+ 	CView::OnMouseMove(nFlags, point);
+ 	}
+ 	catch(...)
+@@ -5616,6 +5617,7 @@
+ 	if (MouseMovingActive && nChar==VK_ESCAPE) { EndGripMove(true); SurpressCharMessage=1; return; }
+ 	if (MouseSizingActive && nChar==VK_ESCAPE) { EndMouseSizing(true); SurpressCharMessage=1; return; }
+ 	if (MouseRotationActive && nChar==VK_ESCAPE) { EndMouseRotation(true); SurpressCharMessage=1; return; }
++    if(nChar==VK_ESCAPE && IsDrawingMode && MouseMode==0){RestoreClipboardBackground();IsDrawingMode=0;RepaintTheView();SurpressCharMessage=1;return;}
+     if(nChar==VK_ESCAPE && (ClipboardExpression||ClipboardDrawing)){CancelFloatingPlacement();SurpressCharMessage=1;return;}
+     if (nChar=='B' && (GetKeyState(VK_CONTROL)&0x8000) && !(GetKeyState(VK_MENU)&0x8000))
+     { SurpressCharMessage=1; OnWritingBold(); return; }
+@@ -9650,10 +9652,23 @@
+     }
+ }
+ 
++static void StyleDrawingToolSample(CDrawing *drawing,int zoom,int depth=0)
++{
++    if(!drawing || depth>64 || drawing->IsSpecialDrawing)return;
++    drawing->m_Color=SelectedLineColor;
++    for(int i=0;i<drawing->NumItems;i++){
++        tDrawingItem *item=drawing->Items+i;
++        if(item->Type==1)item->LineWidth=(short)max(1,min(32700,(int)((long long)SelectedLineWidth*ViewZoom/max(1,zoom))));
++        else if(item->Type==0)StyleDrawingToolSample((CDrawing*)item->pSubdrawing,zoom,depth+1);
++    }
++}
++
+ int CMathomirView::PaintClipboard(int X,int Y)
+ {
+     RestoreClipboardBackground();
+-    if(PlacementPreviewPaused || (!ClipboardExpression && !ClipboardDrawing) || ViewZoom<=0)return 0;
++    const bool toolPreview=IsDrawingMode>0 && IsDrawingMode<60 && MouseMode==0 &&
++        !ClipboardExpression && !ClipboardDrawing && !(GetKeyState(VK_CONTROL)&0x8000);
++    if(PlacementPreviewPaused || (!ClipboardExpression && !ClipboardDrawing && !toolPreview) || ViewZoom<=0 || ViewOnlyMode || PrintRendering)return 0;
+     CRect client;GetClientRect(&client);
+     if(!client.PtInRect(CPoint(X,Y)))return 0;
+     CPoint screen(X,Y);ClientToScreen(&screen);
+@@ -9677,12 +9692,27 @@
+         }
+     }
+     CExpression expression(NULL,NULL,font);
++    CDrawing toolSample;
+     short length=0,above=0,below=0;
+     int docX=0,docY=0,paintX=0,paintY=0,zoom=ViewZoom;
+     struct Item { CExpression *expression;CDrawing *drawing;int x,y,docX,docY;CRect bounds; };
+     std::vector<Item> items;
+     CRect bounds;bounds.SetRectEmpty();
+-    if(ClipboardExpression){
++    if(toolPreview){
++        if((!Toolbox || !Toolbox->CopyDrawingToolSample(IsDrawingMode,&toolSample)) && IsDrawingMode!=6 && IsDrawingMode!=7)return 0;
++        toolSample.CalculateSize(&dc,100,&length,&below);
++        zoom=max(100,min(400,(int)(100.0*min(100.0/max(1,(int)length),70.0/max(1,(int)below)))));
++        StyleDrawingToolSample(&toolSample,zoom);
++        toolSample.CalculateSize(&dc,zoom,&length,&below);
++        int width=max(130,(int)length+20),height=max(58,(int)below+20);
++        int left=X+20,top=Y+32;
++        if(left+width>client.right-4)left=X-width-20;
++        if(top+height>client.bottom-4)top=Y-height-32;
++        left=max(4,min(left,client.right-width-4));top=max(24,min(top,client.bottom-height-4));
++        bounds=CRect(left,top,left+width,top+height);
++        paintX=left+(width-length)/2;paintY=top+(height-below)/2;
++        Item item={NULL,&toolSample,paintX,paintY,0,0,bounds};items.push_back(item);
++    }else if(ClipboardExpression){
+         // The same copy operation as commit preserves nested sizes, rotation,
+         // colors and table formatting without modifying the held source.
+         expression.CopyExpression(ClipboardExpression,0,1,0);expression.DeselectExpression();
+@@ -9726,7 +9756,15 @@
+     }
+     if(items.empty() || bounds.IsRectEmpty())return 0;
+ 
+-    const char *label=compact?"Insert into math":"Preview   Click to place   Esc to cancel";
++    static const char *toolNames[]={"Drawing","Rectangle","Line","Freehand","Circle","Arrow","Large eraser","Eraser",
++        "Coordinate axes","Centered axes","Linear grid","Log X grid","Log Y grid","Log grid","Freehand arrow",
++        "Pentagon","Hexagon","Centered circle","Section line","Brace","Check mark","Exclamation mark","Question mark",
++        "Cross","Drawing","Hatching","Hatching","Centered rectangle","Sine curve","Parabola","Right triangle",
++        "Isosceles triangle","Circular sector","Circular segment"};
++    CString toolLabel;
++    if(toolPreview){const char *name=IsDrawingMode<34?toolNames[IsDrawingMode]:IsDrawingMode==50?"Drawing box":IsDrawingMode==51?"Function graph":IsDrawingMode==52?"Image box":"Drawing";
++        toolLabel.Format("%s sample   %s",name,(IsDrawingMode==6 || IsDrawingMode==7)?"Drag to erase":"Drag to size");}
++    const char *label=toolPreview?(LPCSTR)toolLabel:compact?"Insert into math":"Preview   Click to place   Esc to cancel";
+     CFont *oldFont=dc.SelectObject((CFont*)CFont::FromHandle((HFONT)::GetStockObject(DEFAULT_GUI_FONT)));
+     CSize text=dc.GetTextExtent(label,(int)strlen(label));dc.SelectObject(oldFont);
+     int badgeX=max(3,min(bounds.left,client.right-text.cx-12));
+@@ -9756,17 +9794,23 @@
+     CBitmap *oldBitmap=buffer.SelectObject(&image);
+     buffer.BitBlt(0,0,region.Width(),region.Height(),ClipboardBackground.DC,0,0,SRCCOPY);
+     int state=buffer.SaveDC();buffer.SetViewportOrg(-region.left,-region.top);
+-    if(compact)buffer.FillSolidRect(bounds,RGB(255,255,255));
++    if(compact || toolPreview)buffer.FillSolidRect(bounds,RGB(255,255,255));
+     for(size_t i=0;i<items.size();i++){
+         Item &item=items[i];
+         CRect visible;visible.IntersectRect(item.bounds,client);if(visible.IsRectEmpty())continue;
+         int itemState=buffer.SaveDC();
+         if(item.expression)item.expression->PaintExpression(&buffer,(short)zoom,(short)item.x,(short)item.y);
+-        else{PlacementGraphState(item.drawing,true);item.drawing->PaintDrawing(&buffer,ViewZoom,(short)item.x,(short)item.y,item.docX,item.docY);}
++        else{if(!toolPreview)PlacementGraphState(item.drawing,true);item.drawing->PaintDrawing(&buffer,(short)(toolPreview?zoom:ViewZoom),(short)item.x,(short)item.y,item.docX,item.docY);}
+         buffer.RestoreDC(itemState);
+     }
+     CPen outline(PS_DOT,1,RGB(112,139,162));buffer.SelectObject(&outline);buffer.SelectStockObject(NULL_BRUSH);buffer.SetBkMode(TRANSPARENT);
+     buffer.Rectangle(footprint);
++    if(toolPreview && toolSample.NumItems==0){
++        buffer.SelectStockObject(BLACK_PEN);
++        int cx=(bounds.left+bounds.right)/2,cy=(bounds.top+bounds.bottom)/2;
++        buffer.Rectangle(cx-18,cy-10,cx+19,cy+11);
++        buffer.MoveTo(cx-14,cy+14);buffer.LineTo(cx+20,cy+14);
++    }
+     buffer.FillSolidRect(badge,RGB(255,255,255));buffer.Draw3dRect(badge,RGB(204,214,222),RGB(204,214,222));
+     buffer.SelectStockObject(DEFAULT_GUI_FONT);buffer.SetTextAlign(TA_LEFT|TA_TOP);buffer.SetBkMode(TRANSPARENT);buffer.SetTextColor(RGB(45,55,65));buffer.TextOut(badge.left+5,badge.top+3,label);
+     buffer.RestoreDC(state);
+@@ -9774,7 +9818,7 @@
+     buffer.SelectObject(oldBitmap);ClipboardBackground.Restored=0;
+     if(getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS")){
+         const char *names[]={"Active","Left","Top","Right","Bottom","X","Y","Zoom","Kind"};
+-        int values[]={1,bounds.left,bounds.top,bounds.right,bounds.bottom,docX,docY,ViewZoom,compact?3:ClipboardExpression?1:2};
++        int values[]={1,bounds.left,bounds.top,bounds.right,bounds.bottom,docX,docY,ViewZoom,toolPreview?4:compact?3:ClipboardExpression?1:2};
+         for(int i=0;i<9;i++){CString key="MathomirPlacement_";key+=names[i];::SetProp(GetSafeHwnd(),key,(HANDLE)(INT_PTR)(values[i]+1));}
+     }
+     return 1;
+@@ -9783,9 +9827,12 @@
+ 
+ // Opt-in Windows regression probe. Use the real clipboard-copy paths while
+ // keeping test setup independent of the native click-to-copy selection gesture.
+-LRESULT CMathomirView::OnPlacementPreviewProbe(WPARAM kind,LPARAM)
+-{
+-    if(!getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS") || !NumDocumentElements)return 0;
++LRESULT CMathomirView::OnPlacementPreviewProbe(WPARAM kind,LPARAM index)
++{
++    if(!getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS"))return 0;
++    if(kind==5 || kind==6)return Toolbox?Toolbox->PalettePlacementProbe((int)index,kind==6):0;
++    if(kind==7)return IsDrawingMode;
++    if(!NumDocumentElements)return 0;
+     if(kind==4){
+         tDocumentStruct *object=ResizeHandleDocument();CPoint center;
+         bool hasCenter=CenterMoveGripPoint(object,center);
+--- a/Mathomir/Toolbox.cpp
++++ b/Mathomir/Toolbox.cpp
+@@ -51,6 +51,7 @@
+ extern int EasycastListStart;
+ extern int MovingStartX;
+ extern int MovingStartY;
++extern int RootObjectCopy,RootObjectFontSize;
+ // CToolbox
+ extern char HelpTutorLoaded;
+ 
+@@ -6173,15 +6174,44 @@
+     SetHoverHelp(help);
+ }
+ 
++// Reuse the actual palette geometry. Rendering a sample must never call the
++// drawing creator: it stores the live gesture in process-wide state.
++bool CToolbox::CopyDrawingToolSample(int form,CDrawing *sample)
++{
++    if(!sample)return false;
++    for(int i=0;i<ToolboxNumMembers;i++)for(int j=0;j<ToolboxMembers[i].NumSubmembers;j++)
++        if(ToolboxMembers[i].Above[j]==-1 && !(ToolboxMembers[i].userdef_mask&(1u<<j))){
++            CDrawing *source=(CDrawing*)ToolboxMembers[i].Submembers[j];
++            if(source && source->OriginalForm==form){sample->CopyDrawing(source);sample->SelectDrawing(0);return true;}
++        }
++    return false;
++}
++
++// Opt-in regression entry: enumerate and pick up the real palette entries,
++// through the same function as a left-side click. Dialog actions are excluded.
++int CToolbox::PalettePlacementProbe(int index,bool pick)
++{
++    if(!getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS"))return 0;
++    int current=0;
++    for(int i=0;i<ToolboxNumMembers;i++)for(int j=0;j<ToolboxMembers[i].NumSubmembers;j++,current++){
++        if(current!=index)continue;
++        int type=1;
++        if(ToolboxMembers[i].Above[j]==-1){
++            int form=((CDrawing*)ToolboxMembers[i].Submembers[j])->OriginalForm;
++            type=ToolboxMembers[i].userdef_mask&(1u<<j)?2:form>0 && form<60?100+form:0;
++        }
++        if(pick && type)PickUpElementFromToolbox(i,j);
++        return type;
++    }
++    return index<0?current:-1;
++}
++
+ extern int CalcStructuralChecksumOnly;
+ void CToolbox::PickUpElementFromToolbox(int member, int submember)
+ {
+-	IsDrawingMode=0;
+-	if (ClipboardExpression)
+-	{
+-		delete ClipboardExpression;
+-		ClipboardExpression=NULL;
+-	}
++    pMainView->CancelFloatingPlacement();
++    IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;
++    RootObjectCopy=0;RootObjectFontSize=DefaultFontSize;
+ 
+ 	if (this->m_IsMain)
+ 	{
+@@ -6229,11 +6259,13 @@
+ 		ClipboardExpression=new CExpression(NULL,NULL,100);
+ 		ClipboardExpression->CopyExpression(ToolboxMembers[member].Submembers[submember],0);
+ 		short l,a,b;
+-		ClipboardExpression->CalculateSize(this->GetDC(),100,&l,&a,&b);
++		{CClientDC dc(this);ClipboardExpression->CalculateSize(&dc,100,&l,&a,&b);}
+ 		ToolboxMembers[member].Submembers[submember]->DeselectExpression();
+ 	}
+ 
+-	pMainView->SetMousePointer();
++    pMainView->SetFocus();
++    pMainView->SetMousePointer();
++    pMainView->RepaintTheView();
+ }
+ 
+ #pragma optimize("s",on)
+--- a/Mathomir/Toolbox.h
++++ b/Mathomir/Toolbox.h
+@@ -105,6 +105,8 @@
+ 	CExpression *ReturnKeycode(int keycode_order, char **Keycode);
+ 	void ShowHelptext(const char *text,const char *command,const char *accelerator,const char *easycast, int language_code);
+ 	void PickUpElementFromToolbox(int member, int submember);
++    bool CopyDrawingToolSample(int form,CDrawing *sample);
++    int PalettePlacementProbe(int index,bool pick);
+ 	int InsertIntoToolbox(void);
+ 	void ToolbarShowHelp(void);
+ 	void UpdateToolbar(char force_redraw=0);
