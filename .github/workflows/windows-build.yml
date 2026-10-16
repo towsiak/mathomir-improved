@@ -71,6 +71,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../accurate-placement-preview.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../nested-object-layering.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
           ./tools/setup-math-renderer.ps1
       - name: Locate MSBuild and check MFC
@@ -358,6 +360,8 @@ jobs:
           git -C source apply --ignore-space-change ../sticky-exponent.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../accurate-placement-preview.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../nested-object-layering.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
           ./tools/setup-math-renderer.ps1

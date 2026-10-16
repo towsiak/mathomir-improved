@@ -573,3 +573,10 @@ Center move grip (2026-10-15 evening)
 - Active objects show a small center move grip as well as their existing corner grips. It searches nearby central space to avoid foreground annotations, stays a fixed usable size at any zoom, and hides while editing.
 - Drag past the small movement threshold to move; small clicks do not nudge objects or consume Undo. Escape cancels a drag.
 - Double-click the center grip to edit the existing text/math, open a graph formula, or expose drawing nodes. Double-clicking elsewhere retains free-space annotation placement.
+
+2026-10-16: Nested-object interaction layers
+- A formula, text or smaller drawing inside a diagram remains independently targetable in either creation order.
+- Enclosing center grips avoid the child's bounds and search a wider free interior when needed.
+- Enclosing hollow bounds no longer suppress a child's own center grip.
+- Hovering through the sum's whitespace or toward its move controls retains the inner target.
+- Eighteen native nested sigma/text/shape scenes cover both creation orders at 60/100/200 percent zoom, approach stability, child/enclosure drags, exact Undo and Escape restoration.

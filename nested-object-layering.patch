@@ -1,0 +1,141 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -619,6 +619,21 @@
+         annotation->absolute_Y-annotation->Above>=container->absolute_Y-container->Above &&
+         annotation->absolute_Y+annotation->Below<=container->absolute_Y+container->Below;
+ }
++// Enclosing diagrams are background interaction layers, regardless of creation
++// order. This does not reorder document objects or merge their Undo histories.
++static bool InteractionChild(tDocumentStruct *child,tDocumentStruct *container)
++{
++    if(AnnotationInsideLargeExpression(child,container))return true;
++    if(!child || !container || child==container || !child->Object || !container->Object ||
++        container->Type!=2 || IsGraphObject(child) ||
++        (child->Type==2 && ((CDrawing*)child->Object)->IsSpecialDrawing))return false;
++    double childArea=max(1,child->Length)*double(max(1,child->Above+child->Below));
++    double containerArea=max(1,container->Length)*double(max(1,container->Above+container->Below));
++    return childArea*1.5<containerArea && child->absolute_X>=container->absolute_X &&
++        child->absolute_X+child->Length<=container->absolute_X+container->Length &&
++        child->absolute_Y-child->Above>=container->absolute_Y-container->Above &&
++        child->absolute_Y+child->Below<=container->absolute_Y+container->Below;
++}
+ static tDocumentStruct *FrontContentAtPoint(CPoint point)
+ {
+     // Graphs form their own background layer. A small contained annotation
+@@ -632,7 +647,7 @@
+         if(x<-3 || x>object->Length*ViewZoom/100+3 || y<-object->Above*ViewZoom/100-3 || y>object->Below*ViewZoom/100+3)continue;
+         if((object->Type==1 && ExpressionContentAtPoint((CExpression*)object->Object,x,y)) ||
+            (object->Type==2 && DrawingContentAtPoint((CDrawing*)object->Object,x,y))){
+-            if(!front || AnnotationInsideLargeExpression(object,front))front=object;
++            if(!front || InteractionChild(object,front))front=object;
+         }
+     }
+ #ifdef MATHOMIR_AI_TESTING
+@@ -654,6 +669,17 @@
+         (object->absolute_X+object->Length-ViewX)*ViewZoom/100+1,
+         (object->absolute_Y+object->Below-ViewY)*ViewZoom/100+1);
+     return bounds.PtInRect(point)!=FALSE;
++}
++static tDocumentStruct *FrontBoundsAtPoint(CPoint point)
++{
++    tDocumentStruct *front=NULL;
++    for(int i=NumDocumentElements-1;i>=0;i--){
++        tDocumentStruct *candidate=TheDocument+i;
++        if(!candidate->Object || candidate->MovingDotState==5 ||
++            (candidate->Type!=1 && candidate->Type!=2) || !ObjectBoundsContain(candidate,point))continue;
++        if(!front || (IsGraphObject(front) && !IsGraphObject(candidate)) || InteractionChild(candidate,front))front=candidate;
++    }
++    return front;
+ }
+ extern int NumSelectedObjects;
+ // A fixed screen-size control near the visible center. Prefer whitespace and
+@@ -678,8 +704,12 @@
+     int dx=min(30,max(0,(right-left)/3)),dy=min(26,max(0,(bottom-top)/3));
+     const int offsets[9][2]={{0,0},{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+     int best=INT_MAX;bool found=false;
+-    for(int k=0;k<9;k++){
+-        CPoint candidate(cx+offsets[k][0]*dx,cy+offsets[k][1]*dy);
++    for(int k=0;k<58;k++){
++        // Search the wider visible interior if the central nine spots are all
++        // occupied by labels. Keep the original near-center layout when it fits.
++        if(k==9 && found)break;
++        CPoint candidate=k<9?CPoint(cx+offsets[k][0]*dx,cy+offsets[k][1]*dy):
++            CPoint(left+(right-left)*((k-9)%7)/6,top+(bottom-top)*((k-9)/7)/6);
+         // Tiny symbols must keep distinct resize/delete/rotate hit areas. If
+         // the center has no room, retain the existing outer move controls.
+         CPoint controls[]={ResizeHandlePoint(object),DeleteGripPoint(object),
+@@ -694,12 +724,13 @@
+         for(int i=NumDocumentElements-1;i>=0;i--){
+             tDocumentStruct *other=TheDocument+i;
+             if(other==object || !other->Object || other->MovingDotState==5 || IsGraphObject(other))continue;
+-            if(!IsGraphObject(object) && !AnnotationInsideLargeExpression(other,object) &&
+-                (other<object || AnnotationInsideLargeExpression(object,other)))continue;
++            if(InteractionChild(object,other))continue;
++            if(!IsGraphObject(object) && !InteractionChild(other,object) && other<object)continue;
+             CRect bounds((other->absolute_X-ViewX)*ViewZoom/100,
+                 (other->absolute_Y-other->Above-ViewY)*ViewZoom/100,
+                 (other->absolute_X+other->Length-ViewX)*ViewZoom/100+1,
+                 (other->absolute_Y+other->Below-ViewY)*ViewZoom/100+1),intersection;
++            if(InteractionChild(other,object))bounds.InflateRect(8,8);
+             if(intersection.IntersectRect(handle,bounds)){covered=true;break;}
+         }
+         if(covered)continue;
+@@ -3828,7 +3859,10 @@
+     {
+         tDocumentStruct *current=ResizeHandleDocument();
+         tDocumentStruct *front=FrontContentAtPoint(point);
+-        if(front && current && current!=front && !(current && InControlApproach(current,point) && AnnotationInsideLargeExpression(current,front)) && (!current || IsGraphObject(current) || front>current || AnnotationInsideLargeExpression(front,current)))
++        if(front && current && current!=front &&
++            !(InControlApproach(current,point) && InteractionChild(current,front)) &&
++            !InteractionChild(current,front) &&
++            (IsGraphObject(current) || front>current || InteractionChild(front,current)))
+         {
+             ResizeHandleObject=front->Object;
+             RotationHandleObject=CanRotateObject(front)?front->Object:NULL;
+@@ -3867,7 +3901,7 @@
+         MouseMode==0 && !(nFlags&MK_LBUTTON) && InControlApproach(moveHover,point))
+     {
+         tDocumentStruct *front=FrontContentAtPoint(point);
+-        if((!front && !ObjectBoundsContain(moveHover,point)) || AnnotationInsideLargeExpression(moveHover,front))
++        if(!front || InteractionChild(moveHover,front))
+         {
+             if(SpecialDrawingHover){SpecialDrawingHover=NULL;Invalidate(FALSE);}
+             SetCursor(::LoadCursor(NULL,IDC_ARROW));return;
+@@ -4415,6 +4449,8 @@
+ 		tDocumentStruct *ds=TheDocument+NumDocumentElements-1;
+ 		int ccc=1+100/ViewZoom;
+         tDocumentStruct *hoverContent=(!(nFlags&MK_SHIFT) && !TouchMouseMode && !IsDrawingMode)?FrontContentAtPoint(point):NULL;
++        if(!hoverContent && !(nFlags&MK_SHIFT) && !TouchMouseMode && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing)
++            hoverContent=FrontBoundsAtPoint(point);
+ 
+         for(int layer=0;layer<2;layer++)
+         {
+@@ -4707,7 +4743,7 @@
+                 if(AbsoluteX>=candidate->absolute_X && AbsoluteX<=candidate->absolute_X+candidate->Length &&
+                     AbsoluteY>=candidate->absolute_Y-candidate->Above && AbsoluteY<=candidate->absolute_Y+candidate->Below){
+                     if(!TouchedObject || (IsGraphObject(TouchedObject) && !IsGraphObject(candidate)) ||
+-                        AnnotationInsideLargeExpression(candidate,TouchedObject))TouchedObject=candidate;
++                        InteractionChild(candidate,TouchedObject))TouchedObject=candidate;
+                 }
+             }
+         }
+@@ -9739,6 +9775,19 @@
+ LRESULT CMathomirView::OnPlacementPreviewProbe(WPARAM kind,LPARAM)
+ {
+     if(!getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS") || !NumDocumentElements)return 0;
++    if(kind==4){
++        tDocumentStruct *object=ResizeHandleDocument();CPoint center;
++        bool hasCenter=CenterMoveGripPoint(object,center);
++        ::SetProp(GetSafeHwnd(),"MathomirLayer_CenterX",(HANDLE)(INT_PTR)(hasCenter?center.x+1:0));
++        ::SetProp(GetSafeHwnd(),"MathomirLayer_CenterY",(HANDLE)(INT_PTR)(hasCenter?center.y+1:0));
++        if(object){
++            int values[]={(object->absolute_X-ViewX)*ViewZoom/100,(object->absolute_Y-object->Above-ViewY)*ViewZoom/100,
++                (object->absolute_X+object->Length-ViewX)*ViewZoom/100,(object->absolute_Y+object->Below-ViewY)*ViewZoom/100};
++            const char *keys[]={"MathomirLayer_Left","MathomirLayer_Top","MathomirLayer_Right","MathomirLayer_Bottom"};
++            for(int i=0;i<4;i++)::SetProp(GetSafeHwnd(),keys[i],(HANDLE)(INT_PTR)(values[i]+1));
++        }
++        return object?(LRESULT)(object-TheDocument+1):0;
++    }
+     if(kind==3){
+         if(PlacementGraphState(ClipboardDrawing,false))return 1;
+         for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && PlacementGraphState((CDrawing*)TheDocument[i].Object,false))return 1;
