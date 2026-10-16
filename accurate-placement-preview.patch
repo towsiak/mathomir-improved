@@ -17,7 +17,15 @@
  extern char TemporaryShowColoredSelection;
  extern int EasycastListStart;
  char MouseIsTouchingExpression;
-@@ -2207,6 +2217,8 @@
+@@ -834,6 +844,7 @@
+ 	ON_COMMAND(ID_FILE_PRINT_DIRECT, CView::OnFilePrint)
+ 	ON_COMMAND(ID_FILE_PRINT_PREVIEW, CView::OnFilePrintPreview)
+     ON_MESSAGE(WM_APP+155,OnPrintGridCheck)
++    ON_MESSAGE(WM_APP+156,OnPlacementPreviewProbe)
+ 	ON_WM_LBUTTONDOWN()
+ 	ON_WM_LBUTTONDBLCLK()
+     ON_WM_CAPTURECHANGED()
+@@ -2207,6 +2218,8 @@
  static CObject *ExplicitTypingRoot=NULL;
  void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  {
@@ -26,7 +34,7 @@
      const bool centerWasVisible=CenterMoveGripHit(ResizeHandleDocument(),point);
      CenterEditRelease=false;
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *t=fopen("center-move-grip-trace.txt","a");if(t){fprintf(t,"down %d,%d mode=%d center=%d\n",point.x,point.y,MouseMode,centerWasVisible);fclose(t);}}
-@@ -2961,16 +2973,8 @@
+@@ -2961,16 +2974,8 @@
  
  
  
@@ -45,7 +53,7 @@
  
  
  		//if clipboard holds an empty expression then simply start the keyboard entry mode
-@@ -3002,7 +3006,7 @@
+@@ -3002,7 +3007,7 @@
  		//ds->absolute_X=AbsoluteX; 
  		//ds->absolute_Y=AbsoluteY;
  		//ds->Type=1; //expression
@@ -54,7 +62,7 @@
  		if ((RootObjectCopy==-1 || RootObjectCopy==ClipboardExpression->CalcChecksum()))
  		{
  			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
-@@ -3947,7 +3951,8 @@
+@@ -3947,7 +3952,8 @@
  	{
  		//we cannot have both clipboards active at the same time, expressions have precedance
  		if ((ClipboardExpression) && (ClipboardDrawing)){delete ClipboardDrawing;ClipboardDrawing=NULL;}
@@ -64,7 +72,7 @@
  	}
  	
  	//capturing cursor (if outside of client area, or atop other window, release)
-@@ -5060,6 +5065,7 @@
+@@ -5060,6 +5066,7 @@
          // controls paragraph already explains center dragging and double-click.
          SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
      }
@@ -72,7 +80,7 @@
  	CView::OnMouseMove(nFlags, point);
  	}
  	catch(...)
-@@ -9536,151 +9542,167 @@
+@@ -9536,151 +9543,191 @@
  #pragma optimize("",on)
  
  
@@ -217,7 +225,6 @@
 -	ReleaseDC(DC);
 -PaintDrawingHotspot();
 -	return 0;
--}
 +// Preview and commit use the same font and document-coordinate calculations.
 +static int ClipboardPlacementFont()
 +{
@@ -375,6 +382,30 @@
 +    return 1;
 +}
 +
++
++// Opt-in Windows regression probe. Use the real clipboard-copy paths while
++// keeping test setup independent of the native click-to-copy selection gesture.
++LRESULT CMathomirView::OnPlacementPreviewProbe(WPARAM kind,LPARAM)
++{
++    if(!getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS") || !NumDocumentElements)return 0;
++    CancelFloatingPlacement();
++    if(kind==1 && TheDocument[0].Type==1){
++        CExpression *source=(CExpression*)TheDocument[0].Object;
++        ClipboardExpression=new CExpression(NULL,NULL,100);
++        ClipboardExpression->CopyExpression(source,0,1,0);
++        RootObjectCopy=-1;RootObjectFontSize=source->m_FontSize;
++    }else if(kind==2){
++        int x=0,y=0;ClipboardDrawing=(CDrawing*)ComposeDrawing(&x,&y,1,0);
++    }
++    for(int i=0;i<NumDocumentElements;i++){
++        TheDocument[i].MovingDotState=0;
++        if(TheDocument[i].Type==1)((CExpression*)TheDocument[i].Object)->DeselectExpression();
++        else if(TheDocument[i].Type==2)((CDrawing*)TheDocument[i].Object)->SelectDrawing(0);
++    }
++    NumSelectedObjects=0;MouseMode=0;IsDrawingMode=0;TouchMouseMode=0;
++    MovingStartX=MovingStartY=0;IsInsertionPointTouched=NULL;NewlineAddObject=-1;GuidlineElement=-2;
++    SetFocus();RepaintTheView();return ClipboardExpression||ClipboardDrawing?1:0;
+ }
  
  int CMathomirView::RestoreClipboardBackground(void)
  {
@@ -382,7 +413,7 @@
  	if (ClipboardBackground.Restored) return 0;
  	if (ClipboardBackground.bmp==NULL) return 0;
  	CDC *DC=GetDC();
-@@ -11074,6 +11096,7 @@
+@@ -11074,6 +11121,7 @@
  }
  void CMathomirView::OnMouseLeave()
  {
@@ -390,7 +421,7 @@
      FunctionHelpMouseTracking=false;
      if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive){
          tDocumentStruct *hover=ResizeHandleDocument();POINT screen={};::GetCursorPos(&screen);
-@@ -11095,6 +11118,7 @@
+@@ -11095,6 +11143,7 @@
  
  void CMathomirView::OnCaptureChanged(CWnd *window)
  {
@@ -398,7 +429,7 @@
      if (MouseMovingActive && window!=this) EndGripMove(true);
      if (MouseSizingActive && window!=this) EndMouseSizing(true);
      if (MouseRotationActive && window!=this) EndMouseRotation(true);
-@@ -12050,39 +12074,8 @@
+@@ -12050,39 +12099,8 @@
  	CDrawing *mydrw=(CDrawing*)drawing;
  	if (mydrw==NULL) mydrw=ClipboardDrawing;
  	if (mydrw==NULL) return 0;
@@ -440,3 +471,13 @@
  
  
  
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -53,6 +53,7 @@
+     void OnSelectAllObjects();
+     void PaintSafePrintGuide(CDC *dc);
+     afx_msg LRESULT OnPrintGridCheck(WPARAM mode,LPARAM page);
++    afx_msg LRESULT OnPlacementPreviewProbe(WPARAM kind,LPARAM unused);
+ 	void AdjustPosition(void);
+ 	afx_msg void OnSize(UINT nType, int cx, int cy);
+ 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);

@@ -64,11 +64,10 @@ function Grid($style,$snap){
  [MathomirUiProbe]::Send($dialog,273,((5-shl 16)-bor 1361))|Out-Null
  [MathomirUiProbe]::Send($dialog,273,1)|Out-Null
 }
-function Grab {
+function Grab($kind){
  [MathomirUiProbe]::Mouse($view,512,0,25,20)
- $image=Capture;try{$ink=[PlacementProbe]::FirstInk($image)}finally{$image.Dispose()}
  [MathomirUiProbe]::Send($main,273,0xE12A)|Out-Null
- Click $ink[0] $ink[1]
+ Check ([MathomirUiProbe]::Send($view,(0x8000+156),$kind) -eq 1) 'Native clipboard preparation failed'
 }
 function Scene($case,$zoom){
  $script:fixture=Join-Path $folder ('placement-preview-'+$case.name+'-'+$zoom+'.mom')
@@ -104,7 +103,7 @@ try {
  foreach($case in $cases){foreach($zoom in $(if($case.zooms){$case.zooms}else{@(60,100,200)})){
   if($case.ContainsKey('style')){Grid $case.style 1}else{Grid 0 0}
   Scene $case $zoom;$baseline=SaveDoc;$originalCount=$baseline.SelectNodes('/mathomir/*').Count
-  Grab
+  Grab $case.kind
   $x=570;$y=350
   [MathomirUiProbe]::Mouse($view,512,0,$x,$y);Start-Sleep -Milliseconds 100
   Check ([PlacementProbe]::Stat($view,'Active') -eq 1) ('No live preview after grabbing '+$case.name+' at '+$zoom)
@@ -128,7 +127,7 @@ try {
   }finally{$before.Dispose();$after.Dispose()}
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null
   Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) ('Undo did not restore placement: '+$case.name)
-  Grab;[MathomirUiProbe]::Mouse($view,512,0,$x,$y)
+  Grab $case.kind;[MathomirUiProbe]::Mouse($view,512,0,$x,$y)
   [MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null
   [MathomirUiProbe]::Mouse($view,512,0,25,20)
   Check ([PlacementProbe]::Stat($view,'Active') -ne 1) 'Escape left a live preview'
@@ -137,7 +136,7 @@ try {
  }}
  Grid 0 0;Scene $originalCases[0] 100;$baseline=SaveDoc
  $sourceImage=Capture;try{$ink=[PlacementProbe]::FirstInk($sourceImage)}finally{$sourceImage.Dispose()}
- Grab;[MathomirUiProbe]::Mouse($view,512,0,$ink[0],$ink[1]);Start-Sleep -Milliseconds 100
+ Grab 1;[MathomirUiProbe]::Mouse($view,512,0,$ink[0],$ink[1]);Start-Sleep -Milliseconds 100
  Check ([PlacementProbe]::Stat($view,'Kind') -eq 3) 'Existing math did not get a labelled compact insertion preview'
  Check ((SaveDoc).OuterXml -eq $baseline.OuterXml) 'Insertion preview changed native math'
  [MathomirUiProbe]::Send($view,256,27)|Out-Null
