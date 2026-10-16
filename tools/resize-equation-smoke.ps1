@@ -1,6 +1,9 @@
 $ErrorActionPreference='Stop'
+$base=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
+Invoke-Expression $base.Substring(0,$base.IndexOf('$exe ='))
 $helpers=Get-Content (Join-Path $PSScriptRoot 'large-resize-grip-smoke.ps1') -Raw
-Invoke-Expression $helpers.Substring(0,$helpers.IndexOf('$exe='))
+$start=$helpers.IndexOf("Add-Type @'")
+Invoke-Expression $helpers.Substring($start,$helpers.IndexOf('$exe=')-$start)
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path
 $folder=Split-Path $exe
 $app=Start-Process $exe -WorkingDirectory $folder -PassThru

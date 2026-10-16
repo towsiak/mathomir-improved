@@ -7,7 +7,11 @@ permissions:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        resize_patch: [false, true]
     steps:
       - uses: actions/checkout@v4
       - name: Fetch original source and apply repair
@@ -63,6 +67,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../center-move-grip.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ('${{ matrix.resize_patch }}' -eq 'true') {
+            git -C source apply --ignore-space-change ../resize-equation-stability.patch
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           Copy-Item Mathomir.vcxproj source/Mathomir/
           ./tools/setup-math-renderer.ps1
       - name: Locate MSBuild and check MFC
@@ -83,7 +91,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Equation-Resize-Diagnostics
+          name: Equation-Resize-Diagnostics-${{ matrix.resize_patch }}
           path: |
             source/build/resize-equation-*.mom
             source/build/center-move-grip-trace.txt

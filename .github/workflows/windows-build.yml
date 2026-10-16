@@ -63,6 +63,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../center-move-grip.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../resize-equation-stability.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
           ./tools/setup-math-renderer.ps1
       - name: Locate MSBuild and check MFC
@@ -77,6 +79,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Equations with equals and nested math resize checks
+        shell: pwsh
+        run: ./tools/resize-equation-smoke.ps1
       - name: Center move grips and double-click editing checks
         shell: pwsh
         run: ./tools/center-move-grip-smoke.ps1
@@ -202,6 +207,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/resize-equation-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
           ./tools/formula-reference-model-test.ps1
           ./tools/formula-reference-smoke.ps1 -OnlineFixture
@@ -327,6 +333,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../center-move-grip.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../resize-equation-stability.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
           ./tools/setup-math-renderer.ps1
       - name: Locate MSBuild and check MFC
@@ -347,6 +355,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/resize-equation-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
           ./tools/formula-reference-model-test.ps1
           ./tools/formula-reference-smoke.ps1 -OnlineFixture

@@ -1,0 +1,129 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -486,7 +486,7 @@
+ static CObject *CenterPressObject=NULL;static DWORD CenterPressTime=0;
+ static int MoveStartX,MoveStartY;
+ static CObject *MoveGripObject=NULL;
+-static CExpression *SizingExpressionSnapshot=NULL;
++#include "MouseResizeFonts.h"
+ static CDrawing *SizingDrawingSnapshot=NULL;
+ static int SizingStartX,SizingStartY,SizingFontSize;
+ static double SizingAnchorX,SizingAnchorY,SizingVectorX,SizingVectorY,SizingScale;
+@@ -11255,6 +11255,7 @@
+     if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
+     if (KeyboardEntryObject) { ((CExpression*)KeyboardEntryObject)->KeyboardStop(); KeyboardEntryObject=NULL; KeyboardEntryBaseObject=NULL; }
+     FunctionHelpText.Empty(); LastQuickTypeObject=NULL;
++    LastCursorPositionExpression=NULL;LongClickObject=NULL;TouchMouseMode=0;
+     if(IsGraphObject(object) && !((CFunctionPlotter*)((CDrawing*)object->Object)->SpecialData)->StopForZoom())return false;
+     SizingStartX=object->absolute_X; SizingStartY=object->absolute_Y;
+     SizingAnchorX=object->absolute_X; SizingAnchorY=object->absolute_Y-object->Above;
+@@ -11265,9 +11266,7 @@
+     {
+         CExpression *expression=(CExpression*)object->Object;
+         SizingFontSize=expression->m_FontSize;
+-        SizingExpressionSnapshot=new CExpression(NULL,NULL,SizingFontSize);
+-        SizingExpressionSnapshot->CopyExpression(expression,0,1,0);
+-        SizingExpressionSnapshot->m_FontSize=SizingFontSize;
++        MouseResizeFonts::fonts.clear();MouseResizeFonts::Capture(expression);
+     }
+     else { SizingDrawingSnapshot=new CDrawing(); SizingDrawingSnapshot->CopyDrawing((CDrawing*)object->Object); }
+     UndoSave("resize with grip",20506);
+@@ -11286,19 +11285,18 @@
+     if(flags&MK_SHIFT)delta/=4.0;
+     double scale=max(0.05,min(8.0,1.0+delta));
+     short length,above=0,below; CClientDC dc(this);
+-    if (object->Type==1 && SizingExpressionSnapshot)
++    if (object->Type==1 && !MouseResizeFonts::fonts.empty())
+     {
+         // Keep the legacy signed-short font representation valid, without the
+         // old 800% UI ceiling. Account for the font calculation's integer range.
+         int fontLimit=min(32700,min(16350000/max(1,(int)ViewZoom),2147480000/max(1,(int)ViewZoom)/20));
+-        int size=max(40,min(fontLimit,(int)floor(SizingFontSize*scale+0.5)));
++        // Preserve unusually large authored children without signed-short overflow.
++        fontLimit=min(fontLimit,(int)((double)fontLimit*SizingFontSize/max(1,MouseResizeFonts::LargestFont(SizingFontSize))));
++        int size=max(10,min(fontLimit,max(40,(int)floor(SizingFontSize*scale+0.5))));
+         CExpression *expression=(CExpression*)object->Object;
+         if (size==expression->m_FontSize) return;
+-        // CopyExpression preserves root size and scales children relative to it.
+-        // Restore the original root size before copying, then apply drag once.
+-        expression->m_FontSize=SizingFontSize;
+-        expression->CopyExpression(SizingExpressionSnapshot,0,1,0);
+-        expression->ChangeFontSize((float)size/max(10,SizingFontSize));
++        // Keep nested objects and their editing references valid throughout the drag.
++        if(!MouseResizeFonts::Apply(expression,(double)size/max(10,SizingFontSize))){EndMouseSizing(false);return;}
+         expression->CalculateSize(&dc,ViewZoom,&length,&above,&below);
+         object->absolute_Y=(int)SizingAnchorY+above*100/ViewZoom;
+     }
+@@ -11319,18 +11317,17 @@
+     tDocumentStruct *object=ResizeHandleDocument();
+     if (cancel && object)
+     {
+-        if (object->Type==1 && SizingExpressionSnapshot)
++        if (object->Type==1 && !MouseResizeFonts::fonts.empty())
+         {
+             CExpression *expression=(CExpression*)object->Object;
+-            expression->m_FontSize=SizingFontSize;
+-            expression->CopyExpression(SizingExpressionSnapshot,0,1,0);
++            MouseResizeFonts::Apply(expression,1.0);
+         }
+         if (object->Type==2 && SizingDrawingSnapshot) ((CDrawing*)object->Object)->CopyDrawing(SizingDrawingSnapshot);
+         object->absolute_X=SizingStartX; object->absolute_Y=SizingStartY;
+     }
+     MouseSizingActive=false; MouseMode=0;
+     if (GetCapture()==this) ReleaseCapture();
+-    delete SizingExpressionSnapshot; SizingExpressionSnapshot=NULL;
++    MouseResizeFonts::fonts.clear();
+     delete SizingDrawingSnapshot; SizingDrawingSnapshot=NULL;
+     RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
+ }
+--- /dev/null
++++ b/Mathomir/MouseResizeFonts.h
+@@ -0,0 +1,48 @@
++#pragma once
++#include <vector>
++
++// Resizing changes font sizes, never the identity of editable math nodes.
++// Keeping the authored values makes every update independent of earlier drags.
++namespace MouseResizeFonts {
++struct FontState { CExpression *expression; short fontSize; };
++static std::vector<FontState> fonts;
++static void Capture(CExpression *expression)
++{
++    FontState state={expression,expression->m_FontSize};fonts.push_back(state);
++    for(int i=0;i<expression->m_NumElements;i++){
++        tElementStruct *item=expression->m_pElementList+i;
++        if(!item->Type || !item->pElementObject)continue;
++        CElement *element=item->pElementObject;
++        if(element->Expression1)Capture((CExpression*)element->Expression1);
++        if(element->Expression2)Capture((CExpression*)element->Expression2);
++        if(element->Expression3)Capture((CExpression*)element->Expression3);
++    }
++}
++static bool IsLive(CExpression *expression,size_t &index)
++{
++    if(index>=fonts.size() || fonts[index++].expression!=expression)return false;
++    for(int i=0;i<expression->m_NumElements;i++){
++        tElementStruct *item=expression->m_pElementList+i;
++        if(!item->Type || !item->pElementObject)continue;
++        CElement *element=item->pElementObject;
++        if(element->Expression1 && !IsLive((CExpression*)element->Expression1,index))return false;
++        if(element->Expression2 && !IsLive((CExpression*)element->Expression2,index))return false;
++        if(element->Expression3 && !IsLive((CExpression*)element->Expression3,index))return false;
++    }
++    return true;
++}
++static bool Apply(CExpression *expression,double factor)
++{
++    size_t index=0;
++    // Undo/open may replace a tree: inspect live nodes before touching old ones.
++    if(!IsLive(expression,index) || index!=fonts.size())return false;
++    for(size_t i=0;i<fonts.size();i++)
++        fonts[i].expression->m_FontSize=(short)max(10,min(32700,(int)floor(fonts[i].fontSize*factor+0.5)));
++    return true;
++}
++static int LargestFont(int rootSize)
++{
++    for(size_t i=0;i<fonts.size();i++)rootSize=max(rootSize,(int)fonts[i].fontSize);
++    return rootSize;
++}
++}
