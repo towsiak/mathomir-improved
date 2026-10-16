@@ -31,6 +31,15 @@ public static class GridUI {
  [StructLayout(LayoutKind.Sequential)] public struct Point {public int x,y;}
  [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+ [DllImport("user32.dll")] static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
+ public static void Drag(IntPtr frame,IntPtr view,int x,int y,int endX,int endY){
+  SetForegroundWindow(frame);Point a=new Point{x=x,y=y},b=new Point{x=endX,y=endY};ClientToScreen(view,ref a);ClientToScreen(view,ref b);
+  SetCursorPos(a.x,a.y);System.Threading.Thread.Sleep(100);
+  mouse_event(2,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(80);
+  try{for(int step=1;step<=4;step++){SetCursorPos(a.x+(b.x-a.x)*step/4,a.y+(b.y-a.y)*step/4);System.Threading.Thread.Sleep(60);}}
+  finally{mouse_event(4,0,0,0,UIntPtr.Zero);}System.Threading.Thread.Sleep(120);
+ }
+
  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
  public static void Hover(IntPtr owner,int id){SetForegroundWindow(owner);IntPtr h=Child(owner,id);Rect r;GetWindowRect(h,out r);SetCursorPos(r.left-10,r.top-10);SetCursorPos((r.left+r.right)/2,(r.top+r.bottom)/2);if(IsWindowEnabled(h))Send(h,512,0,(((r.bottom-r.top)/2)<<16)|((r.right-r.left)/2));else{Point p=new Point{x=(r.left+r.right)/2,y=(r.top+r.bottom)/2};ScreenToClient(owner,ref p);Send(owner,512,0,(p.y<<16)|p.x);}}
  public static bool TipVisible(IntPtr owner){IntPtr registered=GetProp(owner,"MathomirFeatureTips");if(registered!=IntPtr.Zero)return IsWindowVisible(registered);bool shown=false;EnumWindows((h,p)=>{var c=new StringBuilder(100);GetClassName(h,c,100);if(c.ToString()=="tooltips_class32"&&GetWindow(h,4)==owner&&IsWindowVisible(h))shown=true;return true;},IntPtr.Zero);return shown;}
@@ -123,9 +132,12 @@ try {
  foreach($style in 0..5){foreach($snap in 0..1){
   Blank "draw-$style-$snap";Grid $style $snap
   [GridUI]::Send($main,273,33049)|Out-Null
-  [GridUI]::Mouse($view,512,0,131,143);[GridUI]::Mouse($view,513,1,131,143);[GridUI]::Mouse($view,512,1,213,237);[GridUI]::Mouse($view,514,0,213,237);[GridUI]::Send($view,258,27)|Out-Null
+  # Hold the real mouse button while the preview/view repaints. Mixing a real
+  # cursor update with synthetic button messages can enqueue a no-button move
+  # after the fake press and legitimately cancel the native gesture.
+  [GridUI]::Drag($main,$view,131,143,213,237);[GridUI]::Send($view,258,27)|Out-Null
   [GridUI]::Send($main,273,0xE103)|Out-Null
-  [xml]$saved=Get-Content $fixture -Raw;$o=$saved.SelectSingleNode('/mathomir/*[self::o or self::obj][last()]');Check ($null -ne $o) 'Mouse drawing produced no object'
+  [xml]$saved=Get-Content $fixture -Raw;$o=$saved.SelectSingleNode('/mathomir/*[self::o or self::obj][last()]');Check ($null -ne $o) "Mouse drawing produced no object: style=$style snap=$snap"
   $xy=if($snap){$expected[$style]}else{@(131,143)}
   $ink=$o.SelectSingleNode("./draw | ./dw");Check ($null -ne $ink -and $ink.HasAttribute("X1")) "Rectangle has no saved ink coordinates"
   $inkX=[int]$o.X+[int]$ink.X1/1000;$inkY=[int]$o.Y+[int]$ink.Y1/1000

@@ -92,6 +92,9 @@ jobs:
       - name: Actual palette pickup and in-transit preview checks
         shell: pwsh
         run: ./tools/palette-carry-smoke.ps1
+      - name: Grid styles and snapping UI checks
+        shell: pwsh
+        run: ./tools/canvas-grid-smoke.ps1
       - name: Center move grips and double-click editing checks
         shell: pwsh
         run: ./tools/center-move-grip-smoke.ps1
@@ -139,6 +142,7 @@ jobs:
         with:
           name: Enlarged-Overlap-Preview
           path: |
+            source/build/grid-*.mom
             source/build/palette-carry-*
             source/build/placement-preview-*
             source/build/center-move-grip*
@@ -203,9 +207,6 @@ jobs:
       - name: Signed unit-circle UI checks
         shell: pwsh
         run: ./tools/unit-circle-smoke.ps1
-      - name: Grid styles and snapping UI checks
-        shell: pwsh
-        run: ./tools/canvas-grid-smoke.ps1
       - name: Tooltips and rounding UI checks
         shell: pwsh
         run: ./tools/feature-help-smoke.ps1
@@ -230,6 +231,7 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/palette-carry-smoke.ps1
+          ./tools/canvas-grid-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
           ./tools/placement-preview-smoke.ps1
           ./tools/resize-equation-smoke.ps1
@@ -280,6 +282,7 @@ jobs:
             source/build/sparse-rounded-freehand.mom
             source/build/large-resize-grip-*.mom
             source/build/enlarged-hit-diagnostics.txt
+            source/build/grid-*.mom
             source/build/palette-carry-*
             source/build/placement-preview-*
             source/build/center-move-grip*
@@ -394,6 +397,7 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/palette-carry-smoke.ps1
+          ./tools/canvas-grid-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
           ./tools/placement-preview-smoke.ps1
           ./tools/resize-equation-smoke.ps1
@@ -441,6 +445,7 @@ jobs:
             source/build/sparse-rounded-freehand.mom
             source/build/large-resize-grip-*.mom
             source/build/enlarged-hit-diagnostics.txt
+            source/build/grid-*.mom
             source/build/palette-carry-*
             source/build/placement-preview-*
             source/build/center-move-grip*
