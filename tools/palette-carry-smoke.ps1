@@ -1,6 +1,9 @@
 $ErrorActionPreference='Stop'
+$helpers=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
+Invoke-Expression $helpers.Substring(0,$helpers.IndexOf('$exe ='))
 $all=Get-Content (Join-Path $PSScriptRoot 'placement-preview-smoke.ps1') -Raw
-Invoke-Expression $all.Substring(0,$all.IndexOf('$exe=(Resolve-Path'))
+$start=$all.IndexOf('Add-Type -AssemblyName System.Drawing')
+Invoke-Expression $all.Substring($start,$all.IndexOf('$exe=(Resolve-Path')-$start)
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
