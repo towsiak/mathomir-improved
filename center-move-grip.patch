@@ -148,7 +148,12 @@
      if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point)){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
      CCanvasHintScope canvasHintScope;
      if(ClipboardExpression || ClipboardDrawing)ShowFeatureCanvasHint(5,"Click to place. Hold Shift while clicking to place a separate object over existing text or math.");
-@@ -3728,13 +3823,14 @@
+@@ -3724,17 +3819,18 @@
+         }
+     }
+     tDocumentStruct *moveHover=ResizeHandleDocument();
+-    if (moveHover && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
++    if (MouseMode==0 && moveHover && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
      {
          CPoint deleteGrip=DeleteGripPoint(moveHover);
          if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){ShowFeatureCanvasHint(1,"Delete this object. Ctrl+Z restores it.");SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
@@ -160,10 +165,19 @@
      }
      tDocumentStruct *sizingObject=ResizeHandleDocument();
 -    if (sizingObject && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
-+    if (sizingObject && !(sizingObject->Type==2 && ((CDrawing*)sizingObject->Object)->GripNodeEditing) && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
++    if (MouseMode==0 && sizingObject && !(sizingObject->Type==2 && ((CDrawing*)sizingObject->Object)->GripNodeEditing) && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
      {
          CPoint handle=ResizeHandlePoint(sizingObject);
          if (abs(point.x-handle.x)<=9 && abs(point.y-handle.y)<=9)
+@@ -3742,7 +3838,7 @@
+     }
+ 
+ 	tDocumentStruct *rotationObject=RotationHandleDocument();
+-	if (rotationObject && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode)
++	if (MouseMode==0 && rotationObject && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode)
+ 	{
+ 		CPoint handle=RotationHandlePoint(rotationObject);
+ 		int dx=point.x-handle.x,dy=point.y-handle.y;
 @@ -4063,6 +4159,7 @@
  			int AbsoluteX=ViewX*10+point.x*1000/ViewZoom;
  			int AbsoluteY=ViewY*10+point.y*1000/ViewZoom;
