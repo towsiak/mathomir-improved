@@ -11,6 +11,8 @@ CENTER MOVE GRIPS AND EQUATION RESIZING (2026-10-15)
   deletes and reconstructs roots, powers, fractions and operators per mouse event.
   Exact authored sizes are retained for repeated updates and Escape cancellation;
   old caret/long-click references are cleared before starting a size gesture.
+- Document replacement now clears old hover, selection and typing references
+  before releasing the old document, fixing a reproduced stale-pointer crash.
 - Added Windows regression cases for equals alone, x=2, the radical/power/prime
   form shown in the report, and a fractional equation, at three
   font sizes and three zoom levels. The screenshot establishes a Windows hang;

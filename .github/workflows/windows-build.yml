@@ -65,6 +65,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../resize-equation-stability.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../document-lifetime.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
           ./tools/setup-math-renderer.ps1
       - name: Locate MSBuild and check MFC
@@ -334,6 +336,8 @@ jobs:
           git -C source apply --ignore-space-change ../center-move-grip.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           git -C source apply --ignore-space-change ../resize-equation-stability.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C source apply --ignore-space-change ../document-lifetime.patch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item Mathomir.vcxproj source/Mathomir/
           ./tools/setup-math-renderer.ps1

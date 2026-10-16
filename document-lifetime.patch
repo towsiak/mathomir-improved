@@ -1,0 +1,25 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -2246,7 +2246,10 @@
+     if(!ViewOnlyMode && !IsDrawingMode && !ClipboardExpression && !ClipboardDrawing){
+         tDocumentStruct *front=FrontContentAtPoint(point);
+         if(front && front->Type==1)ExplicitTypingRoot=front->Object;
+-        else if(!front && prevTouchedObject && prevTouchedObject->Type==1)ExplicitTypingRoot=prevTouchedObject->Object;
++        else if(!front && prevTouchedObject)
++            for(int i=0;i<NumDocumentElements;i++)if(TheDocument+i==prevTouchedObject){
++                if(TheDocument[i].Type==1)ExplicitTypingRoot=TheDocument[i].Object;break;
++            }
+     }
+     // A click in another expression must release the old caret before hit testing.
+     // Otherwise a stale hover selection can leave the next keystroke in the old box.
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -897,6 +897,8 @@
+ {
+     // Hover entries point into TheDocument: clear them before freeing its storage.
+     SpecialDrawingHover=prevSpecialDrawingHover=NULL;
++    prevTouchedObject=SelectedDocumentObject=SelectedDocumentObject2=NULL;
++    LongClickObject=NULL;KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;
+ 	int i;
+ 	if (TheDocument)
+ 	{
