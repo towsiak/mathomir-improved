@@ -67,10 +67,10 @@ try{
   $letters=((Label $d).SelectNodes('.//var | .//elm[@tp="1"]')|ForEach-Object{if($_.HasAttribute('t')){$_.t}else{$_.tx}})-join '';Check ($letters.Contains('Z')) ('Double-click did not enter the original text/math object: letters='+$letters+' XML='+$d.OuterXml)
  }}}
  # Nested content must remain accessible in hollow drawings, in either order.
- $triangle='<o t="2" X="100" Y="100"><dw d="32|0,10240;6400,0;12800,10240;0,10240" /></o>'
- $sum='<o t="1" X="250" Y="290"><ex fh="320"><elm tp="7" stp="Sigma" E1="" E2="" E3=""><ex fh="320"><var t="i" f="00" /></ex><ex fh="240"><var t="i" f="00" /><opr s="=" /><var t="1" f="00" /></ex><ex fh="240"><var t="5" f="00" /></ex></elm></ex></o>'
- $text='<o t="1" X="250" Y="290"><ex fh="320" stxt="1"><var t="note" f="00" /></ex></o>'
- $innerShape='<o t="2" X="250" Y="230"><dw d="32|0,0;3200,0;3200,2560;0,2560;0,0" /></o>'
+ $triangle='<o t="2" X="80" Y="40"><dw d="32|0,7680;5120,0;10240,7680;0,7680" /></o>'
+ $sum='<o t="1" X="200" Y="170"><ex fh="160"><elm tp="7" stp="Sigma" E1="" E2="" E3=""><ex fh="160"><var t="i" f="00" /></ex><ex fh="120"><var t="5" f="00" /></ex><ex fh="120"><var t="i" f="00" /><opr s="=" /><var t="1" f="00" /></ex></elm></ex></o>'
+ $text='<o t="1" X="200" Y="170"><ex fh="320" stxt="1"><var t="note" f="00" /></ex></o>'
+ $innerShape='<o t="2" X="200" Y="130"><dw d="32|0,0;3200,0;3200,2560;0,2560;0,0" /></o>'
  foreach($kind in @('sigma','text','shape')){foreach($outerLast in @($false,$true)){foreach($zoom in @(60,100,200)){
   Write-Output "Nested grip case: $kind, outerLast=$outerLast, zoom=$zoom"
   $inner=if($kind -eq 'sigma'){$sum}elseif($kind -eq 'text'){$text}else{$innerShape}
@@ -78,17 +78,17 @@ try{
   $innerIndex=if($outerLast){0}else{1};$outerIndex=1-$innerIndex
   $before=SaveDoc;$outerXml=$before.mathomir.ChildNodes[$outerIndex].OuterXml
   # Start on the enclosure, then travel onto its child.
-  [MathomirUiProbe]::Mouse($view,512,0,[int](150*$scale),[int](350*$scale))
+  [MathomirUiProbe]::Mouse($view,512,0,[int](120*$scale),[int](240*$scale))
   Check ([MathomirUiProbe]::Send($view,(0x8000+156),4) -eq ($outerIndex+1)) 'Could not acquire the enclosing triangle'
   $outerGrip=@([CenterGripProbe]::Stat($view,'CenterX'),[CenterGripProbe]::Stat($view,'CenterY'))
-  [MathomirUiProbe]::Mouse($view,512,0,[int](265*$scale),[int]($(if($kind -eq 'shape'){230}else{280})*$scale))
+  [MathomirUiProbe]::Mouse($view,512,0,[int](215*$scale),[int]($(if($kind -eq 'shape'){130}else{160})*$scale))
   Check ([MathomirUiProbe]::Send($view,(0x8000+156),4) -eq ($innerIndex+1)) 'Triangle stole the nested object hover'
   $g=@([CenterGripProbe]::Stat($view,'CenterX'),[CenterGripProbe]::Stat($view,'CenterY'))
   Check ($g[0] -ge 0 -and $g[1] -ge 0) 'No usable middle grip for the nested object'
   $bounds=@('Left','Top','Right','Bottom')|ForEach-Object{[CenterGripProbe]::Stat($view,$_)}
   Check (!($outerGrip[0]+10 -ge $bounds[0] -and $outerGrip[0]-10 -le $bounds[2] -and $outerGrip[1]+10 -ge $bounds[1] -and $outerGrip[1]-10 -le $bounds[3])) 'Enclosing center grip covers the child'
   # Approach the real grip in small steps: empty spaces in a sum are not the triangle.
-  $fromX=[int](265*$scale);$fromY=[int]($(if($kind -eq 'shape'){230}else{280})*$scale)
+  $fromX=[int](215*$scale);$fromY=[int]($(if($kind -eq 'shape'){130}else{160})*$scale)
   for($step=1;$step -le 12;$step++){
    [MathomirUiProbe]::Mouse($view,512,0,[int]($fromX+($g[0]-$fromX)*$step/12),[int]($fromY+($g[1]-$fromY)*$step/12))
    Check ([MathomirUiProbe]::Send($view,(0x8000+156),4) -eq ($innerIndex+1)) 'Nested controls changed owner on the path to the center'
@@ -96,7 +96,7 @@ try{
   }
   Capture 'center-move-grip-nested-ui.png'
   Drag $g ([int](30*$scale)) ([int](20*$scale));$d=SaveDoc
-  Check ($d.mathomir.ChildNodes[$innerIndex].X -eq '280' -and $d.mathomir.ChildNodes[$innerIndex].Y -eq $(if($kind -eq 'shape'){'250'}else{'310'})) 'Middle drag did not move only the nested child'
+  Check ($d.mathomir.ChildNodes[$innerIndex].X -eq '230' -and $d.mathomir.ChildNodes[$innerIndex].Y -eq $(if($kind -eq 'shape'){'150'}else{'190'})) 'Middle drag did not move only the nested child'
   Check ($d.mathomir.ChildNodes[$outerIndex].OuterXml -eq $outerXml) 'Moving the inner object altered its triangle'
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$d=SaveDoc
   Check ($d.OuterXml -eq $before.OuterXml) 'Nested move Undo did not restore the exact document'
@@ -105,11 +105,11 @@ try{
   Drag $g ([int](30*$scale)) ([int](20*$scale)) -Cancel;$d=SaveDoc
   Check ($d.OuterXml -eq $before.OuterXml) 'Nested move Escape did not restore the exact document'
   # The enclosure itself stays movable without taking its child along.
-  [MathomirUiProbe]::Mouse($view,512,0,[int](150*$scale),[int](350*$scale));Check ([MathomirUiProbe]::Send($view,(0x8000+156),4) -eq ($outerIndex+1)) 'Child prevents access to the enclosure'
+  [MathomirUiProbe]::Mouse($view,512,0,[int](120*$scale),[int](240*$scale));Check ([MathomirUiProbe]::Send($view,(0x8000+156),4) -eq ($outerIndex+1)) 'Child prevents access to the enclosure'
   $g=@([CenterGripProbe]::Stat($view,'CenterX'),[CenterGripProbe]::Stat($view,'CenterY'))
   Check ($g[0] -ge 0) 'No free middle grip for enclosing triangle'
   Drag $g ([int](30*$scale)) ([int](20*$scale));$d=SaveDoc
-  Check ($d.mathomir.ChildNodes[$outerIndex].X -eq '130' -and $d.mathomir.ChildNodes[$outerIndex].Y -eq '120') 'Could not move enclosing triangle'
+  Check ($d.mathomir.ChildNodes[$outerIndex].X -eq '110' -and $d.mathomir.ChildNodes[$outerIndex].Y -eq '60') 'Could not move enclosing triangle'
   Check ($d.mathomir.ChildNodes[$innerIndex].OuterXml -eq $before.mathomir.ChildNodes[$innerIndex].OuterXml) 'Enclosure movement changed its independent child'
  }}}
  # A graph grip must avoid an annotation occupying its exact center.

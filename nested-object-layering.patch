@@ -64,7 +64,7 @@
          // Tiny symbols must keep distinct resize/delete/rotate hit areas. If
          // the center has no room, retain the existing outer move controls.
          CPoint controls[]={ResizeHandlePoint(object),DeleteGripPoint(object),
-@@ -694,12 +724,13 @@
+@@ -694,16 +724,18 @@
          for(int i=NumDocumentElements-1;i>=0;i--){
              tDocumentStruct *other=TheDocument+i;
              if(other==object || !other->Object || other->MovingDotState==5 || IsGraphObject(other))continue;
@@ -80,7 +80,13 @@
              if(intersection.IntersectRect(handle,bounds)){covered=true;break;}
          }
          if(covered)continue;
-@@ -3828,7 +3859,10 @@
+-        int score=k; // center wins ties; move off a glyph when space allows.
++        int score=k<9?k:9+abs(candidate.x-cx)+abs(candidate.y-cy);
++        // Nearest free interior wins the wider search, rather than a far corner.
+         if(object->Type==1 && ExpressionContentAtPoint((CExpression*)object->Object,
+             candidate.x-(object->absolute_X-ViewX)*ViewZoom/100,
+             candidate.y-(object->absolute_Y-ViewY)*ViewZoom/100,5))score+=20;
+@@ -3828,7 +3860,10 @@
      {
          tDocumentStruct *current=ResizeHandleDocument();
          tDocumentStruct *front=FrontContentAtPoint(point);
@@ -92,7 +98,7 @@
          {
              ResizeHandleObject=front->Object;
              RotationHandleObject=CanRotateObject(front)?front->Object:NULL;
-@@ -3867,7 +3901,7 @@
+@@ -3867,7 +3902,7 @@
          MouseMode==0 && !(nFlags&MK_LBUTTON) && InControlApproach(moveHover,point))
      {
          tDocumentStruct *front=FrontContentAtPoint(point);
@@ -101,7 +107,7 @@
          {
              if(SpecialDrawingHover){SpecialDrawingHover=NULL;Invalidate(FALSE);}
              SetCursor(::LoadCursor(NULL,IDC_ARROW));return;
-@@ -4415,6 +4449,8 @@
+@@ -4415,6 +4450,8 @@
  		tDocumentStruct *ds=TheDocument+NumDocumentElements-1;
  		int ccc=1+100/ViewZoom;
          tDocumentStruct *hoverContent=(!(nFlags&MK_SHIFT) && !TouchMouseMode && !IsDrawingMode)?FrontContentAtPoint(point):NULL;
@@ -110,7 +116,7 @@
  
          for(int layer=0;layer<2;layer++)
          {
-@@ -4707,7 +4743,7 @@
+@@ -4707,7 +4744,7 @@
                  if(AbsoluteX>=candidate->absolute_X && AbsoluteX<=candidate->absolute_X+candidate->Length &&
                      AbsoluteY>=candidate->absolute_Y-candidate->Above && AbsoluteY<=candidate->absolute_Y+candidate->Below){
                      if(!TouchedObject || (IsGraphObject(TouchedObject) && !IsGraphObject(candidate)) ||
@@ -119,7 +125,7 @@
                  }
              }
          }
-@@ -9739,6 +9775,19 @@
+@@ -9739,6 +9776,19 @@
  LRESULT CMathomirView::OnPlacementPreviewProbe(WPARAM kind,LPARAM)
  {
      if(!getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS") || !NumDocumentElements)return 0;

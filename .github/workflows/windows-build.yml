@@ -87,15 +87,15 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Center move grips and double-click editing checks
+        shell: pwsh
+        run: ./tools/center-move-grip-smoke.ps1
       - name: Placement preview pixel and lifecycle checks
         shell: pwsh
         run: ./tools/placement-preview-smoke.ps1
       - name: Equations with equals and nested math resize checks
         shell: pwsh
         run: ./tools/resize-equation-smoke.ps1
-      - name: Center move grips and double-click editing checks
-        shell: pwsh
-        run: ./tools/center-move-grip-smoke.ps1
       - name: Exponent typing and explicit exit UI checks
         shell: pwsh
         run: ./tools/sticky-exponent-smoke.ps1
@@ -223,9 +223,9 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/center-move-grip-smoke.ps1
           ./tools/placement-preview-smoke.ps1
           ./tools/resize-equation-smoke.ps1
-          ./tools/center-move-grip-smoke.ps1
           ./tools/sticky-exponent-smoke.ps1
           ./tools/formula-reference-model-test.ps1
           ./tools/formula-reference-smoke.ps1 -OnlineFixture
@@ -383,9 +383,9 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/center-move-grip-smoke.ps1
           ./tools/placement-preview-smoke.ps1
           ./tools/resize-equation-smoke.ps1
-          ./tools/center-move-grip-smoke.ps1
           ./tools/sticky-exponent-smoke.ps1
           ./tools/formula-reference-model-test.ps1
           ./tools/formula-reference-smoke.ps1 -OnlineFixture
