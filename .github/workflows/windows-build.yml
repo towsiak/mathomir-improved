@@ -80,6 +80,9 @@ jobs:
       - name: Center move grips and double-click editing checks
         shell: pwsh
         run: ./tools/center-move-grip-smoke.ps1
+      - name: Selection approximation UI checks
+        shell: pwsh
+        run: ./tools/selection-approx-smoke.ps1
       - name: Formula reference and free AI UI checks
         shell: pwsh
         run: |
@@ -145,9 +148,6 @@ jobs:
       - name: AI help and connection setup UI checks
         shell: pwsh
         run: ./tools/ai-help-smoke.ps1
-      - name: Selection approximation UI checks
-        shell: pwsh
-        run: ./tools/selection-approx-smoke.ps1
       - name: Arbitrary log-base numerical checks
         shell: pwsh
         run: ./tools/log-base-test.ps1

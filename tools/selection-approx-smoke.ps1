@@ -28,6 +28,9 @@ function Panel {
  return [MathomirUiProbe]::CaptionChild($view,'Math selection')
 }
 function OpenContext($x,$y){
+ # Settle the real pointer before synthetic button messages. A pending OS move
+ # otherwise arrives without MK_RBUTTON and ends the native right-click gesture.
+ [MathomirUiProbe]::Mouse($view,512,0,$x,$y)
  [MathomirUiProbe]::Mouse($view,516,2,$x,$y);[MathomirUiProbe]::Mouse($view,517,0,$x,$y);Start-Sleep -Milliseconds 80
  $p=Panel;$popup=[MathomirUiProbe]::Window($appProcess.Id,'PopupMenu');Check ($popup -ne [IntPtr]::Zero -and $p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)) 'Built-in popup did not contain approximation controls'
  return $p
