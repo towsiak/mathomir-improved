@@ -12,7 +12,7 @@ CENTER MOVE GRIPS AND EQUATION RESIZING (2026-10-15)
   Exact authored sizes are retained for repeated updates and Escape cancellation;
   old caret/long-click references are cleared before starting a size gesture.
 - Added Windows regression cases for equals alone, x=2, the radical/power/prime
-  form shown in the report, and an equals sign carrying an upper label, at three
+  form shown in the report, and a fractional equation, at three
   font sizes and three zoom levels. The screenshot establishes a Windows hang;
   hovering a standalone equals sign reproduced an endless approximation-helper
   loop before resizing. An empty left side is now rejected before deletion.

@@ -127,7 +127,7 @@ Escape cancellation, native graph formula editing and shape node editing remain.
 Equation resizing now changes the live font tree in place rather than deleting
 and copying nested expressions on every mouse event. This preserves internal
 editing references and exact authored child sizes. The added native Windows
-checks cover equals signs, roots, powers, prime marks and operator labels across
+checks cover equals signs, roots, powers, prime marks and fractional equations across
 three font sizes and three zoom levels. The new test reproduced an infinite
 approximation-helper deletion loop on a standalone equals sign; an empty left
 side is now rejected before deletion. Small symbols also keep their resize,

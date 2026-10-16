@@ -27,7 +27,7 @@ try{
   @{name='equals';body='<opr s="=" />'},
   @{name='simple';body='<var t="x" f="00" /><opr s="=" /><var t="2" f="00" />'},
   @{name='radical-power-primes';body=$left+'<opr s="=" />'+$right},
-  @{name='equals-label';body='<var t="x" f="00" /><opr s="=" E1="upp"><ex fh="70"><var t="rule" f="00" /></ex></opr>'+ $radical}
+  @{name='fraction-equation';body='<var t="y" f="00" /><opr s="=" /><fra E1="n" E2="d"><ex fh="90"><var t="x" f="00" /><opr s="+" /><var t="1" f="00" /></ex><ex fh="90"><var t="x" f="00" /><opr s="-" /><var t="2" f="00" /></ex></fra>'}
  )
  foreach($case in $cases){foreach($font in @(100,600,1200)){foreach($zoom in @(60,100,200)){
   Write-Output ('Starting resize: '+$case.name+' font='+$font+' zoom='+$zoom)
@@ -52,7 +52,7 @@ try{
   if((Shape $cancelled) -ne $original){throw 'Undo or Escape altered equation contents'}
   Write-Output ('Passed resize: '+$case.name+' font='+$font+' zoom='+$zoom)
  }}}
- Write-Output 'Equation resizing passed: equals, equations, roots/powers/primes, operator labels; 36 cases; grow/shrink/Undo/Escape/content preservation.'
+ Write-Output 'Equation resizing passed: equals, equations, roots/powers/primes, fraction equations; 36 cases; grow/shrink/Undo/Escape/content preservation.'
  }finally{
  if($main -and !$app.HasExited){
   Add-Type -AssemblyName System.Drawing
