@@ -1,0 +1,437 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -105,6 +105,16 @@
+ int QuickSelectActive=0;
+ int RootObjectCopy;
+ int RootObjectFontSize;
++static bool PlacementPreviewPaused=false;
++static int ClipboardPlacementFont();
++static void ResolveExpressionPlacement(int cursorX,int cursorY,int &x,int &y,bool separate);
++static void ResolveDrawingPlacement(CDrawing *drawing,int cursorX,int cursorY,int &x,int &y);
++struct ScopedPlacementPreviewPause {
++    bool previous;
++    ScopedPlacementPreviewPause():previous(PlacementPreviewPaused){PlacementPreviewPaused=true;}
++    ~ScopedPlacementPreviewPause(){PlacementPreviewPaused=previous;}
++};
++
+ extern char TemporaryShowColoredSelection;
+ extern int EasycastListStart;
+ char MouseIsTouchingExpression;
+@@ -2207,6 +2217,8 @@
+ static CObject *ExplicitTypingRoot=NULL;
+ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ {
++    ScopedPlacementPreviewPause previewPause;
++    RestoreClipboardBackground();
+     const bool centerWasVisible=CenterMoveGripHit(ResizeHandleDocument(),point);
+     CenterEditRelease=false;
+     if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *t=fopen("center-move-grip-trace.txt","a");if(t){fprintf(t,"down %d,%d mode=%d center=%d\n",point.x,point.y,MouseMode,centerWasVisible);fclose(t);}}
+@@ -2961,16 +2973,8 @@
+ 
+ 
+ 
+-		int make_text=0;
+-		if (GuidlineElement>=0)
+-		{
+-			AbsoluteX=prevGuidlineX;
+-			make_text=SelectedGuidelineType;
+-		}
+-		else if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+-		{
+-			SnapCanvasGridPoint(AbsoluteX,AbsoluteY,3);
+-		}
++        int make_text=(GuidlineElement>=0)?SelectedGuidelineType:0;
++        ResolveExpressionPlacement(point.x,point.y,AbsoluteX,AbsoluteY,separatePlacement);
+ 
+ 
+ 		//if clipboard holds an empty expression then simply start the keyboard entry mode
+@@ -3002,7 +3006,7 @@
+ 		//ds->absolute_X=AbsoluteX; 
+ 		//ds->absolute_Y=AbsoluteY;
+ 		//ds->Type=1; //expression
+-		ds->Object=(CObject*)new CExpression(NULL,NULL,DefaultFontSize);
++		ds->Object=(CObject*)new CExpression(NULL,NULL,ClipboardPlacementFont());
+ 		if ((RootObjectCopy==-1 || RootObjectCopy==ClipboardExpression->CalcChecksum()))
+ 		{
+ 			((CExpression*)(ds->Object))->m_FontSize=RootObjectFontSize;
+@@ -3947,7 +3951,8 @@
+ 	{
+ 		//we cannot have both clipboards active at the same time, expressions have precedance
+ 		if ((ClipboardExpression) && (ClipboardDrawing)){delete ClipboardDrawing;ClipboardDrawing=NULL;}
+-		PaintClipboard(point.x,point.y);
++        // Resolve hover, insertion and snapping before painting the preview.
++        RestoreClipboardBackground();
+ 	}
+ 	
+ 	//capturing cursor (if outside of client area, or atop other window, release)
+@@ -5060,6 +5065,7 @@
+         // controls paragraph already explains center dragging and double-click.
+         SetCursor(::LoadCursor(NULL,IDC_SIZEALL));
+     }
++    if(ClipboardExpression || ClipboardDrawing)PaintClipboard(point.x,point.y);
+ 	CView::OnMouseMove(nFlags, point);
+ 	}
+ 	catch(...)
+@@ -9536,151 +9542,162 @@
+ #pragma optimize("",on)
+ 
+ 
+-int CMathomirView::PaintClipboard(int X, int Y)
+-{
+-	
+-	X=ViewX+X*100/ViewZoom;
+-	Y=ViewY+Y*100/ViewZoom;
+-
+-	X=(X-ViewX)*ViewZoom/100;
+-	Y=(Y-ViewY)*ViewZoom/100;
+-
+-	// nothing to paint
+-	if ((ClipboardExpression==NULL) && (ClipboardDrawing==NULL))
+-	{
+-		RestoreClipboardBackground();
+-		return 0;
+-	}
+-	if (ClipboardExpression)
+-		ClipboardExpression->SelectExpression(3);
+-	else if (ClipboardDrawing)
+-		ClipboardDrawing->SelectDrawing(1);
+-
+-	CDC *DC=GetDC();
+-
+-	//first, check if ClipboardBackground image is already created
+-	if (ClipboardBackground.bmp==NULL)
+-	{
+-		ClipboardBackground.bmp=new CBitmap();
+-		ClipboardBackground.bmp->CreateCompatibleBitmap(DC,1,1);
+-		ClipboardBackground.DC=new CDC();
+-		ClipboardBackground.DC->CreateCompatibleDC(DC);
+-		ClipboardBackground.DC->SelectObject(ClipboardBackground.bmp);
+-		ClipboardBackground.Restored=1;
+-	}
+-
+-	//now, check the size of the clipboard image
+-	short l=0,a=0,b=0;
+-	if (ClipboardExpression)
+-	{
+-		ClipboardBackground.ZoomLevel=min(80,ViewZoom);
+-		ClipboardExpression->CalculateSize(DC,ClipboardBackground.ZoomLevel,&l,&a,&b);
+-		if ((l>300) || (a+b>240))
+-		{
+-			ClipboardBackground.ZoomLevel=min(50,ViewZoom);
+-			ClipboardExpression->CalculateSize(DC,ClipboardBackground.ZoomLevel,&l,&a,&b);
+-		}
+-	}
+-	else
+-	{
+-		ClipboardBackground.ZoomLevel=ViewZoom;
+-		ClipboardDrawing->CalculateSize(DC,ClipboardBackground.ZoomLevel,&l,&b);
+-	}
+-
+-
+-	if ((l!=ClipboardBackground.Cx-10) || (a+b!=ClipboardBackground.Cy-10))
+-	{
+-		RestoreClipboardBackground();
+-
+-		//the size differs, create new clipboard bitmap image
+-		ClipboardBackground.DC->DeleteDC();
+-		ClipboardBackground.bmp->DeleteObject();
+-		delete ClipboardBackground.bmp;
+-		delete ClipboardBackground.DC;
+-
+-		ClipboardBackground.Cx=l+10;
+-		ClipboardBackground.Cy=a+b+10;
+-
+-		ClipboardBackground.bmp=new CBitmap();
+-		ClipboardBackground.bmp->CreateCompatibleBitmap(DC,ClipboardBackground.Cx,ClipboardBackground.Cy);
+-		ClipboardBackground.DC=new CDC();
+-		ClipboardBackground.DC->CreateCompatibleDC(DC);
+-		ClipboardBackground.DC->SelectObject(ClipboardBackground.bmp);
+-	}
+-
+-	int newx=X+5;
+-	int newy=Y+10;
+-	if (ClipboardDrawing)
+-	{
+-		newx=X-MovingStartX*ViewZoom/100;
+-		newy=Y-MovingStartY*ViewZoom/100;
+-
+-		if ((SpecialDrawingHover==NULL) || (((CDrawing*)SpecialDrawingHover->Object)->IsSpecialDrawing!=50)) //note: we dont use snap to grid inside drawing box
+-		if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+-		{
+-			int X=ViewX+newx*100/ViewZoom;
+-			int Y=ViewY+newy*100/ViewZoom;
+-		
+-			int x1,y1;
+-			ClipboardDrawing->FindRealCorner(&x1,&y1);
+-			X+=x1;
+-			Y+=y1;
+-			SnapCanvasGridPoint(X,Y);
+-
+-			newx=(X-x1-ViewX)*ViewZoom/100;
+-			newy=(Y-y1-ViewY)*ViewZoom/100;
+-		}
+-		newx-=5;
+-		newy-=5;
+-	}
+-PaintDrawingHotspot(1);
+-	if ((abs(newx-ClipboardBackground.X)<10) && (abs(newy-ClipboardBackground.Y)<10))
+-	{
+-		CBitmap tmpbmp;
+-		CDC tmpdc;
+-		tmpbmp.CreateCompatibleBitmap(DC,ClipboardBackground.Cx+20,ClipboardBackground.Cy+20);
+-		tmpdc.CreateCompatibleDC(DC);
+-		tmpdc.SelectObject(tmpbmp);
+-		tmpdc.BitBlt(0,0,ClipboardBackground.Cx+20,ClipboardBackground.Cy+20,DC,ClipboardBackground.X-10,ClipboardBackground.Y-10,SRCCOPY);
+-		if (!ClipboardBackground.Restored)
+-			tmpdc.BitBlt(10,10,ClipboardBackground.Cx,ClipboardBackground.Cy,ClipboardBackground.DC,0,0,SRCCOPY);
+-
+-		ClipboardBackground.DC->BitBlt(0,0,ClipboardBackground.Cx,ClipboardBackground.Cy,&tmpdc,10+newx-ClipboardBackground.X,10+newy-ClipboardBackground.Y,SRCCOPY);
+-
+-		//now paint into the background image
+-		if (ClipboardExpression)
+-			ClipboardExpression->PaintExpression(&tmpdc,ClipboardBackground.ZoomLevel,10+newx-ClipboardBackground.X+5,10+newy-ClipboardBackground.Y+a+5,0);
+-		else if (ClipboardDrawing)
+-			ClipboardDrawing->PaintDrawing(&tmpdc,ClipboardBackground.ZoomLevel,10+newx-ClipboardBackground.X+5,10+newy-ClipboardBackground.Y+a+5,-1,-1,0);
+-		ClipboardBackground.Restored=0;
+-
+-		DC->BitBlt(ClipboardBackground.X-10,ClipboardBackground.Y-10,ClipboardBackground.Cx+20,ClipboardBackground.Cy+20,&tmpdc,0,0,SRCCOPY);
+-		ClipboardBackground.X=newx;
+-		ClipboardBackground.Y=newy;
+-	}
+-	else
+-	{
+-		RestoreClipboardBackground();
+-
+-		//get background image
+-		ClipboardBackground.X=newx;
+-		ClipboardBackground.Y=newy;
+-		ClipboardBackground.DC->BitBlt(0,0,ClipboardBackground.Cx,ClipboardBackground.Cy,DC,ClipboardBackground.X,ClipboardBackground.Y,SRCCOPY);
+-
+-		//paint Clipboard
+-		if (ClipboardExpression)
+-			ClipboardExpression->PaintExpression(DC,ClipboardBackground.ZoomLevel,ClipboardBackground.X+5,ClipboardBackground.Y+a+5);
+-		else if (ClipboardDrawing)
+-			ClipboardDrawing->PaintDrawing(DC,ClipboardBackground.ZoomLevel,ClipboardBackground.X+5,ClipboardBackground.Y+a+5,-1,-1);
+-		ClipboardBackground.Restored=0;
+-	}
+-	ReleaseDC(DC);
+-PaintDrawingHotspot();
+-	return 0;
+-}
++// Preview and commit use the same font and document-coordinate calculations.
++static int ClipboardPlacementFont()
++{
++    return ClipboardExpression && (RootObjectCopy==-1 || RootObjectCopy==ClipboardExpression->CalcChecksum())
++        ? RootObjectFontSize : DefaultFontSize;
++}
++
++static void ResolveExpressionPlacement(int cursorX,int cursorY,int &x,int &y,bool separate)
++{
++    x=ViewX+cursorX*100/ViewZoom;y=ViewY+cursorY*100/ViewZoom;
++    if(!separate && GuidlineElement>=0)x=prevGuidlineX;
++    else if(IsCanvasGridSnapActive() && !(GetKeyState(VK_MENU)&0xFFFE))SnapCanvasGridPoint(x,y,3);
++}
++
++static void ResolveDrawingPlacement(CDrawing *drawing,int cursorX,int cursorY,int &x,int &y)
++{
++    x=ViewX+cursorX*100/ViewZoom-MovingStartX;
++    y=ViewY+cursorY*100/ViewZoom-MovingStartY;
++    if(MouseMode==9 || MouseMode==11)return;
++    if(SpecialDrawingHover && ((CDrawing*)SpecialDrawingHover->Object)->IsSpecialDrawing==50){
++        if((GetKeyState(VK_MENU)&0xFFFE) && tmpDrawing){
++            int px=x+MovingStartX,py=y+MovingStartY;
++            if(tmpDrawing->FindNerbyPoint(&px,&py,NULL,0,0,0,0)){x=px-MovingStartX;y=py-MovingStartY;}
++        }
++    }else if(IsCanvasGridSnapActive() && !(GetKeyState(VK_MENU)&0xFFFE)){
++        SnapCanvasGridPoint(x,y);
++        int cornerX,cornerY;drawing->FindRealCorner(&cornerX,&cornerY);x-=cornerX;y-=cornerY;
++    }
++}
++
++int CMathomirView::PaintClipboard(int X,int Y)
++{
++    RestoreClipboardBackground();
++    if(PlacementPreviewPaused || (!ClipboardExpression && !ClipboardDrawing) || ViewZoom<=0)return 0;
++    CRect client;GetClientRect(&client);
++    if(!client.PtInRect(CPoint(X,Y)))return 0;
++    CPoint screen(X,Y);ClientToScreen(&screen);
++    if(::WindowFromPoint(screen)!=GetSafeHwnd())return 0;
++
++    CClientDC dc(this);
++    const bool separate=(GetKeyState(VK_SHIFT)&0x8000)!=0;
++    bool compact=false;
++    int font=ClipboardPlacementFont();
++    if(ClipboardExpression && !separate){
++        // Insertion may reflow an existing equation. Show a labelled payload
++        // thumbnail beside its native insertion marker, not a false drop site.
++        for(int i=0;i<NumDocumentElements;i++)if(TheDocument+i==IsInsertionPointTouched && TheDocument[i].Type==1){
++            compact=true;font=((CExpression*)TheDocument[i].Object)->m_FontSize;break;
++        }
++        int row=NewlineAddObject&0x3FFFFFFF;
++        if(NewlineAddObject>=0 && row<NumDocumentElements && TheDocument[row].Type==1){
++            compact=true;font=((CExpression*)TheDocument[row].Object)->m_FontSize;
++        }
++    }
++    CExpression expression(NULL,NULL,font);
++    short length=0,above=0,below=0;
++    int docX=0,docY=0,paintX=0,paintY=0,zoom=ViewZoom;
++    struct Item { CExpression *expression;CDrawing *drawing;int x,y,docX,docY;CRect bounds; };
++    std::vector<Item> items;
++    CRect bounds;bounds.SetRectEmpty();
++    if(ClipboardExpression){
++        // The same copy operation as commit preserves nested sizes, rotation,
++        // colors and table formatting without modifying the held source.
++        expression.CopyExpression(ClipboardExpression,0,1,0);expression.DeselectExpression();
++        expression.CalculateSize(&dc,zoom,&length,&above,&below);
++        if(compact){
++            double scale=min(1.0,min(220.0/max(1,(int)length),140.0/max(1,(int)above+below)));
++            zoom=max(5,(int)(ViewZoom*scale));
++            expression.CalculateSize(&dc,zoom,&length,&above,&below);
++            paintX=max(4,min(X+16,client.right-(int)length-8));
++            int top=max(24,min(Y+20,client.bottom-(int)above-below-8));paintY=top+above;
++        }else{
++            ResolveExpressionPlacement(X,Y,docX,docY,separate);
++            paintX=(docX-ViewX)*ViewZoom/100;paintY=(docY-ViewY)*ViewZoom/100;
++        }
++        bounds=CRect(paintX,paintY-above,paintX+max(1,(int)length),paintY+max(1,(int)below));
++        Item item={&expression,NULL,paintX,paintY,docX,docY,bounds};items.push_back(item);
++    }else{
++        ClipboardDrawing->SelectDrawing(0);
++        ClipboardDrawing->CalculateSize(&dc,ViewZoom,&length,&below);
++        ResolveDrawingPlacement(ClipboardDrawing,X,Y,docX,docY);
++        // A held group is unpacked on commit. Match each child's rounding and
++        // expression baseline exactly, instead of painting an approximate group.
++        for(int i=0;i<ClipboardDrawing->NumItems;i++){
++            tDrawingItem *source=ClipboardDrawing->Items+i;
++            if(!source->pSubdrawing || (source->Type!=0 && source->Type!=2))continue;
++            Item item={};item.docX=docX+source->X1/DRWZOOM;item.docY=docY+source->Y1/DRWZOOM;
++            short l=0,a=0,b=0;
++            if(source->Type==0){
++                item.drawing=(CDrawing*)source->pSubdrawing;item.drawing->CalculateSize(&dc,ViewZoom,&l,&b);
++            }else{
++                item.expression=(CExpression*)source->pSubdrawing;item.expression->CalculateSize(&dc,ViewZoom,&l,&a,&b);
++                item.docY+=a*100/ViewZoom;
++            }
++            item.x=(item.docX-ViewX)*ViewZoom/100;item.y=(item.docY-ViewY)*ViewZoom/100;
++            item.bounds=CRect(item.x,item.y-a,item.x+max(1,(int)l),item.y+max(1,(int)b));
++            if(bounds.IsRectEmpty())bounds=item.bounds;else bounds.UnionRect(bounds,item.bounds);
++            items.push_back(item);
++        }
++        paintX=(docX-ViewX)*ViewZoom/100;paintY=(docY-ViewY)*ViewZoom/100;
++    }
++    if(items.empty() || bounds.IsRectEmpty())return 0;
++
++    const char *label=compact?"Insert into math":"Preview   Click to place   Esc to cancel";
++    CFont *oldFont=dc.SelectObject((CFont*)CFont::FromHandle((HFONT)::GetStockObject(DEFAULT_GUI_FONT)));
++    CSize text=dc.GetTextExtent(label,(int)strlen(label));dc.SelectObject(oldFont);
++    int badgeX=max(3,min(bounds.left,client.right-text.cx-12));
++    int badgeY=bounds.top-text.cy-11;if(badgeY<3)badgeY=min(client.bottom-text.cy-9,bounds.bottom+8);
++    CRect badge(badgeX,badgeY,badgeX+text.cx+10,badgeY+text.cy+6);
++    CRect footprint=bounds;footprint.InflateRect(4,4);
++    CRect region;region.UnionRect(footprint,badge);region.InflateRect(2,2);region.IntersectRect(region,client);
++    if(region.IsRectEmpty())return 0;
++
++    // Save only visible canvas pixels: very large objects never require a
++    // bitmap the size of the entire object, and never get silently shrunk.
++    if(!ClipboardBackground.bmp || ClipboardBackground.Cx!=region.Width() || ClipboardBackground.Cy!=region.Height()){
++        if(ClipboardBackground.DC){ClipboardBackground.DC->DeleteDC();delete ClipboardBackground.DC;ClipboardBackground.DC=NULL;}
++        if(ClipboardBackground.bmp){delete ClipboardBackground.bmp;ClipboardBackground.bmp=NULL;}
++        ClipboardBackground.bmp=new CBitmap();ClipboardBackground.DC=new CDC();
++        if(!ClipboardBackground.bmp->CreateCompatibleBitmap(&dc,region.Width(),region.Height()) || !ClipboardBackground.DC->CreateCompatibleDC(&dc))return 0;
++        ClipboardBackground.DC->SelectObject(ClipboardBackground.bmp);
++    }
++    ClipboardBackground.X=region.left;ClipboardBackground.Y=region.top;
++    ClipboardBackground.Cx=region.Width();ClipboardBackground.Cy=region.Height();ClipboardBackground.ZoomLevel=ViewZoom;
++    ClipboardBackground.DC->BitBlt(0,0,region.Width(),region.Height(),&dc,region.left,region.top,SRCCOPY);
++    CDC buffer;CBitmap image;
++    if(!buffer.CreateCompatibleDC(&dc) || !image.CreateCompatibleBitmap(&dc,region.Width(),region.Height()))return 0;
++    CBitmap *oldBitmap=buffer.SelectObject(&image);
++    buffer.BitBlt(0,0,region.Width(),region.Height(),ClipboardBackground.DC,0,0,SRCCOPY);
++    int state=buffer.SaveDC();buffer.SetViewportOrg(-region.left,-region.top);
++    if(compact)buffer.FillSolidRect(bounds,RGB(255,255,255));
++    for(size_t i=0;i<items.size();i++){
++        Item &item=items[i];
++        CRect visible;visible.IntersectRect(item.bounds,client);if(visible.IsRectEmpty())continue;
++        if(item.expression)item.expression->PaintExpression(&buffer,(short)zoom,(short)item.x,(short)item.y);
++        else item.drawing->PaintDrawing(&buffer,ViewZoom,(short)item.x,(short)item.y,item.docX,item.docY);
++    }
++    CPen outline(PS_DOT,1,RGB(112,139,162));buffer.SelectObject(&outline);buffer.SelectStockObject(NULL_BRUSH);buffer.SetBkMode(TRANSPARENT);
++    buffer.Rectangle(footprint);
++    buffer.FillSolidRect(badge,RGB(255,255,255));buffer.Draw3dRect(badge,RGB(204,214,222),RGB(204,214,222));
++    buffer.SelectStockObject(DEFAULT_GUI_FONT);buffer.SetTextColor(RGB(45,55,65));buffer.TextOut(badge.left+5,badge.top+3,label);
++    buffer.RestoreDC(state);
++    dc.BitBlt(region.left,region.top,region.Width(),region.Height(),&buffer,0,0,SRCCOPY);
++    buffer.SelectObject(oldBitmap);ClipboardBackground.Restored=0;
++    if(getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS")){
++        const char *names[]={"Active","Left","Top","Right","Bottom","X","Y","Zoom","Kind"};
++        int values[]={1,bounds.left,bounds.top,bounds.right,bounds.bottom,docX,docY,ViewZoom,compact?3:ClipboardExpression?1:2};
++        for(int i=0;i<9;i++){CString key="MathomirPlacement_";key+=names[i];::SetProp(GetSafeHwnd(),key,(HANDLE)(INT_PTR)(values[i]+1));}
++    }
++    return 1;
++}
++
+ 
+ int CMathomirView::RestoreClipboardBackground(void)
+ {
++    if(getenv("MATHOMIR_PLACEMENT_DIAGNOSTICS"))::SetProp(GetSafeHwnd(),"MathomirPlacement_Active",(HANDLE)1);
+ 	if (ClipboardBackground.Restored) return 0;
+ 	if (ClipboardBackground.bmp==NULL) return 0;
+ 	CDC *DC=GetDC();
+@@ -11074,6 +11091,7 @@
+ }
+ void CMathomirView::OnMouseLeave()
+ {
++    RestoreClipboardBackground();
+     FunctionHelpMouseTracking=false;
+     if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive){
+         tDocumentStruct *hover=ResizeHandleDocument();POINT screen={};::GetCursorPos(&screen);
+@@ -11095,6 +11113,7 @@
+ 
+ void CMathomirView::OnCaptureChanged(CWnd *window)
+ {
++    if(window!=this)RestoreClipboardBackground();
+     if (MouseMovingActive && window!=this) EndGripMove(true);
+     if (MouseSizingActive && window!=this) EndMouseSizing(true);
+     if (MouseRotationActive && window!=this) EndMouseRotation(true);
+@@ -12050,39 +12069,8 @@
+ 	CDrawing *mydrw=(CDrawing*)drawing;
+ 	if (mydrw==NULL) mydrw=ClipboardDrawing;
+ 	if (mydrw==NULL) return 0;
+-	int AbsoluteX=ViewX+(int)cursorX*100/(int)ViewZoom;
+-	int AbsoluteY=ViewY+(int)cursorY*100/(int)ViewZoom;
+-	AbsoluteX-=MovingStartX;
+-	AbsoluteY-=MovingStartY;
+-
+-
+-	if ((MouseMode!=9) && (MouseMode!=11))
+-	{
+-		if ((SpecialDrawingHover) && 
+-			(((CDrawing*)SpecialDrawingHover->Object)->IsSpecialDrawing==50))
+-		{
+-			if (GetKeyState(VK_MENU)&0xFFFE)
+-			{
+-				//snap to point is used inside drawing boxes when ALT key is held
+-				int ppx=AbsoluteX+MovingStartX;
+-				int ppy=AbsoluteY+MovingStartY;
+-				if ((tmpDrawing) && (tmpDrawing->FindNerbyPoint(&ppx,&ppy,NULL,0,0,0,0)))
+-				{
+-					AbsoluteX=ppx-MovingStartX;
+-					AbsoluteY=ppy-MovingStartY;
+-				}
+-			}
+-		}
+-		else if ((IsCanvasGridSnapActive()) && (!(GetKeyState(VK_MENU)&0xFFFE)))
+-		{
+-			SnapCanvasGridPoint(AbsoluteX,AbsoluteY);
+-		
+-			int x1,y1;
+-			mydrw->FindRealCorner(&x1,&y1);
+-			AbsoluteX-=x1;
+-			AbsoluteY-=y1;
+-		}
+-	}
++    int AbsoluteX,AbsoluteY;
++    ResolveDrawingPlacement(mydrw,cursorX,cursorY,AbsoluteX,AbsoluteY);
+ 
+ 
+ 

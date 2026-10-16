@@ -1,3 +1,18 @@
+ACCURATE PLACEMENT PREVIEWS (2026-10-16)
+- Prepared math/text, drawings and groups now preview with their final native
+  colors, zoom, root font and placement coordinates. Math previews are no longer
+  silently reduced to 80% or 50% or shifted away from their eventual baseline.
+- Drawing previews unpack the same children as placement, preserving rounding,
+  mixed math/drawing baselines, graph rendering and the grab offset.
+- Preview and placement share grid/guideline resolution. A faint outline and a
+  small placement label distinguish the held object from committed content.
+- Inserting into existing math uses a labelled compact payload thumbnail beside
+  the native insertion marker, since that action can reflow the destination.
+- Preview buffers are clipped to the visible canvas, including very large
+  objects. Moving, repainting, cancelling and leaving the canvas erase them.
+- Preview works on a copy of held math and pauses during the placement click;
+  hovering does not add an object or consume Undo.
+
 EXPONENT TYPING (2026-10-16)
 - Arithmetic operators no longer leave a simple exponent automatically. After
   typing x^1, /2 stays in the exponent, as do +, - and *. Press Enter, navigate
