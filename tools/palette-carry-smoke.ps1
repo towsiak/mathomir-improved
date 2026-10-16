@@ -16,8 +16,8 @@ public static class PaletteProbe {
 $exe=(Resolve-Path 'source/build/Mathomir.exe').Path;$folder=Split-Path $exe
 $env:MATHOMIR_PLACEMENT_DIAGNOSTICS='1';$app=Start-Process $exe -WorkingDirectory $folder -PassThru
 function Check($ok,$message){if(!$ok){throw $message}}
-function Move($x,$y){[MathomirUiProbe]::Mouse($view,512,0,$x,$y)}
-function Cancel {[MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null;Move 25 20;[PlacementProbe]::Refresh($view)}
+function MovePointer($x,$y){[MathomirUiProbe]::Mouse($view,512,0,$x,$y)}
+function Cancel {[MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null;MovePointer 25 20;[PlacementProbe]::Refresh($view)}
 function Snapshot {return [PlacementProbe]::Capture($view,$width,$height)}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $fixture -Raw)}
 function AssertPreview($kind,$index){
@@ -42,19 +42,19 @@ try{
  '<?xml version="1.0"?><mathomir><o t="1" X="40" Y="60"><ex><var t="seed" f="00" /></ex></o></mathomir>'|Set-Content $fixture -Encoding ascii
  [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 200
  [MathomirUiProbe]::Send($view,276,4)|Out-Null;for($i=0;$i -lt 10;$i++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
- Move 25 20;$baseline=SaveDoc
+ MovePointer 25 20;$baseline=SaveDoc
  $count=[PaletteProbe]::Query($view,5,-1);Check ($count -gt 100) 'Palette enumeration incomplete'
  $tools=New-Object System.Collections.Generic.List[int];$mathCount=0;$toolCount=0
  foreach($zoom in @(100,60,200)){
   [MathomirUiProbe]::Send($view,273,$(if($zoom -eq 60){32777}elseif($zoom -eq 200){33019}else{32775}))|Out-Null
-  Move 25 20;[PlacementProbe]::Refresh($view);$clean=Snapshot
+  MovePointer 25 20;[PlacementProbe]::Refresh($view);$clean=Snapshot
   for($index=0;$index -lt $count;$index++){
    $kind=[PaletteProbe]::Query($view,5,$index)
    if($kind -eq 0 -or $kind -eq 2){continue}
    if($zoom -ne 100 -and $kind -le 100){continue}
    Check ([PaletteProbe]::Query($view,6,$index) -eq $kind) "Actual palette pickup failed: $index"
-   Move 320 220;AssertPreview $kind $index
-   Move 350 245;AssertPreview $kind $index
+   MovePointer 320 220;AssertPreview $kind $index
+   MovePointer 350 245;AssertPreview $kind $index
    if($kind -eq 130 -and $zoom -eq 100){$s=Snapshot;SaveShot $s 'palette-carry-triangle.png';$s.Dispose()}
    if($kind -gt 100){$toolCount++;if($zoom -eq 100){$tools.Add($index)}}else{$mathCount++}
    Cancel
@@ -67,13 +67,13 @@ try{
  # Actual left-side click: first default operator tile, before any board click.
  $toolbox=[MathomirUiProbe]::CaptionChild($main,'Toolbox');$tr=[MathomirUiProbe]::ClientRect($toolbox);$tile=[int]($tr.Right/4);$tileY=[int]($tr.Right/2+6)
  [MathomirUiProbe]::Mouse($toolbox,512,0,$tile,$tileY);[MathomirUiProbe]::Mouse($toolbox,513,1,$tile,$tileY);[MathomirUiProbe]::Mouse($toolbox,514,0,$tile,$tileY)
- Move 320 220;AssertPreview 1 -1;Cancel
+ MovePointer 320 220;AssertPreview 1 -1;Cancel
  # A real drawing gesture must keep its shape; samples never touch creator state.
  foreach($index in $tools){
   $kind=[PaletteProbe]::Query($view,5,$index);$form=$kind-100
   if($form -notin @(1,2,4,5,8,9,15,16,17,19,27,28,29,30,31,32,33)){continue}
   [MathomirUiProbe]::Send($view,273,32775)|Out-Null
-  [PaletteProbe]::Query($view,6,$index)|Out-Null;Move 320 220;AssertPreview $kind $index
+  [PaletteProbe]::Query($view,6,$index)|Out-Null;MovePointer 320 220;AssertPreview $kind $index
   [MathomirUiProbe]::Mouse($view,513,1,320,220)
   for($step=1;$step -le 4;$step++){[MathomirUiProbe]::Mouse($view,512,1,(320+25*$step),(220+20*$step))}
   [MathomirUiProbe]::Mouse($view,514,0,420,300)
