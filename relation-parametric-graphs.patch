@@ -86,7 +86,7 @@
      if(strncmp(file,"integral ",9)==0){
          IntegralArea::Settings proposed;char attribute[64],value[2048];file+=8;
          do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,2048);if(!file)return NULL;
-@@ -1794,6 +1808,44 @@
+@@ -1794,6 +1808,49 @@
      value=rhs.PlotterCalculateFunctionValue(0,variables,radians);rhs.PlotterReleaseVariablePositions(variables);
      return GraphDiscontinuities::Finite(value);
  }
@@ -96,6 +96,11 @@
 +    int equal=-1;
 +    for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='='){if(equal>=0)return false;equal=n;}
 +    if(equal<=0)return false; // Preserve the legacy '=formula' entry form.
++    // Native named functions have their own element type, distinct from typed f(x).
++    if(equal==1 && expression->m_pElementList[0].Type==6){
++        CElement *name=expression->m_pElementList[0].pElementObject;
++        if(name && !SymbolicDerivative::Known(NativeSymbolic::FunctionName(name->Data1)))return false;
++    }
 +    // A named function prefix is a label, not an implicit x/y relation.
 +    // Preserve every ordinary function name, including subscripted names.
 +    if((equal==1 || (equal==2 && expression->m_pElementList[1].Type==5)) && expression->m_pElementList[0].Type==1){
@@ -131,7 +136,7 @@
  int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  {
  	if (ViewZoom==0)
-@@ -1908,6 +1960,7 @@
+@@ -1908,6 +1965,7 @@
  
  
  
@@ -139,7 +144,7 @@
  	CExpression *Func[8];
      bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
      bool vertical[8]={false};double verticalX[8]={0};
-@@ -1917,7 +1970,11 @@
+@@ -1917,7 +1975,11 @@
  	int any_found=0;
  	for (int kk=0;kk<8;kk++,*pItem++)
  	{
@@ -152,7 +157,7 @@
  		if (Base->NumItems>=kk+9)
  		{
  			if ((pItem->pSubdrawing) &&
-@@ -2336,6 +2393,12 @@
+@@ -2336,6 +2398,12 @@
                      mDC.Ellipse((int)px-radius,Ylen-(int)py-radius,(int)px+radius+1,Ylen-(int)py+radius+1);
                      mDC.SelectObject(brush);mDC.SelectObject(pen);
                  }
@@ -165,7 +170,7 @@
  			mDC.SelectObject(prev_bitmap);
  			if (PrintDC==NULL)
  			{
-@@ -2396,6 +2459,11 @@
+@@ -2396,6 +2464,11 @@
  {
      if(Base->NumItems<8 || !StopForZoom()) return false;
      double xmin,xmax,ymin,ymax;PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
