@@ -92,15 +92,21 @@ try{
   Write-Output "Object appearance passed: $kind, eight inks, eight backgrounds, custom/cancel, clear, Undo, save/reopen, neighbor isolation"
  }
  # A mixed text/drawing selection should receive one background action and one Undo.
- $kind='shape';$fixture=Join-Path $folder 'object-colors-mixed.mom';('<?xml version="1.0"?><mathomir><o t="2" X="150" Y="130">'+$line+'</o>'+$neighbor+'</mathomir>')|Set-Content $fixture -Encoding ascii
- [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 200;$before=(SaveDoc).OuterXml
- [MathomirUiProbe]::Send($view,273,0xE12A)|Out-Null;OpenPopup;Choose 923;$mixed=SaveDoc
- Check ($mixed.SelectNodes('/mathomir/*/appearance[@bg="15260415"] | /mathomir/*/ex[@bg="15260415"]').Count -eq 2) 'Mixed selection background did not reach text and drawing'
- [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;Check ((SaveDoc).OuterXml -eq $before) 'Mixed selection background did not Undo in one step'
+ foreach($reverse in @($false,$true)){
+  $kind='shape';$fixture=Join-Path $folder ("object-colors-mixed-$reverse.mom")
+  $shape='<o t="2" X="150" Y="130">'+$line+'</o>'
+  $objects=if($reverse){$neighbor+$shape}else{$shape+$neighbor}
+  ('<?xml version="1.0"?><mathomir>'+$objects+'</mathomir>')|Set-Content $fixture -Encoding ascii
+  [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 200;$before=(SaveDoc).OuterXml
+  [MathomirUiProbe]::Send($view,273,0xE12A)|Out-Null;OpenPopup;Choose 923;$mixed=SaveDoc
+  Check ($mixed.SelectNodes('/mathomir/*/appearance[@bg="15260415"] | /mathomir/*/*[self::ex or self::expr][@bg="15260415"]').Count -eq 2) 'Mixed selection background did not reach text and drawing'
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;Check ((SaveDoc).OuterXml -eq $before) 'Mixed selection background did not Undo in one step'
+ }
  Write-Output 'Object appearance checks passed for shared text/math/drawing/group menus and mixed selection.'
 }catch{
- if($main -ne [IntPtr]::Zero){Capture $main 'object-colors-failure.png'}
- throw
+ $failure=$_
+ try{if($main -ne [IntPtr]::Zero){Capture $main 'object-colors-failure.png'}}catch{Write-Output 'Application window unavailable for failure screenshot.'}
+ throw $failure
 }finally{
  if(!$app.HasExited){Stop-Process -Id $app.Id -Force}
  Remove-Item Env:MATHOMIR_POPUP_COLOR_DIAGNOSTICS -ErrorAction SilentlyContinue

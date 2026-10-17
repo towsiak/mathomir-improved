@@ -294,7 +294,16 @@
      if(!no_reposition)m_ApproxPanelHandle=pMainView->PrepareContextApprox(this,expression,OwnerType);
  
  	MovingMode=0;
-@@ -506,27 +584,12 @@
+@@ -456,7 +534,7 @@
+ 		//options: delete, line size, group, ungroup, node edit?, sizing, rotating, mirroring, 
+ 		//         lock, unlock, arrange (left,center,right, top, center, ..)
+ 
+-		CDrawing *drw;
++		CDrawing *drw=NULL;
+ 		tDocumentStruct *dss=NULL;
+ 		int NumDrawings=0;
+ 		int NumExpressions=0;
+@@ -506,27 +584,13 @@
  		m_NumOptions=0;
  		memset((void*)&Options,0,sizeof(Options));
  
@@ -319,6 +328,7 @@
 -		AddCheckedMenuOption(TSize/8+4*TSize/3,TSize/3,"Blk ",(common_color==0)?1:0,581,0);
 -		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize/3,TSize/3,"Grn ",(common_color==2)?1:0,583,0);
 -		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize_2p3,TSize/3,"Gry ",(common_color==4)?1:0,585,1);
++        if(!dss)goto popupmenu_end_showpopup;
 +        AddMenuOption(TSize/3,TSize,"Delete ",501,1);
 +        if(common_color>=0)common_color&=7;
 +        if(Any_nonselected)AddMenuOption(TSize/3,TSize,"Select ",570,1);
@@ -328,7 +338,16 @@
  
  		if (Any_nonselected)
  		{
-@@ -843,15 +906,9 @@
+@@ -644,7 +708,7 @@
+ 			AddMenuOptionButton(5*TSize/3+TSize/8,"V. stretch +15% ",531,52,0);
+ 			AddMenuOptionButton(6*TSize/3+TSize/8,"V. stretch +50% ",532,53,1);
+ 
+-			if ((NumDrawings>1) || (dss==NULL) || (((CDrawing*)(dss->Object))->IsSpecialDrawing==0))
++			if ((NumDrawings>1) || (drw && drw->IsSpecialDrawing==0))
+ 			{
+ 
+ 				PopupOption_Y+=TSize_1p20;
+@@ -843,15 +907,9 @@
  		if (m_OwnerType!=3)
  		{
  			if (m_MenuType==1) common_color=m_Expression->m_Color;
@@ -347,7 +366,7 @@
  
  			if (m_MenuType==1)
  			{
-@@ -898,12 +955,7 @@
+@@ -898,12 +956,7 @@
  	{
  		//adding color options for font formatting menu (right clicked at the toolbox header 'U' option)
  		int common_color=m_Expression->m_pElementList->pElementObject->m_Color;
@@ -361,7 +380,7 @@
  	}
  
  	if (((m_MenuType==2) || (m_MenuType==6) || (add_even_chars)) && (m_theSelectedElement!=NULL)) //the font menu
-@@ -1064,6 +1116,7 @@
+@@ -1064,6 +1117,7 @@
  			}
  		}
  		this->ReleaseDC(dcc);
@@ -369,7 +388,7 @@
  		Options[m_NumOptions].Y=PopupOption_Y;
  		Options[m_NumOptions].X=0;
  		Options[m_NumOptions].Cx=l+TSize_1p2;
-@@ -1732,14 +1785,15 @@
+@@ -1732,14 +1786,15 @@
  			{
  
  				if (((Options[i].Data>=81) && (Options[i].Data<90)) || 
@@ -387,7 +406,7 @@
  					if (m_SelectedOption==i) lrg=TSize/24; else lrg=1;
  					dc->FillSolidRect(Options[i].X+TSize/8+1-lrg,Options[i].Y+1+TSize_1p20-lrg,TSize/8+2*lrg,TSize/8+2*lrg,clr);
  					if (Options[i].IsChecked&0x01) 
-@@ -1861,6 +1915,12 @@
+@@ -1861,6 +1916,12 @@
  	dc->MoveTo(1,TSize/4-9-1);dc->LineTo(TSize/4-9,0);
  	dc->MoveTo(1,TSize/4-12-1);dc->LineTo(TSize/4-12,0);
  	dc->MoveTo(1,TSize/4-15-1);dc->LineTo(TSize/4-15,0);
@@ -400,7 +419,7 @@
  	pdc->BitBlt(0,0,rct.right,rct.bottom,dc,0,0,SRCCOPY);
  	delete dc;
  
-@@ -1922,7 +1982,7 @@
+@@ -1922,7 +1983,7 @@
  
  
  	char delete_clipboard_at_exit=0;
@@ -409,7 +428,7 @@
  	{
  		int dataval=Options[m_SelectedOption].Data;
  
-@@ -1937,6 +1997,7 @@
+@@ -1937,6 +1998,7 @@
  		//	//do nothing, just exit
  		//}
  
@@ -417,7 +436,16 @@
  		if ((dataval>=110) && (dataval<115)) //stack-clipboard option
  		{
  			pMainView->OnEditUndo();
-@@ -3918,8 +3979,8 @@
+@@ -2578,7 +2640,7 @@
+ 					if ((data>=580) && (data<590)) //color changing
+ 					{
+ 						if (found==0) ((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("color",20107);
+-						if (data==589) ((CDrawing*)(ds->Object))->SetColor(0x08);
++						if (data==589){if(ds->Type==2)((CDrawing*)(ds->Object))->SetColor(0x08);}
+ 						else if (ds->Type==1) ((CExpression*)(ds->Object))->SetColor(data-581);
+ 						else if (ds->Type==2) ((CDrawing*)(ds->Object))->SetColor(data-581);
+ 					}
+@@ -3918,8 +3980,8 @@
  		{	
  			//we are not closing the context menu
  			int tmp=Options[m_SelectedOption].IsChecked&0x01;
@@ -428,7 +456,7 @@
  			if ((dd>=72) && (dd<=74)) UncheckOptions(72,74); //alignment (condition list)
  			if ((dd>=50) && (dd<=52)) UncheckOptions(50,52); //small,medium,large (symbol)
  			if (((dd>=30) && (dd<=39)) || (dd==49) || (dd==56) || (dd==57))
-@@ -4783,6 +4844,7 @@
+@@ -4783,6 +4845,7 @@
  #pragma optimize("s",on)
  int PopupMenu::AddMathMenuOption(CExpression * E1,CExpression *original)
  {
