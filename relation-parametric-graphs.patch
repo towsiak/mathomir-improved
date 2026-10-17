@@ -86,7 +86,7 @@
      if(strncmp(file,"integral ",9)==0){
          IntegralArea::Settings proposed;char attribute[64],value[2048];file+=8;
          do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,2048);if(!file)return NULL;
-@@ -1794,6 +1808,35 @@
+@@ -1794,6 +1808,38 @@
      value=rhs.PlotterCalculateFunctionValue(0,variables,radians);rhs.PlotterReleaseVariablePositions(variables);
      return GraphDiscontinuities::Finite(value);
  }
@@ -101,8 +101,11 @@
 +        SymbolicDerivative::Parser p;auto rhs=p.Parse(right);
 +        if(left=="y"&&!SymbolicDerivative::Depends(rhs,"y"))return false;
 +        if(left=="x"&&!SymbolicDerivative::Depends(rhs,"x")&&!SymbolicDerivative::Depends(rhs,"y"))return false;
-+        return program.Parse(left+"="+right,radians,error);
-+    }catch(const std::exception &){return false;}
++        program.Parse(left+"="+right,radians,error);return true;
++    }catch(const std::exception &){
++        // Never reinterpret an invalid two-sided relation as its right-hand side.
++        try{return NativeSymbolic::Formula(expression,0,equal)!="y";}catch(const std::exception &){return true;}
++    }
 +}
 +static void PaintRelationCurves(CDC &dc,const RelationGraph::Viewport &view,RelationGraph::Program *relations,bool *active,
 +    const RelationGraph::Parametric &parametric,int zoom,std::atomic<unsigned char> &abort)
@@ -122,7 +125,7 @@
  int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
  {
  	if (ViewZoom==0)
-@@ -1908,6 +1951,7 @@
+@@ -1908,6 +1954,7 @@
  
  
  
@@ -130,7 +133,7 @@
  	CExpression *Func[8];
      bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
      bool vertical[8]={false};double verticalX[8]={0};
-@@ -1917,7 +1961,11 @@
+@@ -1917,7 +1964,11 @@
  	int any_found=0;
  	for (int kk=0;kk<8;kk++,*pItem++)
  	{
@@ -143,7 +146,7 @@
  		if (Base->NumItems>=kk+9)
  		{
  			if ((pItem->pSubdrawing) &&
-@@ -2336,6 +2384,12 @@
+@@ -2336,6 +2387,12 @@
                      mDC.Ellipse((int)px-radius,Ylen-(int)py-radius,(int)px+radius+1,Ylen-(int)py+radius+1);
                      mDC.SelectObject(brush);mDC.SelectObject(pen);
                  }
@@ -156,11 +159,15 @@
  			mDC.SelectObject(prev_bitmap);
  			if (PrintDC==NULL)
  			{
-@@ -2396,6 +2450,7 @@
+@@ -2396,6 +2453,11 @@
  {
      if(Base->NumItems<8 || !StopForZoom()) return false;
      double xmin,xmax,ymin,ymax;PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
-+    if(parametric.enabled){TheState=0;PlotFunction(1);return true;}
++    if(parametric.enabled){
++        std::vector<double> xs(4097),ys(4097);for(int i=0;i<=4096;i++){auto point=parametric.Value(parametric.low+(parametric.high-parametric.low)*i/4096);xs[i]=point.x;ys[i]=point.y;}
++        double left,right,bottom,top;if(GraphZoom::Fit(xs.data(),(int)xs.size(),is_x_log!=0,left,right)&&GraphZoom::Fit(ys.data(),(int)ys.size(),is_y_log!=0,bottom,top))SetBounds(left,right,bottom,top);
++        TheState=0;PlotFunction(1);return true;
++    }
      if(resetX){xmin=is_x_log?0.1:(is_x_pi?-2*PiAxis::pi:-10);xmax=is_x_log?100:(is_x_pi?2*PiAxis::pi:10);ymin=is_y_log?0.1:-10;ymax=is_y_log?100:10;SetBounds(xmin,xmax,ymin,ymax);}
      TheState=0;PlotFunction(2);return true;
  }

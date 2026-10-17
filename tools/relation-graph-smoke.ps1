@@ -51,6 +51,11 @@ try{
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1429),'2*pi');[MathomirUiProbe]::Send($d,273,1439)|Out-Null;Capture $d 'relation-parametric-dialog.png';Apply $d;Place;$saved=SaveDoc
  $metadata=$saved.SelectSingleNode('//parametric');Check ($metadata -and $metadata.rad -eq '1' -and [double]$metadata.hi -gt 6) 'Parametric metadata missing'
  Check ([MathomirUiProbe]::CountColor($view,160,105,520,385,0) -gt 200) 'Native parametric ellipse absent';Capture $main 'relation-parametric-canvas.png'
+ HoverGraph;$before=Get-GraphRange $saved;[MathomirUiProbe]::Send($main,273,33030)|Out-Null;Start-Sleep -Seconds 1;$zoom=SaveDoc;$range=Get-GraphRange $zoom
+ Check ([Math]::Abs(($range[1]-$range[0])/($before[1]-$before[0])-.8) -lt .001) 'Parametric zoom did not use existing graph window'
+ HoverGraph;[MathomirUiProbe]::Send($main,273,33028)|Out-Null;Start-Sleep -Seconds 1;$fitted=SaveDoc;$range=Get-GraphRange $fitted
+ Check ($range[0] -lt -3 -and $range[1] -gt 3 -and $range[1] -lt 5 -and $range[2] -lt -2 -and $range[3] -gt 2 -and $range[3] -lt 4) "Parametric fit failed: $range"
+
  $reopened=Join-Path $folder 'relation-parametric-reopened.mom';Copy-Item $fixture $reopened;[MathomirUiProbe]::OpenFile($main,$reopened);$script:fixture=$reopened;Start-Sleep -Seconds 2;HoverGraph;$d=Dialog
  Check ([MathomirUiProbe]::Send([MathomirUiProbe]::Child($d,1420),327,0) -eq 1) 'Parametric mode not reopened'
  Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1425)) -eq '3*cos(t)') 'x(t) changed on reopen'
