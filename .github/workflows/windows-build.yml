@@ -31,6 +31,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Shared object colors and backgrounds UI checks
+        shell: pwsh
+        run: ./tools/object-colors-smoke.ps1
       - name: Actual palette pickup and in-transit preview checks
         shell: pwsh
         run: ./tools/palette-carry-smoke.ps1
@@ -83,6 +86,8 @@ jobs:
           path: |
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/object-colors-*
+            source/build/popup-colors-menu.txt
             source/build/table-dialog-*.png
             source/build/table-preview-*.mom
             source/build/placement-preview-*
@@ -159,6 +164,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
           ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1
@@ -213,6 +219,8 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/object-colors-*
+            source/build/popup-colors-menu.txt
             source/build/table-dialog-*.png
             source/build/table-preview-*.mom
             source/build/placement-preview-*
@@ -239,7 +247,7 @@ jobs:
   memory_check:
     name: Native operations memory checks
     runs-on: windows-2022
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Fetch original source and apply repair
@@ -264,6 +272,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
           ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1
@@ -316,6 +325,8 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/object-colors-*
+            source/build/popup-colors-menu.txt
             source/build/table-dialog-*.png
             source/build/table-preview-*.mom
             source/build/placement-preview-*

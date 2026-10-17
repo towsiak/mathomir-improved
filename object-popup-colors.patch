@@ -1,0 +1,461 @@
+--- a/Mathomir/ColorPalette.h
++++ b/Mathomir/ColorPalette.h
+@@ -2,3 +2,7 @@
+ static const unsigned int ImprovedColors[8]={0,0x000000CC,0x0000CC00,0x00C00000,0x00909090,0x000080D0,0x00A03080,0x00808000};
+ static const char *ImprovedColorNames[8]={"Black","Red","Green","Blue","Gray","Orange","Purple","Teal"};
+ inline unsigned int ImprovedColor(int index){return ImprovedColors[index>=0&&index<8?index:0];}
++
++static const unsigned int ImprovedBackgrounds[8]={0x00AAF8FF,0x00FFEBD7,0x00DAF8D7,0x00E8DAFF,0x00C3E3FF,0x00FFDCEB,0x00E4E4E4,0x00FFFFFF};
++static const char *ImprovedBackgroundNames[8]={"Yellow","Blue","Green","Pink","Orange","Purple","Gray","White"};
++inline int &ImprovedCustomBackground(){static int color=0x00AAF8FF;return color;}
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -102,6 +102,7 @@
+ 	NodeX=-1;
+ 	NodeY=-1;
+ 	m_Color=-1;
++    m_BackgroundColor=-1;
+ }
+ 
+ CDrawing::~CDrawing(void)
+@@ -1631,6 +1632,7 @@
+ 		delete (CBitmapImage*)SpecialData;
+ 	}
+ 	m_Color=-1;
++    m_BackgroundColor=-1;
+ 	IsSpecialDrawing=0;
+ 	IsSelected=0;
+ 	OriginalForm=0;
+@@ -1909,6 +1911,10 @@
+ 	int zoom=zoom2; //to change from short to int
+ 	if (zoom<0) {zoom=-zoom;no_background=1;}
+ 
++    if(m_BackgroundColor>=0 && !no_background && !IsSpecialDrawing){
++        short width,height;CalculateSize(DC,(short)zoom,&width,&height);
++        DC->FillSolidRect(X,Y,width,height,(COLORREF)m_BackgroundColor);
++    }
+ 	if (m_Color!=-1) color=ImprovedColor(m_Color&0x07);
+     if(AxisGrid.role==3 || AxisGrid.role==4)color=(COLORREF)CoordinateAxes::Ink(AxisGrid,AxisGrid.role==4);
+     if((AxisGrid.role==3 && AxisGrid.minorDarkness==0)||(AxisGrid.role==4 && AxisGrid.majorDarkness==0))return;
+@@ -2083,7 +2089,7 @@
+ 
+ int CDrawing::CalcChecksum(void)
+ {
+-	int ret=(NumItems+m_Color*2)^(int)CoordinateAxes::Checksum(AxisGrid);
++	int ret=(NumItems+m_Color*2)^(int)CoordinateAxes::Checksum(AxisGrid)^(m_BackgroundColor+1);
+ 	tDrawingItem *di=Items;
+ 	for (int i=1;i<=NumItems;i++,di++)
+ 	{
+@@ -2154,6 +2160,7 @@
+ 	Items=(tDrawingItem*)malloc(sizeof(tDrawingItem)*Original->NumItems);
+ 	IsSpecialDrawing=Original->IsSpecialDrawing;
+ 	m_Color=Original->m_Color;
++    m_BackgroundColor=Original->m_BackgroundColor;
+ 	OriginalForm=Original->OriginalForm;
+     AxisGrid=Original->AxisGrid;
+ 	if (IsSpecialDrawing)
+@@ -2299,6 +2306,7 @@
+ 		}
+ 	}
+ 
++    if(!ret && BackgroundContains(X,Y,zoom))ret=(CObject*)this;
+ 	if ((IsSpecialDrawing) && (ret==NULL) && (internal_call==0))
+ 	{		
+ 		*NodeEdit=0xFFFF8000; //magic value returned - marks that mouse is pointing at a special drawing interrior
+@@ -2307,6 +2315,21 @@
+ 
+ 	if (ret) SelectDrawing(1);
+ 	return ret;
++}
++
++// Use the same cached extents as the native size calculation. Children are
++// tested first by selection so a group background never hides its contents.
++bool CDrawing::BackgroundContains(double x,double y,double zoom) const
++{
++    if(m_BackgroundColor<0 || IsSpecialDrawing || x<0 || y<0)return false;
++    double width=0,height=0,scale=zoom/(100.0*DRWZOOM);
++    for(int i=0;i<NumItems;i++){
++        const tDrawingItem &item=Items[i];
++        double padding=item.Type==1?item.LineWidth+halfDRWZOOM:0;
++        width=max(width,(double)max(item.X1,item.X2)+padding);
++        height=max(height,(double)max(item.Y1,item.Y2)+padding);
++    }
++    return x<width*scale && y<height*scale;
+ }
+ 
+ #pragma optimize("s",on)
+@@ -2316,6 +2339,10 @@
+ 	static char tmpstr[256];
+ 
+ 	if (num_tabs>16) num_tabs=16;
++    if(m_BackgroundColor>=0){
++        char appearance[64];int count=sprintf(appearance,"<appearance bg=\"%d\" />\r\n",m_BackgroundColor);
++        len+=count;if(!only_calculate){memcpy(output,appearance,count);output+=count;}
++    }
+ 
+     if(AxisGrid.role || OriginalForm==8 || OriginalForm==9){
+         auto c=AxisGrid;if(!c.role)c.form=OriginalForm;
+@@ -2462,6 +2489,12 @@
+ 		file=mf->XML_search("",file); //find anything
+ 		if (file==NULL) return NULL;
+ 
++        if(strncmp(file,"appearance",10)==0){
++            file+=10;char attribute[64],value[512];
++            do{file=mf->XML_read_attribute(attribute,value,file,512);if(!file)return NULL;
++                if(!strcmp(attribute,"bg")){int color=atoi(value);if(color>=0 && color<=0xFFFFFF)m_BackgroundColor=color;}
++            }while(attribute[0]);continue;
++        }
+         if(strncmp(file,"axesgrid",8)==0){
+             file+=8;CoordinateAxes::Settings c;char attribute[64],value[512];
+             do{file=mf->XML_read_attribute(attribute,value,file,512);if(!file)return NULL;int v=atoi(value);double f=atof(value);
+@@ -3984,7 +4017,7 @@
+ 		}
+ 		if ((di->pSubdrawing) && (di->Type==2))
+ 		{
+-			((CExpression*)(di->pSubdrawing))->SetColor(color&0x07);
++			((CExpression*)(di->pSubdrawing))->SetColor(color<0?-1:color&0x07);
+ 		}
+ 	}
+ 
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -35,6 +35,8 @@
+     void SetGripNodeEditing(bool enabled);
+     bool GripNodeEditing; // transient center-grip edit mode; never saved/copied
+ 	char m_Color;
++    int m_BackgroundColor; // -1 is transparent; independent of stroke/fill color
++    bool BackgroundContains(double x,double y,double zoom) const;
+ 	char OriginalForm; //used from toolbox (to store the purpose of this drawing)
+ 	char IsSpecialDrawing;
+ 
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -606,7 +606,7 @@
+         }else if(item->Type==0 && DrawingContentAtPoint((CDrawing*)item->pSubdrawing,x-x1,y-y1,depth+1))return true;
+         else if(item->Type==2 && ExpressionContentAtPoint((CExpression*)item->pSubdrawing,x-x1,y-y1-item->LineWidth,2,depth+1))return true;
+     }
+-    return false;
++    return drawing->BackgroundContains(x,y,ViewZoom);
+ }
+ static bool AnnotationInsideLargeExpression(tDocumentStruct *annotation,tDocumentStruct *container)
+ {
+@@ -11943,13 +11943,10 @@
+     }return found;
+ }
+ 
+-static const COLORREF TypedBackgrounds[8]={RGB(255,248,170),RGB(215,235,255),RGB(215,248,218),RGB(255,218,232),RGB(255,227,195),RGB(235,220,255),RGB(228,228,228),RGB(255,255,255)};
+-static const char *TypedBackgroundNames[8]={"Yellow","Blue","Green","Pink","Orange","Purple","Gray","White"};
+-static COLORREF CustomTypedBackground=RGB(255,248,170);
+ void CMathomirView::OnBackgroundColors()
+ {
+     CMenu menu;menu.CreatePopupMenu();
+-    for(int i=0;i<8;i++)menu.AppendMenu(MF_STRING,ID_BACKGROUND_FIRST+i,TypedBackgroundNames[i]);
++    for(int i=0;i<8;i++)menu.AppendMenu(MF_STRING,ID_BACKGROUND_FIRST+i,ImprovedBackgroundNames[i]);
+     menu.AppendMenu(MF_SEPARATOR);menu.AppendMenu(MF_STRING,ID_BACKGROUND_CUSTOM,"Custom color...");menu.AppendMenu(MF_STRING,ID_BACKGROUND_CLEAR,"Clear background (transparent)");
+     CPoint point;GetCursorPos(&point);UINT command=menu.TrackPopupMenu(TPM_RETURNCMD|TPM_NONOTIFY|TPM_LEFTALIGN,point.x,point.y,this);
+     if(command)OnBackgroundColor(command);SetFocus();
+@@ -11957,8 +11954,8 @@
+ void CMathomirView::OnBackgroundColor(UINT command)
+ {
+     if(ViewOnlyMode)return;
+-    int color=command==ID_BACKGROUND_CLEAR?-1:command==ID_BACKGROUND_CUSTOM?(int)CustomTypedBackground:(int)TypedBackgrounds[command-ID_BACKGROUND_FIRST];
+-    if(command==ID_BACKGROUND_CUSTOM){CColorDialog dialog(CustomTypedBackground,CC_FULLOPEN,this);if(dialog.DoModal()!=IDOK)return;color=(int)dialog.GetColor();CustomTypedBackground=color;}
++    int color=command==ID_BACKGROUND_CLEAR?-1:command==ID_BACKGROUND_CUSTOM?(int)ImprovedCustomBackground():(int)ImprovedBackgrounds[command-ID_BACKGROUND_FIRST];
++    if(command==ID_BACKGROUND_CUSTOM){CColorDialog dialog(ImprovedCustomBackground(),CC_FULLOPEN,this);if(dialog.DoModal()!=IDOK)return;color=(int)dialog.GetColor();ImprovedCustomBackground()=color;}
+     bool changed=false;
+     if(KeyboardEntryObject && !NumSelectedObjects){CExpression *expression=(CExpression*)KeyboardEntryObject;UndoSave("typed object background");expression->m_BackgroundColor=color;changed=true;}
+     else {
+--- a/Mathomir/PopupMenu.cpp
++++ b/Mathomir/PopupMenu.cpp
+@@ -30,6 +30,8 @@
+ #include "toolbox.h"
+ #include "drawing.h"
+ #include "math.h"
++#include <algorithm>
++#include <afxdlgs.h>
+ 
+ 
+ extern thread_local short CElementInitType; //passed through global variable for speed
+@@ -96,6 +98,7 @@
+ #pragma optimize("s",on)
+ int PopupMenu::AddMenuOption(int X, int Cx, char * text, int Data, int new_line)
+ {
++    if(m_NumOptions>=_countof(Options))return -1;
+ 	Options[m_NumOptions].Y=PopupOption_Y;
+ 	Options[m_NumOptions].X=X;
+ 	Options[m_NumOptions].Cx=Cx;
+@@ -122,6 +125,7 @@
+ #pragma optimize("s",on)
+ int PopupMenu::AddMenuOptionButton(int X, char * text, int Data, int button_ndx, int new_line)
+ {
++    if(m_NumOptions>=_countof(Options))return -1;
+ 	Options[m_NumOptions].Y=PopupOption_Y;
+ 	Options[m_NumOptions].X=X;
+ 	Options[m_NumOptions].Cx=(TSize<70)?17:((TSize<80)?19:25); 
+@@ -141,6 +145,7 @@
+ #pragma optimize("s",on)
+ int PopupMenu::AddCheckedMenuOptionButton(int X, char * text, int is_checked, int Data, int button_ndx, int new_line)
+ {
++    if(m_NumOptions>=_countof(Options))return -1;
+ 	Options[m_NumOptions].Y=PopupOption_Y;
+ 	Options[m_NumOptions].X=X;
+ 	Options[m_NumOptions].Cx=(TSize<70)?17:((TSize<80)?19:25); 
+@@ -160,6 +165,7 @@
+ #pragma optimize("s",on)
+ int PopupMenu::AddCheckedMenuOption(int X, int Cx, char * text, int is_checked, int Data, int new_line)
+ {
++    if(m_NumOptions>=_countof(Options))return -1;
+ 	Options[m_NumOptions].Y=PopupOption_Y;
+ 	Options[m_NumOptions].X=X;
+ 	Options[m_NumOptions].Cx=Cx;
+@@ -175,6 +181,77 @@
+ }
+ 
+ 
++static bool DrawingOwnsExpression(CDrawing *drawing,CExpression *expression,int depth=0)
++{
++    if(!drawing || depth>128)return false;
++    for(int i=0;i<drawing->NumItems;i++){
++        tDrawingItem *item=drawing->Items+i;
++        if(item->Type==2 && item->pSubdrawing==(CObject*)expression)return true;
++        if(item->Type==0 && DrawingOwnsExpression((CDrawing*)item->pSubdrawing,expression,depth+1))return true;
++    }
++    return false;
++}
++void PopupMenu::CaptureAppearanceTargets(CExpression *expression,int ownerType)
++{
++    m_AppearanceTargets.clear();
++    if(ownerType!=1 && ownerType!=2 && ownerType!=3)return;
++    CExpression *root=expression;
++    for(int depth=0;root && root->m_pPaternalExpression && depth<128;depth++)root=root->m_pPaternalExpression;
++    for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *object=TheDocument+i;if(!object->Object)continue;
++        bool target=false;
++        if(root)target=(object->Type==1 && object->Object==(CObject*)root) || (object->Type==2 && DrawingOwnsExpression((CDrawing*)object->Object,root));
++        else if(ownerType==2)target=object->MovingDotState==3 ||
++            (object->Type==2 && ((CDrawing*)object->Object)->IsSelected) ||
++            (object->Type==1 && ((CExpression*)object->Object)->m_Selection==0x7FFF);
++        if(target)m_AppearanceTargets.push_back(object->Object);
++    }
++}
++void PopupMenu::AddAppearanceOptions(int commonColor,int baseData,bool background)
++{
++    AddMenuOption(0,3*TSize,"Color:",-950,1);
++    int cell=TSize/3;
++    AddCheckedMenuOption(0,cell,"A",commonColor==-1,baseData,0);
++    for(int i=0;i<8;i++)AddCheckedMenuOption((i+1)*cell,cell,(char*)ImprovedColorNames[i],commonColor==i,baseData+i+1,i==7);
++    if(!background || m_AppearanceTargets.empty())return;
++    int commonBackground=-2;bool supported=false;
++    for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *object=TheDocument+i;
++        if(std::find(m_AppearanceTargets.begin(),m_AppearanceTargets.end(),object->Object)==m_AppearanceTargets.end())continue;
++        if(object->Type!=1 && (object->Type!=2 || ((CDrawing*)object->Object)->IsSpecialDrawing))return;
++        int color=object->Type==1?((CExpression*)object->Object)->m_BackgroundColor:((CDrawing*)object->Object)->m_BackgroundColor;
++        if(!supported)commonBackground=color;else if(commonBackground!=color)commonBackground=-2;supported=true;
++    }
++    if(!supported)return;
++    AddMenuOption(0,3*TSize,"Background:",-951,1);
++    for(int i=0;i<8;i++)AddCheckedMenuOption((i+1)*cell,cell,(char*)ImprovedBackgroundNames[i],commonBackground==(int)ImprovedBackgrounds[i],920+i,i==7);
++    AddCheckedMenuOption(0,3*TSize/2,"Clear",commonBackground==-1,929,0);
++    AddMenuOption(3*TSize/2,3*TSize/2,"Custom...",928,1);
++}
++void PopupMenu::ApplyBackgroundOption(int data)
++{
++    // Hide before opening a native color dialog. It can pump messages and change
++    // hover/selection; revalidate the captured identities against the live document.
++    std::vector<CObject*> targets=m_AppearanceTargets;
++    HidePopupMenu();
++    if(ViewOnlyMode)return;
++    int color=data==929?-1:data==928?ImprovedCustomBackground():(int)ImprovedBackgrounds[data-920];
++    if(data==928){CColorDialog dialog((COLORREF)color,CC_FULLOPEN,pMainView);if(dialog.DoModal()!=IDOK)return;color=(int)dialog.GetColor();ImprovedCustomBackground()=color;}
++    bool changed=false;
++    for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *object=TheDocument+i;
++        if(!object->Object || object->MovingDotState==5 || std::find(targets.begin(),targets.end(),object->Object)==targets.end())continue;
++        int *background=NULL;
++        if(object->Type==1)background=&((CExpression*)object->Object)->m_BackgroundColor;
++        else if(object->Type==2 && !((CDrawing*)object->Object)->IsSpecialDrawing)background=&((CDrawing*)object->Object)->m_BackgroundColor;
++        if(!background || *background==color)continue;
++        if(!changed)((CMainFrame*)theApp.m_pMainWnd)->UndoSave("object background");
++        *background=color;changed=true;
++    }
++    if(changed){pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);}
++    pMainView->SetFocus();
++}
++
+ int YorderQSort(const void *first, const void *second)
+ {
+ 	//sorts documents object on Y coordinate
+@@ -198,6 +275,7 @@
+ int PopupMenu::ShowPopupMenu(CExpression* expression, CWnd*owner, int OwnerType,int UserParam,int no_reposition)
+ {
+ 	PopupMenuSecondPassChoosing=0;
++    if(!no_reposition)CaptureAppearanceTargets(expression,OwnerType);
+     if(!no_reposition)m_ApproxPanelHandle=pMainView->PrepareContextApprox(this,expression,OwnerType);
+ 
+ 	MovingMode=0;
+@@ -506,27 +584,12 @@
+ 		m_NumOptions=0;
+ 		memset((void*)&Options,0,sizeof(Options));
+ 
+-		//the 'delete' option
+-		AddMenuOption(TSize/3,TSize,"Delete ",501,0);
+-		if (common_color!=-1) common_color=common_color&0xF7;
+-			AddCheckedMenuOption(TSize/8+4*TSize/3-TSize/10,TSize/3+2,"A ",(common_color==-1)?1:0,580,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3+TSize/3,TSize/3,"Red ",(common_color==1)?1:0,582,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3+TSize_2p3,TSize_1p2,"Blu ",(common_color==3)?1:0,584,1);
+-
+-
+-		if (Any_nonselected) 
+-			AddMenuOption(TSize/3,TSize,"Select ",570,0);
+-		else
+-		{
+-			if (NumExpressions+NumDrawings==1)
+-				AddCheckedMenuOption(TSize/3-TSize/5+1,TSize,"Lock ",Any_locked,567,0);
+-			else 
+-				if (Any_unlocked) AddMenuOption(TSize/3,TSize,"Lock all  ",568,0);
+-		}
+-
+-		AddCheckedMenuOption(TSize/8+4*TSize/3,TSize/3,"Blk ",(common_color==0)?1:0,581,0);
+-		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize/3,TSize/3,"Grn ",(common_color==2)?1:0,583,0);
+-		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize_2p3,TSize/3,"Gry ",(common_color==4)?1:0,585,1);
++        AddMenuOption(TSize/3,TSize,"Delete ",501,1);
++        if(common_color>=0)common_color&=7;
++        if(Any_nonselected)AddMenuOption(TSize/3,TSize,"Select ",570,1);
++        else if(NumExpressions+NumDrawings==1)AddCheckedMenuOption(TSize/3-TSize/5+1,TSize,"Lock ",Any_locked,567,1);
++        else if(Any_unlocked)AddMenuOption(TSize/3,TSize,"Lock all ",568,1);
++        AddAppearanceOptions(common_color,580,true);
+ 
+ 		if (Any_nonselected)
+ 		{
+@@ -843,15 +906,9 @@
+ 		if (m_OwnerType!=3)
+ 		{
+ 			if (m_MenuType==1) common_color=m_Expression->m_Color;
+-			AddMenuOption(TSize/3,TSize+TSize/8,"Pick up ",1,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3-TSize/10,TSize/3+2,"A ",(common_color==-1)?1:0,80,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3+TSize/3,TSize/3,"Red ",(common_color==1)?1:0,82,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3+TSize_2p3,TSize/2,"Blu ",(common_color==3)?1:0,84,1);
+-
+-			AddMenuOption(TSize/3,TSize+TSize/8,"Delete ",2,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3,TSize/3,"Blk ",(common_color==0)?1:0,81,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3+TSize/3,TSize/3,"Grn ",(common_color==2)?1:0,83,0);
+-			AddCheckedMenuOption(TSize/8+4*TSize/3+TSize_2p3,TSize/3,"Gry ",(common_color==4)?1:0,85,1);
++            AddMenuOption(TSize/3,TSize+TSize/8,"Pick up ",1,0);
++            AddMenuOption(5*TSize/3,TSize+TSize/8,"Delete ",2,1);
++            AddAppearanceOptions(common_color,80,true);
+ 
+ 			if (m_MenuType==1)
+ 			{
+@@ -898,12 +955,7 @@
+ 	{
+ 		//adding color options for font formatting menu (right clicked at the toolbox header 'U' option)
+ 		int common_color=m_Expression->m_pElementList->pElementObject->m_Color;
+-		AddCheckedMenuOption(TSize/8+4*TSize/3-TSize/10,TSize/3+2,"A ",(common_color==-1)?1:0,80,0);
+-		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize/3,TSize/3,"Red ",(common_color==1)?1:0,82,0);
+-		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize_2p3,TSize/2,"Blu ",(common_color==3)?1:0,84,1);
+-		AddCheckedMenuOption(TSize/8+4*TSize/3,TSize/3,"Blk ",(common_color==0)?1:0,81,0);
+-		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize/3,TSize/3,"Grn ",(common_color==2)?1:0,83,0);
+-		AddCheckedMenuOption(TSize/8+4*TSize/3+TSize_2p3,TSize/3,"Gry ",(common_color==4)?1:0,85,1);
++        AddAppearanceOptions(common_color,80,false);
+ 	}
+ 
+ 	if (((m_MenuType==2) || (m_MenuType==6) || (add_even_chars)) && (m_theSelectedElement!=NULL)) //the font menu
+@@ -1064,6 +1116,7 @@
+ 			}
+ 		}
+ 		this->ReleaseDC(dcc);
++        if(m_NumOptions>=_countof(Options))goto popupmenu_end_showpopup;
+ 		Options[m_NumOptions].Y=PopupOption_Y;
+ 		Options[m_NumOptions].X=0;
+ 		Options[m_NumOptions].Cx=l+TSize_1p2;
+@@ -1732,14 +1785,15 @@
+ 			{
+ 
+ 				if (((Options[i].Data>=81) && (Options[i].Data<90)) || 
+-					((Options[i].Data>=581) && (Options[i].Data<589)))
++					((Options[i].Data>=581) && (Options[i].Data<589)) ||
++                    ((Options[i].Data>=920) && (Options[i].Data<=927)))
+ 				{
+ 					//special handling for color options
+ 					int clr=0;
+ 					int lrg=0;
+ 					clr=Options[i].Data-81;
+ 					if (clr>100) clr-=500;
+-					clr=ImprovedColor(clr);
++					clr=(Options[i].Data>=920)?ImprovedBackgrounds[Options[i].Data-920]:ImprovedColor(clr);
+ 					if (m_SelectedOption==i) lrg=TSize/24; else lrg=1;
+ 					dc->FillSolidRect(Options[i].X+TSize/8+1-lrg,Options[i].Y+1+TSize_1p20-lrg,TSize/8+2*lrg,TSize/8+2*lrg,clr);
+ 					if (Options[i].IsChecked&0x01) 
+@@ -1861,6 +1915,12 @@
+ 	dc->MoveTo(1,TSize/4-9-1);dc->LineTo(TSize/4-9,0);
+ 	dc->MoveTo(1,TSize/4-12-1);dc->LineTo(TSize/4-12,0);
+ 	dc->MoveTo(1,TSize/4-15-1);dc->LineTo(TSize/4-15,0);
++    if(getenv("MATHOMIR_POPUP_COLOR_DIAGNOSTICS")){
++        FILE *file=fopen("popup-colors-menu.txt","w");if(file){
++            for(int i=0;i<m_NumOptions;i++)fprintf(file,"%d %d %d %d %s\n",Options[i].Data,Options[i].X+Options[i].Cx/2,Options[i].Y+Options[i].Cy/2,Options[i].IsEnabled,Options[i].Text);
++            fclose(file);
++        }
++    }
+ 	pdc->BitBlt(0,0,rct.right,rct.bottom,dc,0,0,SRCCOPY);
+ 	delete dc;
+ 
+@@ -1922,7 +1982,7 @@
+ 
+ 
+ 	char delete_clipboard_at_exit=0;
+-	if ((m_SelectedOption>=0) && (m_SelectedOption<63))
++	if ((m_SelectedOption>=0) && (m_SelectedOption<m_NumOptions) && (m_SelectedOption<_countof(Options)))
+ 	{
+ 		int dataval=Options[m_SelectedOption].Data;
+ 
+@@ -1937,6 +1997,7 @@
+ 		//	//do nothing, just exit
+ 		//}
+ 
++        if(dataval>=920 && dataval<=929){ApplyBackgroundOption(dataval);return;}
+ 		if ((dataval>=110) && (dataval<115)) //stack-clipboard option
+ 		{
+ 			pMainView->OnEditUndo();
+@@ -3918,8 +3979,8 @@
+ 		{	
+ 			//we are not closing the context menu
+ 			int tmp=Options[m_SelectedOption].IsChecked&0x01;
+-			if ((dd>=580) && (dd<=585)) UncheckOptions(580,585);//colors
+-			if ((dd>=80) && (dd<=85)) UncheckOptions(80,85); //colors
++			if ((dd>=580) && (dd<=588)) UncheckOptions(580,588);//colors
++			if ((dd>=80) && (dd<=88)) UncheckOptions(80,88); //colors
+ 			if ((dd>=72) && (dd<=74)) UncheckOptions(72,74); //alignment (condition list)
+ 			if ((dd>=50) && (dd<=52)) UncheckOptions(50,52); //small,medium,large (symbol)
+ 			if (((dd>=30) && (dd<=39)) || (dd==49) || (dd==56) || (dd==57))
+@@ -4783,6 +4844,7 @@
+ #pragma optimize("s",on)
+ int PopupMenu::AddMathMenuOption(CExpression * E1,CExpression *original)
+ {
++    if(m_NumOptions>=_countof(Options)-2)return 0;
+ 	E1->CodeDecodeUnitsOfMeasurement(0,-1);
+ 	E1->MakeExpressionBeautiful();
+ 
+--- a/Mathomir/PopupMenu.h
++++ b/Mathomir/PopupMenu.h
+@@ -1,6 +1,7 @@
+ #pragma once
+ #include "Expression.h"
+ #include "Element.h"
++#include <vector>
+ 
+ 
+ // PopupMenu
+@@ -54,7 +55,11 @@
+ 		int Data; //any valuable data
+ 		int DataArray[6];
+ 		CExpression *Parent; //the original that will be replaced if menu item is chosen
+-	} Options[64];
++	} Options[128];
++    std::vector<CObject*> m_AppearanceTargets;
++    void CaptureAppearanceTargets(CExpression *expression,int ownerType);
++    void AddAppearanceOptions(int commonColor,int baseData,bool background);
++    void ApplyBackgroundOption(int data);
+ 
+ protected:
+ 	DECLARE_MESSAGE_MAP()

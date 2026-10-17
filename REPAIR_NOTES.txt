@@ -596,3 +596,12 @@ Center move grip (2026-10-15 evening)
 - Table setup now previews its native layout live, with optional sample-only text, input validation and scaled fitting. Placement uses the same constructor and starts empty.
 - CODE_HEALTH_AUDIT.md records remaining ordinary-save atomicity, transactional loading, serialization and interaction-state weaknesses.
 - Native table borders now use consistent shared boundaries, preventing the second row from erasing the header separator.
+
+OBJECT APPEARANCE POPUP (17 October 2026)
+Text, formulas, drawings and groups share all eight native foreground colors.
+Text/math and ordinary drawings/groups also have eight background presets,
+a native custom background color dialog, and Clear (transparent). Drawing
+backgrounds cover the object bounds; the existing Fill option fills a closed
+shape with its stroke color. Backgrounds participate in Undo, copy and MOM
+save/reopen. Opaque images, graphs and drawing-box containers retain their
+specialized rendering; this popup does not recolor their interiors.
