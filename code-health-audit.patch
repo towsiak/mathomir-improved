@@ -1,0 +1,270 @@
+--- a/Mathomir/MathomirDoc.cpp
++++ b/Mathomir/MathomirDoc.cpp
+@@ -30,6 +30,7 @@
+ #include "diffiehellman.h"
+ #include "passworddlg.h"
+ #include <io.h>
++#include "MomDecode.h"
+ 
+ #ifdef _DEBUG
+ #define new DEBUG_NEW
+@@ -91,8 +92,7 @@
+ BOOL CMathomirDoc::OnSaveDocument(LPCTSTR lpszPathName)
+ {
+ 	//called by CMathomirDoc whenever needs to save document
+-	SaveMOMFile((char*)lpszPathName,TheFileType);
+-	return 1;
++	return SaveMOMFile((char*)lpszPathName,TheFileType)!=0;
+ }
+ 
+ #pragma optimize("s",on)
+@@ -100,14 +100,17 @@
+ {	
+ 	//called by CMathomirDoc whenever a modifed document needs to be closed (should return 0 if not to be closed)
+ 	if (!IsModified()) return 1;
+-	if (NumDocumentElements==0) return 1;
+ 
+ 	char str[120];
+ 	CopyTranslatedString(str,"Save changes?",5020,119);
+ 	int ret=AfxMessageBox(str,MB_YESNOCANCEL | MB_ICONQUESTION,NULL);
+ 	if (ret==IDCANCEL) return 0; //should not be clossed
+-	if (ret==IDYES) OnFileSave(); //save the document
+-	return 1;
++	if (ret==IDYES)
++	{
++		OnFileSave();
++		return !IsModified(); // canceled Save As or failed write must keep the document open
++	}
++	return ret==IDNO;
+ }
+ 
+ #pragma optimize("s",on)
+@@ -215,7 +218,7 @@
+ 		if (fd.m_pOFN->nFilterIndex==4) type='e';
+ 		if (fd.m_pOFN->nFilterIndex==5) type='v';
+ 		if ((fd.m_pOFN->nFilterIndex==1) && (TheFileType=='r')) type='r';
+-		SaveMOMFile((char*)fd.m_pOFN->lpstrFile,type);
++		if (!SaveMOMFile((char*)fd.m_pOFN->lpstrFile,type)) return;
+ 		if (fd.m_pOFN->nFilterIndex!=4)
+ 		{
+ 			SetPathName(fd.m_pOFN->lpstrFile,1);
+@@ -1041,7 +1044,9 @@
+ 	ToolboxSize=(BaseToolboxSize)?BaseToolboxSize:60;
+ 	if (Toolbox) Toolbox->ShowWindow(SW_SHOW);
+ 
+-	if (strncmp(*buffer,"MOM",3)) {TheFileType=0;return len;} //not a compressed MOM file
++	if (!buffer || !*buffer || len<0) return 0;
++	if (len<3 || memcmp(*buffer,"MOM",3)) {TheFileType=0;return len;}
++	if (len<8) return 0; //not a compressed MOM file
+ 
+ 	char passw[24];
+ 	passw[0]=0;
+@@ -1073,7 +1078,8 @@
+ 
+ 	}
+ 	
+-	int olen=*((int*)(*buffer+4)); //original file length
++	int olen;memcpy(&olen,*buffer+4,sizeof(olen)); //original file length
++	if (olen<=0) return 0;
+ 
+ 	//remove header
+ 	len-=8;
+@@ -1121,7 +1127,8 @@
+ 	{
+ 		//if password is defined, then we unscramble this file
+ 		char *buf2;
+-		buf2=(char*)malloc(len+1);
++		buf2=(char*)malloc((size_t)len+1);
++		if (!buf2) return 0;
+ 
+ 		int passlen=(int)strlen(passw);
+ 		for (int j=passlen-1;j>=0;j--)
+@@ -1150,85 +1157,22 @@
+ 		free(buf2);
+ 
+ 		//remove random numbers (salt)
+-		unsigned int num_randoms=(unsigned char)*buffer[0];
++		if (len<1) return 0;
++		unsigned int num_randoms=(unsigned char)(*buffer)[0];
++		if (num_randoms>(unsigned int)len) return 0;
+ 		len-=num_randoms;
+-		if (len<0) len=0;
+ 		memmove(*buffer,*buffer+num_randoms,len);
+ 	}
+ 	
+-	//we procede by decompressing the file
+-	char *buf=(char*)malloc(olen+1);
+-	int j=0;
+-	int inside_quotation=0;
+-	for (int i=0;i<len;i++)
+-	{
+-		char c=*((*buffer)+i);
+-		if ((i==0) && (c!='<')) break;
+-		if (c=='"') 
+-		{
+-			if (inside_quotation) inside_quotation=0; else inside_quotation=1;
+-		}
+-		if (inside_quotation==0)
+-		{
+-			if (c!=13)
+-			if (c!=10)
+-			if ((c<31) || (c>250))
+-				c+=0;
+-			if (c==1) {strcpy(buf+j,"<obj type=");j+=10;continue;}
+-			if (c==2) {strcpy(buf+j,"</obj>");j+=6;continue;}
+-			if (c==3) {strcpy(buf+j,"<draw type=");j+=11;continue;}
+-			if (c==4) {strcpy(buf+j,"<group");j+=6;continue;}
+-			if (c==5) {strcpy(buf+j,"</group>\r\n");j+=10;continue;}
+-			if (c==6) {strcpy(buf+j," width=");j+=7;continue;}
+-			if (c==8) {strcpy(buf+j,"<expr fnt_h=");j+=12;continue;}
+-			if (c==9) {strcpy(buf+j," brack=");j+=7;continue;}
+-			if (c==11) {strcpy(buf+j,"<elm tp=\"1\" tx=");j+=15;continue;}
+-			if (c==12) {strcpy(buf+j,"<elm tp=");j+=8;continue;}
+-			if (c==14) {strcpy(buf+j," fnt=");j+=5;continue;}
+-			if (c==15) {strcpy(buf+j,"</expr>\r\n");j+=9;continue;}
+-			if (c==31) {strcpy(buf+j,"</elm>\r\n");j+=8;continue;}
+-			if (c==16) {strcpy(buf+j," stp=");j+=5;continue;}
+-			if (c==17) {strcpy(buf+j,">\r\n");j+=3;continue;}
+-
+-			if (c==19) {strcpy(buf+j," txt=");j+=5;continue;}
+-			if (c==20) {strcpy(buf+j," alig=");j+=6;continue;}
+-			if (c==21) {strcpy(buf+j," Exp1=");j+=6;continue;}
+-			if (c==22) {strcpy(buf+j," Exp2=");j+=6;continue;}
+-			if (c==23) {strcpy(buf+j," X=");j+=3;continue;}
+-			if (c==24) {strcpy(buf+j," Y=");j+=3;continue;}
+-
+-			if (c==25) {strcpy(buf+j," X1=");j+=4;continue;}
+-			if (c==26) {strcpy(buf+j," Y1=");j+=4;continue;}
+-			if (c==27) {strcpy(buf+j," X2=");j+=4;continue;}
+-			if (c==28) {strcpy(buf+j," Y2=");j+=4;continue;}
+-			if (c==29) {strcpy(buf+j," X3=");j+=4;continue;}
+-			if (c==30) {strcpy(buf+j," Y3=");j+=4;continue;}
+-			if (c==(char)251) {strcpy(buf+j,"<bmp bits=");j+=10;continue;}
+-			if (c==(char)252) {strcpy(buf+j," fnthq_h=");j+=9;continue;}
+-			if (c==(char)255) {strcpy(buf+j," b_shape=");j+=9;continue;}
+-			if (c==(char)254) {strcpy(buf+j," b_height=");j+=10;continue;}
+-			if (c==(char)253) {strcpy(buf+j," b_data=");j+=8;continue;}
+-		}
+-		else
+-		{
+-			if (c==18)
+-			{
+-				int k=*((*buffer)+i+1);
+-				for (int n=0;n<k+1;n++)
+-				{
+-					buf[j++]=*((*buffer)+i+2);
+-					buf[j++]=*((*buffer)+i+3);
+-				}
+-				i+=3;
+-				continue;
+-			}
+-			if (c==7) {strcpy(buf+j,"000\"");j+=4;inside_quotation=0;continue;}
+-		}	
+-		buf[j++]=c;
+-	}
+-	len=j;	
+-	free(*buffer);
+-	*buffer=buf;
++	// Every token expansion is bounded by the header's declared output length.
++    char *buf=(char*)malloc((size_t)olen+1);
++    if (!buf) return 0;
++    size_t written=0;
++    if (!MomDecode::Payload(*buffer,(size_t)len,buf,(size_t)olen,written)) {
++        free(buf);return 0;
++    }
++    len=(int)written;
++    free(*buffer);*buffer=buf;
+ 
+ 	if (type=='e') TheFileType='r';
+ 	else if (type=='r') TheFileType=0;
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -1717,6 +1717,7 @@
+ 
+ char * CMainFrame::XML_read_attribute(char * attribute, char * value, char * file, int value_buffer_size)
+ {
++	if (!file || !attribute || !value || value_buffer_size<=0) return NULL;
+ 	int j=0;
+ 	int k=0;
+ 	char started_attribute=0;
+@@ -1736,6 +1737,9 @@
+ 
+ 			if ((ch=='\\') && (started_value==1)) //special character \XX (hex-code)
+ 			{
++				// Check the first byte before reading the second: a trailing backslash
++				// has only its terminating NUL left in the input allocation.
++				if (!file[1] || !file[2]) return NULL;
+ 				char tmp[3];
+ 				tmp[0]=*(file+1);
+ 				tmp[1]=*(file+2);
+--- /dev/null
++++ b/Mathomir/MomDecode.h
+@@ -0,0 +1,68 @@
++#pragma once
++#include <cstddef>
++#include <cstring>
++// Bounded decoder for the existing MOM token format. Capacity excludes the NUL.
++namespace MomDecode {
++inline const char *Token(unsigned char c){
++    switch(c){
++        case 1:return "<obj type=";
++        case 2:return "</obj>";
++        case 3:return "<draw type=";
++        case 4:return "<group";
++        case 5:return "</group>\r\n";
++        case 6:return " width=";
++        case 8:return "<expr fnt_h=";
++        case 9:return " brack=";
++        case 11:return "<elm tp=\"1\" tx=";
++        case 12:return "<elm tp=";
++        case 14:return " fnt=";
++        case 15:return "</expr>\r\n";
++        case 31:return "</elm>\r\n";
++        case 16:return " stp=";
++        case 17:return ">\r\n";
++        case 19:return " txt=";
++        case 20:return " alig=";
++        case 21:return " Exp1=";
++        case 22:return " Exp2=";
++        case 23:return " X=";
++        case 24:return " Y=";
++        case 25:return " X1=";
++        case 26:return " Y1=";
++        case 27:return " X2=";
++        case 28:return " Y2=";
++        case 29:return " X3=";
++        case 30:return " Y3=";
++        case 251:return "<bmp bits=";
++        case 252:return " fnthq_h=";
++        case 255:return " b_shape=";
++        case 254:return " b_height=";
++        case 253:return " b_data=";
++    }return NULL;
++}
++inline bool Payload(const char *input,size_t length,char *output,size_t capacity,size_t &written){
++    written=0;
++    if(!input || !output || !length || input[0]!='<')return false;
++    bool quoted=false;
++    for(size_t i=0;i<length;i++){
++        unsigned char c=(unsigned char)input[i];
++        if(c=='"')quoted=!quoted;
++        if(!quoted){
++            const char *token=Token(c);
++            if(token){size_t n=std::strlen(token);if(n>capacity-written)return false;
++                std::memcpy(output+written,token,n);written+=n;continue;}
++        }else if(c==18){
++            if(length-i<4)return false;
++            size_t count=(unsigned char)input[i+1]+1u;
++            if(count>(capacity-written)/2)return false;
++            for(size_t n=0;n<count;n++){output[written++]=input[i+2];output[written++]=input[i+3];}
++            i+=3;continue;
++        }else if(c==7){
++            if(capacity-written<4)return false;
++            std::memcpy(output+written,"000\"",4);written+=4;quoted=false;continue;
++        }
++        if(written>=capacity)return false;
++        output[written++]=(char)c;
++    }
++    output[written]=0;return true;
++}
++}

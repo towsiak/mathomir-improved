@@ -588,3 +588,10 @@ Center move grip (2026-10-15 evening)
 - Palette selection clears stale carried state and font identity; Escape and pointer departure clear previews.
 - Native tests enumerate palette math/drawing entries, use the actual pickup function and a real left-tile click, check visible ink while moving, then verify drawing gestures and Undo.
 - Small carried formulas and narrow symbols also get an enlarged native thumbnail beside their exact landing preview.
+
+2026-10-17: Code audit and table layout preview
+- Save/close and Save As now honor write failure and cancellation, including a modified empty document.
+- Bounded compressed-token decoding and XML escape lookahead repair two reproduced malformed-input memory defects.
+- One source-patch manifest serves Release, memory and resize builds. Every checked-in C++ check is compiled and run.
+- Table setup now previews its native layout live, with optional sample-only text, input validation and scaled fitting. Placement uses the same constructor and starts empty.
+- CODE_HEALTH_AUDIT.md records remaining ordinary-save atomicity, transactional loading, serialization and interaction-state weaknesses.

@@ -13,70 +13,7 @@ jobs:
       - name: Fetch original source and apply repair
         shell: pwsh
         run: |
-          git clone https://github.com/mathomir/Mathomir_GIT.git source
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source checkout 0300c13e5108fb6112403b20f576d977db3309f9
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../interaction-repair.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../graph-overlap-followup.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../unit-circle-signed-arc.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../print-grid.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../integral-evaluation.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../integral-followup.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../log-base.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../selection-approx.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../ai-help.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../cursor-stability.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../unit-common-coordinates.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../groq-context-approx.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../ai-math-reader.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../page-toolbar.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../enlarged-text-overlap.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../title-file-path.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../placement-lifecycle.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../large-resize-grip.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../freehand-rounding.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../coordinate-axes-editor.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../formula-reference-ai.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../latex-rendering.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../center-move-grip.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../resize-equation-stability.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../document-lifetime.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../sticky-exponent.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../accurate-placement-preview.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../nested-object-layering.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../palette-carry-preview.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item Mathomir.vcxproj source/Mathomir/
-          ./tools/setup-math-renderer.ps1
+          ./tools/prepare-source.ps1
       - name: Locate MSBuild and check MFC
         shell: pwsh
         run: |
@@ -84,6 +21,11 @@ jobs:
           $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.ATLMFC -property installationPath
           if (!$vs) { throw 'Visual Studio with MFC is required on the runner.' }
           "MSBUILD=$vs\MSBuild\Current\Bin\MSBuild.exe" >> $env:GITHUB_ENV
+      - name: All C++ model checks and native source failure cases
+        shell: pwsh
+        run: |
+          ./tools/portable-checks.ps1
+          ./tools/source-health-test.ps1
       - name: Build Release Win32
         shell: pwsh
         run: |
@@ -92,6 +34,9 @@ jobs:
       - name: Actual palette pickup and in-transit preview checks
         shell: pwsh
         run: ./tools/palette-carry-smoke.ps1
+      - name: Live table layout dialog preview checks
+        shell: pwsh
+        run: ./tools/table-preview-smoke.ps1
       - name: Grid styles and snapping UI checks
         shell: pwsh
         run: ./tools/canvas-grid-smoke.ps1
@@ -113,17 +58,14 @@ jobs:
       - name: Formula reference and free AI UI checks
         shell: pwsh
         run: |
-          ./tools/formula-reference-model-test.ps1
           ./tools/formula-reference-smoke.ps1
       - name: Coordinate axes editor geometry and UI checks
         shell: pwsh
         run: |
-          ./tools/coordinate-axes-model-test.ps1
           ./tools/coordinate-axes-editor-smoke.ps1
       - name: Sparse freehand curve geometry and UI checks
         shell: pwsh
         run: |
-          ./tools/smart-stroke-test.ps1
           ./tools/sparse-stroke-smoke.ps1
       - name: Large object resize grip UI checks
         shell: pwsh
@@ -131,9 +73,6 @@ jobs:
       - name: Overlapping annotations UI checks
         shell: pwsh
         run: ./tools/overlap-smoke.ps1
-      - name: AI formatted text and native math engine checks
-        shell: pwsh
-        run: ./tools/ai-presentation-test.ps1
       - name: Enlarged text placement and selection UI checks
         shell: pwsh
         run: ./tools/enlarged-text-overlap-smoke.ps1
@@ -144,6 +83,8 @@ jobs:
           path: |
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/table-dialog-*.png
+            source/build/table-preview-*.mom
             source/build/placement-preview-*
             source/build/center-move-grip*
             source/build/center-grip-*.mom
@@ -173,21 +114,12 @@ jobs:
       - name: Mixed text and math cursor checks
         shell: pwsh
         run: ./tools/cursor-stability-smoke.ps1
-      - name: AI protocol checks
-        shell: pwsh
-        run: ./tools/ai-protocol-test.ps1
       - name: AI help and connection setup UI checks
         shell: pwsh
         run: ./tools/ai-help-smoke.ps1
-      - name: Arbitrary log-base numerical checks
-        shell: pwsh
-        run: ./tools/log-base-test.ps1
       - name: Arbitrary log-base Windows UI checks
         shell: pwsh
         run: ./tools/log-base-smoke.ps1
-      - name: Integral numerical checks
-        shell: pwsh
-        run: ./tools/integral-area-test.ps1
       - name: Integral shader and inline evaluation UI checks
         shell: pwsh
         run: ./tools/integral-evaluation-smoke.ps1
@@ -201,9 +133,6 @@ jobs:
       - name: Print grid and preview checks
         shell: pwsh
         run: ./tools/print-grid-smoke.ps1
-      - name: Signed unit-circle geometry checks
-        shell: pwsh
-        run: ./tools/unit-circle-geometry-test.ps1
       - name: Signed unit-circle UI checks
         shell: pwsh
         run: ./tools/unit-circle-smoke.ps1
@@ -231,12 +160,12 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/palette-carry-smoke.ps1
+          ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
           ./tools/placement-preview-smoke.ps1
           ./tools/resize-equation-smoke.ps1
           ./tools/sticky-exponent-smoke.ps1
-          ./tools/formula-reference-model-test.ps1
           ./tools/formula-reference-smoke.ps1 -OnlineFixture
           ./tools/coordinate-axes-editor-smoke.ps1
           ./tools/statistics-smoke.ps1
@@ -284,6 +213,8 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/table-dialog-*.png
+            source/build/table-preview-*.mom
             source/build/placement-preview-*
             source/build/center-move-grip*
             source/build/center-grip-*.mom
@@ -314,70 +245,7 @@ jobs:
       - name: Fetch original source and apply repair
         shell: pwsh
         run: |
-          git clone https://github.com/mathomir/Mathomir_GIT.git source
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source checkout 0300c13e5108fb6112403b20f576d977db3309f9
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../interaction-repair.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../graph-overlap-followup.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../unit-circle-signed-arc.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../print-grid.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../integral-evaluation.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../integral-followup.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../log-base.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../selection-approx.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../ai-help.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../cursor-stability.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../unit-common-coordinates.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../groq-context-approx.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../ai-math-reader.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../page-toolbar.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../enlarged-text-overlap.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../title-file-path.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../placement-lifecycle.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../large-resize-grip.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../freehand-rounding.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../coordinate-axes-editor.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../formula-reference-ai.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../latex-rendering.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../center-move-grip.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../resize-equation-stability.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../document-lifetime.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../sticky-exponent.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../accurate-placement-preview.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../nested-object-layering.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git -C source apply --ignore-space-change ../palette-carry-preview.patch
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item Mathomir.vcxproj source/Mathomir/
-          ./tools/setup-math-renderer.ps1
+          ./tools/prepare-source.ps1
       - name: Locate MSBuild and check MFC
         shell: pwsh
         run: |
@@ -397,6 +265,7 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/palette-carry-smoke.ps1
+          ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
           ./tools/placement-preview-smoke.ps1
@@ -447,6 +316,8 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/table-dialog-*.png
+            source/build/table-preview-*.mom
             source/build/placement-preview-*
             source/build/center-move-grip*
             source/build/center-grip-*.mom

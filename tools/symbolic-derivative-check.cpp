@@ -1,4 +1,4 @@
-#include "../../mathomir-source/Mathomir/SymbolicDerivative.h"
+#include "SymbolicDerivative.h"
 #include <iostream>
 #include <cassert>
 using namespace SymbolicDerivative;

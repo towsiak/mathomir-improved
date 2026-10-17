@@ -1,0 +1,212 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -14675,28 +14675,108 @@
+     ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;
+     IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
+ }
++// Dialog previews and placement use one native table constructor. Sample text
++// belongs only to the private preview and never reaches the placed expression.
++static CExpression *BuildConfiguredTable(int rows,int columns,int font,int borders,int alignment,bool sample=false)
++{
++    if(rows<1 || rows>20 || columns<1 || columns>12 || rows*columns<2 || font<40 || font>800 ||
++       borders<0 || borders>3 || alignment<0 || alignment>2)return NULL;
++    CExpression *table=new CExpression(NULL,NULL,font);
++    table->InsertEmptyElement(0,5,(char)0x80);
++    CExpression *cells=(CExpression*)table->m_pElementList->pElementObject->Expression1;
++    cells->m_ParenthesesFlags=0;cells->m_ParentheseShape=' ';
++    if(cells->FindMatrixElement(rows-1,columns-1,1)<0){delete table;return NULL;}
++    char align=alignment==0?'l':alignment==1?'c':'r';
++    for(int row=0;row<rows;row++)for(int col=0;col<columns;col++){
++        char top=' ',bottom=' ',left=' ',right=' ';
++        if(borders==0)top=bottom=left=right='-';
++        if(borders==1){if(row==0)top='-';if(row==rows-1)bottom='-';if(col==0)left='-';if(col==columns-1)right='-';}
++        if(borders==2 && row==0)bottom='-';
++        cells->SetCellAttributes(row,col,align,top,bottom,left,right);
++    }
++    if(sample)for(int row=rows-1;row>=0;row--)for(int col=columns-1;col>=0;col--){
++        int cell=cells->FindMatrixElement(row,col,0);
++        if(cell<0){delete table;return NULL;}
++        cells->InsertEmptyElement(cell,1,'x');
++        if(row==0)strcpy(cells->m_pElementList[cell].pElementObject->Data1,"ABC");
++    }
++    return table;
++}
++class CTableLayoutPreview : public CStatic
++{
++public:
++    CExpression *table;
++    CTableLayoutPreview():table(NULL){}
++    ~CTableLayoutPreview(){delete table;}
++    void Set(CExpression *next){delete table;table=next;if(GetSafeHwnd())Invalidate(FALSE);}
++protected:
++    afx_msg void OnPaint(){
++        CPaintDC screen(this);CRect r;GetClientRect(&r);
++        CDC dc;CBitmap bitmap;
++        if(!dc.CreateCompatibleDC(&screen) || !bitmap.CreateCompatibleBitmap(&screen,max(1,r.Width()),max(1,r.Height())))return;
++        CBitmap *old=dc.SelectObject(&bitmap);int saved=dc.SaveDC();dc.FillSolidRect(r,RGB(255,255,255));dc.SetBkMode(TRANSPARENT);
++        if(table){
++            short width,above,below;table->CalculateSize(&dc,100,&width,&above,&below);
++            double fit=min(1.0,min((r.Width()-20.0)/max(1,(int)width),(r.Height()-20.0)/max(1,(int)above+below)));
++            short zoom=(short)max(1,(int)floor(fit*100));
++            table->CalculateSize(&dc,zoom,&width,&above,&below);
++            table->PaintExpression(&dc,zoom,max(5,(r.Width()-width)/2),max(5,(r.Height()-above-below)/2)+above,&r);
++            if(getenv("MATHOMIR_TABLE_DIAGNOSTICS")){
++                ::SetProp(GetSafeHwnd(),"TablePreview_Width",(HANDLE)(INT_PTR)(width+1));
++                ::SetProp(GetSafeHwnd(),"TablePreview_Height",(HANDLE)(INT_PTR)(above+below+1));
++                ::SetProp(GetSafeHwnd(),"TablePreview_Zoom",(HANDLE)(INT_PTR)(zoom+1));
++            }
++        }else{
++            dc.SetTextColor(RGB(120,70,50));CRect message=r;message.DeflateRect(12,12);
++            dc.DrawText("Enter valid settings to see the table layout.",message,DT_CENTER|DT_WORDBREAK|DT_VCENTER);
++        }
++        dc.RestoreDC(saved);screen.BitBlt(0,0,r.Width(),r.Height(),&dc,0,0,SRCCOPY);dc.SelectObject(old);
++    }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CTableLayoutPreview,CStatic)
++    ON_WM_PAINT()
++END_MESSAGE_MAP()
+ class CTableSetupDialog : public CFeatureDialog
+ {
++    CTableLayoutPreview preview;bool loading;
++    bool ReadSettings(){
++        BOOL validRows,validColumns,validFont;
++        rows=GetDlgItemInt(IDC_TABLE_ROWS,&validRows,FALSE);columns=GetDlgItemInt(IDC_TABLE_COLUMNS,&validColumns,FALSE);font=GetDlgItemInt(IDC_TABLE_FONT,&validFont,FALSE);
++        borders=((CComboBox*)GetDlgItem(IDC_TABLE_BORDERS))->GetCurSel();alignment=((CComboBox*)GetDlgItem(IDC_TABLE_ALIGN))->GetCurSel();
++        return validRows && validColumns && validFont && rows>=1 && rows<=20 && columns>=1 && columns<=12 && rows*columns>=2 && font>=40 && font<=800 && borders>=0 && borders<=3 && alignment>=0 && alignment<=2;
++    }
++    void Refresh(){
++        if(loading)return;
++        bool valid=ReadSettings();
++        CExpression *next=valid?BuildConfiguredTable(rows,columns,font,borders,alignment,IsDlgButtonChecked(IDC_TABLE_SAMPLE)==BST_CHECKED):NULL;
++        valid=next!=NULL;preview.Set(next);GetDlgItem(IDOK)->EnableWindow(valid);
++        CString status;if(valid)status.Format("%d rows x %d columns | Font %d%% | Scaled to fit",rows,columns,font);
++        else status="Choose 1-20 rows, 1-12 columns, at least 2 cells; font 40-800%.";
++        SetDlgItemText(IDC_TABLE_PREVIEW_STATUS,status);
++    }
+ public:
+     int rows,columns,font,borders,alignment;
+-    CTableSetupDialog():CFeatureDialog(IDD_TABLE_SETUP,theApp.m_pMainWnd),rows(4),columns(3),font(100),borders(0),alignment(0){}
+-    virtual BOOL OnInitDialog()
+-    {
+-        CFeatureDialog::OnInitDialog();
+-        SetDlgItemInt(IDC_TABLE_ROWS,rows); SetDlgItemInt(IDC_TABLE_COLUMNS,columns); SetDlgItemInt(IDC_TABLE_FONT,font);
++    CTableSetupDialog():CFeatureDialog(IDD_TABLE_SETUP,theApp.m_pMainWnd),loading(true),rows(4),columns(3),font(100),borders(0),alignment(0){}
++    virtual BOOL OnInitDialog(){
++        CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(IDC_TABLE_PREVIEW,this);
++        SetDlgItemInt(IDC_TABLE_ROWS,rows);SetDlgItemInt(IDC_TABLE_COLUMNS,columns);SetDlgItemInt(IDC_TABLE_FONT,font);
++        for(int id:{IDC_TABLE_ROWS,IDC_TABLE_COLUMNS,IDC_TABLE_FONT})((CEdit*)GetDlgItem(id))->LimitText(4);
+         CComboBox *border=(CComboBox*)GetDlgItem(IDC_TABLE_BORDERS);
+-        border->AddString("All grid lines");border->AddString("Outer border");border->AddString("Header separator");border->AddString("No borders");border->SetCurSel(0);
++        for(const char *label:{"All grid lines","Outer border","Header separator","No borders"})border->AddString(label);border->SetCurSel(borders);
+         CComboBox *align=(CComboBox*)GetDlgItem(IDC_TABLE_ALIGN);
+-        align->AddString("Left");align->AddString("Center");align->AddString("Right");align->SetCurSel(0);
+-        return TRUE;
+-    }
+-    virtual void OnOK()
+-    {
+-        BOOL validRows,validColumns,validFont;
+-        rows=GetDlgItemInt(IDC_TABLE_ROWS,&validRows,FALSE); columns=GetDlgItemInt(IDC_TABLE_COLUMNS,&validColumns,FALSE);font=GetDlgItemInt(IDC_TABLE_FONT,&validFont,FALSE);
+-        if(!validRows || !validColumns || !validFont || rows<1 || rows>20 || columns<1 || columns>12 || rows*columns<2 || font<40 || font>800)
+-        {AfxMessageBox("Choose 1-20 rows, 1-12 columns, at least two cells, and a font size from 40% to 800%.");return;}
+-        borders=((CComboBox*)GetDlgItem(IDC_TABLE_BORDERS))->GetCurSel();alignment=((CComboBox*)GetDlgItem(IDC_TABLE_ALIGN))->GetCurSel();
++        for(const char *label:{"Left","Center","Right"})align->AddString(label);align->SetCurSel(alignment);
++        CheckDlgButton(IDC_TABLE_SAMPLE,BST_CHECKED);loading=false;Refresh();return TRUE;
++    }
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){
++        int id=LOWORD(wp),code=HIWORD(wp);
++        if(!loading && ((id>=IDC_TABLE_ROWS && id<=IDC_TABLE_FONT && code==EN_CHANGE) ||
++            ((id==IDC_TABLE_BORDERS || id==IDC_TABLE_ALIGN) && code==CBN_SELCHANGE) ||
++            (id==IDC_TABLE_SAMPLE && code==BN_CLICKED))){Refresh();return TRUE;}
++        return CFeatureDialog::OnCommand(wp,lp);
++    }
++    virtual void OnOK(){
++        if(!ReadSettings()){Refresh();return;}
+         CFeatureDialog::OnOK();
+     }
+ };
+@@ -14706,26 +14786,12 @@
+     OnChar(27,1,0);
+     CTableSetupDialog dialog;
+     if(dialog.DoModal()!=IDOK)return;
+-    CExpression *table=new CExpression(NULL,NULL,dialog.font);
+-    table->InsertEmptyElement(0,5,(char)0x80);
+-    CExpression *cells=(CExpression*)table->m_pElementList->pElementObject->Expression1;
+-    cells->m_ParenthesesFlags=0; cells->m_ParentheseShape=' ';
+-    if(cells->FindMatrixElement(dialog.rows-1,dialog.columns-1,1)<0){delete table;AfxMessageBox("Cannot create this table.");return;}
+-    char align=dialog.alignment==0?'l':(dialog.alignment==1?'c':'r');
+-    for(int row=0;row<dialog.rows;row++)for(int col=0;col<dialog.columns;col++)
+-    {
+-        char top=' ',bottom=' ',left=' ',right=' ';
+-        if(dialog.borders==0)top=bottom=left=right='-';
+-        if(dialog.borders==1){if(row==0)top='-';if(row==dialog.rows-1)bottom='-';if(col==0)left='-';if(col==dialog.columns-1)right='-';}
+-        if(dialog.borders==2 && row==0)bottom='-';
+-        cells->SetCellAttributes(row,col,align,top,bottom,left,right);
+-    }
+-    RestoreClipboardBackground();
+-    if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}
+-    if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
+-    CDC *dc=GetDC();short length,above,below;table->CalculateSize(dc,ViewZoom,&length,&above,&below);ReleaseDC(dc);
+-    ClipboardExpression=table;RootObjectCopy=-1;RootObjectFontSize=dialog.font; // configured font must survive preview layout changes
+-    IsDrawingMode=0;MouseMode=0;
++    CExpression *table=BuildConfiguredTable(dialog.rows,dialog.columns,dialog.font,dialog.borders,dialog.alignment);
++    if(!table){AfxMessageBox("Cannot create this table.");return;}
++    CancelFloatingPlacement();
++    CClientDC dc(this);short length,above,below;table->CalculateSize(&dc,ViewZoom,&length,&above,&below);
++    ClipboardExpression=table;RootObjectCopy=-1;RootObjectFontSize=dialog.font;
++    IsDrawingMode=0;MouseMode=0;MovingStartX=MovingStartY=0;
+     SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
+ }
+ 
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -730,24 +730,28 @@
+ #endif    // not APSTUDIO_INVOKED
+ 
+ 
+-IDD_TABLE_SETUP DIALOGEX 0,0,250,155
++IDD_TABLE_SETUP DIALOGEX 0,0,450,194
+ STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+ CAPTION "Configure table"
+ FONT 9,"Segoe UI"
+ BEGIN
+  LTEXT "Rows (1-20)",IDC_STATIC,12,15,100,12
+- EDITTEXT IDC_TABLE_ROWS,135,12,90,14,ES_NUMBER | ES_AUTOHSCROLL
++ EDITTEXT IDC_TABLE_ROWS,116,12,90,14,ES_NUMBER | ES_AUTOHSCROLL
+  LTEXT "Columns (1-12)",IDC_STATIC,12,36,100,12
+- EDITTEXT IDC_TABLE_COLUMNS,135,33,90,14,ES_NUMBER | ES_AUTOHSCROLL
++ EDITTEXT IDC_TABLE_COLUMNS,116,33,90,14,ES_NUMBER | ES_AUTOHSCROLL
+  LTEXT "Font size (%)",IDC_STATIC,12,57,100,12
+- EDITTEXT IDC_TABLE_FONT,135,54,90,14,ES_NUMBER | ES_AUTOHSCROLL
++ EDITTEXT IDC_TABLE_FONT,116,54,90,14,ES_NUMBER | ES_AUTOHSCROLL
+  LTEXT "Borders",IDC_STATIC,12,78,100,12
+- COMBOBOX IDC_TABLE_BORDERS,135,75,90,70,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++ COMBOBOX IDC_TABLE_BORDERS,116,75,90,70,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+  LTEXT "Cell alignment",IDC_STATIC,12,99,100,12
+- COMBOBOX IDC_TABLE_ALIGN,135,96,90,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+- LTEXT "Choose settings, then click to place. Tab moves between cells.",IDC_STATIC,12,116,225,12
+- DEFPUSHBUTTON "Place table",IDOK,104,135,70,14
+- PUSHBUTTON "Cancel",IDCANCEL,181,135,56,14
++ COMBOBOX IDC_TABLE_ALIGN,116,96,90,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++ GROUPBOX "Live layout preview",IDC_STATIC,218,8,220,145
++ CONTROL "",IDC_TABLE_PREVIEW,"Static",SS_NOTIFY | WS_BORDER,226,22,204,104
++ CONTROL "Show sample text (inserted table is empty)",IDC_TABLE_SAMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,226,132,204,14
++ LTEXT "Choose settings, then click to place. Tab moves between cells.",IDC_STATIC,12,122,192,26
++ LTEXT "",IDC_TABLE_PREVIEW_STATUS,12,155,426,12
++ DEFPUSHBUTTON "Place table",IDOK,295,174,70,14
++ PUSHBUTTON "Cancel",IDCANCEL,372,174,66,14
+ END
+ 
+ 
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -240,6 +240,9 @@
+ #define IDC_TABLE_FONT 1123
+ #define IDC_TABLE_BORDERS 1124
+ #define IDC_TABLE_ALIGN 1125
++#define IDC_TABLE_PREVIEW 1126
++#define IDC_TABLE_PREVIEW_STATUS 1127
++#define IDC_TABLE_SAMPLE 1128
+ 
+ #define ID_DRAW_PEN 33047
+ #define ID_DRAW_LINE 33048
