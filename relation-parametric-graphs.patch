@@ -111,7 +111,7 @@
 +    auto cancel=[&](){return abort!=0;};
 +    for(int k=0;k<8&&!cancel();k++)if(active[k]||(parametric.enabled&&k==0)){
 +        COLORREF color=ImprovedColor(colors[k]);CPen pen(PS_SOLID,max(1,zoom/200),color);dc.SelectObject(&pen);
-+        auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));};
++        auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));dc.SetPixelV((int)floor(b.x+.5),(int)floor(b.y+.5),color);};
 +        auto shade=[&](int x,int y,int right,int bottom){dc.FillSolidRect(x,y,right-x,bottom-y,RGB(230,236,245));};
 +        if(parametric.enabled&&k==0)RelationGraph::Trace(parametric,view,emit,cancel);
 +        else RelationGraph::Contour(relations[k],view,emit,shade,cancel);
@@ -276,10 +276,10 @@
 +    std::vector<RelationGraph::Program> programs;RelationGraph::Parametric parametric;RelationGraph::Viewport viewport;bool ready;
 +    CRelationPreview():ready(false){}
 +    afx_msg void OnPaint(){CPaintDC dc(this);CRect r;GetClientRect(&r);dc.FillSolidRect(r,RGB(255,255,255));if(!ready)return;
-+        RelationGraph::Viewport v=viewport;v.width=r.Width()-16;v.height=r.Height()-16;int saved=dc.SaveDC();dc.SetViewportOrg(8,8);
++        RelationGraph::Viewport v=viewport;double aspect=double((std::max)(2,viewport.width))/(std::max)(2,viewport.height);v.height=r.Height()-16;v.width=(int)(v.height*aspect);if(v.width>r.Width()-16){v.width=r.Width()-16;v.height=(int)(v.width/aspect);}int saved=dc.SaveDC();dc.SetViewportOrg((r.Width()-v.width)/2,(r.Height()-v.height)/2);dc.IntersectClipRect(0,0,v.width,v.height);
 +        const int colors[8]={0,2,1,3,5,6,7,4};auto cancel=[](){return false;};
 +        for(size_t i=0;i<(parametric.enabled?1:programs.size());i++){CPen pen(PS_SOLID,1,ImprovedColor(colors[i]));dc.SelectObject(&pen);
-+            auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));};
++            auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));dc.SetPixelV((int)floor(b.x+.5),(int)floor(b.y+.5),ImprovedColor(colors[i]));};
 +            auto shade=[&](int x,int y,int right,int bottom){dc.FillSolidRect(x,y,right-x,bottom-y,RGB(230,236,245));};
 +            if(parametric.enabled)RelationGraph::Trace(parametric,v,emit,cancel);else RelationGraph::Contour(programs[i],v,emit,shade,cancel);dc.SelectStockObject(BLACK_PEN);
 +        }
@@ -295,7 +295,7 @@
 +{
 +public:
 +    std::string equations;RelationGraph::Parametric parametric;RelationGraph::Viewport viewport;bool radians,initializing;std::vector<RelationGraph::Program> programs;CRelationPreview preview;
-+    CRelationDialog():CFeatureDialog(IDD_RELATION_GRAPH,theApp.m_pMainWnd),equations("x^2+y^2=25"),radians(true),initializing(true){}
++    CRelationDialog():CFeatureDialog(IDD_RELATION_GRAPH,theApp.m_pMainWnd),equations("x^2+y^2=25"),radians(true),initializing(true){viewport.width=550;viewport.height=415;}
 +    CString Text(int id){CString s;GetDlgItemText(id,s);s.Trim();return s;}
 +    void Mode(){bool param=((CComboBox*)GetDlgItem(1420))->GetCurSel()==1;GetDlgItem(1423)->EnableWindow(!param);for(int id=1425;id<=1429;id++)GetDlgItem(id)->EnableWindow(param);}
 +    bool Check(){
@@ -332,7 +332,7 @@
 +{
 +    if(ViewOnlyMode)return;CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto o=TheDocument+i;if(o->Type==2&&(o==prevTouchedObject||o->MovingDotState==3)){existing=FindRelationGraph((CDrawing*)o->Object);if(existing)break;}}
 +    if(MouseMode==102)existing=NULL;OnChar(27,1,0);CRelationDialog dialog;
-+    if(existing){auto p=(CFunctionPlotter*)existing->SpecialData;if(!p->StopForZoom())return;p->EnsureFunctionSlots();dialog.parametric=p->parametric;dialog.radians=p->is_x_pi!=0;p->PlotFunctionGetBondaries(&dialog.viewport.xmin,&dialog.viewport.xmax,&dialog.viewport.ymin,&dialog.viewport.ymax);
++    if(existing){auto p=(CFunctionPlotter*)existing->SpecialData;if(!p->StopForZoom())return;p->EnsureFunctionSlots();dialog.parametric=p->parametric;dialog.radians=p->is_x_pi!=0;dialog.viewport.width=max(2,abs(existing->Items[0].X2-existing->Items[0].X1)/DRWZOOM-p->MX);dialog.viewport.height=max(2,abs(existing->Items[1].Y2-existing->Items[1].Y1)/DRWZOOM-p->MY);p->PlotFunctionGetBondaries(&dialog.viewport.xmin,&dialog.viewport.xmax,&dialog.viewport.ymin,&dialog.viewport.ymax);
 +        dialog.equations.clear();for(int i=8;i<existing->NumItems&&i<16;i++)try{auto expression=(CExpression*)existing->Items[i].pSubdrawing;if(!NativeSymbolic::Empty(expression)){if(!dialog.equations.empty())dialog.equations+="\r\n";dialog.equations+=GraphEquationText(expression);}}catch(const std::exception &){AfxMessageBox("This graph contains expressions the relation editor cannot read. Edit those expressions directly with f1 to f8.");return;}
 +    }
 +    if(dialog.DoModal()!=IDOK)return;CDrawing *drawing=existing;
@@ -373,7 +373,7 @@
      afx_msg void OnFormulaReference();
 --- /dev/null
 +++ b/Mathomir/RelationGraph.h
-@@ -0,0 +1,102 @@
+@@ -0,0 +1,103 @@
 +#pragma once
 +#include "SymbolicDerivative.h"
 +#include <functional>
@@ -466,6 +466,7 @@
 +};
 +inline void ParametricPart(const Parametric &p,const Viewport &v,double ta,double tb,Point a,Point b,int depth,const Emit &emit,const Cancel &cancel,int &budget){
 +    if(--budget<0||cancel())return;double tm=ta+(tb-ta)/2;Point m=v.Pixel(p.Value(tm));
++    if(!Finite(a)&&!Finite(b)&&!Finite(m))return;
 +    bool valid=Finite(a)&&Finite(b)&&Finite(m);double deviation=valid?std::hypot(m.x-(a.x+b.x)/2,m.y-(a.y+b.y)/2):1e30;
 +    double span=valid?std::hypot(b.x-a.x,b.y-a.y):1e30;
 +    if(deviation>.4||span>32){if(depth<10){ParametricPart(p,v,ta,tm,a,m,depth+1,emit,cancel,budget);ParametricPart(p,v,tm,tb,m,b,depth+1,emit,cancel,budget);}return;}

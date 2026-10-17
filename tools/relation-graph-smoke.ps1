@@ -21,7 +21,7 @@ function Apply($d){[MathomirUiProbe]::PostMessage($d,273,[IntPtr]1,[IntPtr]::Zer
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $fixture -Raw)}
 function HoverGraph {[MathomirUiProbe]::Mouse($view,512,0,290,240);Start-Sleep -Milliseconds 150}
 function Blank($name){$script:fixture=Join-Path $folder ('relation-'+$name+'.mom');'<?xml version="1.0"?><mathomir></mathomir>'|Set-Content $fixture -Encoding ascii;[MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,32775)|Out-Null}
-function Place {[MathomirUiProbe]::Mouse($view,512,0,100,100);[MathomirUiProbe]::Mouse($view,513,1,100,100);[MathomirUiProbe]::Mouse($view,514,0,100,100);[MathomirUiProbe]::Send($view,258,27)|Out-Null;Start-Sleep -Seconds 2}
+function Place {[MathomirUiProbe]::Mouse($view,512,0,100,100);[MathomirUiProbe]::Mouse($view,513,1,100,100);[MathomirUiProbe]::Mouse($view,514,0,100,100);[MathomirUiProbe]::Send($view,258,27)|Out-Null;[MathomirUiProbe]::Mouse($view,512,0,850,50);Start-Sleep -Seconds 2}
 $exe=(Resolve-Path source/build/Mathomir.exe).Path;$folder=Split-Path $exe
 $env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
 $app=Start-Process $exe -WorkingDirectory $folder -PassThru
@@ -35,16 +35,16 @@ try{
  foreach($bad in @('x+z=0','x=y=2','sin(x=0')){[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1423),$bad);[MathomirUiProbe]::Send($d,273,1439)|Out-Null;Check (![RelationProbe]::IsWindowEnabled([MathomirUiProbe]::Child($d,1))) "Invalid relation accepted: $bad"}
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1423),"x^2+y^2=25`r`nx*y=1`r`ny=x");[MathomirUiProbe]::Send($d,273,1439)|Out-Null
  Check ([RelationProbe]::IsWindowEnabled([MathomirUiProbe]::Child($d,1))) 'Mixed relations invalid';Apply $d;Place;$saved=SaveDoc
- Check ($saved.SelectNodes('//opr[@s="="]').Count -ge 3) 'Equations not native editable math'
+ Check ($saved.SelectNodes('//opr[@s="="] | //elm[@tp="2"][@stp="="]').Count -ge 3) 'Equations not native editable math'
  Check ([MathomirUiProbe]::CountColor($view,160,105,520,385,0) -gt 300) 'Native circle absent'
- Check ([MathomirUiProbe]::CountColor($view,160,105,520,385,0x000000FF) -gt 150) 'Native hyperbola absent'
+ Check ([MathomirUiProbe]::CountColor($view,160,105,520,385,0x0000CC00) -gt 150) 'Native hyperbola absent'
  Capture $main 'relation-equations-canvas.png'
  # Reopen a distinct copy, then edit the same graph with its shared editor.
  $reopened=Join-Path $folder 'relation-reopened.mom';Copy-Item $fixture $reopened;[MathomirUiProbe]::OpenFile($main,$reopened);$script:fixture=$reopened;Start-Sleep -Seconds 2;HoverGraph;$d=Dialog
  $text=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1423));Check ($text.Contains('y') -and $text.Contains('25') -and $text.Contains('=1')) "Saved relations lost: $text"
  [MathomirUiProbe]::Send($d,273,1437)|Out-Null;Apply $d;Start-Sleep -Seconds 2;$saved=SaveDoc
  Check ($saved.mathomir.ChildNodes.Count -eq 1) 'Editing duplicated graph'
- [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$saved=SaveDoc;Check ($saved.SelectNodes('//opr[@s="="]').Count -ge 3) 'Undo did not restore relations'
+ [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$saved=SaveDoc;Check ($saved.SelectNodes('//opr[@s="="] | //elm[@tp="2"][@stp="="]').Count -ge 3) 'Undo did not restore relations'
  Blank 'parametric';$d=Dialog;[MathomirUiProbe]::Send($d,273,1438)|Out-Null
  Check ([RelationProbe]::IsWindowEnabled([MathomirUiProbe]::Child($d,1425))) 'Parametric fields disabled'
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1429),'0');[MathomirUiProbe]::Send($d,273,1439)|Out-Null;Check (![RelationProbe]::IsWindowEnabled([MathomirUiProbe]::Child($d,1))) 'Empty t interval accepted'

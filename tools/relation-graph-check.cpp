@@ -18,6 +18,7 @@ int main(){
     for(auto s:lines){Point a=world(s.a);Check(std::fabs(a.x*a.x/9+a.y*a.y/4-1)<1e-9,"ellipse residual");}
     Point start=t.Value(t.low),end=t.Value(t.high);Check(std::hypot(start.x-end.x,start.y-end.y)<1e-12,"ellipse interval closure");
     t.xtext="t";t.ytext="1/(t-0.3)";t.low=-2;t.high=2;Check(t.Parse(error),"parametric pole parse");lines.clear();Trace(t,v,emit,cancel);Check(!lines.empty(),"parametric rational absent");for(auto s:lines)Check((world(s.a).x-.3)*(world(s.b).x-.3)>0,"parametric pole bridge");
+    t.xtext="t";t.ytext="sqrt(t)";t.low=-2;t.high=2;Check(t.Parse(error),"partial domain parse");lines.clear();Trace(t,v,emit,cancel);Check(lines.size()>100,"valid parametric domain starved by undefined half");for(auto s:lines)Check(world(s.a).x>=-1e-10,"undefined parametric domain drawn");
     t.xtext="cos(t)";t.ytext="sin(t)";t.radians=false;t.low=0;t.high=360;Check(t.Parse(error),"degrees parse");Check(std::fabs(t.Value(90).y-1)<1e-12,"degrees wrong");
     t.xtext="x";Check(!t.Parse(error),"x accepted as t");t.xtext="t";t.high=t.low;Check(!t.Parse(error),"empty t interval accepted");
     Point a={-1e20,150},b={1e20,150};Check(Clip(a,b,v.width,v.height)&&a.x>=0&&b.x<=v.width-1,"large line clipping");
