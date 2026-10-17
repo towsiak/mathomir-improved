@@ -605,3 +605,10 @@ backgrounds cover the object bounds; the existing Fill option fills a closed
 shape with its stroke color. Backgrounds participate in Undo, copy and MOM
 save/reopen. Opaque images, graphs and drawing-box containers retain their
 specialized rendering; this popup does not recolor their interiors.
+
+ROTATION CENTER MARKER (17 October 2026)
+A fixed-size crosshair and center dot show the actual rotation pivot while
+using a rotation grip, hovering rotation angle options, or right-dragging a
+selection. Angle-button rotations briefly retain the pivot on the canvas.
+The marker is a temporary view overlay: it does not enter drawings, saved
+files or printed output. Release/Escape and document changes clear it.

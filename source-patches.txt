@@ -30,3 +30,4 @@ palette-carry-preview.patch
 code-health-audit.patch
 table-dialog-preview.patch
 object-popup-colors.patch
+rotation-center-marker.patch

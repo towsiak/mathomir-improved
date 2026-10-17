@@ -1,0 +1,327 @@
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -895,6 +895,7 @@
+ //clears the entire document (like File->New)
+ int CMainFrame::ClearDocument(void)
+ {
++    if(pMainView)pMainView->ClearRotationCenter();
+     // Hover entries point into TheDocument: clear them before freeing its storage.
+     SpecialDrawingHover=prevSpecialDrawingHover=NULL;
+     prevTouchedObject=SelectedDocumentObject=SelectedDocumentObject2=NULL;
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -765,6 +765,9 @@
+     }
+     return false;
+ }
++static bool RotationCenterVisible=false;
++static double RotationCenterX=0,RotationCenterY=0;
++static DWORD RotationCenterExpires=0;
+ static bool MouseRotationActive=false;
+ static double MouseRotationStartDirection,MouseRotationCenterX,MouseRotationCenterY;
+ static int MouseRotationStartAngle,MouseRotationStartX,MouseRotationStartY;
+@@ -1765,15 +1768,11 @@
+ 			}
+ 			else
+ 			{
+-				//paint rotation handles
+-				CPen mpen(PS_SOLID,1,RGB(255,0,0));
+-				int cx=((SelectionRectOrig.right+SelectionRectOrig.left)/2-ViewX)*ViewZoom/100;
+-				int cy=((SelectionRectOrig.bottom+SelectionRectOrig.top)/2-ViewY)*ViewZoom/100;
+-				HPEN p=(HPEN)bitmapDC.SelectObject(mpen);
+-				bitmapDC.Ellipse(cx-2,cy-2,cx+2,cy+2);
+-				bitmapDC.SelectObject(p);
+-			}
+-		}
++                // The shared overlay below draws the selection rotation pivot.
++			}
++		}
++
++        PaintRotationCenter(&bitmapDC);
+ 
+ 		/*{
+ 			//paint the ruller
+@@ -2325,6 +2324,7 @@
+ 	if (BeginGripMove(point,centerWasVisible && (nFlags&(MK_CONTROL|MK_SHIFT))==0)) return;
+ 	if (BeginMouseSizing(point)) return;
+ 	if (BeginMouseRotation(point)) return;
++    ClearRotationCenter();
+ 	RotationHandleObject=NULL;
+ 	FreePlacementGesture=false;
+ 	SteadyCursorTimer=0;
+@@ -3862,6 +3862,7 @@
+ 		if (!(nFlags&MK_LBUTTON)) { EndMouseRotation(false); return; }
+ 		UpdateMouseRotation(point,nFlags); return;
+ 	}
++    if(MouseMode!=11)ClearRotationCenter(true);
+     // Foreground content wins over stale controls of an underlying object.
+     if(!IsDrawingMode && MouseMode==0 && !ClipboardExpression && !ClipboardDrawing)
+     {
+@@ -3900,7 +3901,8 @@
+ 	{
+ 		CPoint handle=RotationHandlePoint(rotationObject);
+ 		int dx=point.x-handle.x,dy=point.y-handle.y;
+-		if (dx*dx+dy*dy<=121) { ShowFeatureCanvasHint(4,"Rotate by dragging. Hold Shift for 15-degree steps; Escape cancels.");SetCursor(::LoadCursor(NULL,IDC_HAND)); return; }
++		if (dx*dx+dy*dy<=121) { ShowRotationCenter(rotationObject->absolute_X+rotationObject->Length/2.0,
++            rotationObject->absolute_Y+(rotationObject->Below-rotationObject->Above)/2.0); ShowFeatureCanvasHint(4,"Rotate by dragging. Hold Shift for 15-degree steps; Escape cancels.");SetCursor(::LoadCursor(NULL,IDC_HAND)); return; }
+ 	}
+ 
+     // Keep an annotation's controls while crossing the few pixels between the
+@@ -4361,12 +4363,14 @@
+ 			tmpDrawing2->AdjustCoordinates(&x,&y,&w,&h);
+ 			int ow=w/2;
+ 			int oh=h/2;
++            ShowRotationCenter(SelectionRectOrig.left+ow,SelectionRectOrig.top+oh);
+ 			tmpDrawing2->RotateForAngle((float)(arc1-arc2),ow,oh,&x,&y,&w,&h);
+ 			tmpDrawing2->CalculateSize(DC,ViewZoom,&ww,&hh);
+ 
+ 			MultipleX=SelectionRectOrig.left+x+ow;
+ 			MultipleY=SelectionRectOrig.top+y+oh;
+ 			tmpDrawing2->PaintDrawing(DC,ViewZoom,(MultipleX-ViewX)*ViewZoom/100,(MultipleY-ViewY)*ViewZoom/100,-1,-1);
++            PaintRotationCenter(DC);
+ 		}
+ 		else 
+ 		{
+@@ -5167,6 +5171,8 @@
+ 		MovingStartX=AbsoluteX;
+ 		MovingStartY=AbsoluteY;
+ 		MouseMode=11;
++        ShowRotationCenter((SelectionRectOrig.left+SelectionRectOrig.right)/2,
++            (SelectionRectOrig.top+SelectionRectOrig.bottom)/2);
+ 		ResizingFirstPass=1;
+ 		goto on_rbuttondown_end;
+ 	}
+@@ -5616,6 +5622,7 @@
+     if(nChar=='A' && (GetKeyState(VK_CONTROL)&0x8000) && (GetKeyState(VK_SHIFT)&0x8000)){OnSelectAllObjects();return;}
+ 	if (MouseMovingActive && nChar==VK_ESCAPE) { EndGripMove(true); SurpressCharMessage=1; return; }
+ 	if (MouseSizingActive && nChar==VK_ESCAPE) { EndMouseSizing(true); SurpressCharMessage=1; return; }
++    if(nChar==VK_ESCAPE)ClearRotationCenter();
+ 	if (MouseRotationActive && nChar==VK_ESCAPE) { EndMouseRotation(true); SurpressCharMessage=1; return; }
+     if(nChar==VK_ESCAPE && IsDrawingMode && MouseMode==0){RestoreClipboardBackground();IsDrawingMode=0;RepaintTheView();SurpressCharMessage=1;return;}
+     if(nChar==VK_ESCAPE && (ClipboardExpression||ClipboardDrawing)){CancelFloatingPlacement();SurpressCharMessage=1;return;}
+@@ -7270,6 +7277,8 @@
+ unsigned int TimerTickAccumulator;
+ void CMathomirView::OnTimer(UINT nIDEvent)
+ {
++    if(RotationCenterVisible && RotationCenterExpires && (LONG)(GetTickCount()-RotationCenterExpires)>=0)
++        ClearRotationCenter();
+     if(m_SelectionApproxPanel&&m_SelectionApproxPanel->IsWindowVisible()){
+         POINT cursor;GetCursorPos(&cursor);ScreenToClient(&cursor);KeepSelectionApproxPanel(CPoint(cursor));
+     }else if(KeyboardEntryObject && theApp.m_pMainWnd && theApp.m_pMainWnd->IsWindowEnabled()){
+@@ -8732,6 +8741,7 @@
+ 
+ 	if (MouseMode==11) //rotating
+ 	{
++        ClearRotationCenter();
+ 		int oldpos=-1;
+ 		for (int ii=0;ii<NumDocumentElements;ii++)
+ 			if (TheDocument[ii].MovingDotState==3)
+@@ -11298,6 +11308,7 @@
+ }
+ void CMathomirView::OnMouseLeave()
+ {
++    if(!MouseRotationActive && MouseMode!=11)ClearRotationCenter(true);
+     RestoreClipboardBackground();
+     FunctionHelpMouseTracking=false;
+     if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive){
+@@ -11570,6 +11581,50 @@
+     RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
+ }
+ 
++static CRect RotationCenterRect()
++{
++    int x=(int)floor((RotationCenterX-ViewX)*ViewZoom/100.0+0.5);
++    int y=(int)floor((RotationCenterY-ViewY)*ViewZoom/100.0+0.5);
++    return CRect(x-11,y-11,x+12,y+12);
++}
++void CMathomirView::ShowRotationCenter(double x,double y,unsigned int holdMilliseconds)
++{
++    CRect previous=RotationCenterRect();bool changed=!RotationCenterVisible || x!=RotationCenterX || y!=RotationCenterY;
++    RotationCenterVisible=true;RotationCenterX=x;RotationCenterY=y;
++    RotationCenterExpires=holdMilliseconds?GetTickCount()+holdMilliseconds:0;
++    if(changed){InvalidateRect(previous,FALSE);CRect current=RotationCenterRect();InvalidateRect(current,FALSE);UpdateWindow();}
++}
++void CMathomirView::ClearRotationCenter(bool keepFlash)
++{
++    if(!RotationCenterVisible || (keepFlash && RotationCenterExpires))return;
++    CRect previous=RotationCenterRect();RotationCenterVisible=false;RotationCenterExpires=0;
++    if(GetSafeHwnd())InvalidateRect(previous,FALSE);
++}
++void CMathomirView::PaintRotationCenter(CDC *dc)
++{
++    bool visible=RotationCenterVisible && !PrintRendering && !ViewOnlyMode && !IsDrawingMode;
++    CRect area=RotationCenterRect();int x=area.left+11,y=area.top+11;
++    if(getenv("MATHOMIR_ROTATION_DIAGNOSTICS")){
++        ::SetProp(GetSafeHwnd(),"RotationPivot_Visible",(HANDLE)(INT_PTR)(visible+1));
++        ::SetProp(GetSafeHwnd(),"RotationPivot_X",(HANDLE)(INT_PTR)(x+1));
++        ::SetProp(GetSafeHwnd(),"RotationPivot_Y",(HANDLE)(INT_PTR)(y+1));
++        tDocumentStruct *object=RotationHandleDocument();CPoint grip=object?RotationHandlePoint(object):CPoint(-1,-1);
++        ::SetProp(GetSafeHwnd(),"RotationPivot_GripX",(HANDLE)(INT_PTR)(grip.x+1));
++        ::SetProp(GetSafeHwnd(),"RotationPivot_GripY",(HANDLE)(INT_PTR)(grip.y+1));
++    }
++    if(!visible)return;
++    int saved=dc->SaveDC();dc->SetROP2(R2_COPYPEN);
++    CPen halo(PS_SOLID,3,RGB(255,255,255));CPen ink(PS_SOLID,1,RGB(20,55,90));
++    CBrush paper(RGB(255,255,255)),dot(RGB(20,55,90));
++    dc->SelectObject(&halo);dc->SelectObject(&paper);
++    dc->MoveTo(x-9,y);dc->LineTo(x+10,y);dc->MoveTo(x,y-9);dc->LineTo(x,y+10);
++    dc->SelectObject(&ink);
++    dc->MoveTo(x-9,y);dc->LineTo(x+10,y);dc->MoveTo(x,y-9);dc->LineTo(x,y+10);
++    dc->Ellipse(x-5,y-5,x+6,y+6);
++    dc->SelectObject(&dot);dc->Ellipse(x-2,y-2,x+3,y+3);
++    dc->RestoreDC(saved);
++}
++
+ void CMathomirView::PaintRotationHandle(CDC *dc)
+ {
+ #ifdef MATHOMIR_AI_TESTING
+@@ -11666,6 +11721,7 @@
+     MouseRotationStartDirection=atan2(y-MouseRotationCenterY,x-MouseRotationCenterX);
+     UndoSave("rotate equation with mouse",20504);
+     MouseRotationActive=true; MouseMode=103;
++    ShowRotationCenter(MouseRotationCenterX,MouseRotationCenterY);
+     SetCapture(); SetCursor(::LoadCursor(NULL,IDC_CROSS));
+     return true;
+ }
+@@ -11721,6 +11777,7 @@
+     }
+     if(RotationDrawingSnapshot){delete RotationDrawingSnapshot;RotationDrawingSnapshot=NULL;}
+     MouseRotationActive=false; MouseMode=0;
++    ClearRotationCenter();
+     if (GetCapture()==this) ReleaseCapture();
+     RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
+ }
+@@ -11777,7 +11834,12 @@
+     }
+     if (!first) { OnRotateWithMouse(); return; }
+     CEquationRotationDialog dialog(first->m_RotationMilliDegrees/1000.0);
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==(CObject*)first){
++        tDocumentStruct *object=TheDocument+i;
++        ShowRotationCenter(object->absolute_X+object->Length/2.0,object->absolute_Y+(object->Below-object->Above)/2.0);break;
++    }
+     INT_PTR result=dialog.DoModal();
++    ClearRotationCenter();
+     if (result==IDC_ROTATION_MOUSE) { OnRotateWithMouse(); return; }
+     if (result!=IDOK) return;
+     int angle=(int)(dialog.angle*1000.0+(dialog.angle<0 ? -0.5 : 0.5));
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -178,6 +178,9 @@
+ 	void UpdateMouseSizing(CPoint point,UINT flags);
+ 	void EndMouseSizing(bool cancel);
+ 	void PaintRotationHandle(CDC *dc);
++    void ShowRotationCenter(double x,double y,unsigned int holdMilliseconds=0);
++    void ClearRotationCenter(bool keepFlash=false);
++    void PaintRotationCenter(CDC *dc);
+ 	bool BeginMouseRotation(CPoint point);
+ 	void UpdateMouseRotation(CPoint point, UINT flags);
+ 	void EndMouseRotation(bool cancel);
+--- a/Mathomir/PopupMenu.cpp
++++ b/Mathomir/PopupMenu.cpp
+@@ -252,6 +252,27 @@
+     pMainView->SetFocus();
+ }
+ 
++static bool IsPopupSelectionObject(tDocumentStruct *object)
++{
++    return object->Object && (object->MovingDotState==3 ||
++        (object->Type==2 && ((CDrawing*)object->Object)->IsSelected) ||
++        (object->Type==1 && ((CExpression*)object->Object)->m_Selection==0x7FFF));
++}
++static bool PopupSelectionBounds(int &left,int &top,int &right,int &bottom)
++{
++    left=top=0x7FFFFFFF;right=bottom=INT_MIN;bool found=false;
++    for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *object=TheDocument+i;if(!IsPopupSelectionObject(object))continue;
++        left=min(left,object->absolute_X);top=min(top,object->absolute_Y-object->Above);
++        right=max(right,object->absolute_X+object->Length);bottom=max(bottom,object->absolute_Y+object->Below);found=true;
++    }
++    return found;
++}
++static bool IsPopupRotationCommand(int data)
++{
++    return (data>=540 && data<=545) || (data>=571 && data<=575);
++}
++
+ int YorderQSort(const void *first, const void *second)
+ {
+ 	//sorts documents object on Y coordinate
+@@ -275,6 +296,7 @@
+ int PopupMenu::ShowPopupMenu(CExpression* expression, CWnd*owner, int OwnerType,int UserParam,int no_reposition)
+ {
+ 	PopupMenuSecondPassChoosing=0;
++    if(!no_reposition)pMainView->ClearRotationCenter();
+     if(!no_reposition)CaptureAppearanceTargets(expression,OwnerType);
+     if(!no_reposition)m_ApproxPanelHandle=pMainView->PrepareContextApprox(this,expression,OwnerType);
+ 
+@@ -1642,6 +1664,14 @@
+ 			break;
+ 		}
+ 	}
++
++    if(m_OwnerType==2){
++        int data=m_SelectedOption>=0?Options[m_SelectedOption].Data:0;
++        if(IsPopupRotationCommand(data) || (ValueEntryBox && IsPopupRotationCommand(Options[ValueEntryBoxData].Data))){
++            int left,top,right,bottom;
++            if(PopupSelectionBounds(left,top,right,bottom))pMainView->ShowRotationCenter((left+right)/2,(top+bottom)/2);
++        }else pMainView->ClearRotationCenter(true);
++    }
+ 
+ 	//deselect any other graphics object (ones that are not selected)
+ 	int j;
+@@ -1998,6 +2028,7 @@
+ 		//	//do nothing, just exit
+ 		//}
+ 
++        if(!IsPopupRotationCommand(dataval))pMainView->ClearRotationCenter();
+         if(dataval>=920 && dataval<=929){ApplyBackgroundOption(dataval);return;}
+ 		if ((dataval>=110) && (dataval<115)) //stack-clipboard option
+ 		{
+@@ -2411,22 +2442,7 @@
+ 					//find upper left, and lower right corrner of selection
+ 					if (found==0)
+ 					{
+-						StartX=0x7FFFFFFF;
+-						StartY=0x7FFFFFFF;
+-						MaxX=MaxY=0x80000000;
+-						for (int kkk=ii;kkk<NumDocumentElements;kkk++)
+-						{
+-							tDocumentStruct *ds2=TheDocument+kkk;
+-							if ((ds2->Object) && ((ds2->MovingDotState==3) || 
+-							((ds2->Type==2) && (((CDrawing*)(ds2->Object))->IsSelected)) ||
+-								((ds2->Type==1) && (((CExpression*)(ds2->Object))->m_Selection==0x7FFF))))
+-							{
+-								if (ds2->absolute_X<StartX) StartX=ds2->absolute_X;
+-								if (ds2->absolute_Y-ds2->Above<StartY) StartY=ds2->absolute_Y-ds2->Above;
+-								if (ds2->absolute_X+ds2->Length>MaxX) MaxX=ds2->absolute_X+ds2->Length;
+-								if (ds2->absolute_Y+ds2->Below>MaxY) MaxY=ds2->absolute_Y+ds2->Below;
+-							}
+-						}
++                        PopupSelectionBounds(StartX,StartY,MaxX,MaxY);
+ 					}
+ 
+ 					if (data==590) //add center point (to cyrcle)
+@@ -2821,6 +2837,7 @@
+ 							((CMainFrame*)(theApp.m_pMainWnd))->UndoSave("rotate",20114);
+ 							StartX=(StartX+MaxX)/2;
+ 							StartY=(StartY+MaxY)/2;
++                            pMainView->ShowRotationCenter(StartX,StartY,1500);
+ 						}
+ 						int x1=0,y1=0,w=0,h=0;
+ 						double angle=0;
+@@ -2851,6 +2868,7 @@
+ 								ValueEntryBox->SendMessage(WM_SETFONT,(WPARAM)font,MAKELPARAM(1,0));
+ 								ValueEntryBox->SetFocus();
+ 								ValueEntryBoxData=m_SelectedOption;
++                                pMainView->ShowRotationCenter(StartX,StartY);
+ 								CWnd::OnLButtonDown(nFlags, point);
+ 								return;
+ 							}
+@@ -4077,6 +4095,7 @@
+ #pragma optimize("s",on)
+ int PopupMenu::HidePopupMenu(void)
+ {
++    if(pMainView)pMainView->ClearRotationCenter(true);
+ 	//exiting popup menu
+     if(m_ApproxPanelHandle){pMainView->HideSelectionApproxPanel();m_ApproxPanelHandle=NULL;}
+ 	if ((IsWindowVisible()) && (m_Owner!=NULL))

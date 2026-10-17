@@ -31,6 +31,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Rotation center overlay UI checks
+        shell: pwsh
+        run: ./tools/rotation-center-smoke.ps1
       - name: Shared object colors and backgrounds UI checks
         shell: pwsh
         run: ./tools/object-colors-smoke.ps1
@@ -86,6 +89,7 @@ jobs:
           path: |
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
             source/build/table-dialog-*.png
@@ -164,6 +168,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/rotation-center-smoke.ps1
           ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
           ./tools/table-preview-smoke.ps1
@@ -219,6 +224,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
             source/build/table-dialog-*.png
@@ -272,6 +278,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/rotation-center-smoke.ps1
           ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
           ./tools/table-preview-smoke.ps1
@@ -325,6 +332,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
             source/build/table-dialog-*.png
