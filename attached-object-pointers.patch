@@ -169,8 +169,8 @@
 +        if(object->Type==1)((CExpression*)object->Object)->DeselectExpression();
 +        else {((CDrawing*)object->Object)->SelectDrawing(0);((CDrawing*)object->Object)->SetGripNodeEditing(false);}
 +        wrapper->Items[1].Type=0;wrapper->Items[1].pSubdrawing=new CDrawing();
-+        object->absolute_Y-=object->Above;object->Above=0;object->Type=2;object->Object=wrapper;group=wrapper;
-+        if(ResizeHandleObject==target)ResizeHandleObject=wrapper;if(RotationHandleObject==target)RotationHandleObject=wrapper;
++        object->absolute_Y-=object->Above;object->Above=0;object->Type=2;object->Object=(CObject*)wrapper;group=wrapper;
++        if(ResizeHandleObject==target)ResizeHandleObject=(CObject*)wrapper;if(RotationHandleObject==target)RotationHandleObject=(CObject*)wrapper;
 +    }
 +    tDrawingItem &content=group->Items[0],&pointer=group->Items[1];
 +    short width,above=0,below;
