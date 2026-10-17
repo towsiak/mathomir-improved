@@ -32,3 +32,4 @@ table-dialog-preview.patch
 object-popup-colors.patch
 rotation-center-marker.patch
 attached-object-pointers.patch
+relation-parametric-graphs.patch

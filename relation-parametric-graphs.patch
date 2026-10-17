@@ -1,0 +1,502 @@
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -2113,6 +2113,7 @@
+ 			for(const char *p=bounds;*p;++p)metadata=metadata*33u+(unsigned char)*p;
+ 		}
+ 		if(!plot->pieces.empty())ret^=metadata;
++        if(plot->parametric.enabled){const auto &p=plot->parametric;std::string text=p.xtext+"|"+p.ytext+"|"+Piecewise::Number(p.low)+"|"+Piecewise::Number(p.high)+(p.radians?"1":"0");unsigned int hash=5381;for(unsigned char c:text)hash=hash*33u+c;ret^=(int)hash;}
+         if(plot->integral.enabled){
+             const auto &s=plot->integral;std::string text=s.formula+"|"+Piecewise::Number(s.a)+"|"+Piecewise::Number(s.b)+"|"+(s.radians?"1":"0")+(s.hatch?"1":"0")+(s.labels?"1":"0");
+             unsigned int area=5381;for(unsigned char c:text)area=area*33u+c;ret^=(int)area;
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -4,6 +4,7 @@
+ #include <atomic>
+ #include "Statistics.h"
+ #include "IntegralArea.h"
++#include "RelationGraph.h"
+ #include "CoordinateAxes.h"
+ 
+ //scalling factor that defines drawings inner precision
+@@ -125,6 +126,7 @@
+ class CFunctionPlotter
+ {
+ public:
++    RelationGraph::Parametric parametric;
+     IntegralArea::Settings integral;IntegralArea::Result integralResult;std::string integralError;
+     std::vector<Piecewise::Row> pieces;
+     bool pieceRadians;
+--- a/Mathomir/FunctionPlotter.cpp
++++ b/Mathomir/FunctionPlotter.cpp
+@@ -171,6 +171,7 @@
+ 	CFunctionPlotter *org=(CFunctionPlotter*)Original->SpecialData;
+ 	if (!org) return 0;
+ 
++    parametric=org->parametric;
+     integral=org->integral;integralResult=org->integralResult;integralError=org->integralError;
+     pieces=org->pieces;pieceRadians=org->pieceRadians;scatterPoints=org->scatterPoints;statisticsModel=org->statisticsModel;scatterResidual=org->scatterResidual;
+ 	is_y_log=org->is_y_log;
+@@ -985,6 +986,7 @@
+ int CFunctionPlotter::MouseClick(int X, int Y)
+ {
+     EnsureFunctionSlots();
++    if(parametric.enabled && TheState>=108&&TheState<=115&&X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_RELATION_GRAPH,0);return 1;}
+     if(integral.enabled && TheState==108 && X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER,0);return 1;}
+     if(!pieces.empty() && TheState>=108 && TheState<=115 && X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_PIECEWISE_GRAPH,0);return 1;}
+     if(!pieces.empty() && TheState==16){analyze=0;AfxMessageBox("Piecewise graphs use the table editor and Evaluate f(x). Open Graph > Piecewise function grapher.");return 1;}
+@@ -1004,6 +1006,7 @@
+ 		pMainView->ReleaseDC(DC);
+ 	}
+ 
++    if(parametric.enabled && TheState>=8&&TheState<=15&&X!=0x7FFFFFFF&&!ClipboardExpression){pMainView->PostMessage(WM_COMMAND,ID_RELATION_GRAPH,0);return 1;}
+     if(integral.enabled && TheState==8 && X!=0x7FFFFFFF && !ClipboardExpression){pMainView->PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER,0);return 1;}
+ 	if (ThreadHandle)
+ 	if (GetKeyState(VK_LBUTTON)&0x8000)
+@@ -1352,7 +1355,7 @@
+         if(state==1)help="Zoom out around the current graph window.";
+         else if(state==2||state==100)help="Zoom in. Click for a gentle zoom, or drag a rectangle to choose the visible region.";
+         else if(state>=4&&state<=7)help="Click to edit this graph-window limit. Press Enter to apply; Escape cancels. Limits retain full precision.";
+-        else if(state>=8&&state<=15)help="Click to edit this curve's expression. Use functions such as floor(x), ceil(x) and sin(x), or x=constant for a vertical line. Piecewise graphs use their table editor.";
++        else if(state>=8&&state<=15)help="Click to edit this curve's expression. Type y=f(x), x=constant, or a relation such as x^2+y^2=25. Graph > Relations and parametric curves opens the preview editor; parametric f1/f2 are x(t) and y(t).";
+         else if(state==17)help="Switch horizontal-axis labels between decimal numbers and multiples of pi. This changes labels, independently of RAD/DEG calculation mode.";
+         else if(state==16)help="Toggle graph analysis: inspect numerical values and other analysis controls.";
+         else if(state==99)help="Automatically choose a vertical range that fits the plotted curves.";
+@@ -1637,6 +1640,7 @@
+ int CFunctionPlotter::XML_output(char * output,int num_tabs,char only_calculate)
+ {
+     std::string text;
++    if(parametric.enabled)text+="<parametric x=\""+Piecewise::Hex(parametric.xtext)+"\" y=\""+Piecewise::Hex(parametric.ytext)+"\" lo=\""+Piecewise::Number(parametric.low)+"\" hi=\""+Piecewise::Number(parametric.high)+"\" rad=\""+(parametric.radians?"1":"0")+"\" />\r\n";
+     if(integral.enabled)text+="<integral f=\""+Piecewise::Hex(integral.formula)+"\" a=\""+Piecewise::Number(integral.a)+"\" b=\""+Piecewise::Number(integral.b)+"\" rad=\""+(integral.radians?"1":"0")+"\" hatch=\""+(integral.hatch?"1":"0")+"\" labels=\""+(integral.labels?"1":"0")+"\" />\r\n";
+     for(size_t i=0;i<pieces.size();i++){
+         const Piecewise::Row &r=pieces[i];
+@@ -1650,6 +1654,16 @@
+ }
+ char *CFunctionPlotter::XML_input(char *file)
+ {
++    if(strncmp(file,"parametric ",11)==0){
++        RelationGraph::Parametric proposed;char attribute[64],value[2048];file+=10;
++        do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,2048);if(!file)return NULL;
++            if(!strcmp(attribute,"x"))proposed.xtext=Piecewise::Unhex(value);
++            if(!strcmp(attribute,"y"))proposed.ytext=Piecewise::Unhex(value);
++            if(!strcmp(attribute,"lo"))proposed.low=Piecewise::StoredBound(value);
++            if(!strcmp(attribute,"hi"))proposed.high=Piecewise::StoredBound(value);
++            if(!strcmp(attribute,"rad"))proposed.radians=atoi(value)!=0;
++        }while(attribute[0]);std::string error;if(proposed.Parse(error)){proposed.enabled=true;parametric=proposed;is_x_pi=proposed.radians?1:0;}return file;
++    }
+     if(strncmp(file,"integral ",9)==0){
+         IntegralArea::Settings proposed;char attribute[64],value[2048];file+=8;
+         do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,2048);if(!file)return NULL;
+@@ -1794,6 +1808,35 @@
+     value=rhs.PlotterCalculateFunctionValue(0,variables,radians);rhs.PlotterReleaseVariablePositions(variables);
+     return GraphDiscontinuities::Finite(value);
+ }
++static bool NativeGraphRelation(CExpression *expression,RelationGraph::Program &program,bool radians)
++{
++    if(!expression)return false;
++    int equal=-1;
++    for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='='){if(equal>=0)return false;equal=n;}
++    if(equal<0)return false;
++    try{std::string left=NativeSymbolic::Formula(expression,0,equal),right=NativeSymbolic::Formula(expression,equal+1);std::string error;
++        // Keep ordinary y=f(x) and x=constant on their established exact paths.
++        SymbolicDerivative::Parser p;auto rhs=p.Parse(right);
++        if(left=="y"&&!SymbolicDerivative::Depends(rhs,"y"))return false;
++        if(left=="x"&&!SymbolicDerivative::Depends(rhs,"x")&&!SymbolicDerivative::Depends(rhs,"y"))return false;
++        return program.Parse(left+"="+right,radians,error);
++    }catch(const std::exception &){return false;}
++}
++static void PaintRelationCurves(CDC &dc,const RelationGraph::Viewport &view,RelationGraph::Program *relations,bool *active,
++    const RelationGraph::Parametric &parametric,int zoom,std::atomic<unsigned char> &abort)
++{
++    const int colors[8]={0,2,1,3,5,6,7,4};int saved=dc.SaveDC();dc.IntersectClipRect(0,0,view.width,view.height);
++    auto cancel=[&](){return abort!=0;};
++    for(int k=0;k<8&&!cancel();k++)if(active[k]||(parametric.enabled&&k==0)){
++        COLORREF color=ImprovedColor(colors[k]);CPen pen(PS_SOLID,max(1,zoom/200),color);dc.SelectObject(&pen);
++        auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));};
++        auto shade=[&](int x,int y,int right,int bottom){dc.FillSolidRect(x,y,right-x,bottom-y,RGB(230,236,245));};
++        if(parametric.enabled&&k==0)RelationGraph::Trace(parametric,view,emit,cancel);
++        else RelationGraph::Contour(relations[k],view,emit,shade,cancel);
++        dc.SelectStockObject(BLACK_PEN);
++    }dc.RestoreDC(saved);
++}
++
+ int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
+ {
+ 	if (ViewZoom==0)
+@@ -1908,6 +1951,7 @@
+ 
+ 
+ 
++	RelationGraph::Program relations[8];bool relationActive[8]={false};
+ 	CExpression *Func[8];
+     bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
+     bool vertical[8]={false};double verticalX[8]={0};
+@@ -1917,7 +1961,11 @@
+ 	int any_found=0;
+ 	for (int kk=0;kk<8;kk++,*pItem++)
+ 	{
+-		Func[kk]=NULL;
++        Func[kk]=NULL;
++        if(parametric.enabled){if(kk==0)any_found=1;continue;}
++        if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9&&NativeGraphRelation((CExpression*)pItem->pSubdrawing,relations[kk],is_x_pi!=0)){
++            relationActive[kk]=true;any_found=1;continue;
++        }
+ 		if (Base->NumItems>=kk+9)
+ 		{
+ 			if ((pItem->pSubdrawing) &&
+@@ -2336,6 +2384,12 @@
+                     mDC.Ellipse((int)px-radius,Ylen-(int)py-radius,(int)px+radius+1,Ylen-(int)py+radius+1);
+                     mDC.SelectObject(brush);mDC.SelectObject(pen);
+                 }
++            if(i==density*Xlen-1&&!abort_request){
++                RelationGraph::Viewport viewport;viewport.xmin=Xmin;viewport.xmax=Xmax;viewport.ymin=Ymin;viewport.ymax=Ymax;
++                viewport.width=Xlen;viewport.height=Ylen;viewport.logx=is_x_log!=0;viewport.logy=is_y_log!=0;
++                PaintRelationCurves(mDC,viewport,relations,relationActive,parametric,ViewZoom,abort_request);
++                GraphDiagnostic("relation,parametric,width,height",relationActive[0],parametric.enabled,Xlen,Ylen);
++            }
+ 			mDC.SelectObject(prev_bitmap);
+ 			if (PrintDC==NULL)
+ 			{
+@@ -2396,6 +2450,7 @@
+ {
+     if(Base->NumItems<8 || !StopForZoom()) return false;
+     double xmin,xmax,ymin,ymax;PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
++    if(parametric.enabled){TheState=0;PlotFunction(1);return true;}
+     if(resetX){xmin=is_x_log?0.1:(is_x_pi?-2*PiAxis::pi:-10);xmax=is_x_log?100:(is_x_pi?2*PiAxis::pi:10);ymin=is_y_log?0.1:-10;ymax=is_y_log?100:10;SetBounds(xmin,xmax,ymin,ymax);}
+     TheState=0;PlotFunction(2);return true;
+ }
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -502,6 +502,7 @@
+     END
+     POPUP "&Graph"
+     BEGIN
++        MENUITEM "Relations and parametric curves...", ID_RELATION_GRAPH
+         MENUITEM "Integral area shader...", ID_INTEGRAL_SHADER
+         MENUITEM "Logarithm builder...", ID_LOG_BASE_BUILDER
+         MENUITEM "Piecewise function grapher...", ID_PIECEWISE_GRAPH
+@@ -1161,3 +1162,40 @@
+     PUSHBUTTON "Sources",1491,409,372,60,18
+     PUSHBUTTON "Close",IDCANCEL,475,372,75,18
+ END
++
++IDD_RELATION_GRAPH DIALOGEX 0,0,488,329
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Relations and parametric curves"
++FONT 8,"MS Shell Dlg"
++BEGIN
++    LTEXT "Use the existing grapher for equations in x,y or a curve defined by x(t), y(t).",-1,10,9,468,13
++    LTEXT "Graph mode",-1,10,29,56,12
++    COMBOBOX 1420,72,26,256,80,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    CONTROL "Radians",1421,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,360,28,100,14
++    LTEXT "Equations: one per line, up to eight. A plain formula means y = formula.",1422,10,51,467,13
++    EDITTEXT 1423,10,67,226,70,ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | ES_WANTRETURN
++    LTEXT "x(t)",1424,250,69,28,12
++    EDITTEXT 1425,280,66,196,16,ES_AUTOHSCROLL
++    LTEXT "y(t)",1426,250,93,28,12
++    EDITTEXT 1427,280,90,196,16,ES_AUTOHSCROLL
++    LTEXT "t start",-1,250,118,29,12
++    EDITTEXT 1428,280,114,78,16,ES_AUTOHSCROLL
++    LTEXT "t end",-1,370,118,27,12
++    EDITTEXT 1429,400,114,76,16,ES_AUTOHSCROLL
++    LTEXT "x min",-1,10,149,29,12
++    EDITTEXT 1430,40,146,73,16,ES_AUTOHSCROLL
++    LTEXT "x max",-1,127,149,29,12
++    EDITTEXT 1431,158,146,73,16,ES_AUTOHSCROLL
++    LTEXT "y min",-1,250,149,29,12
++    EDITTEXT 1432,280,146,73,16,ES_AUTOHSCROLL
++    LTEXT "y max",-1,370,149,29,12
++    EDITTEXT 1433,400,146,76,16,ES_AUTOHSCROLL
++    CONTROL "",1434,"Static",SS_BLACKFRAME,10,172,466,93
++    LTEXT "",1435,10,271,466,24
++    PUSHBUTTON "Circle",1436,10,305,50,17
++    PUSHBUTTON "Hyperbola",1437,65,305,55,17
++    PUSHBUTTON "Ellipse x(t),y(t)",1438,125,305,88,17
++    PUSHBUTTON "Preview",1439,230,305,66,17
++    DEFPUSHBUTTON "Apply graph",IDOK,310,305,89,17
++    PUSHBUTTON "Cancel",IDCANCEL,408,305,68,17
++END
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -27,6 +27,7 @@
+ #include "SymbolicDerivative.h"
+ #include "ColorPalette.h"
+ #include "ObjectPointer.h"
++#include <sstream>
+ #include "ObjectAppearance.h"
+ #include "GeometryShapes.h"
+ #include "PolygonConstructor.h"
+@@ -444,7 +445,8 @@
+     if(drawing){CoordinateAxes::Geometry g;if(drawing->CoordinateGeometry(g))return L"Coordinate axes - right-click to edit grid spacing, darkness, labels and numeric or trig formats.";}
+     if(!drawing || depth>16)return L"Drawing object";
+     if(drawing->IsSpecialDrawing==51 && drawing->SpecialData && ((CFunctionPlotter*)drawing->SpecialData)->integral.enabled)return L"Integral area graph - blue positive area, rose negative area. Click f1 or Graph > Integral area shader to edit the formula and bounds. Drag its resize corner to enlarge it.";
+-    if(drawing->IsSpecialDrawing==51)return L"Function graph - edit the formulas and coordinate limits; drag its resize corner to enlarge it.";
++    if(drawing->IsSpecialDrawing==51 && drawing->SpecialData && ((CFunctionPlotter*)drawing->SpecialData)->parametric.enabled)return L"Parametric graph - f1 is x(t), f2 is y(t). Click either to edit the curve and t interval. Graph > Relations and parametric curves opens the preview editor.";
++    if(drawing->IsSpecialDrawing==51)return L"Function graph - type formulas or equations in x and y in f1 to f8. Graph > Relations and parametric curves opens the preview editor. Drag its resize corner to enlarge it.";
+     if(drawing->IsSpecialDrawing==52)return L"Image object - use its corner to resize; right-click for image options.";
+     if(drawing->IsSpecialDrawing==50)return L"Drawing box - draw or edit objects within this container.";
+     if(drawing->OriginalForm>=72 && drawing->OriginalForm<=84)return MathDisplay::HelpNotation(GeometryShapeNames[drawing->OriginalForm-72]);
+@@ -955,6 +957,7 @@
+     ON_COMMAND(ID_SYMBOLIC_DERIVATIVE,OnSymbolicDerivative)
+     ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
+     ON_COMMAND(ID_INTEGRAL_SHADER,OnIntegralShader)
++    ON_COMMAND(ID_RELATION_GRAPH,OnRelationGraph)
+     ON_COMMAND(ID_LOG_BASE_BUILDER,OnLogBaseBuilder)
+     ON_COMMAND(ID_AI_HELP,OnAiHelp)
+     ON_COMMAND(ID_NUMBER_FORMAT,OnNumberFormat)
+@@ -11098,6 +11101,7 @@
+     dialog.Add(ID_SYMBOLIC_DERIVATIVE,"Calculus > Symbolic derivative finder...","differentiate derivative calculus symbolic slope chain product quotient higher order");
+     dialog.Add(ID_AI_HELP,"Calculus > AI math help...","AI explain check working OpenAI tutor online graph ideas");
+     dialog.Add(ID_LOG_BASE_BUILDER,"Graph > Logarithm builder...","log base logarithm radical sqrt custom argument change of base");
++    dialog.Add(ID_RELATION_GRAPH,"Graph > Relations and parametric curves...","implicit relation equation circle hyperbola parametric x(t) y(t) graph plot preview");
+     dialog.Add(ID_INTEGRAL_SHADER,"Graph > Integral area shader...","integral area bounds shade shading calculus hatch signed absolute numerical");
+     dialog.Add(ID_PIECEWISE_GRAPH,"Graph > Piecewise function grapher...","piecewise pieces intervals open closed endpoints domain jumps step graph");
+     dialog.Add(ID_INSERT_UNIT_CIRCLE,"Insert > Unit circle maker","unit circle angle start end arc radians degrees trig triangle coordinates palette");
+@@ -11390,7 +11394,8 @@
+             CFunctionPlotter *plot=(CFunctionPlotter*)drawing->SpecialData;
+             if(!plot->StopForZoom()){CenterEditRelease=false;return;}
+             prevTouchedObject=object;
+-            if(plot->integral.enabled)PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER);
++            if(plot->parametric.enabled)PostMessage(WM_COMMAND,ID_RELATION_GRAPH);
++            else if(plot->integral.enabled)PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER);
+             else if(!plot->pieces.empty())PostMessage(WM_COMMAND,ID_PIECEWISE_GRAPH);
+             else if(!plot->scatterPoints.empty())PostMessage(WM_COMMAND,ID_STATISTICS_REGRESSION);
+             else{
+@@ -14341,6 +14346,90 @@
+     RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
+ }
+ 
++static std::string GraphEquationText(CExpression *expression)
++{
++    int equal=-1;for(int i=0;i<expression->m_NumElements;i++)if(expression->m_pElementList[i].Type==2&&expression->m_pElementList[i].pElementObject->Data1[0]=='='){equal=i;break;}
++    return equal<0?NativeSymbolic::Formula(expression):NativeSymbolic::Formula(expression,0,equal)+"="+NativeSymbolic::Formula(expression,equal+1);
++}
++class CRelationPreview:public CStatic
++{
++public:
++    std::vector<RelationGraph::Program> programs;RelationGraph::Parametric parametric;RelationGraph::Viewport viewport;bool ready;
++    CRelationPreview():ready(false){}
++    afx_msg void OnPaint(){CPaintDC dc(this);CRect r;GetClientRect(&r);dc.FillSolidRect(r,RGB(255,255,255));if(!ready)return;
++        RelationGraph::Viewport v=viewport;v.width=r.Width()-16;v.height=r.Height()-16;int saved=dc.SaveDC();dc.SetViewportOrg(8,8);
++        const int colors[8]={0,2,1,3,5,6,7,4};auto cancel=[](){return false;};
++        for(size_t i=0;i<(parametric.enabled?1:programs.size());i++){CPen pen(PS_SOLID,1,ImprovedColor(colors[i]));dc.SelectObject(&pen);
++            auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));};
++            auto shade=[&](int x,int y,int right,int bottom){dc.FillSolidRect(x,y,right-x,bottom-y,RGB(230,236,245));};
++            if(parametric.enabled)RelationGraph::Trace(parametric,v,emit,cancel);else RelationGraph::Contour(programs[i],v,emit,shade,cancel);dc.SelectStockObject(BLACK_PEN);
++        }
++        CPen axis(PS_DOT,1,RGB(170,180,195));dc.SelectObject(&axis);RelationGraph::Point zero=v.Pixel({0,0});
++        if(zero.x>=0&&zero.x<v.width){dc.MoveTo((int)zero.x,0);dc.LineTo((int)zero.x,v.height);}if(zero.y>=0&&zero.y<v.height){dc.MoveTo(0,(int)zero.y);dc.LineTo(v.width,(int)zero.y);}dc.RestoreDC(saved);
++    }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CRelationPreview,CStatic)
++    ON_WM_PAINT()
++END_MESSAGE_MAP()
++class CRelationDialog:public CFeatureDialog
++{
++public:
++    std::string equations;RelationGraph::Parametric parametric;RelationGraph::Viewport viewport;bool radians,initializing;std::vector<RelationGraph::Program> programs;CRelationPreview preview;
++    CRelationDialog():CFeatureDialog(IDD_RELATION_GRAPH,theApp.m_pMainWnd),equations("x^2+y^2=25"),radians(true),initializing(true){}
++    CString Text(int id){CString s;GetDlgItemText(id,s);s.Trim();return s;}
++    void Mode(){bool param=((CComboBox*)GetDlgItem(1420))->GetCurSel()==1;GetDlgItem(1423)->EnableWindow(!param);for(int id=1425;id<=1429;id++)GetDlgItem(id)->EnableWindow(param);}
++    bool Check(){
++        radians=IsDlgButtonChecked(1421)==BST_CHECKED;parametric.enabled=((CComboBox*)GetDlgItem(1420))->GetCurSel()==1;parametric.radians=radians;std::string error;
++        double bounds[4];for(int i=0;i<4;i++)if(!IntegralArea::Constant((LPCSTR)Text(1430+i),bounds[i],error)||!std::isfinite(bounds[i])||fabs(bounds[i])>1e12){error="Enter finite graph-window bounds, with magnitude at most one trillion.";goto invalid;}
++        if(!(bounds[0]<bounds[1]&&bounds[2]<bounds[3])){error="Each graph-window minimum must be smaller than its maximum.";goto invalid;}
++        viewport.xmin=bounds[0];viewport.xmax=bounds[1];viewport.ymin=bounds[2];viewport.ymax=bounds[3];programs.clear();
++        if(parametric.enabled){parametric.xtext=(LPCSTR)Text(1425);parametric.ytext=(LPCSTR)Text(1427);
++            if(!IntegralArea::Constant((LPCSTR)Text(1428),parametric.low,error)||!IntegralArea::Constant((LPCSTR)Text(1429),parametric.high,error)||!parametric.Parse(error))goto invalid;
++        }else{
++            equations=(LPCSTR)Text(1423);std::istringstream lines(equations);std::string line;
++            while(std::getline(lines,line)){if(line.find_first_not_of(" \t\r")==std::string::npos)continue;if(programs.size()>=8){error="Enter up to eight equations, one per line.";goto invalid;}
++                RelationGraph::Program p;if(!p.Parse(line,radians,error))goto invalid;programs.push_back(p);}
++            if(programs.empty()){error="Enter an equation, for example x^2+y^2=25.";goto invalid;}
++        }
++        preview.programs=programs;preview.parametric=parametric;preview.viewport=viewport;preview.ready=true;preview.Invalidate();GetDlgItem(IDOK)->EnableWindow(TRUE);
++        SetDlgItemText(1435,parametric.enabled?"Parametric curve ready. The t interval is independent of the graph window.":"Equations ready. Numerical contours show branches without solving for y. Very small details may require zooming in.");return true;
++    invalid:preview.ready=false;preview.Invalidate();GetDlgItem(IDOK)->EnableWindow(FALSE);SetDlgItemText(1435,error.c_str());return false;
++    }
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1434,this);CComboBox *mode=(CComboBox*)GetDlgItem(1420);mode->AddString("Equations / relations in x and y");mode->AddString("Parametric: x(t), y(t)");mode->SetCurSel(parametric.enabled?1:0);
++        SetDlgItemText(1423,equations.c_str());SetDlgItemText(1425,parametric.xtext.c_str());SetDlgItemText(1427,parametric.ytext.c_str());SetDlgItemText(1428,Piecewise::Number(parametric.low).c_str());SetDlgItemText(1429,Piecewise::Number(parametric.high).c_str());
++        double bounds[4]={viewport.xmin,viewport.xmax,viewport.ymin,viewport.ymax};for(int i=0;i<4;i++)SetDlgItemText(1430+i,Piecewise::Number(bounds[i]).c_str());CheckDlgButton(1421,radians?BST_CHECKED:BST_UNCHECKED);initializing=false;Mode();Check();return TRUE;
++    }
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);if(initializing)return CFeatureDialog::OnCommand(wp,lp);
++        if(id==1436||id==1437||id==1438){initializing=true;bool param=id==1438;((CComboBox*)GetDlgItem(1420))->SetCurSel(param?1:0);SetDlgItemText(1423,id==1437?"x*y=1":"x^2+y^2=25");SetDlgItemText(1425,"3*cos(t)");SetDlgItemText(1427,"2*sin(t)");SetDlgItemText(1428,"0");SetDlgItemText(1429,"2*pi");CheckDlgButton(1421,BST_CHECKED);for(int i=0;i<4;i++)SetDlgItemText(1430+i,i%2?"6":"-6");initializing=false;Mode();Check();return TRUE;}
++        if(id==1420&&notification==CBN_SELCHANGE){Mode();Check();return TRUE;}if(id==1439){Check();return TRUE;}
++        if(id==1421||(notification==EN_CHANGE&&id>=1423&&id<=1433)){preview.ready=false;preview.Invalidate();GetDlgItem(IDOK)->EnableWindow(TRUE);SetDlgItemText(1435,"Press Preview to check the edited definition, or Apply graph.");return TRUE;}
++        return CFeatureDialog::OnCommand(wp,lp);
++    }
++    virtual void OnOK(){if(Check())CFeatureDialog::OnOK();}
++};
++static CDrawing *FindRelationGraph(CDrawing *drawing,int depth=0){if(!drawing||depth>32)return NULL;if(drawing->IsSpecialDrawing==51&&drawing->SpecialData){auto p=(CFunctionPlotter*)drawing->SpecialData;if(!p->integral.enabled&&p->pieces.empty()&&p->scatterPoints.empty())return drawing;}for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0){CDrawing *found=FindRelationGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1);if(found)return found;}return NULL;}
++void CMathomirView::OnRelationGraph()
++{
++    if(ViewOnlyMode)return;CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto o=TheDocument+i;if(o->Type==2&&(o==prevTouchedObject||o->MovingDotState==3)){existing=FindRelationGraph((CDrawing*)o->Object);if(existing)break;}}
++    if(MouseMode==102)existing=NULL;OnChar(27,1,0);CRelationDialog dialog;
++    if(existing){auto p=(CFunctionPlotter*)existing->SpecialData;if(!p->StopForZoom())return;p->EnsureFunctionSlots();dialog.parametric=p->parametric;dialog.radians=p->is_x_pi!=0;p->PlotFunctionGetBondaries(&dialog.viewport.xmin,&dialog.viewport.xmax,&dialog.viewport.ymin,&dialog.viewport.ymax);
++        dialog.equations.clear();for(int i=8;i<existing->NumItems&&i<16;i++)try{auto expression=(CExpression*)existing->Items[i].pSubdrawing;if(!NativeSymbolic::Empty(expression)){if(!dialog.equations.empty())dialog.equations+="\r\n";dialog.equations+=GraphEquationText(expression);}}catch(const std::exception &){AfxMessageBox("This graph contains expressions the relation editor cannot read. Edit those expressions directly with f1 to f8.");return;}
++    }
++    if(dialog.DoModal()!=IDOK)return;CDrawing *drawing=existing;
++    if(existing){if(!((CFunctionPlotter*)existing->SpecialData)->StopForZoom())return;UndoSave("edit graph relations");}
++    else{drawing=new CDrawing();int x,y;drawing->StartCreatingItem(51);drawing->UpdateCreatingItem(6000,4400,0,0);drawing->EndCreatingItem(&x,&y);}
++    auto plotter=(CFunctionPlotter*)drawing->SpecialData;plotter->EnsureFunctionSlots();plotter->parametric=dialog.parametric;plotter->is_x_pi=dialog.radians?1:0;plotter->is_x_log=plotter->is_y_log=plotter->analyze=0;
++    for(int i=0;i<8;i++){auto expression=(CExpression*)drawing->Items[8+i].pSubdrawing;expression->Delete();std::string body;
++        if(dialog.parametric.enabled){if(i<2)body=SymbolicDerivative::Xml(i==0?dialog.parametric.x:dialog.parametric.y);}
++        else if(i<(int)dialog.programs.size()){auto &p=dialog.programs[i];body=SymbolicDerivative::Xml(p.left)+"<opr s=\"=\" />"+SymbolicDerivative::Xml(p.right);}
++        if(!body.empty()){std::string xml="<ex fh=\"100\">"+body+"</ex>";std::vector<char> buffer(xml.begin(),xml.end());buffer.push_back(0);expression->XML_input(&buffer[0]);}
++    }
++    plotter->SetBounds(dialog.viewport.xmin,dialog.viewport.xmax,dialog.viewport.ymin,dialog.viewport.ymax);
++    if(existing){GetDocument()->SetModifiedFlag();plotter->TheState=0;plotter->PlotFunction(1);RepaintTheView(1);SetFocus();return;}
++    RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
++}
++
+ class CIntegralPreview : public CStatic
+ {
+ public:
+@@ -14383,7 +14472,7 @@
+     }
+     virtual void OnOK(){if(Calculate())CFeatureDialog::OnOK();}
+ };
+-static CDrawing *FindIntegralGraph(CDrawing *drawing,int depth=0){if(!drawing||depth>32)return NULL;if(drawing->IsSpecialDrawing==51&&drawing->SpecialData){auto p=(CFunctionPlotter*)drawing->SpecialData;if(p->integral.enabled||(p->pieces.empty()&&p->scatterPoints.empty()))return drawing;}for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0){CDrawing *found=FindIntegralGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1);if(found)return found;}return NULL;}
++static CDrawing *FindIntegralGraph(CDrawing *drawing,int depth=0){if(!drawing||depth>32)return NULL;if(drawing->IsSpecialDrawing==51&&drawing->SpecialData){auto p=(CFunctionPlotter*)drawing->SpecialData;if(p->integral.enabled||(!p->parametric.enabled&&p->pieces.empty()&&p->scatterPoints.empty()))return drawing;}for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0){CDrawing *found=FindIntegralGraph((CDrawing*)drawing->Items[i].pSubdrawing,depth+1);if(found)return found;}return NULL;}
+ void CMathomirView::OnIntegralShader()
+ {
+     if(ViewOnlyMode)return;CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type==2&&(object==prevTouchedObject||object->MovingDotState==3)){existing=FindIntegralGraph((CDrawing*)object->Object);if(existing)break;}}
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -143,6 +143,7 @@
+     void OnSymbolicDerivative();
+     void OnStatisticsRegression();
+     void OnIntegralShader();
++    void OnRelationGraph();
+     void OnLogBaseBuilder();
+     void OnAiHelp();
+     afx_msg void OnFormulaReference();
+--- /dev/null
++++ b/Mathomir/RelationGraph.h
+@@ -0,0 +1,102 @@
++#pragma once
++#include "SymbolicDerivative.h"
++#include <functional>
++#include <vector>
++
++// Numerical curves in the existing plotter's pixel viewport. No Windows/GDI state.
++namespace RelationGraph {
++using SymbolicDerivative::Expr;
++struct Point {double x,y;};
++struct Segment {Point a,b;};
++struct Viewport {
++    double xmin,xmax,ymin,ymax;int width,height;bool logx,logy;
++    Viewport():xmin(-6),xmax(6),ymin(-6),ymax(6),width(400),height(300),logx(false),logy(false){}
++    double X(double p)const{return logx?xmin*std::pow(xmax/xmin,p):(xmin+(xmax-xmin)*p);}
++    double Y(double p)const{return logy?ymax*std::pow(ymin/ymax,p):(ymax+(ymin-ymax)*p);}
++    Point Pixel(Point p)const{Point q={(logx?(p.x>0?std::log(p.x/xmin)/std::log(xmax/xmin):SymbolicDerivative::NaN()):(p.x-xmin)/(xmax-xmin))*(width-1),
++        (logy?(p.y>0?std::log(ymax/p.y)/std::log(ymax/ymin):SymbolicDerivative::NaN()):(ymax-p.y)/(ymax-ymin))*(height-1)};return q;}
++};
++inline bool Finite(double n){return std::isfinite(n);}
++inline bool Finite(Point p){return Finite(p.x)&&Finite(p.y);}
++inline bool Variables(Expr e,bool parametric){if(!e)return true;if(e->op=='v')return e->name=="pi"||e->name=="e"||(parametric?e->name=="t":e->name=="x"||e->name=="y");return Variables(e->a,parametric)&&Variables(e->b,parametric);}
++struct Program {
++    Expr left,right;char relation;bool radians;
++    Program():relation('='),radians(true){}
++    bool Parse(const std::string &text,bool rad,std::string &error){
++        try{size_t p=text.find_first_of("=<>"),n=1;relation=p==std::string::npos?'=':text[p];
++            if(relation!='=')throw std::runtime_error("Use an equation with =, for example x^2+y^2=25.");
++            if(p!=std::string::npos&&p+1<text.size()&&text[p+1]=='=')n=2;
++            if(p!=std::string::npos&&text.find_first_of("=<>",p+n)!=std::string::npos)throw std::runtime_error("Use one relation per line, for example x^2+y^2=25.");
++            SymbolicDerivative::Parser parser;
++            // A plain expression retains the familiar y=f(x) interpretation.
++            left=p==std::string::npos?SymbolicDerivative::Name("y"):parser.Parse(text.substr(0,p));
++            right=parser.Parse(p==std::string::npos?text:text.substr(p+n));
++            if(!Variables(left,false)||!Variables(right,false))throw std::runtime_error("Relations use x and y. Parametric coordinates use t.");
++            radians=rad;error.clear();return true;
++        }catch(const std::exception &e){left.reset();right.reset();error=e.what();return false;}
++    }
++    double Value(Point p)const{return SymbolicDerivative::Value(left,"x",p.x,radians,"y",p.y)-SymbolicDerivative::Value(right,"x",p.x,radians,"y",p.y);}
++    bool Inside(double z)const{return Finite(z)&&(relation=='<'?z<0:relation=='>'?z>0:z==0);}
++};
++inline bool Clip(Point &a,Point &b,int width,int height){
++    if(!Finite(a)||!Finite(b))return false;double dx=b.x-a.x,dy=b.y-a.y,lo=0,hi=1;
++    const double p[4]={-dx,dx,-dy,dy},q[4]={a.x,width-1-a.x,a.y,height-1-a.y};
++    for(int i=0;i<4;i++){if(p[i]==0){if(q[i]<0)return false;}else{double t=q[i]/p[i];if(p[i]<0){if(t>hi)return false;if(t>lo)lo=t;}else{if(t<lo)return false;if(t<hi)hi=t;}}}
++    Point end={a.x+hi*dx,a.y+hi*dy};a.x+=lo*dx;a.y+=lo*dy;b=end;return true;
++}
++typedef std::function<void(Point,Point)> Emit;
++typedef std::function<void(int,int,int,int)> Shade;
++typedef std::function<bool()> Cancel;
++inline bool Root(const Program &p,Point a,Point b,double fa,double fb,Point &root){
++    if(!Finite(fa)||!Finite(fb))return false;
++    if(fa==0){root=a;return true;}if(fb==0){root=b;return true;}
++    if((fa<0)==(fb<0))return false;
++    double scale=(std::min)(std::fabs(fa),std::fabs(fb)),best=scale;Point candidate=std::fabs(fa)<std::fabs(fb)?a:b;
++    for(int i=0;i<24;i++){Point m={(a.x+b.x)/2,(a.y+b.y)/2};double z=p.Value(m);if(!Finite(z))return false;
++        if(std::fabs(z)<best){best=std::fabs(z);candidate=m;}if(z==0){root=m;return true;}
++        if((z<0)==(fa<0)){a=m;fa=z;}else{b=m;fb=z;}}
++    // A sign change across a pole or a jump is not a zero contour.
++    if(best>scale*1e-5)return false;root=candidate;return true;
++}
++inline void Contour(const Program &p,const Viewport &v,const Emit &emit,const Shade &shade,const Cancel &cancel){
++    int nx=(std::max)(16,(std::min)(256,v.width/2)),ny=(std::max)(16,(std::min)(256,v.height/2));
++    std::vector<double> previous(nx+1),next(nx+1);
++    for(int x=0;x<=nx;x++){Point a={v.X(double(x)/nx),v.Y(0)};previous[x]=p.Value(a);}
++    for(int y=0;y<ny;y++){
++        if(cancel())return;
++        for(int x=0;x<=nx;x++){Point a={v.X(double(x)/nx),v.Y(double(y+1)/ny)};next[x]=p.Value(a);}
++        for(int x=0;x<nx;x++){
++            Point a[5]={{v.X(double(x)/nx),v.Y(double(y)/ny)},{v.X(double(x+1)/nx),v.Y(double(y)/ny)},
++                {v.X(double(x+1)/nx),v.Y(double(y+1)/ny)},{v.X(double(x)/nx),v.Y(double(y+1)/ny)},
++                {v.X((x+.5)/nx),v.Y((y+.5)/ny)}};
++            double f[5]={previous[x],previous[x+1],next[x+1],next[x],p.Value(a[4])};
++            if(p.Inside(f[4])&&(p.relation!='='||(f[0]==0&&f[1]==0&&f[2]==0&&f[3]==0)))
++                shade(x*(v.width-1)/nx,y*(v.height-1)/ny,(x+1)*(v.width-1)/nx+1,(y+1)*(v.height-1)/ny+1);
++            for(int k=0;k<4;k++){
++                int ids[3]={k,(k+1)%4,4};Point hits[3];int count=0;
++                for(int e=0;e<3;e++){int i=ids[e],j=ids[(e+1)%3];Point root;
++                    if(f[i]==0&&f[j]==0)continue;
++                    if(Root(p,a[i],a[j],f[i],f[j],root)){bool duplicate=false;for(int h=0;h<count;h++)if(std::fabs(hits[h].x-root.x)<1e-13&&std::fabs(hits[h].y-root.y)<1e-13)duplicate=true;if(!duplicate)hits[count++]=root;}}
++                if(count==2){Point b=v.Pixel(hits[0]),c=v.Pixel(hits[1]);if(Clip(b,c,v.width,v.height))emit(b,c);}
++            }
++        }previous.swap(next);
++    }
++}
++struct Parametric {
++    Expr x,y;std::string xtext,ytext;double low,high;bool enabled,radians;
++    Parametric():xtext("3*cos(t)"),ytext("2*sin(t)"),low(0),high(6.283185307179586),enabled(false),radians(true){}
++    bool Parse(std::string &error){try{if(!Finite(low)||!Finite(high)||!(low<high)||std::fabs(low)>1e12||std::fabs(high)>1e12)throw std::runtime_error("Use finite t bounds with start < end and magnitude at most one trillion.");SymbolicDerivative::Parser p;x=p.Parse(xtext);y=p.Parse(ytext);if(!Variables(x,true)||!Variables(y,true))throw std::runtime_error("Parametric coordinates use t, for example 3*cos(t) and 2*sin(t).");error.clear();return true;}catch(const std::exception &e){error=e.what();return false;}}
++    Point Value(double t)const{Point p={SymbolicDerivative::Value(x,"t",t,radians),SymbolicDerivative::Value(y,"t",t,radians)};return p;}
++};
++inline void ParametricPart(const Parametric &p,const Viewport &v,double ta,double tb,Point a,Point b,int depth,const Emit &emit,const Cancel &cancel,int &budget){
++    if(--budget<0||cancel())return;double tm=ta+(tb-ta)/2;Point m=v.Pixel(p.Value(tm));
++    bool valid=Finite(a)&&Finite(b)&&Finite(m);double deviation=valid?std::hypot(m.x-(a.x+b.x)/2,m.y-(a.y+b.y)/2):1e30;
++    double span=valid?std::hypot(b.x-a.x,b.y-a.y):1e30;
++    if(deviation>.4||span>32){if(depth<10){ParametricPart(p,v,ta,tm,a,m,depth+1,emit,cancel,budget);ParametricPart(p,v,tm,tb,m,b,depth+1,emit,cancel,budget);}return;}
++    if(valid&&Clip(a,b,v.width,v.height))emit(a,b);
++}
++inline void Trace(const Parametric &p,const Viewport &v,const Emit &emit,const Cancel &cancel){
++    const int steps=512;int budget=100000;Point a=v.Pixel(p.Value(p.low));
++    for(int i=0;i<steps&&!cancel()&&budget>0;i++){double ta=p.low+(p.high-p.low)*i/steps,tb=p.low+(p.high-p.low)*(i+1)/steps;Point b=v.Pixel(p.Value(tb));ParametricPart(p,v,ta,tb,a,b,0,emit,cancel,budget);a=b;}
++}
++}
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -327,3 +327,6 @@
+ #define ID_FORMULA_REFERENCE 33104
+ #define ID_FREE_AI_HELP 33105
+ #define IDD_FORMULA_REFERENCE 194
++
++#define ID_RELATION_GRAPH 33106
++#define IDD_RELATION_GRAPH 195
+--- a/Mathomir/SymbolicDerivative.h
++++ b/Mathomir/SymbolicDerivative.h
+@@ -139,9 +139,9 @@
+     Expr Parse(const std::string &s){if(s.empty()||s.size()>512)throw std::runtime_error("Enter a formula of at most 512 characters.");text=s;pos=0;depth=count=0;Expr a=Sum();Space();if(pos!=text.size())throw std::runtime_error("Unexpected character at position "+Number((double)pos+1)+".");return a;}
+ };
+ inline bool Depends(Expr a,const std::string &variable){return a&&(a->op=='v'?a->name==variable:Depends(a->a,variable)||Depends(a->b,variable));}
+-inline double Value(Expr a,const std::string &variable,double x,bool radians=true){
+-    if(!a)return NaN();if(a->op=='n')return a->number;if(a->op=='v'){if(a->name==variable)return x;if(a->name=="pi")return 3.14159265358979323846;if(a->name=="e")return 2.71828182845904523536;return NaN();}
+-    double u=Value(a->a,variable,x,radians),v=a->b?Value(a->b,variable,x,radians):0;if(!Finite(u)||(a->b&&!Finite(v)))return NaN();
++inline double Value(Expr a,const std::string &variable,double x,bool radians=true,const std::string &second="",double y=0){
++    if(!a)return NaN();if(a->op=='n')return a->number;if(a->op=='v'){if(a->name==variable)return x;if(!second.empty()&&a->name==second)return y;if(a->name=="pi")return 3.14159265358979323846;if(a->name=="e")return 2.71828182845904523536;return NaN();}
++    double u=Value(a->a,variable,x,radians,second,y),v=a->b?Value(a->b,variable,x,radians,second,y):0;if(!Finite(u)||(a->b&&!Finite(v)))return NaN();
+     if(a->op=='l')return u>0 && v>0 && v!=1?std::log(u)/std::log(v):NaN();
+     if(a->op=='+')return u+v;if(a->op=='-')return u-v;if(a->op=='*')return u*v;if(a->op=='/')return v==0?NaN():u/v;if(a->op=='~')return -u;if(a->op=='^')return u==0&&v==0?NaN():ScalarFunctions::RealPower(u,v);
+     const std::string &s=a->name;double inverseFactor=radians?1:180./3.14159265358979323846;

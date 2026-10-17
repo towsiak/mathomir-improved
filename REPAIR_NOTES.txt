@@ -620,3 +620,21 @@ using native drawing geometry so it travels with its object, previews while
 carried, prints, copies, saves/reopens and participates in Undo. None removes
 the arrow while preserving its original content and position. Center-grip
 double-click still edits an attached text/math label.
+
+
+NATIVE RELATION / PARAMETRIC GRAPH EXTENSION (2026-10-17)
+- Graph > Relations and parametric curves opens a preview editor on the existing
+  graph object, with eight native equation slots or paired x(t),y(t) coordinates.
+- Native equations involving x and y are recognized on every replot, so ordinary
+  f1-f8 editing also supports implicit equations. y=f(x) and x=constant preserve
+  their existing plotting paths and can share a graph with implicit equations.
+- A bounded contour sampler bisects candidate zeros and rejects pole/jump sign
+  changes. Adaptive parametric tracing clips output and rejects unresolved jumps.
+  Both honor cooperative worker cancellation and existing linear/log viewports.
+- Parametric formulas, interval and angle mode copy/save/load with the graph and
+  participate in Undo checksums. The graph uses existing resize/preview/print.
+- Numerical contours can miss isolated zero points or details smaller than the
+  sampling grid; zoom in. This editor supports equality equations, not inequalities.
+- Validation: portable circle/hyperbola/rational-domain, cancellation, parametric
+  ellipse/pole/unit/bounds checks; native preview/edit/persistence/Undo UI checks
+  are included in Release and AddressSanitizer build workflows.

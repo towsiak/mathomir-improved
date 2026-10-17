@@ -132,3 +132,20 @@ three font sizes and three zoom levels. The new test reproduced an infinite
 approximation-helper deletion loop on a standalone equals sign; an empty left
 side is now rejected before deletion. Small symbols also keep their resize,
 delete and rotation controls clear of the central move grip.
+
+
+### Equations and parametric curves in the native grapher
+
+Use **Graph > Relations and parametric curves**, or Search **implicit** or
+**parametric**. Enter up to eight equations, one per line, such as
+`x^2+y^2=25`, `x*y=1`, and `y=x`. A plain formula still means y = formula.
+Use Preview to inspect the current window before placing or updating the graph.
+You can also type an equation directly into the existing f1–f8 expression slots.
+The equation remains native editable mathematics, rather than a flattened image.
+
+Choose Parametric for x(t), y(t) and an independent finite t interval. The default
+example is an ellipse. Click f1/f2 on a parametric graph to reopen its editor.
+The graph retains the existing pan, zoom, resize, copy, printing, Undo and .mom
+persistence paths. RAD/DEG is chosen in the editor. Relations use numerical
+contours; zoom in to resolve details smaller than the sampling grid. This release
+accepts equations with =; inequalities are not supported by this editor.
