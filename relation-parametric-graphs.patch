@@ -76,8 +76,8 @@
 +    if(strncmp(file,"parametric ",11)==0){
 +        RelationGraph::Parametric proposed;char attribute[64],value[2048];file+=10;
 +        do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,2048);if(!file)return NULL;
-+            if(!strcmp(attribute,"x"))proposed.xtext=Piecewise::Unhex(value);
-+            if(!strcmp(attribute,"y"))proposed.ytext=Piecewise::Unhex(value);
++            if(!strcmp(attribute,"x"))proposed.xtext=Piecewise::Unhex(value,512);
++            if(!strcmp(attribute,"y"))proposed.ytext=Piecewise::Unhex(value,512);
 +            if(!strcmp(attribute,"lo"))proposed.low=Piecewise::StoredBound(value);
 +            if(!strcmp(attribute,"hi"))proposed.high=Piecewise::StoredBound(value);
 +            if(!strcmp(attribute,"rad"))proposed.radians=atoi(value)!=0;
@@ -378,6 +378,15 @@
      void OnLogBaseBuilder();
      void OnAiHelp();
      afx_msg void OnFormulaReference();
+--- a/Mathomir/Piecewise.h
++++ b/Mathomir/Piecewise.h
+@@ -107,5 +107,5 @@
+     }return true;
+ }
+ inline std::string Hex(std::string text){static const char h[]="0123456789abcdef";std::string out;for(size_t i=0;i<text.size();i++){unsigned char c=text[i];out+=h[c>>4];out+=h[c&15];}return out;}
+-inline std::string Unhex(std::string text){std::string out;for(size_t i=0;i+1<text.size() && out.size()<160;i+=2){char b[3]={text[i],text[i+1],0};out+=(char)std::strtol(b,NULL,16);}return out;}
++inline std::string Unhex(std::string text,size_t maximum=160){std::string out;for(size_t i=0;i+1<text.size() && out.size()<maximum;i+=2){char b[3]={text[i],text[i+1],0};out+=(char)std::strtol(b,NULL,16);}return out;}
+ }
 --- /dev/null
 +++ b/Mathomir/RelationGraph.h
 @@ -0,0 +1,103 @@

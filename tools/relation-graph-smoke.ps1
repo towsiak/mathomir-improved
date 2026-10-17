@@ -61,5 +61,9 @@ try{
  Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1425)) -eq '3*cos(t)') 'x(t) changed on reopen'
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1425),'4*cos(t)');Apply $d;Start-Sleep -Seconds 2;$saved=SaveDoc;Check ($saved.mathomir.ChildNodes.Count -eq 1) 'Parametric edit duplicated graph'
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$saved=SaveDoc;Check ($saved.SelectSingleNode('//parametric').x -eq $metadata.x) 'Parametric Undo failed'
+ HoverGraph;$d=Dialog;$long=('0+'*80)+'3*cos(t)';[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1425),$long);Apply $d;Start-Sleep -Seconds 1;$saved=SaveDoc
+ Check ($saved.SelectSingleNode('//parametric').x.Length -gt 320) 'Long formula not stored'
+ $longFile=Join-Path $folder 'relation-long-parametric.mom';Copy-Item $fixture $longFile;[MathomirUiProbe]::OpenFile($main,$longFile);Start-Sleep -Seconds 2;HoverGraph;$d=Dialog
+ Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1425)) -eq $long) 'Long parametric formula truncated on reopen';[MathomirUiProbe]::Send($d,273,2)|Out-Null
  Write-Output 'Native relation and parametric graph checks passed: previews, validation, mixed slots, rendered ink, persistence, edit and Undo.'
 }catch{if($main -ne [IntPtr]::Zero){Capture $main 'relation-failure.png'};throw}finally{if($app -and !$app.HasExited){Stop-Process -Id $app.Id -Force};Remove-Item Env:MATHOMIR_GRAPH_DIAGNOSTICS -ErrorAction SilentlyContinue}

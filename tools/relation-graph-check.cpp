@@ -1,4 +1,5 @@
 #include "RelationGraph.h"
+#include "Piecewise.h"
 #include <iostream>
 #include <cstdlib>
 using namespace RelationGraph;
@@ -21,6 +22,7 @@ int main(){
     t.xtext="t";t.ytext="sqrt(t)";t.low=-2;t.high=2;Check(t.Parse(error),"partial domain parse");lines.clear();Trace(t,v,emit,cancel);Check(lines.size()>100,"valid parametric domain starved by undefined half");for(auto s:lines)Check(world(s.a).x>=-1e-10,"undefined parametric domain drawn");
     t.xtext="cos(t)";t.ytext="sin(t)";t.radians=false;t.low=0;t.high=360;Check(t.Parse(error),"degrees parse");Check(std::fabs(t.Value(90).y-1)<1e-12,"degrees wrong");
     t.xtext="x";Check(!t.Parse(error),"x accepted as t");t.xtext="t";t.high=t.low;Check(!t.Parse(error),"empty t interval accepted");
+    std::string longFormula;for(int i=0;i<80;i++)longFormula+="0+";longFormula+="3*cos(t)";Check(Piecewise::Unhex(Piecewise::Hex(longFormula),512)==longFormula,"long formula decoder truncation");
     Point a={-1e20,150},b={1e20,150};Check(Clip(a,b,v.width,v.height)&&a.x>=0&&b.x<=v.width-1,"large line clipping");
     std::cout<<"Implicit circle/hyperbola/rational domains, cancellation, parametric ellipse/poles/units and validation passed.\n";
 }
