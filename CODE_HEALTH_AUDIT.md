@@ -33,6 +33,8 @@ The missing C++ checks were canvas grid, number display, piecewise math, polygon
 
 ## Table-dialog improvement requested during the audit
 
+The new Windows preview test also exposed an existing native formatting defect: setting the next row erased the header separator. Shared borders are now computed by boundary index on both adjacent cells, repairing preview and placement together.
+
 The table dialog now has a live layout preview. Row count, column count, font, borders, and alignment update it. Preview and placement use one native table constructor. Optional sample text makes alignment visible and is never inserted into the document. The preview scales to fit; text content determines the eventual native cell widths. Invalid settings disable placement, and Cancel must preserve the document.
 
 ## Verification and limits

@@ -59,7 +59,7 @@ try{
  SetValue 1123 40;$small=Signature $preview;SetValue 1123 200;$large=Signature $preview
  Check ($small.Hash -ne $large.Hash) 'Font changes do not update preview.'
  SetValue 1123 100
- $borderHashes=@();for($border=0;$border -lt 4;$border++){Choose 1124 $border;$borderHashes+=(Signature $preview).Hash}
+ $borderHashes=@();for($border=0;$border -lt 4;$border++){Choose 1124 $border;$signature=Signature $preview;$borderHashes+=$signature.Hash;Write-Output ("Table border {0}: hash={1}, ink={2}" -f $border,$signature.Hash,$signature.Ink);Capture $dialog (Join-Path $folder ("table-dialog-border-{0}.png" -f $border))}
  Check (($borderHashes|Sort-Object -Unique).Count -eq 4) 'Four border layouts are not visually distinct.'
  Choose 1124 0
  $alignHashes=@();for($align=0;$align -lt 3;$align++){Choose 1125 $align;$alignHashes+=(Signature $preview).Hash}

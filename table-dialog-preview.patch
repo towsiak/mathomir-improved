@@ -16,13 +16,13 @@
 +    cells->m_ParenthesesFlags=0;cells->m_ParentheseShape=' ';
 +    if(cells->FindMatrixElement(rows-1,columns-1,1)<0){delete table;return NULL;}
 +    char align=alignment==0?'l':alignment==1?'c':'r';
-+    for(int row=0;row<rows;row++)for(int col=0;col<columns;col++){
-+        char top=' ',bottom=' ',left=' ',right=' ';
-+        if(borders==0)top=bottom=left=right='-';
-+        if(borders==1){if(row==0)top='-';if(row==rows-1)bottom='-';if(col==0)left='-';if(col==columns-1)right='-';}
-+        if(borders==2 && row==0)bottom='-';
-+        cells->SetCellAttributes(row,col,align,top,bottom,left,right);
-+    }
++    // A native cell setter also updates its neighbor. Define shared edges by
++    // boundary index so a later row cannot erase an earlier header separator.
++    auto horizontal=[=](int edge){return borders==0 || (borders==1 && (edge==0 || edge==rows)) || (borders==2 && edge==1);};
++    auto vertical=[=](int edge){return borders==0 || (borders==1 && (edge==0 || edge==columns));};
++    for(int row=0;row<rows;row++)for(int col=0;col<columns;col++)
++        cells->SetCellAttributes(row,col,align,horizontal(row)?'-':' ',horizontal(row+1)?'-':' ',
++            vertical(col)?'-':' ',vertical(col+1)?'-':' ');
 +    if(sample)for(int row=rows-1;row>=0;row--)for(int col=columns-1;col>=0;col--){
 +        int cell=cells->FindMatrixElement(row,col,0);
 +        if(cell<0){delete table;return NULL;}

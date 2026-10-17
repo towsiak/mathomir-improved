@@ -595,3 +595,4 @@ Center move grip (2026-10-15 evening)
 - One source-patch manifest serves Release, memory and resize builds. Every checked-in C++ check is compiled and run.
 - Table setup now previews its native layout live, with optional sample-only text, input validation and scaled fitting. Placement uses the same constructor and starts empty.
 - CODE_HEALTH_AUDIT.md records remaining ordinary-save atomicity, transactional loading, serialization and interaction-state weaknesses.
+- Native table borders now use consistent shared boundaries, preventing the second row from erasing the header separator.
