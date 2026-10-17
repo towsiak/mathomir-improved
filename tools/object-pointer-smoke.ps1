@@ -14,7 +14,7 @@ public static class ObjectPointerProbe {
 function Check($ok,$why){if(!$ok){throw $why}}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $fixture -Raw)}
 function Capture($h,$name){$r=[MathomirUiProbe]::WindowRect($h);$b=New-Object Drawing.Bitmap ($r.Right-$r.Left),($r.Bottom-$r.Top);$g=[Drawing.Graphics]::FromImage($b);try{$g.CopyFromScreen($r.Left,$r.Top,0,0,$b.Size);$b.Save((Join-Path $folder $name))}finally{$g.Dispose();$b.Dispose()}}
-function Offset($node){if($node.HasAttribute('d')){$p=$node.d.Split(';')[0].Split(',');return @([double]$p[0]/32,[double]$p[1]/32)};return @([double]$node.X1/1000,[double]$node.Y1/1000)}
+function Offset($node){if($node.HasAttribute('d')){$p=$node.d.Split(';')[0].Split(',');return @(([double]$p[0]/32),([double]$p[1]/32))};return @(([double]$node.X1/1000),([double]$node.Y1/1000))}
 function Root($doc){return $doc.mathomir.ChildNodes[0]}
 function Pointer($doc){return (Root $doc).SelectSingleNode('./pointer')}
 function OpenPopup {
