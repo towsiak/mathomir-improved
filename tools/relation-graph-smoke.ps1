@@ -39,6 +39,18 @@ try{
  Check ([MathomirUiProbe]::CountColor($view,160,105,520,385,0) -gt 300) 'Native circle absent'
  Check ([MathomirUiProbe]::CountColor($view,160,105,520,385,0x0000CC00) -gt 150) 'Native hyperbola absent'
  Capture $main 'relation-equations-canvas.png'
+ # Preserve the pre-existing named-function and leading-equals input forms.
+ $originalFixture=$fixture
+ foreach($prefix in @('named','label','leading')){
+  [xml]$compat=Get-Content $originalFixture -Raw;$slots=$compat.SelectNodes('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[position()>4]/*[self::ex or self::expr]')
+  foreach($slot in $slots){$slot.RemoveAll();$slot.SetAttribute('fh','100')}
+  $name=if($prefix -eq 'named'){'<var t="f" f="00"/><elm tp="5" E1=""><ex br="1"><var t="x" f="00"/></ex></elm>'}elseif($prefix -eq 'label'){'<var t="g" f="00"/>'}else{''}
+  $slots[0].InnerXml=$name+'<opr s="="/><var t="x" f="00"/>'
+  $compatFile=Join-Path $folder ("relation-legacy-$prefix.mom");$compat.Save($compatFile);[MathomirUiProbe]::OpenFile($main,$compatFile);[MathomirUiProbe]::Mouse($view,512,0,850,50);Start-Sleep -Seconds 2
+  Check ([MathomirUiProbe]::CountColor($view,160,105,520,385,0) -gt 300) "Legacy graph input stopped plotting: $prefix"
+ }
+ $script:fixture=$originalFixture
+
  # Reopen a distinct copy, then edit the same graph with its shared editor.
  $reopened=Join-Path $folder 'relation-reopened.mom';Copy-Item $fixture $reopened;[MathomirUiProbe]::OpenFile($main,$reopened);$script:fixture=$reopened;Start-Sleep -Seconds 2;HoverGraph;$d=Dialog
  $text=[MathomirUiProbe]::Text([MathomirUiProbe]::Child($d,1423));Check ($text.Contains('y') -and $text.Contains('25') -and $text.Contains('=1')) "Saved relations lost: $text"
