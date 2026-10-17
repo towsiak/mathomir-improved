@@ -25,9 +25,18 @@ function AssertPreview($kind,$index){
  Check ([PlacementProbe]::Stat($view,'Active') -eq 1) "No in-transit preview: index=$index kind=$kind"
  Check ([PlacementProbe]::Stat($view,'Kind') -eq $(if($kind -gt 100){4}else{1})) "Wrong preview route: index=$index kind=$kind"
  $left=[PlacementProbe]::Stat($view,'Left');$top=[PlacementProbe]::Stat($view,'Top');$right=[PlacementProbe]::Stat($view,'Right');$bottom=[PlacementProbe]::Stat($view,'Bottom')
- $shot=Snapshot
+ # Native GDI painting may finish after the first capture on an instrumented
+ # build. Wait for visible payload ink within a bounded 800 ms; a blank or
+ # missing preview still fails, for every palette item and the actual click.
+ $shot=Snapshot;$settled=0
+ while([PaletteProbe]::Ink($shot.Pixels,$shot.Width,$shot.Height,$left,$top,$right,$bottom) -eq 0 -and $settled -lt 20){
+  $shot.Dispose();Start-Sleep -Milliseconds 40;[PlacementProbe]::Refresh($view)
+  $left=[PlacementProbe]::Stat($view,'Left');$top=[PlacementProbe]::Stat($view,'Top');$right=[PlacementProbe]::Stat($view,'Right');$bottom=[PlacementProbe]::Stat($view,'Bottom')
+  $shot=Snapshot;$settled++
+ }
+ if($settled){Write-Output "Palette preview paint settled after $($settled*40) ms: index=$index kind=$kind"}
  try{
-  Check ([PaletteProbe]::Ink($shot.Pixels,$shot.Width,$shot.Height,$left,$top,$right,$bottom) -gt 0) "Preview has no object ink: index=$index kind=$kind"
+  Check ([PaletteProbe]::Ink($shot.Pixels,$shot.Width,$shot.Height,$left,$top,$right,$bottom) -gt 0) "Preview has no object ink: index=$index kind=$kind bounds=$left,$top,$right,$bottom"
   if($kind -eq 1 -and (($right-$left) -lt 40 -or ($bottom-$top) -lt 32)){
    Check ([PlacementProbe]::Stat($view,'CardZoom') -gt 0) 'Small carried math has no enlarged thumbnail'
    $cl=[PlacementProbe]::Stat($view,'CardLeft');$ct=[PlacementProbe]::Stat($view,'CardTop');$cr=[PlacementProbe]::Stat($view,'CardRight');$cb=[PlacementProbe]::Stat($view,'CardBottom')
