@@ -49,6 +49,12 @@ try{
    OpenPopup;if($direction -eq 1){Capture $popup "object-pointer-$kind-picker.png"};Choose (960+$direction);$saved=SaveDoc;$pointer=Pointer $saved
    Check ($pointer -and [int]$pointer.dir -eq $direction) "Pointer direction $direction not saved for $kind"
    Check ($saved.mathomir.ChildNodes.Count -eq 2 -and $saved.mathomir.ChildNodes[1].OuterXml -eq $neighborXml) 'Pointer altered a neighboring object'
+   if($kind -eq 'text' -and $direction -eq 1){
+    OpenPopup;Choose 923;$colored=SaveDoc
+    Check ((Root $colored).SelectNodes('./subexp/*[self::ex or self::expr][@bg="15260415"]').Count -eq 1) 'Pointer background did not reach the original label'
+    OpenPopup;Choose 929;$cleared=SaveDoc
+    Check ((Root $cleared).SelectNodes('./subexp/*[self::ex or self::expr][@bg]').Count -eq 0) 'Clear left the attached label background'
+   }
    $points=ArrowPoints $saved;Check ($points.Count -ge 5) 'Attached arrow lacks native shaft and arrowhead'
    $tail=$points[0];$tip=$points[1];$dx=$tip.x-$tail.x;$dy=$tip.y-$tail.y
    $expectedX=@(0,1,1,1,0,-1,-1,-1)[$direction-1];$expectedY=@(-1,-1,0,1,1,1,0,-1)[$direction-1]

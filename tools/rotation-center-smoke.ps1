@@ -42,7 +42,6 @@ function Grip($x,$y){
  MovePointer $g[0] $g[1];return $g
 }
 function PopupOption($data){
- $rows=@(Get-Content (Join-Path $folder 'popup-colors-menu.txt')|ForEach-Object{($_ -split ' ',5)})
  # Read one row without PowerShell flattening the parsed columns.
  foreach($row in Get-Content (Join-Path $folder 'popup-colors-menu.txt')){$v=$row -split ' ',5;if([int]$v[0] -eq $data){return @([int]$v[1],[int]$v[2])}}
  throw "Rotation popup option $data missing"
@@ -77,6 +76,7 @@ try{
  }}
  # A selection uses a common pivot; angle buttons preview that same pivot.
  $second='<o t="2" X="380" Y="240"><dw d="32|0,0;2560,0;2560,2560;0,2560;0,0" /></o>'
+ Write-Output 'Checking popup and legacy selection rotation pivots.'
  Scene 'selection' ($shape+$second);$baseline=(SaveDoc).OuterXml
  [MathomirUiProbe]::Send($view,273,0xE12A)|Out-Null
  MovePointer 210 180;[MathomirUiProbe]::Mouse($view,516,2,210,180);[MathomirUiProbe]::Mouse($view,517,0,210,180)

@@ -84,15 +84,33 @@
  
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -26,6 +26,7 @@
+@@ -26,6 +26,8 @@
  #include "IntegralPaint.h"
  #include "SymbolicDerivative.h"
  #include "ColorPalette.h"
 +#include "ObjectPointer.h"
++#include "ObjectAppearance.h"
  #include "GeometryShapes.h"
  #include "PolygonConstructor.h"
  #include "MathDisplay.h"
-@@ -6837,6 +6838,9 @@
+@@ -51,6 +53,7 @@
+ #include "math.h"
+ #include <float.h>
+ #include <vector>
++#include <algorithm>
+ #include "atlimage.h"
+ #include "gdiplusimaging.h" 
+ #include "htmlhelp.h"
+@@ -3862,7 +3865,7 @@
+ 		if (!(nFlags&MK_LBUTTON)) { EndMouseRotation(false); return; }
+ 		UpdateMouseRotation(point,nFlags); return;
+ 	}
+-    if(MouseMode!=11)ClearRotationCenter(true);
++    if(MouseMode!=11 && !(Popup && Popup->IsWindowVisible()))ClearRotationCenter(true);
+     // Foreground content wins over stale controls of an underlying object.
+     if(!IsDrawingMode && MouseMode==0 && !ClipboardExpression && !ClipboardDrawing)
+     {
+@@ -6837,6 +6840,9 @@
  			}
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
@@ -102,7 +120,16 @@
  				short w,h;
  				((CDrawing*)(KeyboardEntryBaseObject->Object))->CalculateSize(DC,ViewZoom,&w,&h);
  				//GentlyPaintObject(KeyboardEntryBaseObject,DC);
-@@ -11372,7 +11376,15 @@
+@@ -11308,7 +11314,7 @@
+ }
+ void CMathomirView::OnMouseLeave()
+ {
+-    if(!MouseRotationActive && MouseMode!=11)ClearRotationCenter(true);
++    if(!MouseRotationActive && MouseMode!=11 && !(Popup && Popup->IsWindowVisible()))ClearRotationCenter(true);
+     RestoreClipboardBackground();
+     FunctionHelpMouseTracking=false;
+     if(!MouseMovingActive && !MouseSizingActive && !MouseRotationActive){
+@@ -11372,7 +11378,15 @@
          root->KeyboardStartNear(&dc,ViewZoom,x,y);
      }else if(object->Type==2){
          CDrawing *drawing=(CDrawing*)object->Object;SpecialDrawingHover=object;
@@ -119,12 +146,10 @@
              CFunctionPlotter *plot=(CFunctionPlotter*)drawing->SpecialData;
              if(!plot->StopForZoom()){CenterEditRelease=false;return;}
              prevTouchedObject=object;
-@@ -11579,6 +11591,75 @@
-     MouseResizeFonts::fonts.clear();
-     delete SizingDrawingSnapshot; SizingDrawingSnapshot=NULL;
+@@ -11581,6 +11595,75 @@
      RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
-+}
-+
+ }
+ 
 +// Preserve the original object as a native child. The arrow and content then
 +// share the existing move/resize/copy/print/persistence paths and placement preview.
 +CObject *CMathomirView::SetObjectPointer(CObject *target,int direction,int length,bool preserveEditing)
@@ -192,9 +217,61 @@
 +    short groupWidth,groupHeight;group->CalculateSize(&dc,ViewZoom,&groupWidth,&groupHeight);
 +    object->Length=groupWidth*100/ViewZoom;object->Above=0;object->Below=groupHeight*100/ViewZoom;
 +    return object->Object;
++}
++
+ static CRect RotationCenterRect()
+ {
+     int x=(int)floor((RotationCenterX-ViewX)*ViewZoom/100.0+0.5);
+@@ -11592,12 +11675,14 @@
+     CRect previous=RotationCenterRect();bool changed=!RotationCenterVisible || x!=RotationCenterX || y!=RotationCenterY;
+     RotationCenterVisible=true;RotationCenterX=x;RotationCenterY=y;
+     RotationCenterExpires=holdMilliseconds?GetTickCount()+holdMilliseconds:0;
++    if(getenv("MATHOMIR_ROTATION_DIAGNOSTICS")){FILE *trace=fopen("rotation-center-trace.txt","a");if(trace){fprintf(trace,"show %lu %.2f %.2f hold=%u mode=%d\n",GetTickCount(),x,y,holdMilliseconds,MouseMode);fclose(trace);}}
+     if(changed){InvalidateRect(previous,FALSE);CRect current=RotationCenterRect();InvalidateRect(current,FALSE);UpdateWindow();}
+ }
+ void CMathomirView::ClearRotationCenter(bool keepFlash)
+ {
+     if(!RotationCenterVisible || (keepFlash && RotationCenterExpires))return;
+     CRect previous=RotationCenterRect();RotationCenterVisible=false;RotationCenterExpires=0;
++    if(getenv("MATHOMIR_ROTATION_DIAGNOSTICS")){FILE *trace=fopen("rotation-center-trace.txt","a");if(trace){fprintf(trace,"clear %lu keep=%d mode=%d popup=%d\n",GetTickCount(),(int)keepFlash,MouseMode,Popup && Popup->IsWindowVisible());fclose(trace);}}
+     if(GetSafeHwnd())InvalidateRect(previous,FALSE);
+ }
+ void CMathomirView::PaintRotationCenter(CDC *dc)
+@@ -12015,20 +12100,24 @@
+ }
+ void CMathomirView::OnBackgroundColor(UINT command)
+ {
+-    if(ViewOnlyMode)return;
+-    int color=command==ID_BACKGROUND_CLEAR?-1:command==ID_BACKGROUND_CUSTOM?(int)ImprovedCustomBackground():(int)ImprovedBackgrounds[command-ID_BACKGROUND_FIRST];
++    if(ViewOnlyMode || (command!=ID_BACKGROUND_CLEAR && command!=ID_BACKGROUND_CUSTOM &&
++        (command<ID_BACKGROUND_FIRST || command>=ID_BACKGROUND_FIRST+8)))return;
++    std::vector<CObject*> targets;
++    CExpression *editing=KeyboardEntryObject && !NumSelectedObjects?(CExpression*)KeyboardEntryObject:NULL;
++    if(!editing)for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *object=TheDocument+i;
++        if(object->Object && object->MovingDotState!=5 && (NumSelectedObjects?object->MovingDotState==3:object==prevTouchedObject))targets.push_back(object->Object);
++    }
++    int color=command==ID_BACKGROUND_CLEAR?-1:command==ID_BACKGROUND_CUSTOM?ImprovedCustomBackground():(int)ImprovedBackgrounds[command-ID_BACKGROUND_FIRST];
+     if(command==ID_BACKGROUND_CUSTOM){CColorDialog dialog(ImprovedCustomBackground(),CC_FULLOPEN,this);if(dialog.DoModal()!=IDOK)return;color=(int)dialog.GetColor();ImprovedCustomBackground()=color;}
+     bool changed=false;
+-    if(KeyboardEntryObject && !NumSelectedObjects){CExpression *expression=(CExpression*)KeyboardEntryObject;UndoSave("typed object background");expression->m_BackgroundColor=color;changed=true;}
+-    else {
+-        for(int i=0;i<NumDocumentElements;i++){
+-            tDocumentStruct *object=TheDocument+i;if(object->Type!=1 || !object->Object || object->MovingDotState==5)continue;
+-            if(NumSelectedObjects?object->MovingDotState!=3:object!=prevTouchedObject)continue;
+-            if(!changed)UndoSave("typed object background");((CExpression*)object->Object)->m_BackgroundColor=color;changed=true;
+-        }
++    if(editing && KeyboardEntryObject==(CObject*)editing){if(editing->m_BackgroundColor!=color){UndoSave("object background");editing->m_BackgroundColor=color;changed=true;}}
++    else for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *object=TheDocument+i;if(!object->Object || object->MovingDotState==5 || std::find(targets.begin(),targets.end(),object->Object)==targets.end())continue;
++        int *background=ObjectAppearance::Background(object->Object,object->Type);if(!background || *background==color)continue;
++        if(!changed)UndoSave("object background");*background=color;changed=true;
+     }
+     if(changed){GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();}
+-    else AfxMessageBox("Point at or select a typed text or math object, or choose a background while editing it.");
  }
  
- static CRect RotationCenterRect()
+ void CMathomirView::OnWritingColors()
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
 @@ -181,6 +181,7 @@
@@ -205,6 +282,25 @@
  	bool BeginMouseRotation(CPoint point);
  	void UpdateMouseRotation(CPoint point, UINT flags);
  	void EndMouseRotation(bool cancel);
+--- /dev/null
++++ b/Mathomir/ObjectAppearance.h
+@@ -0,0 +1,16 @@
++#pragma once
++#include "Expression.h"
++#include "Drawing.h"
++namespace ObjectAppearance {
++// A pointer is an attachment. Background controls still style its original body.
++inline int *Background(CObject *object,int type){
++    for(int depth=0;object && depth<128;depth++){
++        if(type==1)return &((CExpression*)object)->m_BackgroundColor;
++        if(type!=2)return NULL;
++        CDrawing *drawing=(CDrawing*)object;if(drawing->IsSpecialDrawing)return NULL;
++        if(!drawing->HasObjectPointer())return &drawing->m_BackgroundColor;
++        const tDrawingItem &body=drawing->Items[0];object=(CObject*)body.pSubdrawing;type=body.Type==2?1:2;
++    }
++    return NULL;
++}
++}
 --- /dev/null
 +++ b/Mathomir/ObjectPointer.h
 @@ -0,0 +1,24 @@
@@ -234,15 +330,16 @@
 +}
 --- a/Mathomir/PopupMenu.cpp
 +++ b/Mathomir/PopupMenu.cpp
-@@ -20,6 +20,7 @@
+@@ -20,6 +20,8 @@
  *********************************************************************************************************/
  #include "stdafx.h"
  #include "ColorPalette.h"
 +#include "ObjectPointer.h"
++#include "ObjectAppearance.h"
  #include "Mathomir.h"
  #include "MathomirDoc.h"
  #include "MathomirView.h"
-@@ -214,6 +215,7 @@
+@@ -214,12 +216,13 @@
      AddCheckedMenuOption(0,cell,"A",commonColor==-1,baseData,0);
      for(int i=0;i<8;i++)AddCheckedMenuOption((i+1)*cell,cell,(char*)ImprovedColorNames[i],commonColor==i,baseData+i+1,i==7);
      if(!background || m_AppearanceTargets.empty())return;
@@ -250,10 +347,30 @@
      int commonBackground=-2;bool supported=false;
      for(int i=0;i<NumDocumentElements;i++){
          tDocumentStruct *object=TheDocument+i;
-@@ -252,6 +254,53 @@
-     pMainView->SetFocus();
- }
- 
+         if(std::find(m_AppearanceTargets.begin(),m_AppearanceTargets.end(),object->Object)==m_AppearanceTargets.end())continue;
+-        if(object->Type!=1 && (object->Type!=2 || ((CDrawing*)object->Object)->IsSpecialDrawing))return;
+-        int color=object->Type==1?((CExpression*)object->Object)->m_BackgroundColor:((CDrawing*)object->Object)->m_BackgroundColor;
++        int *background=ObjectAppearance::Background(object->Object,object->Type);if(!background)return;
++        int color=*background;
+         if(!supported)commonBackground=color;else if(commonBackground!=color)commonBackground=-2;supported=true;
+     }
+     if(!supported)return;
+@@ -241,12 +244,57 @@
+     for(int i=0;i<NumDocumentElements;i++){
+         tDocumentStruct *object=TheDocument+i;
+         if(!object->Object || object->MovingDotState==5 || std::find(targets.begin(),targets.end(),object->Object)==targets.end())continue;
+-        int *background=NULL;
+-        if(object->Type==1)background=&((CExpression*)object->Object)->m_BackgroundColor;
+-        else if(object->Type==2 && !((CDrawing*)object->Object)->IsSpecialDrawing)background=&((CDrawing*)object->Object)->m_BackgroundColor;
++        int *background=ObjectAppearance::Background(object->Object,object->Type);
+         if(!background || *background==color)continue;
+         if(!changed)((CMainFrame*)theApp.m_pMainWnd)->UndoSave("object background");
+         *background=color;changed=true;
++    }
++    if(changed){pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);}
++    pMainView->SetFocus();
++}
++
 +static int PointerLengthPreference=48;
 +void PopupMenu::AddPointerOptions()
 +{
@@ -296,15 +413,10 @@
 +            if(pMainView->SetObjectPointer(targets[k],direction,length))changed=true;
 +            break;
 +        }
-+    }
-+    if(changed){pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);}
-+    pMainView->SetFocus();
-+}
-+
- static bool IsPopupSelectionObject(tDocumentStruct *object)
- {
-     return object->Object && (object->MovingDotState==3 ||
-@@ -1815,7 +1864,16 @@
+     }
+     if(changed){pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);}
+     pMainView->SetFocus();
+@@ -1815,7 +1863,16 @@
  			else if (Options[i].IsChecked&0x02)
  			{
  
@@ -322,7 +434,7 @@
  					((Options[i].Data>=581) && (Options[i].Data<589)) ||
                      ((Options[i].Data>=920) && (Options[i].Data<=927)))
  				{
-@@ -2029,6 +2087,7 @@
+@@ -2029,6 +2086,7 @@
  		//}
  
          if(!IsPopupRotationCommand(dataval))pMainView->ClearRotationCenter();
