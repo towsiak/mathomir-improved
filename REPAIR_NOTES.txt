@@ -612,3 +612,11 @@ using a rotation grip, hovering rotation angle options, or right-dragging a
 selection. Angle-button rotations briefly retain the pivot on the canvas.
 The marker is a temporary view overlay: it does not enter drawings, saved
 files or printed output. Release/Escape and document changes clear it.
+
+ATTACHED OBJECT POINTERS (17 October 2026)
+The object popup offers an eight-direction arrow grid, None, and three pointer
+lengths. The arrow is attached to text, math, ordinary drawings and groups,
+using native drawing geometry so it travels with its object, previews while
+carried, prints, copies, saves/reopens and participates in Undo. None removes
+the arrow while preserving its original content and position. Center-grip
+double-click still edits an attached text/math label.

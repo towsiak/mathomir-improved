@@ -17,7 +17,7 @@ public static class RotationPivotProbe {
 '@
 function Check($ok,$why){if(!$ok){throw $why}}
 function Stat($name){return [RotationPivotProbe]::Stat($view,$name)}
-function Move($x,$y){[MathomirUiProbe]::Mouse($view,512,0,$x,$y);[RotationPivotProbe]::Refresh($view)}
+function MovePointer($x,$y){[MathomirUiProbe]::Mouse($view,512,0,$x,$y);[RotationPivotProbe]::Refresh($view)}
 function Capture($name){
  $r=[MathomirUiProbe]::WindowRect($view);$b=New-Object Drawing.Bitmap ($r.Right-$r.Left),($r.Bottom-$r.Top);$g=[Drawing.Graphics]::FromImage($b)
  try{$g.CopyFromScreen($r.Left,$r.Top,0,0,$b.Size);$b.Save((Join-Path $folder $name))}finally{$g.Dispose();$b.Dispose()}
@@ -33,13 +33,13 @@ function Scene($name,$objects,$zoom=100){
  [MathomirUiProbe]::OpenFile($main,$fixture);Start-Sleep -Milliseconds 150
  [MathomirUiProbe]::Send($view,273,$(if($zoom -eq 60){32777}elseif($zoom -eq 200){33019}else{32775}))|Out-Null
  [MathomirUiProbe]::Send($view,276,4)|Out-Null;for($i=0;$i -lt 10;$i++){[MathomirUiProbe]::Send($view,277,2)|Out-Null}
- $script:scale=$zoom/100.0;Move 700 430
+ $script:scale=$zoom/100.0;MovePointer 700 430
 }
 function Grip($x,$y){
- Move ([int]($x*$scale)) ([int]($y*$scale));[MathomirUiProbe]::Send($main,273,33008)|Out-Null
+ MovePointer ([int]($x*$scale)) ([int]($y*$scale));[MathomirUiProbe]::Send($main,273,33008)|Out-Null
  [RotationPivotProbe]::Refresh($view);$g=@((Stat 'GripX'),(Stat 'GripY'))
  Check ($g[0] -ge 0 -and $g[1] -ge 0) 'No native rotation grip'
- Move $g[0] $g[1];return $g
+ MovePointer $g[0] $g[1];return $g
 }
 function PopupOption($data){
  $rows=@(Get-Content (Join-Path $folder 'popup-colors-menu.txt')|ForEach-Object{($_ -split ' ',5)})
@@ -67,19 +67,19 @@ try{
    [MathomirUiProbe]::Mouse($view,512,1,[int]($g[0]+($pivot[0]-$g[0])*$step/4),[int]($g[1]+($pivot[1]+80-$g[1])*$step/4));Marker $pivot[0] $pivot[1]
   }
   if($zoom -eq 100){Capture "rotation-center-$kind-drag.png"}
-  [MathomirUiProbe]::Mouse($view,514,0,$pivot[0],($pivot[1]+80));Move 700 430
+  [MathomirUiProbe]::Mouse($view,514,0,$pivot[0],($pivot[1]+80));MovePointer 700 430
   Check ((Stat 'Visible') -eq 0) 'Rotation marker stuck after releasing the grip'
   $rotated=SaveDoc;Check ($rotated.OuterXml -ne $baseline) 'Drawing did not rotate'
-  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;Move 700 430;Check ((SaveDoc).OuterXml -eq $baseline) 'Rotation Undo changed geometry'
+  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;MovePointer 700 430;Check ((SaveDoc).OuterXml -eq $baseline) 'Rotation Undo changed geometry'
   $g=Grip 210 180;[MathomirUiProbe]::Mouse($view,513,1,$g[0],$g[1]);[MathomirUiProbe]::Mouse($view,512,1,($g[0]-40),($g[1]+60));[MathomirUiProbe]::Send($view,256,27)|Out-Null
-  Move 700 430;Check ((Stat 'Visible') -eq 0) 'Escape left a rotation marker';Check ((SaveDoc).OuterXml -eq $baseline) 'Rotation Escape changed geometry'
+  MovePointer 700 430;Check ((Stat 'Visible') -eq 0) 'Escape left a rotation marker';Check ((SaveDoc).OuterXml -eq $baseline) 'Rotation Escape changed geometry'
   Write-Output "Rotation pivot passed: $kind, zoom=$zoom, hover point, stationary drag pivot, visible ink, release, Undo, Escape, unchanged hover document"
  }}
  # A selection uses a common pivot; angle buttons preview that same pivot.
  $second='<o t="2" X="380" Y="240"><dw d="32|0,0;2560,0;2560,2560;0,2560;0,0" /></o>'
  Scene 'selection' ($shape+$second);$baseline=(SaveDoc).OuterXml
  [MathomirUiProbe]::Send($view,273,0xE12A)|Out-Null
- Move 210 180;[MathomirUiProbe]::Mouse($view,516,2,210,180);[MathomirUiProbe]::Mouse($view,517,0,210,180)
+ MovePointer 210 180;[MathomirUiProbe]::Mouse($view,516,2,210,180);[MathomirUiProbe]::Mouse($view,517,0,210,180)
  $popup=[MathomirUiProbe]::Window($app.Id,'PopupMenu');Check ($popup -ne [IntPtr]::Zero) 'Selection popup missing';[RotationPivotProbe]::MovePopup($popup)
  $option=PopupOption 541;[MathomirUiProbe]::Mouse($popup,512,0,$option[0],$option[1]);Marker 321 251
  Check ((SaveDoc).OuterXml -eq $baseline) 'Popup pivot preview changed selection'
@@ -88,9 +88,9 @@ try{
  Start-Sleep -Milliseconds 1700;[RotationPivotProbe]::Refresh($view);Check ((Stat 'Visible') -eq 0) 'Popup rotation pivot did not clear after its brief display'
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;Check ((SaveDoc).OuterXml -eq $baseline) 'Popup rotation Undo changed geometry'
  # Legacy selection right-drag starts on its top-left stretch handle.
- Move 177 177;[MathomirUiProbe]::Mouse($view,516,2,177,177);Marker 321 251
+ MovePointer 177 177;[MathomirUiProbe]::Mouse($view,516,2,177,177);Marker 321 251
  [MathomirUiProbe]::Mouse($view,512,2,300,130);Marker 321 251;Capture 'rotation-center-selection-drag.png'
- [MathomirUiProbe]::Mouse($view,517,0,300,130);Move 700 430;Check ((Stat 'Visible') -eq 0) 'Selection right-drag left its pivot marker'
+ [MathomirUiProbe]::Mouse($view,517,0,300,130);MovePointer 700 430;Check ((Stat 'Visible') -eq 0) 'Selection right-drag left its pivot marker'
  [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;Check ((SaveDoc).OuterXml -eq $baseline) 'Selection rotation Undo changed geometry'
  Write-Output 'Rotation center passed: shared selection pivot, popup hover/action/expiry, right-drag selection, Undo, no serialized marker.'
 }catch{

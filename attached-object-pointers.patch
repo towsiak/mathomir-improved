@@ -1,0 +1,343 @@
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -103,6 +103,7 @@
+ 	NodeY=-1;
+ 	m_Color=-1;
+     m_BackgroundColor=-1;
++    m_PointerDirection=0;m_PointerLength=48;
+ }
+ 
+ CDrawing::~CDrawing(void)
+@@ -1633,6 +1634,7 @@
+ 	}
+ 	m_Color=-1;
+     m_BackgroundColor=-1;
++    m_PointerDirection=0;m_PointerLength=48;
+ 	IsSpecialDrawing=0;
+ 	IsSelected=0;
+ 	OriginalForm=0;
+@@ -2089,7 +2091,7 @@
+ 
+ int CDrawing::CalcChecksum(void)
+ {
+-	int ret=(NumItems+m_Color*2)^(int)CoordinateAxes::Checksum(AxisGrid)^(m_BackgroundColor+1);
++	int ret=(NumItems+m_Color*2)^(int)CoordinateAxes::Checksum(AxisGrid)^(m_BackgroundColor+1)^(m_PointerDirection?m_PointerDirection*131+m_PointerLength*257:0);
+ 	tDrawingItem *di=Items;
+ 	for (int i=1;i<=NumItems;i++,di++)
+ 	{
+@@ -2161,6 +2163,7 @@
+ 	IsSpecialDrawing=Original->IsSpecialDrawing;
+ 	m_Color=Original->m_Color;
+     m_BackgroundColor=Original->m_BackgroundColor;
++    m_PointerDirection=Original->m_PointerDirection;m_PointerLength=Original->m_PointerLength;
+ 	OriginalForm=Original->OriginalForm;
+     AxisGrid=Original->AxisGrid;
+ 	if (IsSpecialDrawing)
+@@ -2319,6 +2322,12 @@
+ 
+ // Use the same cached extents as the native size calculation. Children are
+ // tested first by selection so a group background never hides its contents.
++bool CDrawing::HasObjectPointer() const
++{
++    return m_PointerDirection>=1 && m_PointerDirection<=8 && !IsSpecialDrawing && NumItems==2 && Items &&
++        (Items[0].Type==0 || Items[0].Type==2) && Items[0].pSubdrawing && Items[1].Type==0 && Items[1].pSubdrawing;
++}
++
+ bool CDrawing::BackgroundContains(double x,double y,double zoom) const
+ {
+     if(m_BackgroundColor<0 || IsSpecialDrawing || x<0 || y<0)return false;
+@@ -2339,6 +2348,10 @@
+ 	static char tmpstr[256];
+ 
+ 	if (num_tabs>16) num_tabs=16;
++    if(HasObjectPointer()){
++        char pointer[80];int count=sprintf(pointer,"<pointer dir=\"%d\" len=\"%d\" />\r\n",m_PointerDirection,m_PointerLength);
++        len+=count;if(!only_calculate){memcpy(output,pointer,count);output+=count;}
++    }
+     if(m_BackgroundColor>=0){
+         char appearance[64];int count=sprintf(appearance,"<appearance bg=\"%d\" />\r\n",m_BackgroundColor);
+         len+=count;if(!only_calculate){memcpy(output,appearance,count);output+=count;}
+@@ -2489,6 +2502,13 @@
+ 		file=mf->XML_search("",file); //find anything
+ 		if (file==NULL) return NULL;
+ 
++        if(strncmp(file,"pointer",7)==0){
++            file+=7;char attribute[64],value[512];
++            do{file=mf->XML_read_attribute(attribute,value,file,512);if(!file)return NULL;
++                if(!strcmp(attribute,"dir")){int n=atoi(value);if(n>=1 && n<=8)m_PointerDirection=n;}
++                else if(!strcmp(attribute,"len")){int n=atoi(value);if(n>=8 && n<=1000)m_PointerLength=n;}
++            }while(attribute[0]);continue;
++        }
+         if(strncmp(file,"appearance",10)==0){
+             file+=10;char attribute[64],value[512];
+             do{file=mf->XML_read_attribute(attribute,value,file,512);if(!file)return NULL;
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -37,6 +37,8 @@
+ 	char m_Color;
+     int m_BackgroundColor; // -1 is transparent; independent of stroke/fill color
+     bool BackgroundContains(double x,double y,double zoom) const;
++    int m_PointerDirection,m_PointerLength; // attached native arrow group; zero means ordinary drawing
++    bool HasObjectPointer() const;
+ 	char OriginalForm; //used from toolbox (to store the purpose of this drawing)
+ 	char IsSpecialDrawing;
+ 
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -26,6 +26,7 @@
+ #include "IntegralPaint.h"
+ #include "SymbolicDerivative.h"
+ #include "ColorPalette.h"
++#include "ObjectPointer.h"
+ #include "GeometryShapes.h"
+ #include "PolygonConstructor.h"
+ #include "MathDisplay.h"
+@@ -6837,6 +6838,9 @@
+ 			}
+ 			else if (KeyboardEntryBaseObject->Type==2)
+ 			{
++                CDrawing *group=(CDrawing*)KeyboardEntryBaseObject->Object;
++                if(group->HasObjectPointer() && group->Items[0].Type==2)
++                    SetObjectPointer((CObject*)group,group->m_PointerDirection,group->m_PointerLength,true);
+ 				short w,h;
+ 				((CDrawing*)(KeyboardEntryBaseObject->Object))->CalculateSize(DC,ViewZoom,&w,&h);
+ 				//GentlyPaintObject(KeyboardEntryBaseObject,DC);
+@@ -11372,7 +11376,15 @@
+         root->KeyboardStartNear(&dc,ViewZoom,x,y);
+     }else if(object->Type==2){
+         CDrawing *drawing=(CDrawing*)object->Object;SpecialDrawingHover=object;
+-        if(IsGraphObject(object) && drawing->SpecialData){
++        if(drawing->HasObjectPointer() && drawing->Items[0].Type==2){
++            tDrawingItem &content=drawing->Items[0];CExpression *expression=(CExpression*)content.pSubdrawing;
++            CClientDC dc(this);short width,above,below;expression->CalculateSize(&dc,ViewZoom,&width,&above,&below);
++            int x=point.x-(object->absolute_X-ViewX)*ViewZoom/100-content.X1*ViewZoom/100/DRWZOOM;
++            int y=point.y-(object->absolute_Y-ViewY)*ViewZoom/100-content.Y1*ViewZoom/100/DRWZOOM-above;
++            KeyboardEntryBaseObject=object;KeyboardEntryObject=(CObject*)expression;
++            expression->DeselectExpression();expression->m_IsColumnInsertion=expression->m_IsRowInsertion=0;
++            expression->KeyboardStartNear(&dc,ViewZoom,x,y);
++        }else if(IsGraphObject(object) && drawing->SpecialData){
+             CFunctionPlotter *plot=(CFunctionPlotter*)drawing->SpecialData;
+             if(!plot->StopForZoom()){CenterEditRelease=false;return;}
+             prevTouchedObject=object;
+@@ -11579,6 +11591,75 @@
+     MouseResizeFonts::fonts.clear();
+     delete SizingDrawingSnapshot; SizingDrawingSnapshot=NULL;
+     RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
++}
++
++// Preserve the original object as a native child. The arrow and content then
++// share the existing move/resize/copy/print/persistence paths and placement preview.
++CObject *CMathomirView::SetObjectPointer(CObject *target,int direction,int length,bool preserveEditing)
++{
++    tDocumentStruct *object=NULL;
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==target){object=TheDocument+i;break;}
++    if(!object || object->MovingDotState==5 || ViewOnlyMode || direction<0 || direction>8)return NULL;
++    CDrawing *group=object->Type==2?(CDrawing*)object->Object:NULL;
++    bool attached=group && group->HasObjectPointer();
++    if(group && group->IsSpecialDrawing)return NULL;
++    if(!direction && !attached)return NULL;
++    if(length<8)length=8;if(length>1000)length=1000;
++    if(!preserveEditing){
++    if(KeyboardEntryObject){((CExpression*)KeyboardEntryObject)->KeyboardStop();KeyboardEntryObject=NULL;KeyboardEntryBaseObject=NULL;}
++    LastQuickTypeObject=NULL;ExplicitTypingRoot=NULL;
++    SpecialDrawingHover=prevSpecialDrawingHover=NULL;prevTouchedObject=NULL;
++    IsInsertionPointTouched=NULL;LongClickObject=NULL;m_PopupMenuObject=NULL;
++    if(MoveGripObject==target)MoveGripObject=NULL;
++    }
++    CClientDC dc(this);
++    if(!direction){
++        tDrawingItem content=group->Items[0];CObject *original=(CObject*)content.pSubdrawing;
++        int x=object->absolute_X+content.X1/DRWZOOM,y=object->absolute_Y+content.Y1/DRWZOOM;
++        short width,above=0,below;
++        if(content.Type==2)((CExpression*)original)->CalculateSize(&dc,ViewZoom,&width,&above,&below);
++        else ((CDrawing*)original)->CalculateSize(&dc,ViewZoom,&width,&below);
++        if(group->m_BackgroundColor>=0){if(content.Type==2)((CExpression*)original)->m_BackgroundColor=group->m_BackgroundColor;else ((CDrawing*)original)->m_BackgroundColor=group->m_BackgroundColor;}
++        group->Items[0].pSubdrawing=NULL;
++        object->Object=original;object->Type=content.Type==2?1:2;
++        object->absolute_X=x;object->absolute_Y=y+above*100/ViewZoom;
++        object->Length=width*100/ViewZoom;object->Above=above*100/ViewZoom;object->Below=below*100/ViewZoom;
++        if(ResizeHandleObject==target)ResizeHandleObject=original;if(RotationHandleObject==target)RotationHandleObject=original;
++        delete group;return original;
++    }
++    tDrawingItem *lines=(tDrawingItem*)calloc(3,sizeof(tDrawingItem));if(!lines)return NULL;
++    if(!attached){
++        CDrawing *wrapper=new CDrawing();wrapper->Items=(tDrawingItem*)calloc(2,sizeof(tDrawingItem));
++        if(!wrapper->Items){delete wrapper;free(lines);return NULL;}
++        wrapper->NumItems=wrapper->NumItemsReserved=2;
++        tDrawingItem &content=wrapper->Items[0];content.Type=object->Type==1?2:0;content.pSubdrawing=object->Object;
++        content.X2=object->Length*DRWZOOM;content.Y2=(object->Above+object->Below)*DRWZOOM;
++        if(object->Type==1)((CExpression*)object->Object)->DeselectExpression();
++        else {((CDrawing*)object->Object)->SelectDrawing(0);((CDrawing*)object->Object)->SetGripNodeEditing(false);}
++        wrapper->Items[1].Type=0;wrapper->Items[1].pSubdrawing=new CDrawing();
++        object->absolute_Y-=object->Above;object->Above=0;object->Type=2;object->Object=wrapper;group=wrapper;
++        if(ResizeHandleObject==target)ResizeHandleObject=wrapper;if(RotationHandleObject==target)RotationHandleObject=wrapper;
++    }
++    tDrawingItem &content=group->Items[0],&pointer=group->Items[1];
++    short width,above=0,below;
++    if(content.Type==2)((CExpression*)content.pSubdrawing)->CalculateSize(&dc,100,&width,&above,&below);
++    else ((CDrawing*)content.pSubdrawing)->CalculateSize(&dc,100,&width,&below);
++    CDrawing *arrow=(CDrawing*)pointer.pSubdrawing;
++    int color=content.Type==2?((CExpression*)content.pSubdrawing)->m_Color:((CDrawing*)content.pSubdrawing)->m_Color;
++    arrow->Delete();arrow->Items=lines;arrow->NumItems=arrow->NumItemsReserved=3;arrow->m_Color=color<0?-1:color&7;
++    ObjectPointer::Arrow geometry=ObjectPointer::Build(width,above+below,direction,length);
++    for(int i=0;i<3;i++){
++        tDrawingItem &line=lines[i];line.Type=1;line.LineWidth=DRWZOOM;
++        line.X1=content.X1+(int)floor(geometry.line[i].a.x*DRWZOOM+0.5);line.Y1=content.Y1+(int)floor(geometry.line[i].a.y*DRWZOOM+0.5);
++        line.X2=content.X1+(int)floor(geometry.line[i].b.x*DRWZOOM+0.5);line.Y2=content.Y1+(int)floor(geometry.line[i].b.y*DRWZOOM+0.5);
++    }
++    int x,y,w,h;arrow->AdjustCoordinates(&x,&y,&w,&h);
++    pointer.X1=x*DRWZOOM;pointer.Y1=y*DRWZOOM;pointer.X2=(x+w)*DRWZOOM;pointer.Y2=(y+h)*DRWZOOM;
++    group->m_PointerDirection=direction;group->m_PointerLength=length;
++    group->AdjustCoordinates(&x,&y,&w,&h);object->absolute_X+=x;object->absolute_Y+=y;
++    short groupWidth,groupHeight;group->CalculateSize(&dc,ViewZoom,&groupWidth,&groupHeight);
++    object->Length=groupWidth*100/ViewZoom;object->Above=0;object->Below=groupHeight*100/ViewZoom;
++    return object->Object;
+ }
+ 
+ static CRect RotationCenterRect()
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -181,6 +181,7 @@
+     void ShowRotationCenter(double x,double y,unsigned int holdMilliseconds=0);
+     void ClearRotationCenter(bool keepFlash=false);
+     void PaintRotationCenter(CDC *dc);
++    CObject *SetObjectPointer(CObject *target,int direction,int length,bool preserveEditing=false);
+ 	bool BeginMouseRotation(CPoint point);
+ 	void UpdateMouseRotation(CPoint point, UINT flags);
+ 	void EndMouseRotation(bool cancel);
+--- /dev/null
++++ b/Mathomir/ObjectPointer.h
+@@ -0,0 +1,24 @@
++#pragma once
++#include <cmath>
++namespace ObjectPointer {
++struct Point {double x,y;};
++struct Line {Point a,b;};
++struct Arrow {Line line[3];};
++inline Point Direction(int direction){
++    const double diagonal=0.7071067811865475244;
++    const Point directions[8]={{0,-1},{diagonal,-diagonal},{1,0},{diagonal,diagonal},{0,1},{-diagonal,diagonal},{-1,0},{-diagonal,-diagonal}};
++    return directions[direction>=1 && direction<=8?direction-1:2];
++}
++inline Arrow Build(double width,double height,int direction,double length,double gap=6){
++    Point d=Direction(direction),center={width/2,height/2};
++    double reach=1e30;
++    if(d.x!=0)reach=width/(2*std::fabs(d.x));
++    if(d.y!=0){double vertical=height/(2*std::fabs(d.y));if(vertical<reach)reach=vertical;}
++    Point tail={center.x+d.x*(reach+gap),center.y+d.y*(reach+gap)};
++    Point tip={tail.x+d.x*length,tail.y+d.y*length};
++    double head=length/3;if(head>8)head=8;
++    Point left={tip.x-d.x*head-d.y*head/2,tip.y-d.y*head+d.x*head/2};
++    Point right={tip.x-d.x*head+d.y*head/2,tip.y-d.y*head-d.x*head/2};
++    Arrow arrow={{{tail,tip},{tip,left},{tip,right}}};return arrow;
++}
++}
+--- a/Mathomir/PopupMenu.cpp
++++ b/Mathomir/PopupMenu.cpp
+@@ -20,6 +20,7 @@
+ *********************************************************************************************************/
+ #include "stdafx.h"
+ #include "ColorPalette.h"
++#include "ObjectPointer.h"
+ #include "Mathomir.h"
+ #include "MathomirDoc.h"
+ #include "MathomirView.h"
+@@ -214,6 +215,7 @@
+     AddCheckedMenuOption(0,cell,"A",commonColor==-1,baseData,0);
+     for(int i=0;i<8;i++)AddCheckedMenuOption((i+1)*cell,cell,(char*)ImprovedColorNames[i],commonColor==i,baseData+i+1,i==7);
+     if(!background || m_AppearanceTargets.empty())return;
++    AddPointerOptions();
+     int commonBackground=-2;bool supported=false;
+     for(int i=0;i<NumDocumentElements;i++){
+         tDocumentStruct *object=TheDocument+i;
+@@ -252,6 +254,53 @@
+     pMainView->SetFocus();
+ }
+ 
++static int PointerLengthPreference=48;
++void PopupMenu::AddPointerOptions()
++{
++    if(m_AppearanceTargets.empty())return;
++    int direction=-1,length=-1;
++    for(int i=0;i<NumDocumentElements;i++){
++        tDocumentStruct *object=TheDocument+i;
++        if(!object->Object || std::find(m_AppearanceTargets.begin(),m_AppearanceTargets.end(),object->Object)==m_AppearanceTargets.end())continue;
++        CDrawing *drawing=object->Type==2?(CDrawing*)object->Object:NULL;
++        if(drawing && drawing->IsSpecialDrawing)return;
++        int d=drawing && drawing->HasObjectPointer()?drawing->m_PointerDirection:0;
++        int l=d?drawing->m_PointerLength:PointerLengthPreference;
++        if(direction==-1){direction=d;length=l;}else {if(direction!=d)direction=-2;if(length!=l)length=-2;}
++    }
++    AddMenuOption(0,3*TSize,"Pointer:",-952,1);
++    const int grid[9]={8,1,2,7,0,3,6,5,4};
++    const char *names[9]={"None","Up","Up-right","Right","Down-right","Down","Down-left","Left","Up-left"};
++    for(int i=0;i<9;i++)AddCheckedMenuOption((i%3)*TSize,TSize,(char*)names[grid[i]],direction==grid[i],960+grid[i],i%3==2);
++    const char *sizes[3]={"Short","Medium","Long"};const int lengths[3]={24,48,80};
++    for(int i=0;i<3;i++)AddCheckedMenuOption(i*TSize,TSize,(char*)sizes[i],length==lengths[i],969+i,i==2);
++}
++void PopupMenu::ApplyPointerOption(int data)
++{
++    std::vector<CObject*> targets=m_AppearanceTargets;HidePopupMenu();
++    if(ViewOnlyMode)return;
++    const int lengths[3]={24,48,80};bool sizeOnly=data>=969;
++    if(sizeOnly)PointerLengthPreference=lengths[data-969];
++    bool changed=false;
++    for(size_t k=0;k<targets.size();k++){
++        for(int i=0;i<NumDocumentElements;i++){
++            tDocumentStruct *object=TheDocument+i;if(object->Object!=targets[k] || object->MovingDotState==5)continue;
++            CDrawing *drawing=object->Type==2?(CDrawing*)object->Object:NULL;
++            if(drawing && drawing->IsSpecialDrawing)continue;
++            bool attached=drawing && drawing->HasObjectPointer();
++            int direction=sizeOnly?(attached?drawing->m_PointerDirection:0):data-960;
++            int length=sizeOnly?PointerLengthPreference:attached?drawing->m_PointerLength:PointerLengthPreference;
++            if(!direction && !attached)break;
++            if(attached && direction==drawing->m_PointerDirection && length==drawing->m_PointerLength)break;
++            if(!changed)((CMainFrame*)theApp.m_pMainWnd)->UndoSave("object pointer");
++            if(pMainView->SetObjectPointer(targets[k],direction,length))changed=true;
++            break;
++        }
++    }
++    if(changed){pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);}
++    pMainView->SetFocus();
++}
++
+ static bool IsPopupSelectionObject(tDocumentStruct *object)
+ {
+     return object->Object && (object->MovingDotState==3 ||
+@@ -1815,7 +1864,16 @@
+ 			else if (Options[i].IsChecked&0x02)
+ 			{
+ 
+-				if (((Options[i].Data>=81) && (Options[i].Data<90)) || 
++                if(Options[i].Data>=961 && Options[i].Data<=968){
++                    ObjectPointer::Arrow arrow=ObjectPointer::Build(0,0,Options[i].Data-960,11,0);
++                    ObjectPointer::Point direction=ObjectPointer::Direction(Options[i].Data-960);
++                    int x=Options[i].X+Options[i].Cx/2-(int)(direction.x*5),y=Options[i].Y+Options[i].Cy/2-(int)(direction.y*5);
++                    int saved=dc->SaveDC();CPen ink(PS_SOLID,1,RGB(0,0,0));dc->SelectObject(&ink);
++                    for(int j=0;j<3;j++){dc->MoveTo(x+(int)arrow.line[j].a.x,y+(int)arrow.line[j].a.y);dc->LineTo(x+(int)arrow.line[j].b.x,y+(int)arrow.line[j].b.y);}
++                    if(Options[i].IsChecked&1)PaintCheckedSign(dc,Options[i].X+4,Options[i].Y+1,TSize/6,1);
++                    dc->RestoreDC(saved);
++                }
++                else if (((Options[i].Data>=81) && (Options[i].Data<90)) || 
+ 					((Options[i].Data>=581) && (Options[i].Data<589)) ||
+                     ((Options[i].Data>=920) && (Options[i].Data<=927)))
+ 				{
+@@ -2029,6 +2087,7 @@
+ 		//}
+ 
+         if(!IsPopupRotationCommand(dataval))pMainView->ClearRotationCenter();
++        if(dataval>=960 && dataval<=971){ApplyPointerOption(dataval);return;}
+         if(dataval>=920 && dataval<=929){ApplyBackgroundOption(dataval);return;}
+ 		if ((dataval>=110) && (dataval<115)) //stack-clipboard option
+ 		{
+--- a/Mathomir/PopupMenu.h
++++ b/Mathomir/PopupMenu.h
+@@ -60,6 +60,8 @@
+     void CaptureAppearanceTargets(CExpression *expression,int ownerType);
+     void AddAppearanceOptions(int commonColor,int baseData,bool background);
+     void ApplyBackgroundOption(int data);
++    void AddPointerOptions();
++    void ApplyPointerOption(int data);
+ 
+ protected:
+ 	DECLARE_MESSAGE_MAP()

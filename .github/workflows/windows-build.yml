@@ -31,6 +31,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Attached object pointer chooser checks
+        shell: pwsh
+        run: ./tools/object-pointer-smoke.ps1
       - name: Rotation center overlay UI checks
         shell: pwsh
         run: ./tools/rotation-center-smoke.ps1
@@ -89,6 +92,7 @@ jobs:
           path: |
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/object-pointer-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -168,6 +172,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/object-pointer-smoke.ps1
           ./tools/rotation-center-smoke.ps1
           ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
@@ -224,6 +229,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/object-pointer-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -278,6 +284,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/object-pointer-smoke.ps1
           ./tools/rotation-center-smoke.ps1
           ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
@@ -332,6 +339,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/object-pointer-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
