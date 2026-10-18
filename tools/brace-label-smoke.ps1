@@ -21,7 +21,7 @@ function Check($ok,$why){if(!$ok){throw $why}}
 function Capture($h,$name){$r=[MathomirUiProbe]::WindowRect($h);$b=New-Object Drawing.Bitmap ($r.Right-$r.Left),($r.Bottom-$r.Top);$g=[Drawing.Graphics]::FromImage($b);try{$g.CopyFromScreen($r.Left,$r.Top,0,0,$b.Size);$b.Save((Join-Path $folder $name))}finally{$g.Dispose();$b.Dispose()}}
 function Offset($n){if($n.HasAttribute('d')){$p=$n.d.Split(';')[0].Split(',');return @(([double]$p[0]/32),([double]$p[1]/32))};return @(([double]$n.X1/1000),([double]$n.Y1/1000))}
 function Root($doc){return $doc.mathomir.ChildNodes[0]}
-function Part($doc,$i){$root=Root $doc;$node=$root.SelectNodes('./gr | ./group')[$i];$offset=Offset $node;return @((ShaderPoints $node)|ForEach-Object{[pscustomobject]@{x=[double]$root.X+$offset[0]+$_.x;y=[double]$root.Y+$offset[1]+$_.y}})}
+function Part($doc,$i){$root=Root $doc;$node=$root.SelectNodes('./gr | ./group')[$i];$offset=Offset $node;$last=$null;return @(foreach($point in (ShaderPoints $node)){if($last -and [Math]::Abs($point.x-$last.x) -lt .001 -and [Math]::Abs($point.y-$last.y) -lt .001){continue};$last=$point;[pscustomobject]@{x=[double]$root.X+$offset[0]+$point.x;y=[double]$root.Y+$offset[1]+$point.y}})}
 function BoxCenter($doc){$p=Part $doc 2;return @((($p[0].x+$p[2].x)/2),(($p[0].y+$p[2].y)/2))}
 function Joined($doc){$p=Part $doc 0;$line=Part $doc 1;Check ($p.Count -eq 11 -and $line.Count -eq 2) 'Brace or connector has wrong native geometry';Check ([Math]::Abs($p[5].x-$line[0].x) -le 2 -and [Math]::Abs($p[5].y-$line[0].y) -le 2) 'Label detached from the actual middle tip'}
 function SaveDoc {[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;return [xml](Get-Content $fixture -Raw)}
