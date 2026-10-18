@@ -310,7 +310,7 @@
 +static bool NormalizeInteractive(CDrawing *d,int &dx,int &dy,int depth=0){dx=dy=0;if(!d||d->IsSpecialDrawing||depth>32)return false;bool has=false;for(int i=0;i<d->NumItems;i++)if(d->Items[i].Type==0){auto child=(CDrawing*)d->Items[i].pSubdrawing;int x=0,y=0;bool nested=NormalizeInteractive(child,x,y,depth+1);if(nested){d->Items[i].X1+=x*DRWZOOM;d->Items[i].Y1+=y*DRWZOOM;has=true;}if(child&&child->m_Connector.Attached())has=true;}if(has){int w,h;d->AdjustCoordinates(&dx,&dy,&w,&h);}return has;}
 +}
 +static bool SyncInteractiveObjects(CDC *dc){
-+    if(InteractivePasteInProgress||!dc)return false;auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);bool exact=false;for(auto &n:nodes)if(n.type==2&&((CDrawing*)n.object)->m_Connector.Attached())exact=true;if(exact)nodes=InteractiveNodes(dc);bool changed=false;
++    if(InteractivePasteInProgress||!dc)return false;auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);bool exact=false;for(auto &n:nodes)if(n.type==2&&((CDrawing*)n.object)->m_Connector.Attached())exact=true;InteractiveHasLinks=exact;if(exact)nodes=InteractiveNodes(dc);bool changed=false;
 +    for(auto &n:nodes)if(n.type==2){auto d=(CDrawing*)n.object;if(!d->IsSpecialDrawing&&d->m_Connector.Attached()){auto a=FindInteractive(nodes,d->m_Connector.from),b=FindInteractive(nodes,d->m_Connector.to);if(!a||!b||a==&n||b==&n)continue;if(a->type==2&&((CDrawing*)a->object)->m_Connector.Attached()||b->type==2&&((CDrawing*)b->object)->m_Connector.Attached())continue;changed=WriteConnector(n,InteractiveObjects::Build(a->bounds,b->bounds,d->m_Connector))||changed;}}
 +    if(changed)for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2){int x,y;if(NormalizeInteractive((CDrawing*)TheDocument[i].Object,x,y)){TheDocument[i].absolute_X+=x;TheDocument[i].absolute_Y+=y;}}
 +    if(InteractiveObjects::Reveal().group){int total=0;for(auto &n:nodes)if(n.info->steps==InteractiveObjects::Reveal().group)total=max(total,n.info->order+1);auto &s=InteractiveObjects::Reveal();if(!total)s.group=0;else{s.total=total;s.visible=min(total,max(0,s.visible));}}
@@ -605,7 +605,7 @@
  #include "drawing.h"
 +
 +#include <map>
-+static bool InteractivePasteInProgress=false;
++static bool InteractivePasteInProgress=false,InteractiveHasLinks=false;
 +static std::set<unsigned int> InteractiveCutIds;static DWORD InteractiveCutClipboard=0;static unsigned int InteractiveCutEpoch=0;
 +static InteractiveObjects::Info *InteractiveInfo(CObject *object,int type){return !object?NULL:type==1?&((CExpression*)object)->m_ObjectInfo:type==2?&((CDrawing*)object)->m_ObjectInfo:NULL;}
 +static bool SyncInteractiveObjects(CDC *dc);
@@ -737,7 +737,7 @@
  
  int CMathomirView::GentlyPaintObject(tDocumentStruct * ds, CDC * DC)
  {
-+    if(!InteractivePasteInProgress&&DC&&::WindowFromDC(DC->GetSafeHdc())==GetSafeHwnd()){bool linked=false;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2&&((CDrawing*)TheDocument[i].Object)->m_Connector.Attached()){linked=true;break;}if(linked){SyncInteractiveObjects(DC);InvalidateRect(NULL,FALSE);UpdateWindow();return 1;}}
++    if(!InteractivePasteInProgress&&DC&&::WindowFromDC(DC->GetSafeHdc())==GetSafeHwnd()){if(InteractiveHasLinks){SyncInteractiveObjects(DC);InvalidateRect(NULL,FALSE);UpdateWindow();return 1;}}
 +    if(!PrintRendering&&InteractiveHidden(ds))return 1;
      if(ds && DC && ::WindowFromDC(DC->GetSafeHdc())==GetSafeHwnd())
      {
