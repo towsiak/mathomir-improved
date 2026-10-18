@@ -638,3 +638,18 @@ NATIVE RELATION / PARAMETRIC GRAPH EXTENSION (2026-10-17)
 - Validation: portable circle/hyperbola/rational-domain, cancellation, parametric
   ellipse/pole/unit/bounds checks; native preview/edit/persistence/Undo UI checks
   are included in Release and AddressSanitizer build workflows.
+
+
+BRACE WITH ATTACHED LABEL BOX (2026-10-18)
+- Draw > Brace with label box, Search, and a Geometry palette icon offer four
+  orientations, an initial label, length validation and a native live preview.
+- Brace, connector, box and editable text are one ordinary native drawing group.
+  Double-click the box or middle grip to edit without making a new object.
+- Text changes reflow the box from the actual brace tip, preserving its absolute
+  location. Nested groups and native rotation/scaling retain the attachment.
+- The native background menu colors the box; reflow preserves that background.
+  Carrying previews, print, copy, movement, resize, Undo and save/reopen share the
+  existing drawing code. Attachment metadata is copied and persisted.
+- Validation includes 400 portable direction/rotation/scale geometry cases and
+  native Windows tests for all four orientations, editing, reflow, movement,
+  resizing, Undo and persistence, in Release and AddressSanitizer workflows.

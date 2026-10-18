@@ -31,6 +31,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Attached brace label box checks
+        shell: pwsh
+        run: ./tools/brace-label-smoke.ps1
       - name: Native implicit and parametric graph checks
         shell: pwsh
         run: ./tools/relation-graph-smoke.ps1
@@ -95,6 +98,7 @@ jobs:
           path: |
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
             source/build/rotation-center-*
@@ -176,6 +180,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
           ./tools/object-pointer-smoke.ps1
           ./tools/rotation-center-smoke.ps1
@@ -234,6 +239,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
             source/build/rotation-center-*
@@ -290,6 +296,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
           ./tools/object-pointer-smoke.ps1
           ./tools/rotation-center-smoke.ps1
@@ -346,6 +353,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
             source/build/rotation-center-*

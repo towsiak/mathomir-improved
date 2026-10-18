@@ -1,0 +1,441 @@
+--- /dev/null
++++ b/Mathomir/BraceLabel.h
+@@ -0,0 +1,27 @@
++#pragma once
++#include <cmath>
++#include <algorithm>
++namespace BraceLabel {
++struct Point {double x,y;};
++struct Layout {Point center,contact,corner[4];};
++inline Point Add(Point a,Point b){Point p={a.x+b.x,a.y+b.y};return p;}
++inline Point Scale(Point a,double n){Point p={a.x*n,a.y*n};return p;}
++// Under, over, right and left braces share the same ten-segment geometry.
++inline void Outline(double span,double depth,int side,Point *points){
++    double c=span>600?24:span>300?18:span>150?14:10;
++    double u[11]={0,span/c/4,span/c,(c/2-1)*span/c-span/c/3,span/2-span/c/3,span/2,span/2+span/c/3,(c/2+1)*span/c+span/c/3,(c-1)*span/c,span-span/c/4,span};
++    double v[11]={0,depth/4,depth/2,depth/2,depth*.75,depth,depth*.75,depth/2,depth/2,depth/4,0};
++    for(int i=0;i<11;i++){Point p={u[i],v[i]};if(side==1)p.y=-p.y;if(side>=2){p.x=(side==2?1:-1)*v[i];p.y=u[i];}points[i]=p;}
++}
++// Position the box on the brace's actual outward ray, including after rotation.
++inline Layout Place(Point first,Point last,Point tip,double width,double height,double angle,double gap){
++    Point outward={tip.x-(first.x+last.x)/2,tip.y-(first.y+last.y)/2};double length=std::hypot(outward.x,outward.y);
++    if(length<1e-9){outward.x=0;outward.y=1;length=1;}outward=Scale(outward,1/length);
++    double c=std::cos(angle),s=std::sin(angle),nx=outward.x*c+outward.y*s,ny=-outward.x*s+outward.y*c;
++    double reach=1e30;if(std::fabs(nx)>1e-12)reach=width/(2*std::fabs(nx));if(std::fabs(ny)>1e-12)reach=(std::min)(reach,height/(2*std::fabs(ny)));
++    Layout r;r.contact=Add(tip,Scale(outward,gap));r.center=Add(tip,Scale(outward,gap+reach));
++    const double x[4]={-width/2,width/2,width/2,-width/2},y[4]={-height/2,-height/2,height/2,height/2};
++    for(int i=0;i<4;i++){Point p={c*x[i]-s*y[i],s*x[i]+c*y[i]};r.corner[i]=Add(r.center,p);}return r;
++}
++inline bool Contains(const Point *corners,Point p){bool positive=false,negative=false;for(int i=0;i<4;i++){Point a=corners[i],b=corners[(i+1)%4];double cross=(b.x-a.x)*(p.y-a.y)-(b.y-a.y)*(p.x-a.x);positive|=cross>1e-6;negative|=cross<-1e-6;}return !(positive&&negative);}
++}
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -19,6 +19,7 @@
+ 
+ *********************************************************************************************************/
+ #include "StdAfx.h"
++#include "BraceLabel.h"
+ #include "SmartStroke.h"
+ int FreehandSmoothingLevel=2;
+ bool FineBoldHatching=false;
+@@ -103,7 +104,7 @@
+ 	NodeY=-1;
+ 	m_Color=-1;
+     m_BackgroundColor=-1;
+-    m_PointerDirection=0;m_PointerLength=48;
++    m_PointerDirection=0;m_PointerLength=48;m_BraceLabel=false;
+ }
+ 
+ CDrawing::~CDrawing(void)
+@@ -1634,7 +1635,7 @@
+ 	}
+ 	m_Color=-1;
+     m_BackgroundColor=-1;
+-    m_PointerDirection=0;m_PointerLength=48;
++    m_PointerDirection=0;m_PointerLength=48;m_BraceLabel=false;
+ 	IsSpecialDrawing=0;
+ 	IsSelected=0;
+ 	OriginalForm=0;
+@@ -2103,6 +2104,7 @@
+ 		}
+ 		ret*=i;
+ 	}
++    if(HasBraceLabel())ret^=0x42524345;
+ 	if(IsSpecialDrawing==51 && SpecialData){
+ 		CFunctionPlotter *plot=(CFunctionPlotter*)SpecialData;
+ 		unsigned int metadata=plot->pieceRadians?1u:2u;
+@@ -2164,7 +2166,7 @@
+ 	IsSpecialDrawing=Original->IsSpecialDrawing;
+ 	m_Color=Original->m_Color;
+     m_BackgroundColor=Original->m_BackgroundColor;
+-    m_PointerDirection=Original->m_PointerDirection;m_PointerLength=Original->m_PointerLength;
++    m_PointerDirection=Original->m_PointerDirection;m_PointerLength=Original->m_PointerLength;m_BraceLabel=Original->m_BraceLabel;
+ 	OriginalForm=Original->OriginalForm;
+     AxisGrid=Original->AxisGrid;
+ 	if (IsSpecialDrawing)
+@@ -2237,6 +2239,7 @@
+ 		return (CObject*)this;
+ 	}
+ 
++    if(HasBraceLabel() && BraceBoxContains(double(X)*100/zoom,double(Y)*100/zoom)){SelectDrawing(1);return (CObject*)Items[3].pSubdrawing;}
+ 	int sz;
+ 	if (/*(IsNodeEdit) ||*/	(AllowQuickEditNodes()) || ((GetKeyState(VK_CONTROL)&0xFFFE))) 
+ 	{
+@@ -2323,6 +2326,48 @@
+ 
+ // Use the same cached extents as the native size calculation. Children are
+ // tested first by selection so a group background never hides its contents.
++bool CDrawing::HasBraceLabel() const
++{
++    if(!m_BraceLabel || IsSpecialDrawing || NumItems!=4 || !Items)return false;
++    for(int i=0;i<4;i++)if(Items[i].Type!=(i==3?2:0)||!Items[i].pSubdrawing)return false;
++    CDrawing *brace=(CDrawing*)Items[0].pSubdrawing,*frame=(CDrawing*)Items[2].pSubdrawing;
++    return brace->NumItems==10 && frame->NumItems==4 && brace->Items && frame->Items;
++}
++bool CDrawing::BraceBoxContains(double x,double y) const
++{
++    if(!HasBraceLabel())return false;CDrawing *frame=(CDrawing*)Items[2].pSubdrawing;BraceLabel::Point corners[4];
++    for(int i=0;i<4;i++){corners[i].x=double(Items[2].X1+frame->Items[i].X1)/DRWZOOM;corners[i].y=double(Items[2].Y1+frame->Items[i].Y1)/DRWZOOM;}
++    BraceLabel::Point p={x,y};return BraceLabel::Contains(corners,p);
++}
++static bool BraceNativeLines(CDrawing *drawing,const BraceLabel::Point *a,const BraceLabel::Point *b,int count,tDrawingItem &slot)
++{
++    tDrawingItem *lines=(tDrawingItem*)calloc(count,sizeof(tDrawingItem));if(!lines)return false;
++    int color=drawing->m_Color,background=drawing->m_BackgroundColor;
++    short stroke=drawing->NumItems?drawing->Items[0].LineWidth:DRWZOOM;
++    drawing->Delete();drawing->m_Color=color;drawing->m_BackgroundColor=background;drawing->NumItems=drawing->NumItemsReserved=(unsigned short)count;
++    drawing->Items=lines;
++    for(int i=0;i<count;i++){auto &line=drawing->Items[i];line.Type=1;line.LineWidth=max(1,(int)stroke);line.X1=(int)floor(a[i].x*DRWZOOM+.5);line.Y1=(int)floor(a[i].y*DRWZOOM+.5);line.X2=(int)floor(b[i].x*DRWZOOM+.5);line.Y2=(int)floor(b[i].y*DRWZOOM+.5);}
++    int x,y,w,h;drawing->AdjustCoordinates(&x,&y,&w,&h);slot.X1=x*DRWZOOM;slot.Y1=y*DRWZOOM;slot.X2=(x+w)*DRWZOOM;slot.Y2=(y+h)*DRWZOOM;return true;
++}
++bool CDrawing::LayoutBraceLabel(CDC *dc,int *dx,int *dy)
++{
++    *dx=*dy=0;if(!HasBraceLabel())return false;
++    CDrawing *brace=(CDrawing*)Items[0].pSubdrawing;CExpression *label=(CExpression*)Items[3].pSubdrawing;
++    auto point=[&](int x,int y){BraceLabel::Point p={double(Items[0].X1+x)/DRWZOOM,double(Items[0].Y1+y)/DRWZOOM};return p;};
++    auto first=point(brace->Items[0].X1,brace->Items[0].Y1),last=point(brace->Items[9].X2,brace->Items[9].Y2),tip=point(brace->Items[4].X2,brace->Items[4].Y2);
++    short width,above,below;label->CalculateSize(dc,100,&width,&above,&below);
++    double textHeight=max(max(1,label->m_OverallAbove+label->m_OverallBelow),max(12,20*label->m_FontSize/100));
++    double padding=max(5.,textHeight/4),boxWidth=max(3*textHeight,label->m_OverallLength+2*padding),boxHeight=textHeight+2*padding;
++    double depth=hypot(tip.x-(first.x+last.x)/2,tip.y-(first.y+last.y)/2),angle=label->m_RotationMilliDegrees*3.14159265358979323846/180000.;
++    auto geometry=BraceLabel::Place(first,last,tip,boxWidth,boxHeight,angle,max(4.,depth/4));
++    BraceLabel::Point ends[4]={geometry.corner[1],geometry.corner[2],geometry.corner[3],geometry.corner[0]};
++    if(!BraceNativeLines((CDrawing*)Items[2].pSubdrawing,geometry.corner,ends,4,Items[2]))return false;
++    if(!BraceNativeLines((CDrawing*)Items[1].pSubdrawing,&tip,&geometry.contact,1,Items[1]))return false;
++    Items[3].X1=(int)floor((geometry.center.x-width/2.)*DRWZOOM+.5);Items[3].Y1=(int)floor((geometry.center.y-(above+below)/2.)*DRWZOOM+.5);
++    Items[3].X2=Items[3].X1+width*DRWZOOM;Items[3].Y2=Items[3].Y1+(above+below)*DRWZOOM;
++    int w,h;AdjustCoordinates(dx,dy,&w,&h);return true;
++}
++
+ bool CDrawing::HasObjectPointer() const
+ {
+     return m_PointerDirection>=1 && m_PointerDirection<=8 && !IsSpecialDrawing && NumItems==2 && Items &&
+@@ -2349,6 +2394,9 @@
+ 	static char tmpstr[256];
+ 
+ 	if (num_tabs>16) num_tabs=16;
++    if(HasBraceLabel()){
++        const char *metadata="<bracelabel />\r\n";int count=(int)strlen(metadata);len+=count;if(!only_calculate){memcpy(output,metadata,count);output+=count;}
++    }
+     if(HasObjectPointer()){
+         char pointer[80];int count=sprintf(pointer,"<pointer dir=\"%d\" len=\"%d\" />\r\n",m_PointerDirection,m_PointerLength);
+         len+=count;if(!only_calculate){memcpy(output,pointer,count);output+=count;}
+@@ -2503,6 +2551,9 @@
+ 		file=mf->XML_search("",file); //find anything
+ 		if (file==NULL) return NULL;
+ 
++        if(strncmp(file,"bracelabel",10)==0){
++            file+=10;char attribute[64],value[64];do{file=mf->XML_read_attribute(attribute,value,file,64);if(!file)return NULL;}while(attribute[0]);m_BraceLabel=true;continue;
++        }
+         if(strncmp(file,"pointer",7)==0){
+             file+=7;char attribute[64],value[512];
+             do{file=mf->XML_read_attribute(attribute,value,file,512);if(!file)return NULL;
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -40,6 +40,10 @@
+     bool BackgroundContains(double x,double y,double zoom) const;
+     int m_PointerDirection,m_PointerLength; // attached native arrow group; zero means ordinary drawing
+     bool HasObjectPointer() const;
++    bool m_BraceLabel;
++    bool HasBraceLabel() const;
++    bool BraceBoxContains(double x,double y) const;
++    bool LayoutBraceLabel(CDC *dc,int *dx,int *dy);
+ 	char OriginalForm; //used from toolbox (to store the purpose of this drawing)
+ 	char IsSpecialDrawing;
+ 
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -489,6 +489,7 @@
+         END
+         MENUITEM "Smooth selected freehand curves", ID_SMOOTH_SELECTED
+         MENUITEM "Grid and axis labels...", ID_COORDINATE_GRID_EDIT
++        MENUITEM "Brace with label box...", ID_BRACE_LABEL
+     END
+     POPUP "&Calculus"
+     BEGIN
+@@ -1199,3 +1200,21 @@
+     DEFPUSHBUTTON "Apply graph",IDOK,310,305,89,17
+     PUSHBUTTON "Cancel",IDCANCEL,408,305,68,17
+ END
++
++IDD_BRACE_LABEL DIALOGEX 0,0,370,223
++STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Brace with label box"
++FONT 8,"MS Shell Dlg"
++BEGIN
++    LTEXT "Label",-1,10,11,35,12
++    EDITTEXT 1440,50,8,310,17,ES_AUTOHSCROLL
++    LTEXT "Direction",-1,10,37,40,12
++    COMBOBOX 1441,55,33,202,85,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++    LTEXT "Length",-1,270,37,36,12
++    EDITTEXT 1442,310,33,50,17,ES_AUTOHSCROLL
++    CONTROL "",1443,"Static",SS_BLACKFRAME,10,62,350,104
++    LTEXT "Double-click the box or middle grip to type. The brace and box move and resize together.",-1,10,175,350,20
++    LTEXT "",1444,10,201,205,14
++    DEFPUSHBUTTON "Place brace",IDOK,225,199,76,17
++    PUSHBUTTON "Cancel",IDCANCEL,308,199,52,17
++END
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -27,6 +27,7 @@
+ #include "SymbolicDerivative.h"
+ #include "ColorPalette.h"
+ #include "ObjectPointer.h"
++#include "BraceLabel.h"
+ #include <sstream>
+ #include "ObjectAppearance.h"
+ #include "GeometryShapes.h"
+@@ -444,6 +445,7 @@
+ {
+     if(drawing){CoordinateAxes::Geometry g;if(drawing->CoordinateGeometry(g))return L"Coordinate axes - right-click to edit grid spacing, darkness, labels and numeric or trig formats.";}
+     if(!drawing || depth>16)return L"Drawing object";
++    if(drawing->HasBraceLabel())return L"Brace with label box - double-click the box or middle move grip to type. Move and resize the entire annotation with its grips.";
+     if(drawing->IsSpecialDrawing==51 && drawing->SpecialData && ((CFunctionPlotter*)drawing->SpecialData)->integral.enabled)return L"Integral area graph - blue positive area, rose negative area. Click f1 or Graph > Integral area shader to edit the formula and bounds. Drag its resize corner to enlarge it.";
+     if(drawing->IsSpecialDrawing==51 && drawing->SpecialData && ((CFunctionPlotter*)drawing->SpecialData)->parametric.enabled)return L"Parametric graph - f1 is x(t), f2 is y(t). Click either to edit the curve and t interval. Graph > Relations and parametric curves opens the preview editor.";
+     if(drawing->IsSpecialDrawing==51)return L"Function graph - type formulas or equations in x and y in f1 to f8. Graph > Relations and parametric curves opens the preview editor. Drag its resize corner to enlarge it.";
+@@ -456,6 +458,7 @@
+     if(drawing->OriginalForm==4)return L"Ellipse or circle";
+     if(drawing->OriginalForm==65)return L"Unit circle - angles and coordinates";
+     switch(drawing->OriginalForm){
++        case 97:return L"Brace with label box - an attached editable label at the middle tip; move and resize together.";
+         case 93:return L"Integral area shader - finite bounds, signed integral and total area; solid tint or diagonal hatch.";
+         case 96:return L"AI math help - explain selected math, check working, and suggest graphs. Optional online OpenAI connection.";
+         case 95:return L"Logarithm builder - separate base and argument fields; radical bases, fractions and native editable notation.";
+@@ -958,6 +961,7 @@
+     ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
+     ON_COMMAND(ID_INTEGRAL_SHADER,OnIntegralShader)
+     ON_COMMAND(ID_RELATION_GRAPH,OnRelationGraph)
++    ON_COMMAND(ID_BRACE_LABEL,OnBraceLabel)
+     ON_COMMAND(ID_LOG_BASE_BUILDER,OnLogBaseBuilder)
+     ON_COMMAND(ID_AI_HELP,OnAiHelp)
+     ON_COMMAND(ID_NUMBER_FORMAT,OnNumberFormat)
+@@ -2214,6 +2218,23 @@
+ int root_object_flag;
+ 
+ #pragma optimize("s",on)
++static bool FindBraceLabel(CDrawing *drawing,double x,double y,bool hitOnly,CExpression **label,int *offsetX,int *offsetY,int depth=0)
++{
++    if(!drawing || depth>32)return false;
++    if(drawing->HasBraceLabel() && (!hitOnly||drawing->BraceBoxContains(x,y))){*label=(CExpression*)drawing->Items[3].pSubdrawing;*offsetX=drawing->Items[3].X1;*offsetY=drawing->Items[3].Y1;return true;}
++    for(int i=drawing->NumItems-1;i>=0;i--)if(drawing->Items[i].Type==0&&drawing->Items[i].pSubdrawing){auto &child=drawing->Items[i];
++        if(FindBraceLabel((CDrawing*)child.pSubdrawing,x-double(child.X1)/DRWZOOM,y-double(child.Y1)/DRWZOOM,hitOnly,label,offsetX,offsetY,depth+1)){*offsetX+=child.X1;*offsetY+=child.Y1;return true;}}
++    return false;
++}
++static bool ReflowBraceLabels(CDrawing *drawing,CDC *dc,int *dx,int *dy,int depth=0)
++{
++    *dx=*dy=0;if(!drawing||depth>32||drawing->IsSpecialDrawing)return false;
++    if(drawing->HasBraceLabel())return drawing->LayoutBraceLabel(dc,dx,dy);
++    bool changed=false;for(int i=0;i<drawing->NumItems;i++)if(drawing->Items[i].Type==0&&drawing->Items[i].pSubdrawing){int x,y;auto &child=drawing->Items[i];
++        if(ReflowBraceLabels((CDrawing*)child.pSubdrawing,dc,&x,&y,depth+1)){child.X1+=x*DRWZOOM;child.Y1+=y*DRWZOOM;changed=true;}}
++    if(changed){int w,h;drawing->AdjustCoordinates(dx,dy,&w,&h);}return changed;
++}
++
+ void CMathomirView::OnLButtonDblClk(UINT nFlags, CPoint point)
+ {
+ 	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
+@@ -2228,6 +2249,9 @@
+         if(centerTarget)ResizeHandleObject=centerTarget->Object;
+         if(centerTarget || CenterMoveGripHit(ResizeHandleDocument(),point)){EditFromCenterGrip(point);return;}
+     }
++    if(!ClipboardExpression&&!ClipboardDrawing)for(int i=NumDocumentElements-1;i>=0;i--){auto object=TheDocument+i;if(object->Type!=2||object->MovingDotState==5)continue;
++        CExpression *label=NULL;int x,y;if(FindBraceLabel((CDrawing*)object->Object,double(point.x)*100/ViewZoom+ViewX-object->absolute_X,double(point.y)*100/ViewZoom+ViewY-object->absolute_Y,true,&label,&x,&y)){
++            ResizeHandleObject=object->Object;EditFromCenterGrip(point);return;}}
+ 	RestoreClipboardBackground();
+ 	if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
+ 	if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
+@@ -6844,6 +6868,7 @@
+ 			else if (KeyboardEntryBaseObject->Type==2)
+ 			{
+                 CDrawing *group=(CDrawing*)KeyboardEntryBaseObject->Object;
++                int labelDx,labelDy;if(ReflowBraceLabels(group,DC,&labelDx,&labelDy)){KeyboardEntryBaseObject->absolute_X+=labelDx;KeyboardEntryBaseObject->absolute_Y+=labelDy;}
+                 if(group->HasObjectPointer() && group->Items[0].Type==2)
+                     SetObjectPointer((CObject*)group,group->m_PointerDirection,group->m_PointerLength,true);
+ 				short w,h;
+@@ -11117,6 +11142,7 @@
+     dialog.Add(ID_GRAPH_ZOOM_OUT,"Graph > Zoom out gently","grapher zoom out wider range");
+     dialog.Add(ID_GRAPH_PI_FRACTIONS,"Graph > X-axis: pi fractions (radians)","pi pie fractions radians trig graph ticks labels");
+     dialog.Add(ID_GRAPH_DECIMAL_LABELS,"Graph > X-axis: decimal labels","graph decimal numeric ticks labels");
++    dialog.Add(ID_BRACE_LABEL,"Draw > Brace with label box...","brace bracket curly overbrace underbrace label annotation text box attached kink tip");
+     dialog.Add(0,"Draw > Brace (drag to set its size)","bracket curly brace overbrace underbrace annotation",19);
+     dialog.Add(0,"Draw > Line","straight stroke segment",2);
+     dialog.Add(0,"Draw > Arrow","direction pointer vector",5);
+@@ -11382,11 +11408,15 @@
+         root->KeyboardStartNear(&dc,ViewZoom,x,y);
+     }else if(object->Type==2){
+         CDrawing *drawing=(CDrawing*)object->Object;SpecialDrawingHover=object;
+-        if(drawing->HasObjectPointer() && drawing->Items[0].Type==2){
+-            tDrawingItem &content=drawing->Items[0];CExpression *expression=(CExpression*)content.pSubdrawing;
++        CExpression *attachedLabel=NULL;int labelX=0,labelY=0;
++        if(drawing->HasObjectPointer() && drawing->Items[0].Type==2){attachedLabel=(CExpression*)drawing->Items[0].pSubdrawing;labelX=drawing->Items[0].X1;labelY=drawing->Items[0].Y1;}
++        else{double x=double(point.x)*100/ViewZoom+ViewX-object->absolute_X,y=double(point.y)*100/ViewZoom+ViewY-object->absolute_Y;
++            if(!FindBraceLabel(drawing,x,y,true,&attachedLabel,&labelX,&labelY))FindBraceLabel(drawing,x,y,false,&attachedLabel,&labelX,&labelY);}
++        if(attachedLabel){
++            CExpression *expression=attachedLabel;
+             CClientDC dc(this);short width,above,below;expression->CalculateSize(&dc,ViewZoom,&width,&above,&below);
+-            int x=point.x-(object->absolute_X-ViewX)*ViewZoom/100-content.X1*ViewZoom/100/DRWZOOM;
+-            int y=point.y-(object->absolute_Y-ViewY)*ViewZoom/100-content.Y1*ViewZoom/100/DRWZOOM-above;
++            int x=point.x-(object->absolute_X-ViewX)*ViewZoom/100-labelX*ViewZoom/100/DRWZOOM;
++            int y=point.y-(object->absolute_Y-ViewY)*ViewZoom/100-labelY*ViewZoom/100/DRWZOOM-above;
+             KeyboardEntryBaseObject=object;KeyboardEntryObject=(CObject*)expression;
+             expression->DeselectExpression();expression->m_IsColumnInsertion=expression->m_IsRowInsertion=0;
+             expression->KeyboardStartNear(&dc,ViewZoom,x,y);
+@@ -14346,6 +14376,66 @@
+     RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
+ }
+ 
++static std::string BraceLabelXmlText(const CString &text)
++{
++    std::string xml;for(int first=0;first<text.GetLength();first+=16){xml+="<var t=\"";
++        for(int i=first;i<min(first+16,text.GetLength());i++){unsigned char c=(unsigned char)text[i];if(c=='"'||c=='\\'||c=='<'||c=='>'||c=='&'||c<32){char hex[4];sprintf(hex,"\\%02X",c);xml+=hex;}else xml+=(char)c;}
++        xml+="\" f=\"00\" />";}return xml;
++}
++static CDrawing *CreateBraceLabel(const CString &text,int span,int direction,CDC *dc)
++{
++    std::unique_ptr<CDrawing> drawing(new CDrawing());drawing->Items=(tDrawingItem*)calloc(4,sizeof(tDrawingItem));if(!drawing->Items)return NULL;
++    drawing->NumItems=drawing->NumItemsReserved=4;drawing->m_BraceLabel=true;
++    for(int i=0;i<4;i++){auto &item=drawing->Items[i];item.Type=i==3?2:0;if(i==3){
++        CExpression *label=new CExpression(NULL,NULL,100);item.pSubdrawing=label;
++        std::string xml="<ex fh=\"100\" stxt=\"1\">"+BraceLabelXmlText(text)+"</ex>";std::vector<char> buffer(xml.begin(),xml.end());buffer.push_back(0);label->XML_input(&buffer[0]);label->m_IsText=label->m_StartAsText=1;
++    }else{CDrawing *child=new CDrawing();item.pSubdrawing=child;int count=i==0?10:i==1?1:4;
++        child->Items=(tDrawingItem*)calloc(count,sizeof(tDrawingItem));if(!child->Items)return NULL;child->NumItems=child->NumItemsReserved=(unsigned short)count;for(int n=0;n<count;n++){child->Items[n].Type=1;child->Items[n].LineWidth=DRWZOOM;}}
++    }
++    CDrawing *brace=(CDrawing*)drawing->Items[0].pSubdrawing;BraceLabel::Point points[11];BraceLabel::Outline(span,min(24.,span/6.),direction,points);
++    for(int i=0;i<10;i++){auto &line=brace->Items[i];line.X1=(int)floor(points[i].x*DRWZOOM+.5);line.Y1=(int)floor(points[i].y*DRWZOOM+.5);line.X2=(int)floor(points[i+1].x*DRWZOOM+.5);line.Y2=(int)floor(points[i+1].y*DRWZOOM+.5);}
++    int dx,dy;if(!drawing->LayoutBraceLabel(dc,&dx,&dy))return NULL;return drawing.release();
++}
++class CBraceLabelPreview:public CStatic
++{
++public:
++    std::unique_ptr<CDrawing> drawing;
++    afx_msg void OnPaint(){CPaintDC dc(this);CRect r;GetClientRect(&r);dc.FillSolidRect(r,RGB(255,255,255));if(!drawing)return;
++        short width,height;drawing->CalculateSize(&dc,100,&width,&height);int zoom=max(5,min(160,min((r.Width()-18)*100/max(1,(int)width),(r.Height()-18)*100/max(1,(int)height))));
++        drawing->CalculateSize(&dc,(short)zoom,&width,&height);drawing->PaintDrawing(&dc,(short)zoom,(short)((r.Width()-width)/2),(short)((r.Height()-height)/2),0,0);
++    }
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CBraceLabelPreview,CStatic)
++    ON_WM_PAINT()
++END_MESSAGE_MAP()
++class CBraceLabelDialog:public CFeatureDialog
++{
++public:
++    CString label;int span,direction;bool initializing;CBraceLabelPreview preview;
++    CBraceLabelDialog():CFeatureDialog(IDD_BRACE_LABEL,theApp.m_pMainWnd),label("Label"),span(240),direction(0),initializing(true){}
++    bool Check(){GetDlgItemText(1440,label);CString value;GetDlgItemText(1442,value);value.Trim();char *end=NULL;long n=strtol((LPCSTR)value,&end,10);
++        bool valid=!value.IsEmpty()&&end&&!*end&&n>=40&&n<=1200&&label.GetLength()<=256;GetDlgItem(IDOK)->EnableWindow(valid);
++        if(!valid){preview.drawing.reset();preview.Invalidate();SetDlgItemText(1444,"Length: 40 to 1200. Label: up to 256 characters.");return false;}
++        span=(int)n;direction=((CComboBox*)GetDlgItem(1441))->GetCurSel();if(direction<0||direction>3)direction=0;
++        CClientDC dc(this);preview.drawing.reset(CreateBraceLabel(label,span,direction,&dc));preview.Invalidate();
++        if(!preview.drawing){GetDlgItem(IDOK)->EnableWindow(FALSE);SetDlgItemText(1444,"The annotation could not be created.");return false;}SetDlgItemText(1444,"Ready to place as one object.");return true;
++    }
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();preview.SubclassDlgItem(1443,this);((CEdit*)GetDlgItem(1440))->SetLimitText(256);
++        SetDlgItemText(1440,label);SetDlgItemInt(1442,span);CComboBox *combo=(CComboBox*)GetDlgItem(1441);
++        combo->AddString("Underbrace - label below");combo->AddString("Overbrace - label above");combo->AddString("Side brace - label right");combo->AddString("Side brace - label left");combo->SetCurSel(0);initializing=false;Check();return TRUE;
++    }
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notification=HIWORD(wp);if(!initializing&&((notification==EN_CHANGE&&(id==1440||id==1442))||(id==1441&&notification==CBN_SELCHANGE))){Check();return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
++    virtual void OnOK(){if(Check())CFeatureDialog::OnOK();}
++};
++void CMathomirView::OnBraceLabel()
++{
++    if(ViewOnlyMode)return;OnChar(27,1,0);CBraceLabelDialog dialog;if(dialog.DoModal()!=IDOK)return;
++    RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
++    ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(dialog.preview.drawing.get(),0,0);
++    IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
++}
++
+ static std::string GraphEquationText(CExpression *expression)
+ {
+     int equal=-1;for(int i=0;i<expression->m_NumElements;i++)if(expression->m_pElementList[i].Type==2&&expression->m_pElementList[i].pElementObject->Data1[0]=='='){equal=i;break;}
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -144,6 +144,7 @@
+     void OnStatisticsRegression();
+     void OnIntegralShader();
+     void OnRelationGraph();
++    void OnBraceLabel();
+     void OnLogBaseBuilder();
+     void OnAiHelp();
+     afx_msg void OnFormulaReference();
+--- a/Mathomir/ObjectAppearance.h
++++ b/Mathomir/ObjectAppearance.h
+@@ -8,6 +8,7 @@
+         if(type==1)return &((CExpression*)object)->m_BackgroundColor;
+         if(type!=2)return NULL;
+         CDrawing *drawing=(CDrawing*)object;if(drawing->IsSpecialDrawing)return NULL;
++        if(drawing->HasBraceLabel())return &((CDrawing*)drawing->Items[2].pSubdrawing)->m_BackgroundColor;
+         if(!drawing->HasObjectPointer())return &drawing->m_BackgroundColor;
+         const tDrawingItem &body=drawing->Items[0];object=(CObject*)body.pSubdrawing;type=body.Type==2?1:2;
+     }
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -330,3 +330,6 @@
+ 
+ #define ID_RELATION_GRAPH 33106
+ #define IDD_RELATION_GRAPH 195
++
++#define ID_BRACE_LABEL 33107
++#define IDD_BRACE_LABEL 196
+--- a/Mathomir/Toolbox.cpp
++++ b/Mathomir/Toolbox.cpp
+@@ -734,6 +734,7 @@
+         // Dedicated geometry palette: shapes and parallel-line angle patterns.
+         for(int shape=72;shape<=84;shape++)AddDrawingSubmember(shape,30,20);
+         AddDrawingSubmember(90,30,20); //polygon constructor
++        AddDrawingSubmember(97,30,20); //brace with attached label box
+         ToolboxNumMembers++;
+         // Separate calculus palette: the existing drawing palette has 32 slots.
+         AddDrawingSubmember(93,30,20); //integral shader
+@@ -909,11 +910,11 @@
+ 	int member=ToolboxNumMembers;
+ 	ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers]=(CExpression*)new CDrawing();
+ 	CDrawing *icon=(CDrawing*)ToolboxMembers[member].Submembers[ToolboxMembers[member].NumSubmembers];
+-    if(form>=60 && form<=96)
++    if(form>=60 && form<=97)
+     {
+         icon->m_Color=0;icon->OriginalForm=(char)form;
+         auto line=[&](double x1,double y1,double x2,double y2,int width=1){int index=icon->NumItems;icon->InsertItemAt(index);tDrawingItem *item=icon->Items+index;item->Type=1;item->pSubdrawing=NULL;item->LineWidth=width*DRWZOOM;item->X1=(int)(x1*DRWZOOM);item->Y1=(int)(y1*DRWZOOM);item->X2=(int)(x2*DRWZOOM);item->Y2=(int)(y2*DRWZOOM);};
+-        if(form==96){line(2,17,9,2,2);line(9,2,16,17,2);line(5,11,13,11);line(22,3,22,17,2);line(19,3,25,3,2);line(19,17,25,17,2);}else if(form==95){line(1,1,1,14,2);line(1,14,6,14,2);for(int i=0;i<16;i++){double a=i*6.283185307179586/16,b=(i+1)*6.283185307179586/16;line(12+4*cos(a),8+6*sin(a),12+4*cos(b),8+6*sin(b));}line(26,3,19,3);line(19,3,19,13);line(19,13,26,13);line(26,3,26,17);line(26,17,19,17);line(9,17,11,19);line(11,19,15,15);line(15,15,29,15);}else if(form==93){line(1,18,29,18);line(1,18,1,1);line(4,15,10,4,2);line(10,4,18,3,2);line(18,3,26,13,2);for(int x=6;x<=24;x+=3)line(x,17,x,x<12?8:10);}
++        if(form==97){line(0,2,2,4);line(2,4,11,4);line(11,4,15,8);line(15,8,19,4);line(19,4,28,4);line(28,4,30,2);line(15,8,15,11);line(7,11,23,11);line(23,11,23,20);line(23,20,7,20);line(7,20,7,11);line(11,16,19,16);}else if(form==96){line(2,17,9,2,2);line(9,2,16,17,2);line(5,11,13,11);line(22,3,22,17,2);line(19,3,25,3,2);line(19,17,25,17,2);}else if(form==95){line(1,1,1,14,2);line(1,14,6,14,2);for(int i=0;i<16;i++){double a=i*6.283185307179586/16,b=(i+1)*6.283185307179586/16;line(12+4*cos(a),8+6*sin(a),12+4*cos(b),8+6*sin(b));}line(26,3,19,3);line(19,3,19,13);line(19,13,26,13);line(26,3,26,17);line(26,17,19,17);line(9,17,11,19);line(11,19,15,15);line(15,15,29,15);}else if(form==93){line(1,18,29,18);line(1,18,1,1);line(4,15,10,4,2);line(10,4,18,3,2);line(18,3,26,13,2);for(int x=6;x<=24;x+=3)line(x,17,x,x<12?8:10);}
+         else if(form==94){line(2,6,13,6,2);line(2,13,13,13,2);line(18,5,21,7);line(21,7,24,5);line(24,5,28,7);line(18,12,21,14);line(21,14,24,12);line(24,12,28,14);}
+         else if(form==92){line(2,0,2,19);line(2,19,29,19);line(5,16,27,3);line(6,13,8,13);line(11,11,13,11);line(17,7,19,7);line(24,5,26,5);}
+         else if(form==91){line(0,10,12,10);line(3,5,3,1);line(3,1,9,1);line(9,1,9,8);line(9,8,3,8);line(3,13,3,19);line(3,19,9,19);line(9,19,9,13);line(16,16,29,4);line(23,4,29,4);line(29,4,29,10);}
+@@ -4164,6 +4165,7 @@
+ 				if (drw->OriginalForm==50) {text="Drawing Box";langid=6014;}
+ 				if (drw->OriginalForm==51) {text="Function\r\nPlotter";langid=6015;}
+ 				if (drw->OriginalForm==52) {text="Bitmap Box";langid=6016;}
++                    if(drw->OriginalForm==97){text="Brace with label box\r\nType at the middle tip; move and resize together";langid=0;}
+                     if(drw->OriginalForm==95){text="Logarithm builder\r\nSeparate base and argument; radicals, fractions and graphs";langid=0;}
+                     if(drw->OriginalForm==93){text="Integral area shader\r\nBounds, signed integral and total area";langid=0;}
+                     if(drw->OriginalForm==94){text="Evaluate expression\r\nAppend = or approximate result (Ctrl+Enter)";langid=0;}
+@@ -6228,9 +6230,9 @@
+     if(ToolboxMembers[member].Above[submember]==-1)
+     {
+         int form=((CDrawing*)ToolboxMembers[member].Submembers[submember])->OriginalForm;
+-        if(form>=60 && form<=96)
++        if(form>=60 && form<=97)
+         {
+-            UINT command=form==96?ID_AI_HELP:form==95?ID_LOG_BASE_BUILDER:form==94?ID_EXECUTE_EXPRESSION:form==93?ID_INTEGRAL_SHADER:form==92?ID_STATISTICS_REGRESSION:form==91?ID_SYMBOLIC_DERIVATIVE:form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
++            UINT command=form==97?ID_BRACE_LABEL:form==96?ID_AI_HELP:form==95?ID_LOG_BASE_BUILDER:form==94?ID_EXECUTE_EXPRESSION:form==93?ID_INTEGRAL_SHADER:form==92?ID_STATISTICS_REGRESSION:form==91?ID_SYMBOLIC_DERIVATIVE:form==90?ID_POLYGON_CONSTRUCTOR:form==89?ID_PIECEWISE_GRAPH:form>=87?ID_SMART_HATCH_DOWN+form-87:form>=85?ID_FINE_HATCH_DOWN+form-85:form==84?ID_GEOMETRY_OBTUSE:form>=72?ID_GEOMETRY_TRIANGLE+form-72:form>=68?ID_RAY_OPEN_RIGHT+form-68:form>=66?ID_TRIANGLE_45+form-66:form==65?ID_INSERT_UNIT_CIRCLE:form==60?ID_INSERT_TABLE:ID_INTERVAL_OPEN_OPEN+form-61;
+             theApp.m_pMainWnd->SendMessage(WM_COMMAND,command,0); return;
+         }
+     }

@@ -149,3 +149,15 @@ The graph retains the existing pan, zoom, resize, copy, printing, Undo and .mom
 persistence paths. RAD/DEG is chosen in the editor. Relations use numerical
 contours; zoom in to resolve details smaller than the sampling grid. This release
 accepts equations with =; inequalities are not supported by this editor.
+
+
+### Brace with an attached label box
+
+Use **Draw > Brace with label box**, Search **brace label**, or the new brace/box
+icon in the Geometry palette. Choose an underbrace, overbrace, right-facing or
+left-facing side brace, enter an initial label, and preview before placing it.
+The brace, connector, box and native editable text form one ordinary drawing.
+Double-click the box or the center move grip to type in its label. The box grows
+with the text and stays at the brace's actual middle tip. Move/resize/rotate the
+whole annotation with the normal grips; copy, print, Undo and .mom persistence
+use the existing native drawing paths. Background controls color the label box.
