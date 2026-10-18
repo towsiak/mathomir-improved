@@ -91,7 +91,7 @@
  	if (Original==NULL) return 0;
  	if (Original->m_NumElements<0) return 0;
  	if (Original->m_NumElements>0x7FFF) return 0;
-+    if(!m_ObjectInfo.id && !OnlySelected)m_ObjectInfo=Original->m_ObjectInfo;
++    if(OnlySelected!=1&&(!m_ObjectInfo.id||OnlySelected==2))m_ObjectInfo=Original->m_ObjectInfo;
  
  	if (OnlySelected==2) CopyExpressionSpecialFlag=1;
  	
@@ -120,6 +120,15 @@
  		if (strcmp(attribute,"stxt")==0) {realStartAsText=atoi(value);if (old_version_text_decode==0) m_StartAsText=realStartAsText;}
  		if (strcmp(attribute,"txt")==0) {m_StartAsText=1;old_version_text_decode=1;}
  		if (strcmp(attribute,"hed")==0) m_IsHeadline=atoi(value);
+@@ -12860,7 +12863,7 @@
+ int CExpression::CalcChecksum()
+ {
+ 	if ((m_NumElements==1) && (m_pElementList->Type==5) && ((!m_RotationMilliDegrees && m_BackgroundColor<0) || CalcStructuralChecksumOnly)) //special () =()
+-		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum();
++		return ((CExpression*)(m_pElementList->pElementObject->Expression1))->CalcChecksum()^(CalcStructuralChecksumOnly?0:m_ObjectInfo.Hash());
+ 		
+ 	int c=m_NumElements;
+ 	c+=8*(m_ParenthesesFlags&0x1F);
 @@ -12875,6 +12878,7 @@
  		c+=768*m_Alignment;
  		c^=(unsigned int)m_RotationMilliDegrees*8191U;

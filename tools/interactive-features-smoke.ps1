@@ -6,6 +6,7 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public static class InteractiveUI {
+ [DllImport("user32.dll")] static extern IntPtr SendMessageTimeout(IntPtr h,uint message,IntPtr wp,IntPtr lp,uint flags,uint ms,out UIntPtr result);
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int n);
  [DllImport("user32.dll")] static extern IntPtr GetPropA(IntPtr h,string key);
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
@@ -14,7 +15,7 @@ public static class InteractiveUI {
  [DllImport("user32.dll")] static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
  [StructLayout(LayoutKind.Sequential)] struct Point {public int x,y;}
  public static int Stat(IntPtr h,string key){return GetPropA(h,"MathomirLayer_"+key).ToInt32()-1;}
- public static long Send(IntPtr h,uint message,int wp,IntPtr lp){UIntPtr result;if(MathomirUiProbe.SendMessageTimeout(h,message,(IntPtr)wp,lp,2,5000,out result)==IntPtr.Zero)throw new Exception("Control did not respond");return (long)result.ToUInt64();}
+ public static long Send(IntPtr h,uint message,int wp,IntPtr lp){UIntPtr result;if(SendMessageTimeout(h,message,(IntPtr)wp,lp,2,5000,out result)==IntPtr.Zero)throw new Exception("Control did not respond");return (long)result.ToUInt64();}
  public static long Probe(IntPtr h,int kind,int arg){return Send(h,0x8000+156,kind,(IntPtr)arg);}
  public static void Drag(IntPtr frame,IntPtr view,int x,int y,int endX,int endY){SetForegroundWindow(frame);Point a=new Point{x=x,y=y},b=new Point{x=endX,y=endY};ClientToScreen(view,ref a);ClientToScreen(view,ref b);SetCursorPos(a.x,a.y);System.Threading.Thread.Sleep(100);mouse_event(2,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(80);try{for(int i=1;i<=5;i++){SetCursorPos(a.x+(b.x-a.x)*i/5,a.y+(b.y-a.y)*i/5);System.Threading.Thread.Sleep(60);}}finally{mouse_event(4,0,0,0,UIntPtr.Zero);}System.Threading.Thread.Sleep(150);}
 }
@@ -56,6 +57,7 @@ try{
  Check ([InteractiveUI]::Probe($view,9,1) -eq 1) 'Reveal did not start at the first step';Check ((Black 175 150 220 50) -gt 15 -and (Black 175 230 220 50) -eq 0 -and (Black 175 310 220 50) -eq 0) 'Later steps were painted';Check ((Black 495 310 200 50) -gt 15) 'Reveal hid unrelated content';Capture $main 'interactive-step-first.png'
  [MathomirUiProbe]::Send($view,256,32)|Out-Null;[MathomirUiProbe]::Send($view,258,32)|Out-Null;Check ([InteractiveUI]::Probe($view,9,1) -eq 2) 'Space did not reveal exactly one step';Check ((Black 175 310 220 50) -gt 15 -and (Black 175 230 220 50) -eq 0) 'Step reordering was ignored';Command 33112;Check ([InteractiveUI]::Probe($view,9,1) -eq 1) 'Back failed';[MathomirUiProbe]::Send($view,256,0x23)|Out-Null;Check ([InteractiveUI]::Probe($view,9,1) -eq 3) 'Show all failed';[MathomirUiProbe]::Send($view,256,0x24)|Out-Null;Check ([InteractiveUI]::Probe($view,9,1) -eq 0 -and (Black 175 150 220 50) -eq 0) 'Home did not hide the steps'
  [MathomirUiProbe]::Mouse($view,513,1,200,250);[MathomirUiProbe]::Mouse($view,514,0,200,250);[MathomirUiProbe]::Send($view,258,[int][char]'x')|Out-Null;$s=SaveDoc;Check ($s.mathomir.ChildNodes.Count -eq 4) 'Presentation typing created a document object';Check ($s.SelectNodes('//ex[@steps] | //expr[@steps]').Count -eq 3) 'Save discarded hidden steps or membership';Command 33114;Check ((Black 175 230 220 50) -gt 15) 'Exit did not restore all steps';Reopen 'steps-reopened';Command 33110;Check ([InteractiveUI]::Probe($view,9,1) -eq 1 -and [InteractiveUI]::Probe($view,9,2) -eq 3) 'Saved step sequence did not reopen';Capture $main 'interactive-step-reopened.png';[MathomirUiProbe]::Send($view,256,27)|Out-Null
+ $d=Dialog 33109 'Step-by-step sequence';[MathomirUiProbe]::Send($d,273,1472)|Out-Null;[MathomirUiProbe]::Send([MathomirUiProbe]::Child($d,1474),241,0)|Out-Null;CloseDialog $d;$order=SaveDoc;Check ($order.mathomir.ChildNodes[0].SelectSingleNode('./ex | ./expr').order -eq '1') 'Editing the sequence did not change order';Command 0xE12B;$order=SaveDoc;Check ($order.mathomir.ChildNodes[0].SelectSingleNode('./ex | ./expr').order -eq '0') 'Undo did not restore step metadata'
  Write-Output 'Step reveal passed: order editing, native controls, next/back/all/home/escape, hidden content, group isolation, edit protection and full saved content.'
  # Stable references follow both independently moved targets and survive Undo/copy/reopen.
  $xml='<?xml version="1.0"?><mathomir><obj type="2" X="150" Y="180"><objectinfo oid="101"/><dw d="32|0,0;3200,0;3200,1920;0,1920;0,0"/></obj><obj type="2" X="500" Y="300"><objectinfo oid="102"/><dw d="32|0,0;3200,0;3200,1920;0,1920;0,0"/></obj></mathomir>';Load 'connector' $xml;Select 3;$d=Dialog 33115 'Attached connector';Capture $d 'interactive-connector-dialog.png';CloseDialog $d;$s=SaveDoc;Check ($s.mathomir.ChildNodes.Count -eq 3 -and $s.SelectNodes('//connector').Count -eq 1) 'Attached connector not created';$points=Attached $s
