@@ -56,7 +56,7 @@ try{
   $dx=[double](Root $moved).X-[double](Root $before).X;$dy=[double](Root $moved).Y-[double](Root $before).Y;Check ([Math]::Abs($dx)+[Math]::Abs($dy) -gt 10) 'Center grip did not move the brace'
   foreach($part in 0..2){$a=Part $before $part;$b=Part $moved $part;Check ([Math]::Abs(($b[0].x-$a[0].x)-$dx) -lt 1 -and [Math]::Abs(($b[0].y-$a[0].y)-$dy) -lt 1) 'Move separated an annotation component'}
   [MathomirUiProbe]::Send($main,273,0xE12B)|Out-Null;$undo=SaveDoc;Check ((Root $undo).X -eq (Root $before).X -and (Root $undo).Y -eq (Root $before).Y) 'Undo did not restore brace position'
-  Hover $undo;$size=[MathomirUiProbe]::SizeGrip($view);[BraceUI]::Drag($main,$view,$size[0],$size[1],($size[0]+40),($size[1]+30));$resized=SaveDoc;Joined $resized
+  Hover $undo;$size=[MathomirUiProbe]::GripNear($view,[BraceUI]::Stat($view,'Right'),[BraceUI]::Stat($view,'Bottom'),$false);[BraceUI]::Drag($main,$view,$size[0],$size[1],($size[0]+40),($size[1]+30));$resized=SaveDoc;Joined $resized
   Check ((Root $resized).SelectSingleNode('./bracelabel')) 'Resize discarded attachment metadata'
   # Double-clicking the actual box edits its embedded label without a new object.
   $center=BoxCenter $resized;$anchor=(Part $resized 0)[5];$boxBefore=Part $resized 2
