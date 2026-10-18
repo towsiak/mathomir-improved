@@ -253,17 +253,20 @@
  void CMathomirView::OnLButtonDblClk(UINT nFlags, CPoint point)
  {
  	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
-@@ -2228,6 +2249,9 @@
+@@ -2228,6 +2249,12 @@
          if(centerTarget)ResizeHandleObject=centerTarget->Object;
          if(centerTarget || CenterMoveGripHit(ResizeHandleDocument(),point)){EditFromCenterGrip(point);return;}
      }
-+    if(!ClipboardExpression&&!ClipboardDrawing)for(int i=NumDocumentElements-1;i>=0;i--){auto object=TheDocument+i;if(object->Type!=2||object->MovingDotState==5)continue;
++    for(int i=NumDocumentElements-1;i>=0;i--){auto object=TheDocument+i;if(object->Type!=2||object->MovingDotState==5)continue;
 +        CExpression *label=NULL;int x,y;if(FindBraceLabel((CDrawing*)object->Object,double(point.x)*100/ViewZoom+ViewX-object->absolute_X,double(point.y)*100/ViewZoom+ViewY-object->absolute_Y,true,&label,&x,&y)){
++            // A first click on native label ink may start click-to-copy. A
++            // double-click on the attached box always edits its existing text.
++            RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}
 +            ResizeHandleObject=object->Object;EditFromCenterGrip(point);return;}}
  	RestoreClipboardBackground();
  	if (ClipboardExpression) { delete ClipboardExpression; ClipboardExpression=NULL; }
  	if (ClipboardDrawing) { delete ClipboardDrawing; ClipboardDrawing=NULL; }
-@@ -6844,6 +6868,7 @@
+@@ -6844,6 +6871,7 @@
  			else if (KeyboardEntryBaseObject->Type==2)
  			{
                  CDrawing *group=(CDrawing*)KeyboardEntryBaseObject->Object;
@@ -271,7 +274,7 @@
                  if(group->HasObjectPointer() && group->Items[0].Type==2)
                      SetObjectPointer((CObject*)group,group->m_PointerDirection,group->m_PointerLength,true);
  				short w,h;
-@@ -11117,6 +11142,7 @@
+@@ -11117,6 +11145,7 @@
      dialog.Add(ID_GRAPH_ZOOM_OUT,"Graph > Zoom out gently","grapher zoom out wider range");
      dialog.Add(ID_GRAPH_PI_FRACTIONS,"Graph > X-axis: pi fractions (radians)","pi pie fractions radians trig graph ticks labels");
      dialog.Add(ID_GRAPH_DECIMAL_LABELS,"Graph > X-axis: decimal labels","graph decimal numeric ticks labels");
@@ -279,7 +282,7 @@
      dialog.Add(0,"Draw > Brace (drag to set its size)","bracket curly brace overbrace underbrace annotation",19);
      dialog.Add(0,"Draw > Line","straight stroke segment",2);
      dialog.Add(0,"Draw > Arrow","direction pointer vector",5);
-@@ -11382,11 +11408,15 @@
+@@ -11382,11 +11411,15 @@
          root->KeyboardStartNear(&dc,ViewZoom,x,y);
      }else if(object->Type==2){
          CDrawing *drawing=(CDrawing*)object->Object;SpecialDrawingHover=object;
@@ -299,7 +302,7 @@
              KeyboardEntryBaseObject=object;KeyboardEntryObject=(CObject*)expression;
              expression->DeselectExpression();expression->m_IsColumnInsertion=expression->m_IsRowInsertion=0;
              expression->KeyboardStartNear(&dc,ViewZoom,x,y);
-@@ -14346,6 +14376,66 @@
+@@ -14346,6 +14379,66 @@
      RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardDrawing=new CDrawing();ClipboardDrawing->CopyDrawingIntoSubgroup(drawing,0,0);delete drawing;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));
  }
  
