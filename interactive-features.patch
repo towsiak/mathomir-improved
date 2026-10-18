@@ -329,10 +329,10 @@
 +}
 +
 +class CParameterSlidersDialog:public CFeatureDialog {
-+    CFunctionPlotter *plot;InteractiveObjects::Parameters original,current;bool initializing,changed,pending,wasModified;bool compact;CSize expanded;std::map<int,CRect> positions;    void Layout(bool small){CRect window,client,frame;GetWindowRect(&window);GetClientRect(&client);theApp.m_pMainWnd->GetWindowRect(&frame);int extraX=window.Width()-client.Width(),extraY=window.Height()-client.Height();
++    CFunctionPlotter *plot;InteractiveObjects::Parameters original,current;bool initializing,changed,pending,wasModified;bool compact;CSize expanded;std::map<int,CRect> positions;    void Layout(bool collapsed){CRect window,client,frame;GetWindowRect(&window);GetClientRect(&client);theApp.m_pMainWnd->GetWindowRect(&frame);int extraX=window.Width()-client.Width(),extraY=window.Height()-client.Height();
 +        if(positions.empty()){expanded=CSize(window.Width(),window.Height());for(HWND child=::GetWindow(m_hWnd,GW_CHILD);child;child=::GetWindow(child,GW_HWNDNEXT)){int id=::GetDlgCtrlID(child);if(id<0)continue;CRect r;::GetWindowRect(child,&r);ScreenToClient(&r);positions[id]=r;}}
-+        compact=small;
-+        if(!small){SetDlgItemText(1501,"Apply values / ranges");SetDlgItemText(1502,"Reset defaults");for(auto &item:positions){auto control=GetDlgItem(item.first);control->MoveWindow(item.second);control->ShowWindow(SW_SHOW);}SetDlgItemText(1504,"Compact view");SetWindowPos(NULL,max(frame.left,frame.right-expanded.cx-12),window.top,expanded.cx,expanded.cy,SWP_NOZORDER|SWP_NOACTIVATE);}
++        compact=collapsed;
++        if(!collapsed){SetDlgItemText(1501,"Apply values / ranges");SetDlgItemText(1502,"Reset defaults");for(auto &item:positions){auto control=GetDlgItem(item.first);control->MoveWindow(item.second);control->ShowWindow(SW_SHOW);}SetDlgItemText(1504,"Compact view");SetWindowPos(NULL,max(frame.left,frame.right-expanded.cx-12),window.top,expanded.cx,expanded.cy,SWP_NOZORDER|SWP_NOACTIVATE);}
 +        else{SetDlgItemText(1501,"Apply values");SetDlgItemText(1502,"Reset");
 +            for(int id=1544;id<=1547;id++)GetDlgItem(id)->ShowWindow(SW_HIDE);
 +            GetDlgItem(1543)->MoveWindow(8,6,398,24);
