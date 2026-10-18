@@ -69,6 +69,6 @@ try{
   # Center-grip editing remains available even for a small or crowded label.
   Hover $restored;$gx=[BraceUI]::Stat($view,'CenterX');$gy=[BraceUI]::Stat($view,'CenterY');DoubleClick $gx $gy;[MathomirUiProbe]::Send($view,256,0x23)|Out-Null;[MathomirUiProbe]::Send($view,258,[int][char]'!')|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null;$final=SaveDoc
   Check ($final.mathomir.ChildNodes.Count -eq 1 -and (Root $final).OuterXml.Contains('!')) 'Center grip did not edit the existing label';Joined $final;Capture $main "brace-label-edited-$side.png"
-  Write-Output "Brace label $side: native placement, connector, movement, Undo, resize, double-click edits, live box reflow and persistence passed."
+  Write-Output "Brace label ${side}: native placement, connector, movement, Undo, resize, double-click edits, live box reflow and persistence passed."
  }
 }catch{if($main -ne [IntPtr]::Zero){Capture $main 'brace-label-failure.png'};throw}finally{if($app -and !$app.HasExited){Stop-Process -Id $app.Id -Force};Remove-Item Env:MATHOMIR_PLACEMENT_DIAGNOSTICS -ErrorAction SilentlyContinue;Remove-Item Env:MATHOMIR_DIAGNOSTIC_STARTUP -ErrorAction SilentlyContinue}
