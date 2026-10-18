@@ -315,7 +315,7 @@
 +    drawing->NumItems=drawing->NumItemsReserved=4;drawing->m_BraceLabel=true;
 +    for(int i=0;i<4;i++){auto &item=drawing->Items[i];item.Type=i==3?2:0;if(i==3){
 +        CExpression *label=new CExpression(NULL,NULL,100);item.pSubdrawing=label;
-+        std::string xml="<ex fh=\"100\" stxt=\"1\">"+BraceLabelXmlText(text)+"</ex>";std::vector<char> buffer(xml.begin(),xml.end());buffer.push_back(0);label->XML_input(&buffer[0]);label->m_IsText=label->m_StartAsText=1;
++        std::string xml="<ex fh=\"100\" stxt=\"1\">"+BraceLabelXmlText(text)+"</ex>";std::vector<char> buffer(xml.begin(),xml.end());buffer.push_back(0);label->XML_input(&buffer[0]);label->m_StartAsText=1;
 +    }else{CDrawing *child=new CDrawing();item.pSubdrawing=child;int count=i==0?10:i==1?1:4;
 +        child->Items=(tDrawingItem*)calloc(count,sizeof(tDrawingItem));if(!child->Items)return NULL;child->NumItems=child->NumItemsReserved=(unsigned short)count;for(int n=0;n<count;n++){child->Items[n].Type=1;child->Items[n].LineWidth=DRWZOOM;}}
 +    }
