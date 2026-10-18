@@ -627,7 +627,26 @@
  static bool IsGraphObject(tDocumentStruct *object)
  {
      return object && object->Type==2 && object->Object && ((CDrawing*)object->Object)->IsSpecialDrawing==51;
-@@ -700,7 +714,7 @@
+@@ -661,7 +675,8 @@
+         if(x<-3 || x>object->Length*ViewZoom/100+3 || y<-object->Above*ViewZoom/100-3 || y>object->Below*ViewZoom/100+3)continue;
+         if((object->Type==1 && ExpressionContentAtPoint((CExpression*)object->Object,x,y)) ||
+            (object->Type==2 && DrawingContentAtPoint((CDrawing*)object->Object,x,y))){
+-            if(!front || InteractionChild(object,front))front=object;
++            bool connector=IsAttachedConnector(object),behind=IsAttachedConnector(front);
++            if(!front || (behind&&!connector) || (behind==connector&&InteractionChild(object,front)))front=object;
+         }
+     }
+ #ifdef MATHOMIR_AI_TESTING
+@@ -689,7 +704,7 @@
+     tDocumentStruct *front=NULL;
+     for(int i=NumDocumentElements-1;i>=0;i--){
+         tDocumentStruct *candidate=TheDocument+i;
+-        if(!candidate->Object || candidate->MovingDotState==5 ||
++        if(!candidate->Object || candidate->MovingDotState==5 || IsAttachedConnector(candidate) ||
+             (candidate->Type!=1 && candidate->Type!=2) || !ObjectBoundsContain(candidate,point))continue;
+         if(!front || (IsGraphObject(front) && !IsGraphObject(candidate)) || InteractionChild(candidate,front))front=candidate;
+     }
+@@ -700,7 +715,7 @@
  // never cover a foreground annotation; layout is deterministic while hovering.
  static bool CenterMoveGripPoint(tDocumentStruct *object,CPoint &point)
  {
@@ -636,7 +655,15 @@
      if(MouseMovingActive && CenterMovePending && MoveGripObject==object->Object){
          point=CPoint((object->absolute_X-ViewX)*ViewZoom/100+CenterGripOffset.x,
              (object->absolute_Y-ViewY)*ViewZoom/100+CenterGripOffset.y);return true;
-@@ -791,7 +805,7 @@
+@@ -763,6 +778,7 @@
+ }
+ static bool InControlApproach(tDocumentStruct *object,CPoint point)
+ {
++    if(IsAttachedConnector(object)){CPoint p=DeleteGripPoint(object);return abs(point.x-p.x)<=15&&abs(point.y-p.y)<=15;}
+     CPoint center; if(CenterMoveGripPoint(object,center) && abs(point.x-center.x)<=15 && abs(point.y-center.y)<=15)return true;
+     const CPoint controls[]={MoveGripPoint(object),LowerMoveGripPoint(object),
+         ResizeHandlePoint(object),DeleteGripPoint(object)};
+@@ -791,7 +807,7 @@
  }
  static bool CanRotateObject(tDocumentStruct *object)
  {
@@ -645,7 +672,7 @@
          (object->Type==2 && CanRotateDrawing((CDrawing*)object->Object)));
  }
  static tDocumentStruct *RotationHandleDocument()
-@@ -961,6 +975,11 @@
+@@ -961,6 +977,11 @@
      ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
      ON_COMMAND(ID_INTEGRAL_SHADER,OnIntegralShader)
      ON_COMMAND(ID_RELATION_GRAPH,OnRelationGraph)
@@ -657,7 +684,7 @@
      ON_COMMAND(ID_BRACE_LABEL,OnBraceLabel)
      ON_COMMAND(ID_LOG_BASE_BUILDER,OnLogBaseBuilder)
      ON_COMMAND(ID_AI_HELP,OnAiHelp)
-@@ -1148,6 +1167,7 @@
+@@ -1148,6 +1169,7 @@
  
  CMathomirView::~CMathomirView()
  {
@@ -665,7 +692,7 @@
      if(m_SelectionApproxPanel){if(m_SelectionApproxPanel->GetSafeHwnd())m_SelectionApproxPanel->DestroyWindow();delete m_SelectionApproxPanel;m_SelectionApproxPanel=NULL;}
  	if (ClipboardBackground.DC)
  	{
-@@ -1329,6 +1349,7 @@
+@@ -1329,6 +1351,7 @@
  
  void CMathomirView::OnDraw(CDC* pDC)
  {
@@ -673,7 +700,7 @@
      if (!pDC->IsPrinting()) { ApplyPageWidthFit(); UpdateQuickActionMode(); }
  	tDocumentStruct *ds=TheDocument;
  	int SelectedElement;
-@@ -1576,8 +1597,9 @@
+@@ -1576,8 +1599,9 @@
          ds=TheDocument;
  		for (int i=NumDocumentElements-1;i>=0;i--,ds++)
  		{
@@ -684,7 +711,7 @@
              if(paintLayer!=layer)continue;
  			if ((ds->absolute_Y<-1000) && (ds->absolute_Y>-1200))
  			{
-@@ -2237,6 +2259,8 @@
+@@ -2237,6 +2261,8 @@
  
  void CMathomirView::OnLButtonDblClk(UINT nFlags, CPoint point)
  {
@@ -693,7 +720,7 @@
  	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
  	if (nFlags & (MK_CONTROL|MK_SHIFT)) { OnLButtonDown(nFlags,point); return; }
      if(!ClipboardExpression && !ClipboardDrawing){
-@@ -2288,6 +2312,7 @@
+@@ -2288,6 +2314,7 @@
  static CObject *ExplicitTypingRoot=NULL;
  void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  {
@@ -701,7 +728,7 @@
      ScopedPlacementPreviewPause previewPause;
      RestoreClipboardBackground();
      const bool centerWasVisible=CenterMoveGripHit(ResizeHandleDocument(),point);
-@@ -3846,6 +3871,7 @@
+@@ -3846,6 +3873,7 @@
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -709,7 +736,42 @@
      if(IsDrawingMode)RestoreClipboardBackground();
      if(MouseMode==8 && getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *t=fopen("center-move-grip-trace.txt","a");if(t){fprintf(t,"node move %d,%d flags=%u node=%d,%d\n",point.x,point.y,nFlags,tmpDrawing2?tmpDrawing2->NodeX:-999,tmpDrawing2?tmpDrawing2->NodeY:-999);fclose(t);}}
      if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point)){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
-@@ -5163,6 +5189,7 @@
+@@ -3904,7 +3932,7 @@
+         if(front && current && current!=front &&
+             !(InControlApproach(current,point) && InteractionChild(current,front)) &&
+             !InteractionChild(current,front) &&
+-            (IsGraphObject(current) || front>current || InteractionChild(front,current)))
++            (IsGraphObject(current) || IsAttachedConnector(current) || front>current || InteractionChild(front,current)))
+         {
+             ResizeHandleObject=front->Object;
+             RotationHandleObject=CanRotateObject(front)?front->Object:NULL;
+@@ -3916,13 +3944,15 @@
+     {
+         CPoint deleteGrip=DeleteGripPoint(moveHover);
+         if(abs(point.x-deleteGrip.x)<=9 && abs(point.y-deleteGrip.y)<=9){ShowFeatureCanvasHint(1,"Delete this object. Ctrl+Z restores it.");SetCursor(::LoadCursor(NULL,IDC_HAND));return;}
++        if(!IsAttachedConnector(moveHover)){
+         CPoint grip=MoveGripPoint(moveHover);
+         CPoint lower=LowerMoveGripPoint(moveHover);
+         if ((abs(point.x-grip.x)<=9 && abs(point.y-grip.y)<=9) || (abs(point.x-lower.x)<=9 && abs(point.y-lower.y)<=9))
+         { ShowFeatureCanvasHint(2,"Move this object by dragging. Escape cancels the move.");SetCursor(::LoadCursor(NULL,IDC_SIZEALL)); return; }
++        }
+     }
+     tDocumentStruct *sizingObject=ResizeHandleDocument();
+-    if (MouseMode==0 && sizingObject && !(sizingObject->Type==2 && ((CDrawing*)sizingObject->Object)->GripNodeEditing) && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
++    if (MouseMode==0 && sizingObject && !IsAttachedConnector(sizingObject) && !(sizingObject->Type==2 && ((CDrawing*)sizingObject->Object)->GripNodeEditing) && !ClipboardExpression && !ClipboardDrawing && !IsDrawingMode && !ViewOnlyMode)
+     {
+         CPoint handle=ResizeHandlePoint(sizingObject);
+         if (abs(point.x-handle.x)<=9 && abs(point.y-handle.y)<=9)
+@@ -4788,7 +4818,7 @@
+         if(!TouchedObject && !IsDrawingMode && MouseMode==0){
+             for(int i=NumDocumentElements-1;i>=0;i--){
+                 tDocumentStruct *candidate=TheDocument+i;
+-                if(!candidate->Object || candidate->MovingDotState==5 || (candidate->Type!=1 && candidate->Type!=2))continue;
++                if(!candidate->Object || candidate->MovingDotState==5 || IsAttachedConnector(candidate) || (candidate->Type!=1 && candidate->Type!=2))continue;
+                 if(AbsoluteX>=candidate->absolute_X && AbsoluteX<=candidate->absolute_X+candidate->Length &&
+                     AbsoluteY>=candidate->absolute_Y-candidate->Above && AbsoluteY<=candidate->absolute_Y+candidate->Below){
+                     if(!TouchedObject || (IsGraphObject(TouchedObject) && !IsGraphObject(candidate)) ||
+@@ -5163,6 +5193,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnRButtonDown(UINT nFlags, CPoint point)
  {
@@ -717,7 +779,7 @@
  	IsWindowOutOfFocus=0;
  	SteadyCursorTimer=0;
  	SpacebarPressedRecently=0;
-@@ -5561,6 +5588,7 @@
+@@ -5561,6 +5592,7 @@
  char lockRepeat;
  void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -725,7 +787,7 @@
      if(nChar==27)for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);
      if(KeyboardEntryObject||nChar==27)ExplicitTypingRoot=NULL;
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
-@@ -5649,6 +5677,7 @@
+@@ -5649,6 +5681,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -733,7 +795,7 @@
      if(nChar==VK_ESCAPE){CenterEditRelease=false;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);}
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
      if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
-@@ -8302,6 +8331,8 @@
+@@ -8302,6 +8335,8 @@
  
  int CMathomirView::GentlyPaintObject(tDocumentStruct * ds, CDC * DC)
  {
@@ -742,7 +804,7 @@
      if(ds && DC && ::WindowFromDC(DC->GetSafeHdc())==GetSafeHwnd())
      {
          bool compose=IsGraphObject(ds);
-@@ -9912,6 +9943,8 @@
+@@ -9912,6 +9947,8 @@
      if(kind==5 || kind==6)return Toolbox?Toolbox->PalettePlacementProbe((int)index,kind==6):0;
      if(kind==7)return IsDrawingMode;
      if(!NumDocumentElements)return 0;
@@ -751,7 +813,7 @@
      if(kind==4){
          tDocumentStruct *object=ResizeHandleDocument();CPoint center;
          bool hasCenter=CenterMoveGripPoint(object,center);
-@@ -10230,7 +10263,8 @@
+@@ -10230,7 +10267,8 @@
  #pragma optimize("s",on)
  void CMathomirView::OnEditCut()
  {
@@ -761,7 +823,7 @@
  	//copying to clipboard and deleting selection
  	CMathomirDoc* pDoc = GetDocument();
  
-@@ -10246,6 +10280,7 @@
+@@ -10246,6 +10284,7 @@
  	else
  	{
  		pDoc->SaveMOMFile(NULL,0);
@@ -769,7 +831,7 @@
  
  		int ok=0;
  		for (i=0;i<NumDocumentElements;i++)
-@@ -10274,12 +10309,15 @@
+@@ -10274,12 +10313,15 @@
  #pragma optimize("s",on)
  void CMathomirView::OnEditPaste()
  {
@@ -787,7 +849,7 @@
  	if ((r1) && (TheKeyboardClipboard==NULL))
  	{
  		//something pasted - it is found as selection and we will move it to the cursor location to move together with the cursor
-@@ -10423,6 +10461,7 @@
+@@ -10423,6 +10465,7 @@
  
  void CMathomirView::OnEditDelete()
  {
@@ -795,7 +857,7 @@
  
  	if (ViewOnlyMode) return;
  
-@@ -11129,6 +11168,10 @@
+@@ -11129,6 +11172,10 @@
      dialog.Add(ID_SYMBOLIC_DERIVATIVE,"Calculus > Symbolic derivative finder...","differentiate derivative calculus symbolic slope chain product quotient higher order");
      dialog.Add(ID_AI_HELP,"Calculus > AI math help...","AI explain check working OpenAI tutor online graph ideas");
      dialog.Add(ID_LOG_BASE_BUILDER,"Graph > Logarithm builder...","log base logarithm radical sqrt custom argument change of base");
@@ -806,7 +868,7 @@
      dialog.Add(ID_RELATION_GRAPH,"Graph > Relations and parametric curves...","implicit relation equation circle hyperbola parametric x(t) y(t) graph plot preview");
      dialog.Add(ID_INTEGRAL_SHADER,"Graph > Integral area shader...","integral area bounds shade shading calculus hatch signed absolute numerical");
      dialog.Add(ID_PIECEWISE_GRAPH,"Graph > Piecewise function grapher...","piecewise pieces intervals open closed endpoints domain jumps step graph");
-@@ -11448,6 +11491,7 @@
+@@ -11448,6 +11495,7 @@
  bool CMathomirView::BeginGripMove(CPoint point,bool allowCenter)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -814,7 +876,7 @@
      if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || ClipboardExpression || ClipboardDrawing) return false;
      CPoint grip=MoveGripPoint(object);
      CPoint lower=LowerMoveGripPoint(object);
-@@ -11501,6 +11545,7 @@
+@@ -11501,6 +11549,7 @@
  void CMathomirView::PaintMoveGrip(CDC *dc)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -822,7 +884,7 @@
      if (!object || object->MovingDotState==5) return;
      for(int grip=0;grip<3;grip++)
      {
-@@ -11523,6 +11568,7 @@
+@@ -11523,6 +11572,7 @@
  void CMathomirView::PaintSizeHandle(CDC *dc)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -830,7 +892,7 @@
      if(object && object->Type==2 && ((CDrawing*)object->Object)->GripNodeEditing)return;
      if (!object || object->MovingDotState==5 || (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object))) return;
      CPoint point=ResizeHandlePoint(object);
-@@ -11546,6 +11592,7 @@
+@@ -11546,6 +11596,7 @@
  bool CMathomirView::BeginMouseSizing(CPoint point)
  {
      tDocumentStruct *object=ResizeHandleDocument();
@@ -838,7 +900,7 @@
      if(object && object->Type==2 && ((CDrawing*)object->Object)->GripNodeEditing)return false;
      if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || MouseRotationActive || ClipboardExpression || ClipboardDrawing) return false;
      if (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object)) return false;
-@@ -11660,6 +11707,7 @@
+@@ -11660,6 +11711,7 @@
          if(content.Type==2)((CExpression*)original)->CalculateSize(&dc,ViewZoom,&width,&above,&below);
          else ((CDrawing*)original)->CalculateSize(&dc,ViewZoom,&width,&below);
          if(group->m_BackgroundColor>=0){if(content.Type==2)((CExpression*)original)->m_BackgroundColor=group->m_BackgroundColor;else ((CDrawing*)original)->m_BackgroundColor=group->m_BackgroundColor;}
@@ -846,7 +908,7 @@
          group->Items[0].pSubdrawing=NULL;
          object->Object=original;object->Type=content.Type==2?1:2;
          object->absolute_X=x;object->absolute_Y=y+above*100/ViewZoom;
-@@ -11672,6 +11720,7 @@
+@@ -11672,6 +11724,7 @@
          CDrawing *wrapper=new CDrawing();wrapper->Items=(tDrawingItem*)calloc(2,sizeof(tDrawingItem));
          if(!wrapper->Items){delete wrapper;free(lines);return NULL;}
          wrapper->NumItems=wrapper->NumItemsReserved=2;
@@ -854,7 +916,7 @@
          tDrawingItem &content=wrapper->Items[0];content.Type=object->Type==1?2:0;content.pSubdrawing=object->Object;
          content.X2=object->Length*DRWZOOM;content.Y2=(object->Above+object->Below)*DRWZOOM;
          if(object->Type==1)((CExpression*)object->Object)->DeselectExpression();
-@@ -12464,6 +12513,7 @@
+@@ -12464,6 +12517,7 @@
  	if (mydrw==NULL) return 0;
      int AbsoluteX,AbsoluteY;
      ResolveDrawingPlacement(mydrw,cursorX,cursorY,AbsoluteX,AbsoluteY);
@@ -862,7 +924,7 @@
  
  
  
-@@ -12523,6 +12573,7 @@
+@@ -12523,6 +12577,7 @@
  		}
  	}
  
@@ -870,7 +932,7 @@
  
  	return 0;
  }
-@@ -14468,6 +14519,7 @@
+@@ -14468,6 +14523,7 @@
  class CRelationDialog:public CFeatureDialog
  {
  public:
@@ -878,7 +940,7 @@
      std::string equations;RelationGraph::Parametric parametric;RelationGraph::Viewport viewport;bool radians,initializing;std::vector<RelationGraph::Program> programs;CRelationPreview preview;
      CRelationDialog():CFeatureDialog(IDD_RELATION_GRAPH,theApp.m_pMainWnd),equations("x^2+y^2=25"),radians(true),initializing(true){viewport.width=550;viewport.height=415;}
      CString Text(int id){CString s;GetDlgItemText(id,s);s.Trim();return s;}
-@@ -14485,6 +14537,7 @@
+@@ -14485,6 +14541,7 @@
                  RelationGraph::Program p;if(!p.Parse(line,radians,error))goto invalid;programs.push_back(p);}
              if(programs.empty()){error="Enter an equation, for example x^2+y^2=25.";goto invalid;}
          }
@@ -886,7 +948,7 @@
          preview.programs=programs;preview.parametric=parametric;preview.viewport=viewport;preview.ready=true;preview.Invalidate();GetDlgItem(IDOK)->EnableWindow(TRUE);
          SetDlgItemText(1435,parametric.enabled?"Parametric curve ready. The t interval is independent of the graph window.":"Equations ready. Numerical contours show branches without solving for y. Very small details may require zooming in.");return true;
      invalid:preview.ready=false;preview.Invalidate();GetDlgItem(IDOK)->EnableWindow(FALSE);SetDlgItemText(1435,error.c_str());return false;
-@@ -14506,13 +14559,13 @@
+@@ -14506,13 +14563,13 @@
  {
      if(ViewOnlyMode)return;CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto o=TheDocument+i;if(o->Type==2&&(o==prevTouchedObject||o->MovingDotState==3)){existing=FindRelationGraph((CDrawing*)o->Object);if(existing)break;}}
      if(MouseMode==102)existing=NULL;OnChar(27,1,0);CRelationDialog dialog;
@@ -902,7 +964,7 @@
      for(int i=0;i<8;i++){auto expression=(CExpression*)drawing->Items[8+i].pSubdrawing;expression->Delete();std::string body;
          if(dialog.parametric.enabled){if(i<2)body=SymbolicDerivative::Xml(i==0?dialog.parametric.x:dialog.parametric.y);}
          else if(i<(int)dialog.programs.size()){auto &p=dialog.programs[i];body=SymbolicDerivative::Xml(p.left)+"<opr s=\"=\" />"+SymbolicDerivative::Xml(p.right);}
-@@ -15312,3 +15365,5 @@
+@@ -15312,3 +15369,5 @@
  };
  void CMathomirView::OnFormulaReference(){Popup->HidePopupMenu();HideSelectionApproxPanel();if(GetCapture())ReleaseCapture();CFormulaSheetDialog dialog;int result=dialog.DoModal();if(result==1489){OnChar(27,1,0);CAiHelpDialog ai(dialog.aiText);ai.DoModal();SetFocus();return;}if(result!=IDOK){SetFocus();return;}if(ViewOnlyMode)return;OnChar(27,1,0);CancelFloatingPlacement();RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardExpression=new CExpression(NULL,NULL,100);std::vector<char> data(dialog.xml.begin(),dialog.xml.end());data.push_back(0);if(!ClipboardExpression->XML_input(data.data())){delete ClipboardExpression;ClipboardExpression=NULL;AfxMessageBox("This formula could not be inserted.");return;}RootObjectCopy=-1;RootObjectFontSize=100;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));}
  void CMathomirView::OnFreeAiHelp(){int p=theApp.GetProfileInt("AI","Provider",1);if(p!=1&&p!=2&&p!=3)theApp.WriteProfileInt("AI","Provider",1);OnAiHelp();}
