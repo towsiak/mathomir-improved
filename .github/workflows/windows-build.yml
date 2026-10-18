@@ -31,6 +31,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Sliders, step reveal and attached connector checks
+        shell: pwsh
+        run: ./tools/interactive-features-smoke.ps1
       - name: Attached brace label box checks
         shell: pwsh
         run: ./tools/brace-label-smoke.ps1
@@ -98,6 +101,7 @@ jobs:
           path: |
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/interactive-*
             source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
@@ -180,6 +184,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/interactive-features-smoke.ps1
           ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
           ./tools/object-pointer-smoke.ps1
@@ -239,6 +244,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/interactive-*
             source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
@@ -296,6 +302,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/interactive-features-smoke.ps1
           ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
           ./tools/object-pointer-smoke.ps1
@@ -353,6 +360,7 @@ jobs:
             source/build/enlarged-hit-diagnostics.txt
             source/build/grid-*.mom
             source/build/palette-carry-*
+            source/build/interactive-*
             source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*

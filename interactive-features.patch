@@ -1,0 +1,922 @@
+--- a/Mathomir/Drawing.cpp
++++ b/Mathomir/Drawing.cpp
+@@ -1910,6 +1910,7 @@
+ //MUST BE VERY FAST
+ void CDrawing::PaintDrawing(CDC * DC, short zoom2, short X, short Y,int absX,int absY,RECT *ClipReg,int color)
+ {
++    if(!PrintRendering&&!DC->IsPrinting()&&InteractiveObjects::Hidden(m_ObjectInfo))return;
+ 	int no_background=0;
+ 	int zoom=zoom2; //to change from short to int
+ 	if (zoom<0) {zoom=-zoom;no_background=1;}
+@@ -1955,6 +1956,7 @@
+ 	tDrawingItem *di=Items;
+ 	for (i=0;i<NumItems;i++,di++)
+ 	{
++        if(!PrintRendering&&!DC->IsPrinting()&&di->Type==2&&di->pSubdrawing&&InteractiveObjects::Hidden(((CExpression*)di->pSubdrawing)->m_ObjectInfo))continue;
+ 		if (di->Type==1) //line
+ 		{
+             if((AxisGrid.role==3||AxisGrid.role==4)&&AxisGrid.style==2){
+@@ -2104,6 +2106,7 @@
+ 		}
+ 		ret*=i;
+ 	}
++    ret^=m_ObjectInfo.Hash();if(m_Connector.Attached())ret^=m_Connector.from*97u+m_Connector.to*193u+m_Connector.style*31u+m_Connector.route*71u+m_Connector.fromPort*13u+m_Connector.toPort*19u;
+     if(HasBraceLabel())ret^=0x42524345;
+ 	if(IsSpecialDrawing==51 && SpecialData){
+ 		CFunctionPlotter *plot=(CFunctionPlotter*)SpecialData;
+@@ -2115,6 +2118,7 @@
+ 			for(const char *p=bounds;*p;++p)metadata=metadata*33u+(unsigned char)*p;
+ 		}
+ 		if(!plot->pieces.empty())ret^=metadata;
++        {unsigned int hash=5381;for(int i=0;i<3;i++){const auto &p=plot->parameters.a[i];std::string text=Piecewise::Number(p.value)+"|"+Piecewise::Number(p.low)+"|"+Piecewise::Number(p.high)+"|"+Piecewise::Number(p.step);for(unsigned char c:text)hash=hash*33u+c;}ret^=hash;}
+         if(plot->parametric.enabled){const auto &p=plot->parametric;std::string text=p.xtext+"|"+p.ytext+"|"+Piecewise::Number(p.low)+"|"+Piecewise::Number(p.high)+(p.radians?"1":"0");unsigned int hash=5381;for(unsigned char c:text)hash=hash*33u+c;ret^=(int)hash;}
+         if(plot->integral.enabled){
+             const auto &s=plot->integral;std::string text=s.formula+"|"+Piecewise::Number(s.a)+"|"+Piecewise::Number(s.b)+"|"+(s.radians?"1":"0")+(s.hatch?"1":"0")+(s.labels?"1":"0");
+@@ -2167,6 +2171,7 @@
+ 	m_Color=Original->m_Color;
+     m_BackgroundColor=Original->m_BackgroundColor;
+     m_PointerDirection=Original->m_PointerDirection;m_PointerLength=Original->m_PointerLength;m_BraceLabel=Original->m_BraceLabel;
++    m_ObjectInfo=Original->m_ObjectInfo;m_Connector=Original->m_Connector;
+ 	OriginalForm=Original->OriginalForm;
+     AxisGrid=Original->AxisGrid;
+ 	if (IsSpecialDrawing)
+@@ -2394,6 +2399,8 @@
+ 	static char tmpstr[256];
+ 
+ 	if (num_tabs>16) num_tabs=16;
++    {std::string info=m_ObjectInfo.Attributes();if(!info.empty()){info="<objectinfo"+info+" />\r\n";len+=(int)info.size();if(!only_calculate){memcpy(output,info.data(),info.size());output+=info.size();}}
++     if(m_Connector.Attached()){char link[256];int size=sprintf(link,"<connector from=\"%u\" to=\"%u\" style=\"%d\" route=\"%d\" fp=\"%d\" tp=\"%d\" />\r\n",m_Connector.from,m_Connector.to,m_Connector.style,m_Connector.route,m_Connector.fromPort,m_Connector.toPort);len+=size;if(!only_calculate){memcpy(output,link,size);output+=size;}}}
+     if(HasBraceLabel()){
+         const char *metadata="<bracelabel />\r\n";int count=(int)strlen(metadata);len+=count;if(!only_calculate){memcpy(output,metadata,count);output+=count;}
+     }
+@@ -2551,6 +2558,8 @@
+ 		file=mf->XML_search("",file); //find anything
+ 		if (file==NULL) return NULL;
+ 
++        if(strncmp(file,"objectinfo ",11)==0){file+=10;char attribute[64],value[64];do{file=mf->XML_read_attribute(attribute,value,file,64);if(!file)return NULL;m_ObjectInfo.Read(attribute,value);}while(attribute[0]);continue;}
++        if(strncmp(file,"connector ",10)==0){file+=9;char attribute[64],value[64];InteractiveObjects::Connector link;do{file=mf->XML_read_attribute(attribute,value,file,64);if(!file)return NULL;int n=atoi(value);if(!strcmp(attribute,"from")&&n>0)link.from=n;if(!strcmp(attribute,"to")&&n>0)link.to=n;if(!strcmp(attribute,"style")&&n>=0&&n<=2)link.style=n;if(!strcmp(attribute,"route")&&n>=0&&n<=1)link.route=n;if(!strcmp(attribute,"fp")&&n>=0&&n<=4)link.fromPort=n;if(!strcmp(attribute,"tp")&&n>=0&&n<=4)link.toPort=n;}while(attribute[0]);if(link.Attached())m_Connector=link;continue;}
+         if(strncmp(file,"bracelabel",10)==0){
+             file+=10;char attribute[64],value[64];do{file=mf->XML_read_attribute(attribute,value,file,64);if(!file)return NULL;}while(attribute[0]);m_BraceLabel=true;continue;
+         }
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -40,6 +40,8 @@
+     bool BackgroundContains(double x,double y,double zoom) const;
+     int m_PointerDirection,m_PointerLength; // attached native arrow group; zero means ordinary drawing
+     bool HasObjectPointer() const;
++    InteractiveObjects::Info m_ObjectInfo;
++    InteractiveObjects::Connector m_Connector;
+     bool m_BraceLabel;
+     bool HasBraceLabel() const;
+     bool BraceBoxContains(double x,double y) const;
+@@ -130,6 +132,7 @@
+ class CFunctionPlotter
+ {
+ public:
++    InteractiveObjects::Parameters parameters;
+     RelationGraph::Parametric parametric;
+     IntegralArea::Settings integral;IntegralArea::Result integralResult;std::string integralError;
+     std::vector<Piecewise::Row> pieces;
+--- a/Mathomir/Expression.cpp
++++ b/Mathomir/Expression.cpp
+@@ -3083,6 +3083,7 @@
+ 	if (Original==NULL) return 0;
+ 	if (Original->m_NumElements<0) return 0;
+ 	if (Original->m_NumElements>0x7FFF) return 0;
++    if(!m_ObjectInfo.id && !OnlySelected)m_ObjectInfo=Original->m_ObjectInfo;
+ 
+ 	if (OnlySelected==2) CopyExpressionSpecialFlag=1;
+ 	
+@@ -11918,7 +11919,7 @@
+ int CExpression::XML_output(char * output, int num_tabs, char only_calculate)
+ {
+ 	int len=0;
+-	static char tmpstr[256];
++	static char tmpstr[512];
+ 	static char tabs[17];
+ 
+ 	if (num_tabs>16) num_tabs=16;
+@@ -11969,6 +11970,7 @@
+ 		strcat(tmpstr,tmp);
+ 	}
+ 
++    {std::string info=m_ObjectInfo.Attributes();if(!info.empty()){info.pop_back();strcat(tmpstr,("\""+info).c_str());}}
+     if(m_BackgroundColor>=0){char background[64];sprintf(background,"\" bg=\"%u",(unsigned int)m_BackgroundColor);strcat(tmpstr,background);}
+     if (m_RotationMilliDegrees)
+     {
+@@ -12130,6 +12132,7 @@
+ 		file=mf->XML_read_attribute(attribute,value,file,256);
+ 		if (file==NULL) return NULL;
+ 		if ((strcmp(attribute,"fnt_h")==0) || (strcmp(attribute,"fh")==0)) m_FontSize=atoi(value);
++		m_ObjectInfo.Read(attribute,value);
+ 		if (strcmp(attribute,"stxt")==0) {realStartAsText=atoi(value);if (old_version_text_decode==0) m_StartAsText=realStartAsText;}
+ 		if (strcmp(attribute,"txt")==0) {m_StartAsText=1;old_version_text_decode=1;}
+ 		if (strcmp(attribute,"hed")==0) m_IsHeadline=atoi(value);
+@@ -12875,6 +12878,7 @@
+ 		c+=768*m_Alignment;
+ 		c^=(unsigned int)m_RotationMilliDegrees*8191U;
+ 		c^=m_BackgroundColor+1;
++        c^=m_ObjectInfo.Hash();
+ 		if (m_pPaternalExpression) c+=500;
+ 		c+=m_IsKeyboardEntry+m_KeyboardCursorPos;
+ 		c+=m_InternalInsertionPoint;
+--- a/Mathomir/Expression.h
++++ b/Mathomir/Expression.h
+@@ -1,4 +1,5 @@
+ #pragma once
++#include "InteractiveObjects.h"
+ 
+ #include "Element.h"
+ 
+@@ -103,6 +104,7 @@
+ 	} tVariableList;
+ 
+ public:
++    InteractiveObjects::Info m_ObjectInfo;
+ 	CElement *m_pPaternalElement;
+ 	CExpression *m_pPaternalExpression;
+ 
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -39,6 +39,9 @@
+     }
+ };
+ inline const char *FeatureControlHelp(int dialog,int id){
++    if(dialog==IDD_PARAMETER_SLIDERS){if(id>=1510&&id<=1534)return "Use a, b and c in graph formulas. Sliders change the live graph; each row has value, minimum, maximum and step. Apply validates typed ranges. Cancel restores the starting values.";if(id==1501)return "Validate and apply the typed values and ranges to the current graph.";if(id==1502)return "Reset a=1, b=1, c=0 with ranges -5 to 5 and step 0.1.";}
++    if(dialog==IDD_STEP_SEQUENCE)return "Each listed object or group becomes one step. Use Move up/down to arrange the order. Saving keeps every step; reveal hides only later steps on screen. Existing native groups can contain several objects in one step.";
++    if(dialog==IDD_ATTACHED_CONNECTOR)return "The connector follows the two referenced objects. Choose line or arrow ends, straight or elbow path, and automatic or fixed-side anchors. Swap reverses A and B; Detach keeps the current shape as an ordinary drawing.";
+     if(dialog==IDD_FORMULA_REFERENCE){
+         if(id==1480)return "Search titles, formulas, meanings and conditions. All search words must match. Try: quadratic, chain rule, photon, spring or half life.";
+         if(id==1481)return "Choose a subject, or search all 13 subjects together. Physics runs from mechanics through atomic and nuclear topics.";
+--- a/Mathomir/FunctionPlotter.cpp
++++ b/Mathomir/FunctionPlotter.cpp
+@@ -171,7 +171,7 @@
+ 	CFunctionPlotter *org=(CFunctionPlotter*)Original->SpecialData;
+ 	if (!org) return 0;
+ 
+-    parametric=org->parametric;
++    parameters=org->parameters;parametric=org->parametric;
+     integral=org->integral;integralResult=org->integralResult;integralError=org->integralError;
+     pieces=org->pieces;pieceRadians=org->pieceRadians;scatterPoints=org->scatterPoints;statisticsModel=org->statisticsModel;scatterResidual=org->scatterResidual;
+ 	is_y_log=org->is_y_log;
+@@ -1639,7 +1639,7 @@
+ }
+ int CFunctionPlotter::XML_output(char * output,int num_tabs,char only_calculate)
+ {
+-    std::string text;
++    std::string text="<sliders";for(int i=0;i<3;i++){std::string key(1,(char)('a'+i));const auto &p=parameters.a[i];text+=" "+key+"=\""+Piecewise::Number(p.value)+"\" "+key+"min=\""+Piecewise::Number(p.low)+"\" "+key+"max=\""+Piecewise::Number(p.high)+"\" "+key+"step=\""+Piecewise::Number(p.step)+"\"";}text+=" />\r\n";
+     if(parametric.enabled)text+="<parametric x=\""+Piecewise::Hex(parametric.xtext)+"\" y=\""+Piecewise::Hex(parametric.ytext)+"\" lo=\""+Piecewise::Number(parametric.low)+"\" hi=\""+Piecewise::Number(parametric.high)+"\" rad=\""+(parametric.radians?"1":"0")+"\" />\r\n";
+     if(integral.enabled)text+="<integral f=\""+Piecewise::Hex(integral.formula)+"\" a=\""+Piecewise::Number(integral.a)+"\" b=\""+Piecewise::Number(integral.b)+"\" rad=\""+(integral.radians?"1":"0")+"\" hatch=\""+(integral.hatch?"1":"0")+"\" labels=\""+(integral.labels?"1":"0")+"\" />\r\n";
+     for(size_t i=0;i<pieces.size();i++){
+@@ -1654,6 +1654,7 @@
+ }
+ char *CFunctionPlotter::XML_input(char *file)
+ {
++    if(strncmp(file,"sliders ",8)==0){file+=7;InteractiveObjects::Parameters proposed;char attribute[64],value[128];do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,128);if(!file)return NULL;int i=attribute[0]-'a';if(i>=0&&i<3){double n=Piecewise::StoredBound(value);if(!attribute[1])proposed.a[i].value=n;else if(!strcmp(attribute+1,"min"))proposed.a[i].low=n;else if(!strcmp(attribute+1,"max"))proposed.a[i].high=n;else if(!strcmp(attribute+1,"step"))proposed.a[i].step=n;}}while(attribute[0]);if(proposed.Valid())parameters=proposed;return file;}
+     if(strncmp(file,"parametric ",11)==0){
+         RelationGraph::Parametric proposed;char attribute[64],value[2048];file+=10;
+         do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,2048);if(!file)return NULL;
+@@ -1808,11 +1809,16 @@
+     value=rhs.PlotterCalculateFunctionValue(0,variables,radians);rhs.PlotterReleaseVariablePositions(variables);
+     return GraphDiscontinuities::Finite(value);
+ }
+-static bool NativeGraphRelation(CExpression *expression,RelationGraph::Program &program,bool radians)
++static bool NativeGraphRelation(CExpression *expression,RelationGraph::Program &program,bool radians,const InteractiveObjects::Parameters &parameters)
+ {
+     if(!expression)return false;
+     int equal=-1;
+     for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='='){if(equal>=0)return false;equal=n;}
++    try{std::string right=NativeSymbolic::Formula(expression,equal>=0?equal+1:0);SymbolicDerivative::Parser parser;auto e=parser.Parse(right);bool uses=GraphParameters::Uses(e);
++        std::string left=equal>0?NativeSymbolic::Formula(expression,0,equal):"y";
++        if(equal>0)try{uses=uses||GraphParameters::Uses(parser.Parse(left));}catch(...){}
++        if(uses){if(left!="x"&&left!="y"&&equal==1&&expression->m_pElementList[0].Type==6)left="y";std::string error;program.Parse(left+"="+right,radians,error);program.Bind(parameters);return true;}
++    }catch(...){}
+     if(equal<=0)return false; // Preserve the legacy '=formula' entry form.
+     // Native named functions have their own element type, distinct from typed f(x).
+     if(equal==1 && expression->m_pElementList[0].Type==6){
+@@ -1830,7 +1836,7 @@
+         SymbolicDerivative::Parser p;auto rhs=p.Parse(right);
+         if(left=="y"&&!SymbolicDerivative::Depends(rhs,"y"))return false;
+         if(left=="x"&&!SymbolicDerivative::Depends(rhs,"x")&&!SymbolicDerivative::Depends(rhs,"y"))return false;
+-        program.Parse(left+"="+right,radians,error);return true;
++        program.Parse(left+"="+right,radians,error);program.Bind(parameters);return true;
+     }catch(const std::exception &){
+         // Never reinterpret an invalid two-sided relation as its right-hand side.
+         try{return NativeSymbolic::Formula(expression,0,equal)!="y";}catch(const std::exception &){return true;}
+@@ -1965,7 +1971,8 @@
+ 
+ 
+ 
+-	RelationGraph::Program relations[8];bool relationActive[8]={false};
++	    RelationGraph::Parametric boundParametric=parametric;boundParametric.Bind(parameters);
++    RelationGraph::Program relations[8];bool relationActive[8]={false};
+ 	CExpression *Func[8];
+     bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
+     bool vertical[8]={false};double verticalX[8]={0};
+@@ -1977,7 +1984,7 @@
+ 	{
+         Func[kk]=NULL;
+         if(parametric.enabled){if(kk==0)any_found=1;continue;}
+-        if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9&&NativeGraphRelation((CExpression*)pItem->pSubdrawing,relations[kk],is_x_pi!=0)){
++        if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9&&NativeGraphRelation((CExpression*)pItem->pSubdrawing,relations[kk],is_x_pi!=0,parameters)){
+             relationActive[kk]=true;any_found=1;continue;
+         }
+ 		if (Base->NumItems>=kk+9)
+@@ -2401,7 +2408,7 @@
+             if(i==density*Xlen-1&&!abort_request){
+                 RelationGraph::Viewport viewport;viewport.xmin=Xmin;viewport.xmax=Xmax;viewport.ymin=Ymin;viewport.ymax=Ymax;
+                 viewport.width=Xlen;viewport.height=Ylen;viewport.logx=is_x_log!=0;viewport.logy=is_y_log!=0;
+-                PaintRelationCurves(mDC,viewport,relations,relationActive,parametric,ViewZoom,abort_request);
++                PaintRelationCurves(mDC,viewport,relations,relationActive,boundParametric,ViewZoom,abort_request);
+                 GraphDiagnostic("relation,parametric,width,height",relationActive[0],parametric.enabled,Xlen,Ylen);
+             }
+ 			mDC.SelectObject(prev_bitmap);
+@@ -2465,6 +2472,7 @@
+     if(Base->NumItems<8 || !StopForZoom()) return false;
+     double xmin,xmax,ymin,ymax;PlotFunctionGetBondaries(&xmin,&xmax,&ymin,&ymax);
+     if(parametric.enabled){
++        parametric.Bind(parameters);
+         std::vector<double> xs(4097),ys(4097);for(int i=0;i<=4096;i++){auto point=parametric.Value(parametric.low+(parametric.high-parametric.low)*i/4096);xs[i]=point.x;ys[i]=point.y;}
+         double left,right,bottom,top;if(GraphZoom::Fit(xs.data(),(int)xs.size(),is_x_log!=0,left,right)&&GraphZoom::Fit(ys.data(),(int)ys.size(),is_y_log!=0,bottom,top))SetBounds(left,right,bottom,top);
+         TheState=0;PlotFunction(1);return true;
+--- /dev/null
++++ b/Mathomir/GraphParameters.h
+@@ -0,0 +1,11 @@
++#pragma once
++#include "InteractiveObjects.h"
++#include "SymbolicDerivative.h"
++namespace GraphParameters {
++inline bool Name(const std::string &n){return n=="a"||n=="b"||n=="c";}
++inline bool Uses(SymbolicDerivative::Expr e){return e&&(e->op=='v'&&Name(e->name)||Uses(e->a)||Uses(e->b));}
++inline SymbolicDerivative::Expr Bind(SymbolicDerivative::Expr e,const InteractiveObjects::Parameters &p){
++    if(!e)return e;if(e->op=='v'&&Name(e->name))return SymbolicDerivative::N(p.a[e->name[0]-'a'].value);
++    auto n=std::make_shared<SymbolicDerivative::Node>(*e);n->a=Bind(e->a,p);n->b=Bind(e->b,p);return n;
++}
++}
+--- /dev/null
++++ b/Mathomir/InteractiveFeatures.inl
+@@ -0,0 +1,124 @@
++// Native view integration: persistent object references, live parameter controls,
++// step reveals and connectors. Included after the view's existing implementations.
++namespace {
++using InteractiveObjects::Info;
++using InteractiveObjects::Rect;
++struct InteractiveNode {
++    CObject *object;int type;Info *info;Rect bounds;
++    tDocumentStruct *root;CDrawing *parent;int slot,depth;double parentX,parentY;
++};
++
++static void CollectInteractive(CObject *object,int type,double x,double y,tDocumentStruct *root,CDrawing *parent,int slot,double px,double py,int depth,CDC *dc,std::vector<InteractiveNode> &nodes){
++    if(!object||depth>32||nodes.size()>100000)return;Info *info=InteractiveInfo(object,type);if(!info)return;
++    short w=0,a=0,b=0;if(!dc){w=root->Length;b=root->Above+root->Below;if(parent){w=(short)max(1,(parent->Items[slot].X2-parent->Items[slot].X1)/DRWZOOM);b=(short)max(1,(parent->Items[slot].Y2-parent->Items[slot].Y1)/DRWZOOM);}}else if(type==1)((CExpression*)object)->CalculateSize(dc,100,&w,&a,&b);else ((CDrawing*)object)->CalculateSize(dc,100,&w,&b);
++    Rect bounds={x,y,x+max(1,(int)w),y+max(1,(int)a+b)};InteractiveNode n={object,type,info,bounds,root,parent,slot,depth,px,py};nodes.push_back(n);
++    if(type==2){CDrawing *d=(CDrawing*)object;if(d->IsSpecialDrawing)return;for(int i=0;i<d->NumItems;i++){auto &item=d->Items[i];if((item.Type==0||item.Type==2)&&item.pSubdrawing)CollectInteractive((CObject*)item.pSubdrawing,item.Type==2?1:2,x+double(item.X1)/DRWZOOM,y+double(item.Y1)/DRWZOOM,root,d,i,x,y,depth+1,dc,nodes);}}
++}
++static std::vector<InteractiveNode> InteractiveNodes(CDC *dc){std::vector<InteractiveNode> nodes;for(int i=0;i<NumDocumentElements;i++){auto d=TheDocument+i;if(d->Object)CollectInteractive(d->Object,d->Type,d->absolute_X,d->absolute_Y-(d->Type==1?d->Above:0),d,NULL,-1,0,0,0,dc,nodes);}return nodes;}
++static unsigned int NextInteractiveId=1;
++static unsigned int NewInteractiveId(std::set<unsigned int> &used){while(!NextInteractiveId||used.count(NextInteractiveId)){NextInteractiveId++;if(NextInteractiveId>=0x7fffffffu)NextInteractiveId=1;}unsigned int id=NextInteractiveId++;used.insert(id);return id;}
++static void EnsureInteractiveIds(std::vector<InteractiveNode> &nodes){std::set<unsigned int> used,seen;
++    for(auto &n:nodes){if(n.info->id)used.insert(n.info->id);if(n.info->steps)used.insert(n.info->steps);if(n.type==2){auto &c=((CDrawing*)n.object)->m_Connector;if(c.from)used.insert(c.from);if(c.to)used.insert(c.to);}}
++    for(auto &n:nodes){if(!n.info->id)n.info->id=NewInteractiveId(used);else if(!seen.insert(n.info->id).second){n.info->id=NewInteractiveId(used);n.info->steps=0;n.info->order=0;}}
++}
++static InteractiveNode *FindInteractive(std::vector<InteractiveNode> &nodes,unsigned int id){for(auto &n:nodes)if(n.info->id==id)return &n;return NULL;}
++static bool WriteConnector(InteractiveNode &node,const std::vector<InteractiveObjects::Segment> &segments){
++    if(segments.empty())return false;auto d=(CDrawing*)node.object;bool same=d->NumItems==segments.size();double x=node.bounds.left,y=node.bounds.top;
++    for(size_t i=0;same&&i<segments.size();i++){auto &l=d->Items[i];auto &s=segments[i];same=l.Type==1&&std::fabs(x+double(l.X1)/DRWZOOM-s.a.x)<.04&&std::fabs(y+double(l.Y1)/DRWZOOM-s.a.y)<.04&&std::fabs(x+double(l.X2)/DRWZOOM-s.b.x)<.04&&std::fabs(y+double(l.Y2)/DRWZOOM-s.b.y)<.04;}if(same)return false;
++    double left=segments[0].a.x,top=segments[0].a.y,right=left,bottom=top;for(auto &s:segments){left=(std::min)(left,(std::min)(s.a.x,s.b.x));top=(std::min)(top,(std::min)(s.a.y,s.b.y));right=(std::max)(right,(std::max)(s.a.x,s.b.x));bottom=(std::max)(bottom,(std::max)(s.a.y,s.b.y));}left=std::floor(left)-2;top=std::floor(top)-2;
++    auto lines=(tDrawingItem*)calloc(segments.size(),sizeof(tDrawingItem));if(!lines)return false;int width=d->NumItems?d->Items[0].LineWidth:DRWZOOM;
++    for(size_t i=0;i<segments.size();i++){auto &l=lines[i];auto &s=segments[i];l.Type=1;l.LineWidth=max(1,width);l.X1=(int)std::round((s.a.x-left)*DRWZOOM);l.Y1=(int)std::round((s.a.y-top)*DRWZOOM);l.X2=(int)std::round((s.b.x-left)*DRWZOOM);l.Y2=(int)std::round((s.b.y-top)*DRWZOOM);}
++    int color=d->m_Color,background=d->m_BackgroundColor;d->Delete();d->m_Color=color;d->m_BackgroundColor=background;d->Items=lines;d->NumItems=d->NumItemsReserved=(unsigned short)segments.size();
++    if(node.parent){auto &s=node.parent->Items[node.slot];s.X1=(int)std::round((left-node.parentX)*DRWZOOM);s.Y1=(int)std::round((top-node.parentY)*DRWZOOM);s.X2=s.X1+(int)std::ceil(right-left+2)*DRWZOOM;s.Y2=s.Y1+(int)std::ceil(bottom-top+2)*DRWZOOM;}
++    else{node.root->absolute_X=(int)left;node.root->absolute_Y=(int)top;node.root->Above=0;node.root->Length=(short)min(32000,(int)std::ceil(right-left+2));node.root->Below=(short)min(32000,(int)std::ceil(bottom-top+2));}return true;
++}
++static bool NormalizeInteractive(CDrawing *d,int &dx,int &dy,int depth=0){dx=dy=0;if(!d||d->IsSpecialDrawing||depth>32)return false;bool has=false;for(int i=0;i<d->NumItems;i++)if(d->Items[i].Type==0){auto child=(CDrawing*)d->Items[i].pSubdrawing;int x=0,y=0;bool nested=NormalizeInteractive(child,x,y,depth+1);if(nested){d->Items[i].X1+=x*DRWZOOM;d->Items[i].Y1+=y*DRWZOOM;has=true;}if(child&&child->m_Connector.Attached())has=true;}if(has){int w,h;d->AdjustCoordinates(&dx,&dy,&w,&h);}return has;}
++}
++static bool SyncInteractiveObjects(CDC *dc){
++    if(InteractivePasteInProgress||!dc)return false;auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);bool exact=false;for(auto &n:nodes)if(n.type==2&&((CDrawing*)n.object)->m_Connector.Attached())exact=true;if(exact)nodes=InteractiveNodes(dc);bool changed=false;
++    for(auto &n:nodes)if(n.type==2){auto d=(CDrawing*)n.object;if(!d->IsSpecialDrawing&&d->m_Connector.Attached()){auto a=FindInteractive(nodes,d->m_Connector.from),b=FindInteractive(nodes,d->m_Connector.to);if(!a||!b||a==&n||b==&n)continue;if(a->type==2&&((CDrawing*)a->object)->m_Connector.Attached()||b->type==2&&((CDrawing*)b->object)->m_Connector.Attached())continue;changed=WriteConnector(n,InteractiveObjects::Build(a->bounds,b->bounds,d->m_Connector))||changed;}}
++    if(changed)for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2){int x,y;if(NormalizeInteractive((CDrawing*)TheDocument[i].Object,x,y)){TheDocument[i].absolute_X+=x;TheDocument[i].absolute_Y+=y;}}
++    if(InteractiveObjects::Reveal().group){int total=0;for(auto &n:nodes)if(n.info->steps==InteractiveObjects::Reveal().group)total=max(total,n.info->order+1);auto &s=InteractiveObjects::Reveal();if(!total)s.group=0;else{s.total=total;s.visible=min(total,max(0,s.visible));}}
++    if(exact)for(int i=0;i<NumDocumentElements;i++){auto d=TheDocument+i;if(!d->Object)continue;short w=0,a=0,b=0;if(d->Type==1)((CExpression*)d->Object)->CalculateSize(dc,ViewZoom,&w,&a,&b);else if(d->Type==2)((CDrawing*)d->Object)->CalculateSize(dc,ViewZoom,&w,&b);d->Length=w*100/ViewZoom;d->Above=a*100/ViewZoom;d->Below=b*100/ViewZoom;}
++    return changed;
++}
++static bool StepPresentationActive(){return InteractiveObjects::Reveal().group!=0;}
++static bool InteractiveHidden(tDocumentStruct *object){if(!StepPresentationActive()||!object||!object->Object)return false;Info *info=InteractiveInfo(object->Object,object->Type);if(info&&InteractiveObjects::Hidden(*info))return true;
++    if(object->Type==2&&((CDrawing*)object->Object)->m_Connector.Attached()){auto &c=((CDrawing*)object->Object)->m_Connector;auto nodes=InteractiveNodes(NULL);auto a=FindInteractive(nodes,c.from),b=FindInteractive(nodes,c.to);return a&&InteractiveObjects::Hidden(*a->info)||b&&InteractiveObjects::Hidden(*b->info);}return false;
++}
++static void RemapPastedObjects(int first,int count){CClientDC dc(pMainView);auto nodes=InteractiveNodes(&dc);std::set<unsigned int> used;std::map<unsigned int,unsigned int> ids,groups;
++    for(auto &n:nodes){if(n.info->id)used.insert(n.info->id);if(n.info->steps)used.insert(n.info->steps);}
++    for(auto &n:nodes)if(n.root>=TheDocument+first&&n.root<TheDocument+first+count){unsigned int old=n.info->id;unsigned int id=NewInteractiveId(used);if(old)ids[old]=id;n.info->id=id;if(n.info->steps){auto oldGroup=n.info->steps;if(!groups.count(oldGroup))groups[oldGroup]=NewInteractiveId(used);n.info->steps=groups[oldGroup];}}
++    for(auto &n:nodes)if(n.root>=TheDocument+first&&n.root<TheDocument+first+count&&n.type==2){auto &c=((CDrawing*)n.object)->m_Connector;if(c.Attached()){if(ids.count(c.from)&&ids.count(c.to)){c.from=ids[c.from];c.to=ids[c.to];}else c.from=c.to=0;}}
++}
++
++class CParameterSlidersDialog:public CFeatureDialog {
++    CFunctionPlotter *plot;InteractiveObjects::Parameters original,current;bool initializing,changed,pending,wasModified;
++    void Fields(){initializing=true;for(int i=0;i<3;i++){const auto &p=current.a[i];SetDlgItemText(1511+10*i,Piecewise::Number(p.value).c_str());SetDlgItemText(1512+10*i,Piecewise::Number(p.low).c_str());SetDlgItemText(1513+10*i,Piecewise::Number(p.high).c_str());SetDlgItemText(1514+10*i,Piecewise::Number(p.step).c_str());auto s=(CSliderCtrl*)GetDlgItem(1510+10*i);s->SetRange(0,1000);s->SetPos(p.Position());}initializing=false;}
++    bool Read(){auto proposed=current;std::string error;for(int i=0;i<3;i++){double *fields[4]={&proposed.a[i].value,&proposed.a[i].low,&proposed.a[i].high,&proposed.a[i].step};for(int j=0;j<4;j++){CString s;GetDlgItemText(1511+10*i+j,s);if(!IntegralArea::Constant((LPCSTR)s,*fields[j],error)){SetDlgItemText(1505,"Enter finite values, minimum, maximum and a positive step.");return false;}}}if(!proposed.Valid()){SetDlgItemText(1505,"Use minimum < maximum, a value in that range, and 0 < step <= range. Bounds: +/- one billion.");return false;}current=proposed;return true;}
++    bool Apply(){bool different=false;for(int i=0;i<3;i++){auto a=current.a[i],b=plot->parameters.a[i];different=different||a.value!=b.value||a.low!=b.low||a.high!=b.high||a.step!=b.step;}if(!different){pending=false;return true;}if(!plot->StopForZoom()){SetDlgItemText(1505,"The graph is busy; try again after it finishes.");return false;}if(!changed){pMainView->UndoSave("graph sliders");changed=true;}plot->parameters=current;plot->parametric.Bind(current);plot->TheState=0;plot->PlotFunction(1);pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);CString s;s.Format("Live graph: a=%s   b=%s   c=%s",Piecewise::Number(current.a[0].value).c_str(),Piecewise::Number(current.a[1].value).c_str(),Piecewise::Number(current.a[2].value).c_str());SetDlgItemText(1505,s);pending=false;return true;}
++public:
++    CParameterSlidersDialog(CFunctionPlotter *p):CFeatureDialog(IDD_PARAMETER_SLIDERS,theApp.m_pMainWnd),plot(p),original(p->parameters),current(p->parameters),initializing(true),changed(false),pending(false),wasModified(pMainView->GetDocument()->IsModified()!=FALSE){}
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();Fields();SetTimer(1,100,NULL);CRect r,frame;GetWindowRect(&r);theApp.m_pMainWnd->GetWindowRect(&frame);SetWindowPos(NULL,max(frame.left,frame.right-r.Width()-12),frame.top+125,0,0,SWP_NOSIZE|SWP_NOZORDER);return TRUE;}
++    afx_msg void OnHScroll(UINT code,UINT pos,CScrollBar *bar){if(!initializing&&bar){int i=(bar->GetDlgCtrlID()-1510)/10;if(i>=0&&i<3){current.a[i].value=current.a[i].At(((CSliderCtrl*)bar)->GetPos());SetDlgItemText(1511+10*i,Piecewise::Number(current.a[i].value).c_str());pending=true;}}CFeatureDialog::OnHScroll(code,pos,bar);}
++    afx_msg void OnTimer(UINT_PTR id){if(id==1&&pending)Apply();else CFeatureDialog::OnTimer(id);}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1501){if(Read()){Fields();Apply();}return TRUE;}if(id==1502){current=InteractiveObjects::Parameters();Fields();Apply();return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
++    virtual void OnOK(){if(Read()&&Apply()){KillTimer(1);CFeatureDialog::OnOK();}}
++    virtual void OnCancel(){KillTimer(1);if(changed){if(!plot->StopForZoom()){SetDlgItemText(1505,"The graph is busy; try Cancel again after it finishes.");return;}plot->parameters=original;plot->parametric.Bind(original);plot->TheState=0;plot->PlotFunction(1);pMainView->RepaintTheView(1);pMainView->GetDocument()->SetModifiedFlag(wasModified);}CFeatureDialog::OnCancel();}
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CParameterSlidersDialog,CFeatureDialog)
++    ON_WM_HSCROLL()
++    ON_WM_TIMER()
++END_MESSAGE_MAP()
++void CMathomirView::OnParameterSliders(){if(ViewOnlyMode)return;CDrawing *graph=NULL;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2&&(TheDocument+i==prevTouchedObject||TheDocument[i].MovingDotState==3)){graph=FindRelationGraph((CDrawing*)TheDocument[i].Object);if(graph)break;}
++    if(!graph){int count=0;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2){auto d=FindRelationGraph((CDrawing*)TheDocument[i].Object);if(d){graph=d;count++;}}if(count!=1)graph=NULL;}
++    if(!graph){AfxMessageBox("Point at or select an ordinary, implicit or parametric graph, then open Parameter sliders. Use a, b and c in its formulas.");return;}OnChar(27,1,0);auto plot=(CFunctionPlotter*)graph->SpecialData;if(!plot->StopForZoom())return;CParameterSlidersDialog dialog(plot);dialog.DoModal();SetFocus();}
++
++class CStepControls:public CDialog {
++public:
++    CStepControls():CDialog(IDD_STEP_CONTROLS,pMainView){}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id>=ID_STEP_NEXT&&id<=ID_STEP_EXIT){pMainView->OnStepControl(id);pMainView->SetFocus();return TRUE;}return CDialog::OnCommand(wp,lp);}
++    virtual void OnOK(){}virtual void OnCancel(){pMainView->OnStepControl(ID_STEP_EXIT);}
++};
++static CStepControls *StepControls=NULL;
++static void UpdateStepControls(CMathomirView *view){if(!view||!view->GetSafeHwnd())return;if(!StepPresentationActive()){if(StepControls&&StepControls->GetSafeHwnd())StepControls->ShowWindow(SW_HIDE);return;}
++    if(!StepControls){StepControls=new CStepControls();if(!StepControls->Create(IDD_STEP_CONTROLS,view)){delete StepControls;StepControls=NULL;return;}}
++    auto &s=InteractiveObjects::Reveal();CString label;label.Format("Step %d of %d",s.visible,s.total);StepControls->SetDlgItemText(1460,label);StepControls->GetDlgItem(ID_STEP_PREVIOUS)->EnableWindow(s.visible>0);StepControls->GetDlgItem(ID_STEP_NEXT)->EnableWindow(s.visible<s.total);CRect c,r;view->GetClientRect(&c);StepControls->GetWindowRect(&r);StepControls->SetWindowPos(&CWnd::wndTop,max(5,c.right-r.Width()-12),8,0,0,SWP_NOSIZE|SWP_SHOWWINDOW|SWP_NOACTIVATE);}
++static void DestroyStepControls(){if(StepControls){if(StepControls->GetSafeHwnd())StepControls->DestroyWindow();delete StepControls;StepControls=NULL;}}
++void CMathomirView::OnStepControl(UINT command){auto &s=InteractiveObjects::Reveal();if(!s.group)return;if(command==ID_STEP_NEXT)s.visible=min(s.total,s.visible+1);if(command==ID_STEP_PREVIOUS)s.visible=max(0,s.visible-1);if(command==ID_STEP_ALL)s.visible=s.total;if(command==ID_STEP_EXIT)s.group=0;UpdateStepControls(this);InvalidateRect(NULL,FALSE);UpdateWindow();SetFocus();}
++class CStepSequenceDialog:public CFeatureDialog {
++public:
++    std::vector<InteractiveNode> objects;bool remove,start;
++    CStepSequenceDialog():CFeatureDialog(IDD_STEP_SEQUENCE,theApp.m_pMainWnd),remove(false),start(true){}
++    void Fill(int selected){auto list=(CListBox*)GetDlgItem(1470);list->ResetContent();for(size_t i=0;i<objects.size();i++){auto &n=objects[i];CString label;label.Format("%d. %s at (%d, %d)",(int)i+1,n.type==1?"Text / formula":"Drawing / graph",(int)n.bounds.left,(int)n.bounds.top);list->AddString(label);}list->SetCurSel(max(0,min((int)objects.size()-1,selected)));}
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();Fill(0);CheckDlgButton(1474,BST_CHECKED);return TRUE;}
++    virtual void OnOK(){start=IsDlgButtonChecked(1474)==BST_CHECKED;CFeatureDialog::OnOK();}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1471||id==1472){int i=((CListBox*)GetDlgItem(1470))->GetCurSel(),j=i+(id==1471?-1:1);if(i>=0&&j>=0&&j<(int)objects.size()){std::swap(objects[i],objects[j]);Fill(j);}return TRUE;}if(id==1473){remove=true;EndDialog(IDOK);return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
++};
++static unsigned int FocusedStepGroup(const std::vector<InteractiveNode> &nodes){for(auto &n:nodes)if(n.info->steps&&(n.root==prevTouchedObject||n.root->MovingDotState==3))return n.info->steps;std::set<unsigned int> groups;for(auto &n:nodes)if(n.info->steps)groups.insert(n.info->steps);return groups.size()==1?*groups.begin():0;}
++void CMathomirView::OnStepSequence(){if(ViewOnlyMode)return;OnStepControl(ID_STEP_EXIT);CClientDC dc(this);auto nodes=InteractiveNodes(&dc);EnsureInteractiveIds(nodes);CStepSequenceDialog dialog;unsigned int group=FocusedStepGroup(nodes);std::vector<InteractiveNode> selected;for(auto &n:nodes)if(!n.parent&&n.root->MovingDotState==3)selected.push_back(n);
++    if(selected.size()>=2){dialog.objects=selected;group=0;std::stable_sort(dialog.objects.begin(),dialog.objects.end(),[](const InteractiveNode &a,const InteractiveNode &b){return a.bounds.top!=b.bounds.top?a.bounds.top<b.bounds.top:a.bounds.left<b.bounds.left;});}
++    else if(group){for(auto &n:nodes)if(n.info->steps==group)dialog.objects.push_back(n);std::stable_sort(dialog.objects.begin(),dialog.objects.end(),[](const InteractiveNode &a,const InteractiveNode &b){return a.info->order<b.info->order;});}
++    if(dialog.objects.size()<2){AfxMessageBox("Select two or more objects, then choose Make step sequence. Each object or existing group becomes one step; the list lets you reorder them.");return;}
++    if(dialog.DoModal()!=IDOK)return;UndoSave("step sequence");if(!group){std::set<unsigned int> used;for(auto &n:nodes){used.insert(n.info->id);used.insert(n.info->steps);}group=NewInteractiveId(used);}for(size_t i=0;i<dialog.objects.size();i++){auto info=dialog.objects[i].info;info->steps=dialog.remove?0:group;info->order=dialog.remove?0:(int)i;}GetDocument()->SetModifiedFlag();OnChar(27,1,0);
++    if(!dialog.remove&&dialog.start) {InteractiveObjects::Reveal().group=group;InteractiveObjects::Reveal().visible=1;InteractiveObjects::Reveal().total=(int)dialog.objects.size();}
++    if(!dialog.remove&&dialog.start){prevTouchedObject=SpecialDrawingHover=NULL;ResizeHandleObject=RotationHandleObject=MoveGripObject=NULL;}for(int i=0;i<NumDocumentElements;i++){auto d=TheDocument+i;if(d->MovingDotState!=5)d->MovingDotState=0;if(d->Type==1)((CExpression*)d->Object)->DeselectExpression();else if(d->Type==2)((CDrawing*)d->Object)->SelectDrawing(0);}NumSelectedObjects=0;RepaintTheView(1);UpdateStepControls(this);SetFocus();}
++void CMathomirView::OnStepReveal(){CClientDC dc(this);auto nodes=InteractiveNodes(&dc);unsigned int group=FocusedStepGroup(nodes);if(!group){if(!ViewOnlyMode)OnStepSequence();return;}OnChar(27,1,0);auto &s=InteractiveObjects::Reveal();s.group=group;s.visible=1;s.total=0;for(auto &n:nodes)if(n.info->steps==group)s.total=max(s.total,n.info->order+1);prevTouchedObject=SpecialDrawingHover=NULL;ResizeHandleObject=RotationHandleObject=MoveGripObject=NULL;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].MovingDotState!=5)TheDocument[i].MovingDotState=0;NumSelectedObjects=0;RepaintTheView(1);UpdateStepControls(this);SetFocus();}
++
++class CConnectorDialog:public CFeatureDialog {
++public:
++    InteractiveObjects::Connector link;bool detach,canDetach,missing;CString fromLabel,toLabel;
++    CConnectorDialog():CFeatureDialog(IDD_ATTACHED_CONNECTOR,theApp.m_pMainWnd),detach(false),canDetach(false),missing(false){}
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();GetDlgItem(1487)->EnableWindow(canDetach);GetDlgItem(IDOK)->EnableWindow(!missing);SetDlgItemText(1480,fromLabel);SetDlgItemText(1481,toLabel);const char *styles[]={"Line","Arrow from A to B","Arrows at both ends"};for(auto name:styles)((CComboBox*)GetDlgItem(1482))->AddString(name);((CComboBox*)GetDlgItem(1482))->SetCurSel(link.style);((CComboBox*)GetDlgItem(1483))->AddString("Straight");((CComboBox*)GetDlgItem(1483))->AddString("Elbow");((CComboBox*)GetDlgItem(1483))->SetCurSel(link.route);const char *ports[]={"Automatic edge","Top","Right","Bottom","Left"};for(int id=1484;id<=1485;id++)for(auto name:ports)((CComboBox*)GetDlgItem(id))->AddString(name);((CComboBox*)GetDlgItem(1484))->SetCurSel(link.fromPort);((CComboBox*)GetDlgItem(1485))->SetCurSel(link.toPort);return TRUE;}
++    void Read(){link.style=((CComboBox*)GetDlgItem(1482))->GetCurSel();link.route=((CComboBox*)GetDlgItem(1483))->GetCurSel();link.fromPort=((CComboBox*)GetDlgItem(1484))->GetCurSel();link.toPort=((CComboBox*)GetDlgItem(1485))->GetCurSel();}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1486){Read();std::swap(link.from,link.to);std::swap(link.fromPort,link.toPort);std::swap(fromLabel,toLabel);SetDlgItemText(1480,fromLabel);SetDlgItemText(1481,toLabel);((CComboBox*)GetDlgItem(1484))->SetCurSel(link.fromPort);((CComboBox*)GetDlgItem(1485))->SetCurSel(link.toPort);return TRUE;}if(id==1487){detach=true;EndDialog(IDOK);return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
++    virtual void OnOK(){Read();CFeatureDialog::OnOK();}
++};
++void CMathomirView::OnAttachedConnector(){if(ViewOnlyMode)return;CClientDC dc(this);auto nodes=InteractiveNodes(&dc);EnsureInteractiveIds(nodes);std::vector<InteractiveNode*> targets;CDrawing *existing=NULL;for(auto &n:nodes)if(!n.parent&&n.root->MovingDotState==3){if(n.type==2&&((CDrawing*)n.object)->m_Connector.Attached())existing=(CDrawing*)n.object;else targets.push_back(&n);}
++    if(targets.size()!=2&&!existing&&prevTouchedObject&&prevTouchedObject->Type==2){auto d=(CDrawing*)prevTouchedObject->Object;if(d->m_Connector.Attached())existing=d;}
++    CConnectorDialog dialog;if(targets.size()==2&&!existing){dialog.link.from=targets[0]->info->id;dialog.link.to=targets[1]->info->id;existing=NULL;}else if(existing)dialog.link=existing->m_Connector;else{AfxMessageBox("Select exactly two objects, then choose Connect selected objects. To edit a connector, point at it or select it and open this command again.");return;}
++    auto a=FindInteractive(nodes,dialog.link.from),b=FindInteractive(nodes,dialog.link.to);dialog.canDetach=existing!=NULL;if(!a||!b){dialog.missing=true;dialog.fromLabel="An attached object was deleted.";dialog.toLabel="Detach keeps this shape. Undo can restore the missing object.";}else{dialog.fromLabel.Format("A: %s at (%d, %d)",a->type==1?"Text / formula":"Drawing / graph",(int)a->bounds.left,(int)a->bounds.top);dialog.toLabel.Format("B: %s at (%d, %d)",b->type==1?"Text / formula":"Drawing / graph",(int)b->bounds.left,(int)b->bounds.top);}if(dialog.DoModal()!=IDOK)return;UndoSave("attached connector");
++    if(existing){if(dialog.detach)existing->m_Connector.from=existing->m_Connector.to=0;else existing->m_Connector=dialog.link;}
++    else if(!dialog.detach){auto d=new CDrawing();d->m_Connector=dialog.link;d->m_Color=0;if(!AddDocumentObject(2,0,0)){delete d;return;}TheDocument[NumDocumentElements-1].Object=(CObject*)d;}
++    OnChar(27,1,0);SyncInteractiveObjects(&dc);GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();}
+--- /dev/null
++++ b/Mathomir/InteractiveObjects.h
+@@ -0,0 +1,47 @@
++#pragma once
++#include <algorithm>
++#include <cmath>
++#include <cstdlib>
++#include <string>
++#include <vector>
++namespace InteractiveObjects {
++struct Info {
++    unsigned int id,steps;int order;
++    Info():id(0),steps(0),order(0){}
++    unsigned int Hash()const{return steps*97u+(steps?order*31u:0);}
++    std::string Attributes()const{return (id?" oid=\""+std::to_string(id)+"\"":"")+(steps?" steps=\""+std::to_string(steps)+"\" order=\""+std::to_string(order)+"\"":"");}
++    void Read(const std::string &key,const char *value){char *end=NULL;unsigned long n=std::strtoul(value,&end,10);if(!*value||!end||*end||*value=='-'||n>0x7ffffffeu)return;if(key=="oid")id=(unsigned int)n;if(key=="steps")steps=(unsigned int)n;if(key=="order"&&n<100000)order=(int)n;}
++};
++struct Parameter {
++    double value,low,high,step;
++    Parameter(double n=1):value(n),low(-5),high(5),step(.1){}
++    bool Valid()const{return std::isfinite(value)&&std::isfinite(low)&&std::isfinite(high)&&std::isfinite(step)&&low<high&&step>0&&step<=high-low&&value>=low&&value<=high&&std::fabs(low)<=1e9&&std::fabs(high)<=1e9;}
++    double At(int position)const{double n=low+(high-low)*(std::max)(0,(std::min)(1000,position))/1000.;return (std::max)(low,(std::min)(high,low+std::round((n-low)/step)*step));}
++    int Position()const{return (int)std::round((value-low)*1000/(high-low));}
++};
++struct Parameters {Parameter a[3];Parameters(){a[2].value=0;}bool Valid()const{return a[0].Valid()&&a[1].Valid()&&a[2].Valid();}};
++struct Point {double x,y;};
++struct Rect {double left,top,right,bottom;Point Center()const{Point p={(left+right)/2,(top+bottom)/2};return p;}};
++struct Segment {Point a,b;};
++struct Connector {
++    unsigned int from,to;int style,route,fromPort,toPort;
++    Connector():from(0),to(0),style(1),route(0),fromPort(0),toPort(0){}
++    bool Attached()const{return from&&to&&from!=to;}
++};
++inline Point Port(Rect r,Point other,int port){Point c=r.Center();if(port==1){c.y=r.top;return c;}if(port==2){c.x=r.right;return c;}if(port==3){c.y=r.bottom;return c;}if(port==4){c.x=r.left;return c;}
++    double dx=other.x-c.x,dy=other.y-c.y;if(std::fabs(dx)+std::fabs(dy)<1e-9)dx=1;
++    double t=1e30;if(std::fabs(dx)>1e-9)t=(r.right-r.left)/2/std::fabs(dx);if(std::fabs(dy)>1e-9)t=(std::min)(t,(r.bottom-r.top)/2/std::fabs(dy));Point p={c.x+t*dx,c.y+t*dy};return p;}
++inline void Arrow(std::vector<Segment> &out,Point end,Point previous,double size){double dx=end.x-previous.x,dy=end.y-previous.y,n=std::hypot(dx,dy);if(n<1e-6)return;dx/=n;dy/=n;Point a={end.x-size*dx+size*.45*dy,end.y-size*dy-size*.45*dx},b={end.x-size*dx-size*.45*dy,end.y-size*dy+size*.45*dx};out.push_back({end,a});out.push_back({end,b});}
++inline std::vector<Segment> Build(Rect from,Rect to,const Connector &link){
++    Point a=Port(from,to.Center(),link.fromPort),b=Port(to,from.Center(),link.toPort);std::vector<Point> path;path.push_back(a);
++    if(link.route){bool horizontal=std::fabs(to.Center().x-from.Center().x)>=std::fabs(to.Center().y-from.Center().y);if(link.fromPort==2||link.fromPort==4)horizontal=true;if(link.fromPort==1||link.fromPort==3)horizontal=false;
++        if(horizontal){double x=(a.x+b.x)/2;path.push_back({x,a.y});path.push_back({x,b.y});}else{double y=(a.y+b.y)/2;path.push_back({a.x,y});path.push_back({b.x,y});}}
++    path.push_back(b);std::vector<Point> clean;for(auto p:path)if(clean.empty()||std::hypot(p.x-clean.back().x,p.y-clean.back().y)>1e-6)clean.push_back(p);
++    std::vector<Segment> out;for(size_t i=1;i<clean.size();i++)out.push_back({clean[i-1],clean[i]});
++    if(clean.size()>1){double length=std::hypot(b.x-a.x,b.y-a.y),size=(std::max)(3.,(std::min)(10.,length/5));if(link.style>0)Arrow(out,clean.back(),clean[clean.size()-2],size);if(link.style==2)Arrow(out,clean.front(),clean[1],size);}return out;
++}
++inline bool Hidden(const Info &info,unsigned int active,int visible){return active&&info.steps==active&&info.order>=visible;}
++struct RevealState {unsigned int group;int visible,total;RevealState():group(0),visible(0),total(0){}};
++inline RevealState &Reveal(){static RevealState state;return state;}
++inline bool Hidden(const Info &info){return Hidden(info,Reveal().group,Reveal().visible);}
++}
+--- a/Mathomir/MainFrm.cpp
++++ b/Mathomir/MainFrm.cpp
+@@ -895,6 +895,7 @@
+ //clears the entire document (like File->New)
+ int CMainFrame::ClearDocument(void)
+ {
++    InteractiveObjects::Reveal()=InteractiveObjects::RevealState();
+     if(pMainView)pMainView->ClearRotationCenter();
+     // Hover entries point into TheDocument: clear them before freeing its storage.
+     SpecialDrawingHover=prevSpecialDrawingHover=NULL;
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -8,6 +8,7 @@
+ // Generated from the TEXTINCLUDE 2 resource.
+ //
+ #include "afxres.h"
++#include <commctrl.h>
+ 
+ /////////////////////////////////////////////////////////////////////////////
+ #undef APSTUDIO_READONLY_SYMBOLS
+@@ -310,6 +311,8 @@
+     END
+     POPUP "&View"
+     BEGIN
++        MENUITEM "Make or edit step sequence...", ID_STEP_SEQUENCE
++        MENUITEM "Reveal step sequence", ID_STEP_REVEAL
+         MENUITEM "Fit page width", ID_FIT_PAGE_WIDTH
+         POPUP "&Zoom"
+         BEGIN
+@@ -490,6 +493,7 @@
+         MENUITEM "Smooth selected freehand curves", ID_SMOOTH_SELECTED
+         MENUITEM "Grid and axis labels...", ID_COORDINATE_GRID_EDIT
+         MENUITEM "Brace with label box...", ID_BRACE_LABEL
++        MENUITEM "Connect selected objects...", ID_ATTACHED_CONNECTOR
+     END
+     POPUP "&Calculus"
+     BEGIN
+@@ -504,6 +508,7 @@
+     POPUP "&Graph"
+     BEGIN
+         MENUITEM "Relations and parametric curves...", ID_RELATION_GRAPH
++        MENUITEM "Parameter sliders...", ID_PARAMETER_SLIDERS
+         MENUITEM "Integral area shader...", ID_INTEGRAL_SHADER
+         MENUITEM "Logarithm builder...", ID_LOG_BASE_BUILDER
+         MENUITEM "Piecewise function grapher...", ID_PIECEWISE_GRAPH
+@@ -1218,3 +1223,88 @@
+     DEFPUSHBUTTON "Place brace",IDOK,225,199,76,17
+     PUSHBUTTON "Cancel",IDCANCEL,308,199,52,17
+ END
++
++IDD_PARAMETER_SLIDERS DIALOGEX 0,0,360,229
++STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Graph parameter sliders"
++FONT 9,"Segoe UI"
++BEGIN
++ LTEXT "Use a, b and c in the graph's formulas. Drag a slider to update the graph.",-1,8,8,344,20
++ LTEXT "Value",-1,168,32,40,10
++ LTEXT "Minimum",-1,214,32,42,10
++ LTEXT "Maximum",-1,260,32,42,10
++ LTEXT "Step",-1,306,32,42,10
++ LTEXT "a",-1,8,51,12,12
++ CONTROL "",1510,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,44,139,25
++ EDITTEXT 1511,168,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1512,214,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1513,260,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1514,306,47,45,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "b",-1,8,91,12,12
++ CONTROL "",1520,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,84,139,25
++ EDITTEXT 1521,168,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1522,214,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1523,260,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1524,306,87,45,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "c",-1,8,131,12,12
++ CONTROL "",1530,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,124,139,25
++ EDITTEXT 1531,168,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1532,214,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1533,260,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1534,306,127,45,15,ES_AUTOHSCROLL | WS_TABSTOP
++ PUSHBUTTON "Apply values / ranges",1501,8,158,113,18
++ PUSHBUTTON "Reset defaults",1502,129,158,90,18
++ LTEXT "Drag sliders for live changes. Cancel restores the values you started with.",1505,8,183,344,22
++ DEFPUSHBUTTON "Done",IDOK,236,206,55,17
++ PUSHBUTTON "Cancel",IDCANCEL,298,206,54,17
++END
++
++IDD_STEP_SEQUENCE DIALOGEX 0,0,350,230
++STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Step-by-step sequence"
++FONT 9,"Segoe UI"
++BEGIN
++ LTEXT "Each selected object or group becomes one step. Arrange the reveal order.",-1,8,8,334,18
++ LISTBOX 1470,8,30,256,148,LBS_NOTIFY | WS_VSCROLL | WS_TABSTOP | WS_BORDER
++ PUSHBUTTON "Move up",1471,273,34,69,19
++ PUSHBUTTON "Move down",1472,273,60,69,19
++ PUSHBUTTON "Remove sequence",1473,273,124,69,31
++ CONTROL "Start reveal after saving",1474,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,186,210,14
++ LTEXT "Space / Right: next. Left: back. Home: hide all. End: show all. Esc: exit.",-1,8,204,235,19
++ DEFPUSHBUTTON "Save",IDOK,247,207,44,17
++ PUSHBUTTON "Cancel",IDCANCEL,298,207,44,17
++END
++
++IDD_STEP_CONTROLS DIALOGEX 0,0,338,30
++STYLE DS_CONTROL | WS_CHILD | WS_BORDER
++FONT 9,"Segoe UI"
++BEGIN
++ LTEXT "Step 1 of 1",1460,8,10,64,12
++ PUSHBUTTON "Back",ID_STEP_PREVIOUS,77,5,44,19
++ PUSHBUTTON "Next",ID_STEP_NEXT,126,5,44,19
++ PUSHBUTTON "Show all",ID_STEP_ALL,175,5,62,19
++ PUSHBUTTON "Exit reveal",ID_STEP_EXIT,244,5,85,19
++END
++
++IDD_ATTACHED_CONNECTOR DIALOGEX 0,0,352,208
++STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++CAPTION "Attached connector"
++FONT 9,"Segoe UI"
++BEGIN
++ LTEXT "Connect two objects; the endpoints follow their position and size.",-1,8,8,336,18
++ LTEXT "Object A",1480,8,31,270,15
++ LTEXT "Object B",1481,8,49,270,15
++ PUSHBUTTON "Swap A / B",1486,273,31,71,27
++ LTEXT "Ends",-1,8,77,35,12
++ COMBOBOX 1482,46,73,166,72,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++ LTEXT "Path",-1,224,77,27,12
++ COMBOBOX 1483,253,73,91,56,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++ LTEXT "A attaches at",-1,8,107,72,12
++ COMBOBOX 1484,82,103,100,84,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++ LTEXT "B attaches at",-1,189,107,70,12
++ COMBOBOX 1485,261,103,83,84,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
++ LTEXT "Move or resize either object and the connector follows.\nSelect the connector and reopen this dialog to change its settings.",-1,8,135,336,28
++ PUSHBUTTON "Detach (keep shape)",1487,8,182,120,18
++ DEFPUSHBUTTON "Apply",IDOK,227,182,55,18
++ PUSHBUTTON "Cancel",IDCANCEL,289,182,55,18
++END
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -60,6 +60,17 @@
+ #include "gdiplusimaging.h" 
+ #include "htmlhelp.h"
+ #include "drawing.h"
++
++#include <map>
++static bool InteractivePasteInProgress=false;
++static InteractiveObjects::Info *InteractiveInfo(CObject *object,int type){return !object?NULL:type==1?&((CExpression*)object)->m_ObjectInfo:type==2?&((CDrawing*)object)->m_ObjectInfo:NULL;}
++static bool SyncInteractiveObjects(CDC *dc);
++static bool InteractiveHidden(tDocumentStruct *object);
++static bool StepPresentationActive();
++static void RemapPastedObjects(int first,int count);
++static void UpdateStepControls(CMathomirView *view);
++static void DestroyStepControls();
++
+ 
+ 
+ #ifdef _DEBUG
+@@ -515,6 +526,7 @@
+     return NULL;
+ }
+ static bool DeleteGripClick=false;
++static bool IsAttachedConnector(tDocumentStruct *object){return object&&object->Object&&object->Type==2&&((CDrawing*)object->Object)->m_Connector.Attached();}
+ static bool IsGraphObject(tDocumentStruct *object)
+ {
+     return object && object->Type==2 && object->Object && ((CDrawing*)object->Object)->IsSpecialDrawing==51;
+@@ -700,7 +712,7 @@
+ // never cover a foreground annotation; layout is deterministic while hovering.
+ static bool CenterMoveGripPoint(tDocumentStruct *object,CPoint &point)
+ {
+-    if(!object || !object->Object || object->MovingDotState==5 || PrintRendering || NumSelectedObjects>1)return false;
++    if(!object || !object->Object || IsAttachedConnector(object) || object->MovingDotState==5 || PrintRendering || NumSelectedObjects>1)return false;
+     if(MouseMovingActive && CenterMovePending && MoveGripObject==object->Object){
+         point=CPoint((object->absolute_X-ViewX)*ViewZoom/100+CenterGripOffset.x,
+             (object->absolute_Y-ViewY)*ViewZoom/100+CenterGripOffset.y);return true;
+@@ -791,7 +803,7 @@
+ }
+ static bool CanRotateObject(tDocumentStruct *object)
+ {
+-    return object && object->Object && (object->Type==1 ||
++    return object && object->Object && !IsAttachedConnector(object) && (object->Type==1 ||
+         (object->Type==2 && CanRotateDrawing((CDrawing*)object->Object)));
+ }
+ static tDocumentStruct *RotationHandleDocument()
+@@ -961,6 +973,11 @@
+     ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
+     ON_COMMAND(ID_INTEGRAL_SHADER,OnIntegralShader)
+     ON_COMMAND(ID_RELATION_GRAPH,OnRelationGraph)
++    ON_COMMAND(ID_PARAMETER_SLIDERS,OnParameterSliders)
++    ON_COMMAND(ID_STEP_SEQUENCE,OnStepSequence)
++    ON_COMMAND(ID_STEP_REVEAL,OnStepReveal)
++    ON_COMMAND_RANGE(ID_STEP_NEXT,ID_STEP_EXIT,OnStepControl)
++    ON_COMMAND(ID_ATTACHED_CONNECTOR,OnAttachedConnector)
+     ON_COMMAND(ID_BRACE_LABEL,OnBraceLabel)
+     ON_COMMAND(ID_LOG_BASE_BUILDER,OnLogBaseBuilder)
+     ON_COMMAND(ID_AI_HELP,OnAiHelp)
+@@ -1148,6 +1165,7 @@
+ 
+ CMathomirView::~CMathomirView()
+ {
++    DestroyStepControls();
+     if(m_SelectionApproxPanel){if(m_SelectionApproxPanel->GetSafeHwnd())m_SelectionApproxPanel->DestroyWindow();delete m_SelectionApproxPanel;m_SelectionApproxPanel=NULL;}
+ 	if (ClipboardBackground.DC)
+ 	{
+@@ -1329,6 +1347,7 @@
+ 
+ void CMathomirView::OnDraw(CDC* pDC)
+ {
++    SyncInteractiveObjects(pDC);if(!pDC->IsPrinting())UpdateStepControls(this);
+     if (!pDC->IsPrinting()) { ApplyPageWidthFit(); UpdateQuickActionMode(); }
+ 	tDocumentStruct *ds=TheDocument;
+ 	int SelectedElement;
+@@ -1576,8 +1595,9 @@
+         ds=TheDocument;
+ 		for (int i=NumDocumentElements-1;i>=0;i--,ds++)
+ 		{
++            if(InteractiveHidden(ds))continue;
+             bool graph=ds->Type==2 && ds->Object && ((CDrawing*)ds->Object)->IsSpecialDrawing==51;
+-            int paintLayer=graph?0:annotationLayers[(int)(ds-TheDocument)]?2:1;
++            int paintLayer=(graph||(ds->Type==2&&((CDrawing*)ds->Object)->m_Connector.Attached()))?0:annotationLayers[(int)(ds-TheDocument)]?2:1;
+             if(paintLayer!=layer)continue;
+ 			if ((ds->absolute_Y<-1000) && (ds->absolute_Y>-1200))
+ 			{
+@@ -2237,6 +2257,8 @@
+ 
+ void CMathomirView::OnLButtonDblClk(UINT nFlags, CPoint point)
+ {
++    if(StepPresentationActive())return;
++    for(int i=NumDocumentElements-1;i>=0;i--){auto d=TheDocument+i;if(d==FrontContentAtPoint(point)&&d->Type==2&&((CDrawing*)d->Object)->m_Connector.Attached()&&d->MovingDotState!=5){int node=-1;CClientDC dc(this);if(((CDrawing*)d->Object)->SelectObjectAtPoint(&dc,ViewZoom,point.x-(d->absolute_X-ViewX)*ViewZoom/100,point.y-(d->absolute_Y-ViewY)*ViewZoom/100,&node)){RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}for(int k=0;k<NumDocumentElements;k++)if(TheDocument[k].MovingDotState!=5)TheDocument[k].MovingDotState=0;NumSelectedObjects=0;prevTouchedObject=d;OnAttachedConnector();return;}}}
+ 	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
+ 	if (nFlags & (MK_CONTROL|MK_SHIFT)) { OnLButtonDown(nFlags,point); return; }
+     if(!ClipboardExpression && !ClipboardDrawing){
+@@ -2288,6 +2310,7 @@
+ static CObject *ExplicitTypingRoot=NULL;
+ void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
+ {
++    if(StepPresentationActive())return;
+     ScopedPlacementPreviewPause previewPause;
+     RestoreClipboardBackground();
+     const bool centerWasVisible=CenterMoveGripHit(ResizeHandleDocument(),point);
+@@ -3846,6 +3869,7 @@
+ 
+ void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
+ {
++    if(StepPresentationActive()){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
+     if(IsDrawingMode)RestoreClipboardBackground();
+     if(MouseMode==8 && getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *t=fopen("center-move-grip-trace.txt","a");if(t){fprintf(t,"node move %d,%d flags=%u node=%d,%d\n",point.x,point.y,nFlags,tmpDrawing2?tmpDrawing2->NodeX:-999,tmpDrawing2?tmpDrawing2->NodeY:-999);fclose(t);}}
+     if(!(nFlags&(MK_LBUTTON|MK_SHIFT))&&KeepSelectionApproxPanel(point)){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
+@@ -5163,6 +5187,7 @@
+ #pragma optimize("s",on)
+ void CMathomirView::OnRButtonDown(UINT nFlags, CPoint point)
+ {
++    if(StepPresentationActive())return;
+ 	IsWindowOutOfFocus=0;
+ 	SteadyCursorTimer=0;
+ 	SpacebarPressedRecently=0;
+@@ -5561,6 +5586,7 @@
+ char lockRepeat;
+ void CMathomirView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
+ {
++    if(StepPresentationActive())return;
+     if(nChar==27)for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);
+     if(KeyboardEntryObject||nChar==27)ExplicitTypingRoot=NULL;
+     m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
+@@ -5649,6 +5675,7 @@
+ #pragma optimize("s",on)
+ void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
+ {
++    if(StepPresentationActive()&&!(GetKeyState(VK_CONTROL)&0x8000)){if(nChar==VK_ESCAPE)OnStepControl(ID_STEP_EXIT);else if(nChar==VK_SPACE||nChar==VK_RIGHT||nChar==VK_DOWN||nChar==VK_NEXT)OnStepControl(ID_STEP_NEXT);else if(nChar==VK_LEFT||nChar==VK_UP||nChar==VK_PRIOR)OnStepControl(ID_STEP_PREVIOUS);else if(nChar==VK_END)OnStepControl(ID_STEP_ALL);else if(nChar==VK_HOME){InteractiveObjects::Reveal().visible=0;OnStepControl(0);}return;}
+     if(nChar==VK_ESCAPE){CenterEditRelease=false;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);}
+     m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
+     if(nChar==VK_RETURN && (GetKeyState(VK_CONTROL)&0x8000)){if(GetKeyState(VK_SHIFT)&0x8000)OnApproximateExpression();else OnExecuteExpression();SurpressCharMessage=1;return;}
+@@ -8302,6 +8329,8 @@
+ 
+ int CMathomirView::GentlyPaintObject(tDocumentStruct * ds, CDC * DC)
+ {
++    if(!InteractivePasteInProgress&&DC&&::WindowFromDC(DC->GetSafeHdc())==GetSafeHwnd()){bool linked=false;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2&&((CDrawing*)TheDocument[i].Object)->m_Connector.Attached()){linked=true;break;}if(linked){SyncInteractiveObjects(DC);InvalidateRect(NULL,FALSE);UpdateWindow();return 1;}}
++    if(!PrintRendering&&InteractiveHidden(ds))return 1;
+     if(ds && DC && ::WindowFromDC(DC->GetSafeHdc())==GetSafeHwnd())
+     {
+         bool compose=IsGraphObject(ds);
+@@ -9912,6 +9941,8 @@
+     if(kind==5 || kind==6)return Toolbox?Toolbox->PalettePlacementProbe((int)index,kind==6):0;
+     if(kind==7)return IsDrawingMode;
+     if(!NumDocumentElements)return 0;
++    if(kind==8){if(StepPresentationActive())return 0;for(int i=0;i<NumDocumentElements;i++){auto d=TheDocument+i;bool selected=i<30&&((unsigned int)index&(1u<<i));if(d->MovingDotState!=5)d->MovingDotState=selected?3:0;if(d->Type==1)((CExpression*)d->Object)->DeselectExpression();else if(d->Type==2)((CDrawing*)d->Object)->SelectDrawing(selected?1:0);}prevTouchedObject=NULL;RepaintTheView(1);return NumSelectedObjects;}
++    if(kind==9){const auto &s=InteractiveObjects::Reveal();return index==0?s.group:index==1?s.visible:s.total;}
+     if(kind==4){
+         tDocumentStruct *object=ResizeHandleDocument();CPoint center;
+         bool hasCenter=CenterMoveGripPoint(object,center);
+@@ -10423,6 +10454,7 @@
+ 
+ void CMathomirView::OnEditDelete()
+ {
++    if(StepPresentationActive())return;
+ 
+ 	if (ViewOnlyMode) return;
+ 
+@@ -11129,6 +11161,10 @@
+     dialog.Add(ID_SYMBOLIC_DERIVATIVE,"Calculus > Symbolic derivative finder...","differentiate derivative calculus symbolic slope chain product quotient higher order");
+     dialog.Add(ID_AI_HELP,"Calculus > AI math help...","AI explain check working OpenAI tutor online graph ideas");
+     dialog.Add(ID_LOG_BASE_BUILDER,"Graph > Logarithm builder...","log base logarithm radical sqrt custom argument change of base");
++    dialog.Add(ID_PARAMETER_SLIDERS,"Graph > Parameter sliders...","slider parameters a b c animate explore graph coefficients");
++    dialog.Add(ID_STEP_SEQUENCE,"View > Make or edit step sequence...","steps reveal sequence presentation solution order");
++    dialog.Add(ID_STEP_REVEAL,"View > Reveal step sequence","steps reveal presentation next back show all");
++    dialog.Add(ID_ATTACHED_CONNECTOR,"Draw > Connect selected objects...","connector connected arrow line elbow attach follow endpoints diagram");
+     dialog.Add(ID_RELATION_GRAPH,"Graph > Relations and parametric curves...","implicit relation equation circle hyperbola parametric x(t) y(t) graph plot preview");
+     dialog.Add(ID_INTEGRAL_SHADER,"Graph > Integral area shader...","integral area bounds shade shading calculus hatch signed absolute numerical");
+     dialog.Add(ID_PIECEWISE_GRAPH,"Graph > Piecewise function grapher...","piecewise pieces intervals open closed endpoints domain jumps step graph");
+@@ -11448,6 +11484,7 @@
+ bool CMathomirView::BeginGripMove(CPoint point,bool allowCenter)
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
++    if(IsAttachedConnector(object))return false;
+     if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || ClipboardExpression || ClipboardDrawing) return false;
+     CPoint grip=MoveGripPoint(object);
+     CPoint lower=LowerMoveGripPoint(object);
+@@ -11501,6 +11538,7 @@
+ void CMathomirView::PaintMoveGrip(CDC *dc)
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
++    if(IsAttachedConnector(object))return;
+     if (!object || object->MovingDotState==5) return;
+     for(int grip=0;grip<3;grip++)
+     {
+@@ -11523,6 +11561,7 @@
+ void CMathomirView::PaintSizeHandle(CDC *dc)
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
++    if(IsAttachedConnector(object))return;
+     if(object && object->Type==2 && ((CDrawing*)object->Object)->GripNodeEditing)return;
+     if (!object || object->MovingDotState==5 || (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object))) return;
+     CPoint point=ResizeHandlePoint(object);
+@@ -11546,6 +11585,7 @@
+ bool CMathomirView::BeginMouseSizing(CPoint point)
+ {
+     tDocumentStruct *object=ResizeHandleDocument();
++    if(IsAttachedConnector(object))return false;
+     if(object && object->Type==2 && ((CDrawing*)object->Object)->GripNodeEditing)return false;
+     if (!object || object->MovingDotState==5 || ViewOnlyMode || IsDrawingMode || MouseRotationActive || ClipboardExpression || ClipboardDrawing) return false;
+     if (object->Type==2 && ((CDrawing*)object->Object)->IsSpecialDrawing && !IsGraphObject(object)) return false;
+@@ -11660,6 +11700,7 @@
+         if(content.Type==2)((CExpression*)original)->CalculateSize(&dc,ViewZoom,&width,&above,&below);
+         else ((CDrawing*)original)->CalculateSize(&dc,ViewZoom,&width,&below);
+         if(group->m_BackgroundColor>=0){if(content.Type==2)((CExpression*)original)->m_BackgroundColor=group->m_BackgroundColor;else ((CDrawing*)original)->m_BackgroundColor=group->m_BackgroundColor;}
++        if(InteractiveInfo(original,content.Type==2?1:2))*InteractiveInfo(original,content.Type==2?1:2)=group->m_ObjectInfo;
+         group->Items[0].pSubdrawing=NULL;
+         object->Object=original;object->Type=content.Type==2?1:2;
+         object->absolute_X=x;object->absolute_Y=y+above*100/ViewZoom;
+@@ -11672,6 +11713,7 @@
+         CDrawing *wrapper=new CDrawing();wrapper->Items=(tDrawingItem*)calloc(2,sizeof(tDrawingItem));
+         if(!wrapper->Items){delete wrapper;free(lines);return NULL;}
+         wrapper->NumItems=wrapper->NumItemsReserved=2;
++        if(InteractiveInfo(object->Object,object->Type)){wrapper->m_ObjectInfo=*InteractiveInfo(object->Object,object->Type);*InteractiveInfo(object->Object,object->Type)=InteractiveObjects::Info();}
+         tDrawingItem &content=wrapper->Items[0];content.Type=object->Type==1?2:0;content.pSubdrawing=object->Object;
+         content.X2=object->Length*DRWZOOM;content.Y2=(object->Above+object->Below)*DRWZOOM;
+         if(object->Type==1)((CExpression*)object->Object)->DeselectExpression();
+@@ -12464,6 +12506,7 @@
+ 	if (mydrw==NULL) return 0;
+     int AbsoluteX,AbsoluteY;
+     ResolveDrawingPlacement(mydrw,cursorX,cursorY,AbsoluteX,AbsoluteY);
++    int interactiveFirst=NumDocumentElements;InteractivePasteInProgress=true;
+ 
+ 
+ 
+@@ -12523,6 +12566,7 @@
+ 		}
+ 	}
+ 
++    InteractivePasteInProgress=false;if(!drawing)RemapPastedObjects(interactiveFirst,NumDocumentElements-interactiveFirst);
+ 
+ 	return 0;
+ }
+@@ -14468,6 +14512,7 @@
+ class CRelationDialog:public CFeatureDialog
+ {
+ public:
++    InteractiveObjects::Parameters parameters;
+     std::string equations;RelationGraph::Parametric parametric;RelationGraph::Viewport viewport;bool radians,initializing;std::vector<RelationGraph::Program> programs;CRelationPreview preview;
+     CRelationDialog():CFeatureDialog(IDD_RELATION_GRAPH,theApp.m_pMainWnd),equations("x^2+y^2=25"),radians(true),initializing(true){viewport.width=550;viewport.height=415;}
+     CString Text(int id){CString s;GetDlgItemText(id,s);s.Trim();return s;}
+@@ -14485,6 +14530,7 @@
+                 RelationGraph::Program p;if(!p.Parse(line,radians,error))goto invalid;programs.push_back(p);}
+             if(programs.empty()){error="Enter an equation, for example x^2+y^2=25.";goto invalid;}
+         }
++        for(auto &p:programs)p.Bind(parameters);parametric.Bind(parameters);
+         preview.programs=programs;preview.parametric=parametric;preview.viewport=viewport;preview.ready=true;preview.Invalidate();GetDlgItem(IDOK)->EnableWindow(TRUE);
+         SetDlgItemText(1435,parametric.enabled?"Parametric curve ready. The t interval is independent of the graph window.":"Equations ready. Numerical contours show branches without solving for y. Very small details may require zooming in.");return true;
+     invalid:preview.ready=false;preview.Invalidate();GetDlgItem(IDOK)->EnableWindow(FALSE);SetDlgItemText(1435,error.c_str());return false;
+@@ -14506,13 +14552,13 @@
+ {
+     if(ViewOnlyMode)return;CDrawing *existing=NULL;for(int i=0;i<NumDocumentElements;i++){auto o=TheDocument+i;if(o->Type==2&&(o==prevTouchedObject||o->MovingDotState==3)){existing=FindRelationGraph((CDrawing*)o->Object);if(existing)break;}}
+     if(MouseMode==102)existing=NULL;OnChar(27,1,0);CRelationDialog dialog;
+-    if(existing){auto p=(CFunctionPlotter*)existing->SpecialData;if(!p->StopForZoom())return;p->EnsureFunctionSlots();dialog.parametric=p->parametric;dialog.radians=p->is_x_pi!=0;dialog.viewport.width=max(2,abs(existing->Items[0].X2-existing->Items[0].X1)/DRWZOOM-p->MX);dialog.viewport.height=max(2,abs(existing->Items[1].Y2-existing->Items[1].Y1)/DRWZOOM-p->MY);p->PlotFunctionGetBondaries(&dialog.viewport.xmin,&dialog.viewport.xmax,&dialog.viewport.ymin,&dialog.viewport.ymax);
++    if(existing){auto p=(CFunctionPlotter*)existing->SpecialData;if(!p->StopForZoom())return;p->EnsureFunctionSlots();dialog.parameters=p->parameters;dialog.parametric=p->parametric;dialog.radians=p->is_x_pi!=0;dialog.viewport.width=max(2,abs(existing->Items[0].X2-existing->Items[0].X1)/DRWZOOM-p->MX);dialog.viewport.height=max(2,abs(existing->Items[1].Y2-existing->Items[1].Y1)/DRWZOOM-p->MY);p->PlotFunctionGetBondaries(&dialog.viewport.xmin,&dialog.viewport.xmax,&dialog.viewport.ymin,&dialog.viewport.ymax);
+         dialog.equations.clear();for(int i=8;i<existing->NumItems&&i<16;i++)try{auto expression=(CExpression*)existing->Items[i].pSubdrawing;if(!NativeSymbolic::Empty(expression)){if(!dialog.equations.empty())dialog.equations+="\r\n";dialog.equations+=GraphEquationText(expression);}}catch(const std::exception &){AfxMessageBox("This graph contains expressions the relation editor cannot read. Edit those expressions directly with f1 to f8.");return;}
+     }
+     if(dialog.DoModal()!=IDOK)return;CDrawing *drawing=existing;
+     if(existing){if(!((CFunctionPlotter*)existing->SpecialData)->StopForZoom())return;UndoSave("edit graph relations");}
+     else{drawing=new CDrawing();int x,y;drawing->StartCreatingItem(51);drawing->UpdateCreatingItem(6000,4400,0,0);drawing->EndCreatingItem(&x,&y);}
+-    auto plotter=(CFunctionPlotter*)drawing->SpecialData;plotter->EnsureFunctionSlots();plotter->parametric=dialog.parametric;plotter->is_x_pi=dialog.radians?1:0;plotter->is_x_log=plotter->is_y_log=plotter->analyze=0;
++    auto plotter=(CFunctionPlotter*)drawing->SpecialData;plotter->EnsureFunctionSlots();plotter->parameters=dialog.parameters;plotter->parametric=dialog.parametric;plotter->is_x_pi=dialog.radians?1:0;plotter->is_x_log=plotter->is_y_log=plotter->analyze=0;
+     for(int i=0;i<8;i++){auto expression=(CExpression*)drawing->Items[8+i].pSubdrawing;expression->Delete();std::string body;
+         if(dialog.parametric.enabled){if(i<2)body=SymbolicDerivative::Xml(i==0?dialog.parametric.x:dialog.parametric.y);}
+         else if(i<(int)dialog.programs.size()){auto &p=dialog.programs[i];body=SymbolicDerivative::Xml(p.left)+"<opr s=\"=\" />"+SymbolicDerivative::Xml(p.right);}
+@@ -15312,3 +15358,5 @@
+ };
+ void CMathomirView::OnFormulaReference(){Popup->HidePopupMenu();HideSelectionApproxPanel();if(GetCapture())ReleaseCapture();CFormulaSheetDialog dialog;int result=dialog.DoModal();if(result==1489){OnChar(27,1,0);CAiHelpDialog ai(dialog.aiText);ai.DoModal();SetFocus();return;}if(result!=IDOK){SetFocus();return;}if(ViewOnlyMode)return;OnChar(27,1,0);CancelFloatingPlacement();RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardExpression=new CExpression(NULL,NULL,100);std::vector<char> data(dialog.xml.begin(),dialog.xml.end());data.push_back(0);if(!ClipboardExpression->XML_input(data.data())){delete ClipboardExpression;ClipboardExpression=NULL;AfxMessageBox("This formula could not be inserted.");return;}RootObjectCopy=-1;RootObjectFontSize=100;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;SetFocus();RepaintTheView();SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));}
+ void CMathomirView::OnFreeAiHelp(){int p=theApp.GetProfileInt("AI","Provider",1);if(p!=1&&p!=2&&p!=3)theApp.WriteProfileInt("AI","Provider",1);OnAiHelp();}
++
++#include "InteractiveFeatures.inl"
+--- a/Mathomir/MathomirView.h
++++ b/Mathomir/MathomirView.h
+@@ -145,6 +145,11 @@
+     void OnIntegralShader();
+     void OnRelationGraph();
+     void OnBraceLabel();
++    void OnParameterSliders();
++    void OnStepSequence();
++    void OnStepReveal();
++    void OnStepControl(UINT command);
++    void OnAttachedConnector();
+     void OnLogBaseBuilder();
+     void OnAiHelp();
+     afx_msg void OnFormulaReference();
+--- a/Mathomir/RelationGraph.h
++++ b/Mathomir/RelationGraph.h
+@@ -1,5 +1,6 @@
+ #pragma once
+ #include "SymbolicDerivative.h"
++#include "GraphParameters.h"
+ #include <functional>
+ #include <vector>
+ 
+@@ -18,9 +19,10 @@
+ };
+ inline bool Finite(double n){return std::isfinite(n);}
+ inline bool Finite(Point p){return Finite(p.x)&&Finite(p.y);}
+-inline bool Variables(Expr e,bool parametric){if(!e)return true;if(e->op=='v')return e->name=="pi"||e->name=="e"||(parametric?e->name=="t":e->name=="x"||e->name=="y");return Variables(e->a,parametric)&&Variables(e->b,parametric);}
++inline bool Variables(Expr e,bool parametric){if(!e)return true;if(e->op=='v')return e->name=="pi"||e->name=="e"||GraphParameters::Name(e->name)||(parametric?e->name=="t":e->name=="x"||e->name=="y");return Variables(e->a,parametric)&&Variables(e->b,parametric);}
+ struct Program {
+-    Expr left,right;char relation;bool radians;
++    Expr left,right,compiledLeft,compiledRight;char relation;bool radians;
++    void Bind(const InteractiveObjects::Parameters &p){compiledLeft=GraphParameters::Bind(left,p);compiledRight=GraphParameters::Bind(right,p);}
+     Program():relation('='),radians(true){}
+     bool Parse(const std::string &text,bool rad,std::string &error){
+         try{size_t p=text.find_first_of("=<>"),n=1;relation=p==std::string::npos?'=':text[p];
+@@ -32,10 +34,10 @@
+             left=p==std::string::npos?SymbolicDerivative::Name("y"):parser.Parse(text.substr(0,p));
+             right=parser.Parse(p==std::string::npos?text:text.substr(p+n));
+             if(!Variables(left,false)||!Variables(right,false))throw std::runtime_error("Relations use x and y. Parametric coordinates use t.");
+-            radians=rad;error.clear();return true;
+-        }catch(const std::exception &e){left.reset();right.reset();error=e.what();return false;}
++            radians=rad;Bind(InteractiveObjects::Parameters());error.clear();return true;
++        }catch(const std::exception &e){left.reset();right.reset();compiledLeft.reset();compiledRight.reset();error=e.what();return false;}
+     }
+-    double Value(Point p)const{return SymbolicDerivative::Value(left,"x",p.x,radians,"y",p.y)-SymbolicDerivative::Value(right,"x",p.x,radians,"y",p.y);}
++    double Value(Point p)const{return SymbolicDerivative::Value(compiledLeft,"x",p.x,radians,"y",p.y)-SymbolicDerivative::Value(compiledRight,"x",p.x,radians,"y",p.y);}
+     bool Inside(double z)const{return Finite(z)&&(relation=='<'?z<0:relation=='>'?z>0:z==0);}
+ };
+ inline bool Clip(Point &a,Point &b,int width,int height){
+@@ -83,10 +85,11 @@
+     }
+ }
+ struct Parametric {
+-    Expr x,y;std::string xtext,ytext;double low,high;bool enabled,radians;
++    Expr x,y,compiledX,compiledY;std::string xtext,ytext;
++    void Bind(const InteractiveObjects::Parameters &p){compiledX=GraphParameters::Bind(x,p);compiledY=GraphParameters::Bind(y,p);}double low,high;bool enabled,radians;
+     Parametric():xtext("3*cos(t)"),ytext("2*sin(t)"),low(0),high(6.283185307179586),enabled(false),radians(true){}
+-    bool Parse(std::string &error){try{if(!Finite(low)||!Finite(high)||!(low<high)||std::fabs(low)>1e12||std::fabs(high)>1e12)throw std::runtime_error("Use finite t bounds with start < end and magnitude at most one trillion.");SymbolicDerivative::Parser p;x=p.Parse(xtext);y=p.Parse(ytext);if(!Variables(x,true)||!Variables(y,true))throw std::runtime_error("Parametric coordinates use t, for example 3*cos(t) and 2*sin(t).");error.clear();return true;}catch(const std::exception &e){error=e.what();return false;}}
+-    Point Value(double t)const{Point p={SymbolicDerivative::Value(x,"t",t,radians),SymbolicDerivative::Value(y,"t",t,radians)};return p;}
++    bool Parse(std::string &error){try{if(!Finite(low)||!Finite(high)||!(low<high)||std::fabs(low)>1e12||std::fabs(high)>1e12)throw std::runtime_error("Use finite t bounds with start < end and magnitude at most one trillion.");SymbolicDerivative::Parser p;x=p.Parse(xtext);y=p.Parse(ytext);if(!Variables(x,true)||!Variables(y,true))throw std::runtime_error("Parametric coordinates use t, for example 3*cos(t) and 2*sin(t).");Bind(InteractiveObjects::Parameters());error.clear();return true;}catch(const std::exception &e){error=e.what();return false;}}
++    Point Value(double t)const{Point p={SymbolicDerivative::Value(compiledX,"t",t,radians),SymbolicDerivative::Value(compiledY,"t",t,radians)};return p;}
+ };
+ inline void ParametricPart(const Parametric &p,const Viewport &v,double ta,double tb,Point a,Point b,int depth,const Emit &emit,const Cancel &cancel,int &budget){
+     if(--budget<0||cancel())return;double tm=ta+(tb-ta)/2;Point m=v.Pixel(p.Value(tm));
+--- a/Mathomir/Resource.h
++++ b/Mathomir/Resource.h
+@@ -333,3 +333,15 @@
+ 
+ #define ID_BRACE_LABEL 33107
+ #define IDD_BRACE_LABEL 196
++#define ID_PARAMETER_SLIDERS 33108
++#define ID_STEP_SEQUENCE 33109
++#define ID_STEP_REVEAL 33110
++#define ID_STEP_NEXT 33111
++#define ID_STEP_PREVIOUS 33112
++#define ID_STEP_ALL 33113
++#define ID_STEP_EXIT 33114
++#define ID_ATTACHED_CONNECTOR 33115
++#define IDD_PARAMETER_SLIDERS 197
++#define IDD_STEP_SEQUENCE 198
++#define IDD_ATTACHED_CONNECTOR 199
++#define IDD_STEP_CONTROLS 200

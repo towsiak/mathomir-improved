@@ -653,3 +653,18 @@ BRACE WITH ATTACHED LABEL BOX (2026-10-18)
 - Validation includes 400 portable direction/rotation/scale geometry cases and
   native Windows tests for all four orientations, editing, reflow, movement,
   resizing, Undo and persistence, in Release and AddressSanitizer workflows.
+
+Graph sliders, step reveals and attached connectors (18 October 2026)
+- Graph > Parameter sliders: live a/b/c parameters for equations, implicit
+  relations and parametric curves; editable ranges/step, validation, Cancel,
+  native Undo, copy and save/reopen. Formulas retain symbolic parameter names.
+- View > Make or edit step sequence: order selected objects or groups, then
+  reveal with a canvas control bar or Space/Right/Left/Home/End/Escape.
+  Later steps are hidden on screen; saving and printing retain all content.
+- Draw > Connect selected objects: stable references, straight/elbow routes,
+  one/two/no arrowheads and automatic or fixed-side anchors. Connections
+  follow movement/resizing, persist and work with Undo. Whole-diagram copies
+  remap references; lone connector copies become ordinary drawings.
+- Native Windows tests cover live rendering, validation, Cancel, Undo, saved
+  parameters, parametrics, reveal ordering/visibility/navigation/persistence,
+  connection tracking, deletion recovery, independent copy and text targets.

@@ -34,3 +34,4 @@ rotation-center-marker.patch
 attached-object-pointers.patch
 relation-parametric-graphs.patch
 brace-label-box.patch
+interactive-features.patch

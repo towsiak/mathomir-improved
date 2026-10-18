@@ -1,0 +1,14 @@
+#include "RelationGraph.h"
+#include "InteractiveObjects.h"
+#include <iostream>
+#include <cstdlib>
+static void Check(bool ok,const char *why){if(!ok){std::cerr<<why<<"\n";std::exit(1);}}
+int main(){using namespace InteractiveObjects;Parameters values;Check(values.Valid(),"invalid defaults");Check(values.a[0].At(0)==-5&&values.a[0].At(1000)==5,"slider endpoints");values.a[0].low=1;values.a[0].high=1;Check(!values.Valid(),"zero slider range accepted");values=Parameters();values.a[0].value=3;values.a[1].value=2;values.a[2].value=-1;
+ std::string error;RelationGraph::Program p;Check(p.Parse("y=a*sin(b*x+c)",true,error),"parameter formula rejected");p.Bind(values);Check(std::fabs(p.Value({1,3*std::sin(1.)}))<1e-10,"wrong slider evaluation");Check(SymbolicDerivative::Depends(p.right,"a"),"parameter name was baked into saved formula");values.a[0].value=-2;p.Bind(values);Check(std::fabs(p.Value({1,-2*std::sin(1.)}))<1e-10,"rebinding failed");Check(!p.Parse("y=z*x",true,error),"unknown variable accepted");
+ RelationGraph::Parametric q;q.xtext="a*cos(t)+c";q.ytext="b*sin(t)";Check(q.Parse(error),"parameter coordinates rejected");q.Bind(values);auto v=q.Value(0);Check(std::fabs(v.x+3)<1e-10&&std::fabs(v.y)<1e-10,"parametric binding failed");
+ int cases=0;for(int direction=0;direction<8;direction++)for(int route=0;route<2;route++)for(int style=0;style<3;style++)for(int from=0;from<5;from++)for(int to=0;to<5;to++){
+  Rect a={0,0,100,60};double angle=direction*3.14159265358979323846/4;double x=250*std::cos(angle),y=250*std::sin(angle);Rect b={x,y,x+80,y+50};Connector c;c.from=1;c.to=2;c.style=style;c.route=route;c.fromPort=from;c.toPort=to;auto lines=Build(a,b,c);Check(!lines.empty(),"missing connector");auto first=Port(a,b.Center(),from),last=Port(b,a.Center(),to);Check(std::hypot(lines[0].a.x-first.x,lines[0].a.y-first.y)<1e-9,"wrong source anchor");int shaft=(int)lines.size()-(style==1?2:style==2?4:0);Check(std::hypot(lines[shaft-1].b.x-last.x,lines[shaft-1].b.y-last.y)<1e-9,"wrong target anchor");for(int i=0;i<shaft;i++)if(route)Check(std::fabs(lines[i].a.x-lines[i].b.x)<1e-9||std::fabs(lines[i].a.y-lines[i].b.y)<1e-9,"nonorthogonal elbow");
+  Rect moved={b.left+37,b.top-19,b.right+37,b.bottom-19};auto updated=Build(a,moved,c);auto end=Port(moved,a.Center(),to);int updatedShaft=(int)updated.size()-(style==1?2:style==2?4:0);Check(std::hypot(updated[updatedShaft-1].b.x-end.x,updated[updatedShaft-1].b.y-end.y)<1e-9,"moved endpoint detached");cases++;
+ }
+ Info info;info.steps=12;info.order=2;Check(Hidden(info,12,2)&&!Hidden(info,12,3)&&!Hidden(info,13,0),"step visibility or group isolation");info.Read("oid","-1");Check(info.id==0,"negative identity accepted");info.Read("oid","42");Check(info.id==42,"identity not restored");std::cout<<cases<<" connector routes and slider/reveal checks passed.\n";
+}

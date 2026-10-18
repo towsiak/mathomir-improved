@@ -161,3 +161,25 @@ Double-click the box or the center move grip to type in its label. The box grows
 with the text and stays at the brace's actual middle tip. Move/resize/rotate the
 whole annotation with the normal grips; copy, print, Undo and .mom persistence
 use the existing native drawing paths. Background controls color the label box.
+
+### Graph sliders, step reveals and attached connectors
+
+- **Graph > Parameter sliders** controls a, b and c in ordinary equations,
+  implicit relations and parametric coordinates. Defaults: a=1, b=1, c=0.
+  Each slider has a value, minimum, maximum and positive increment; typed ranges
+  use Apply. Dragging updates the existing graph. Cancel restores starting values.
+- Select objects and use **View > Make or edit step sequence**. Each object or
+  existing native group becomes a step; reorder the list and start the reveal.
+  Back/Next/Show all/Exit appear on the canvas. Space/Right advances, Left goes
+  back, Home hides all, End shows all, and Escape exits. Saving retains every
+  step and its order; printing includes the complete solution.
+- Select two objects and use **Draw > Connect selected objects**. Choose a line,
+  one arrow or two arrows, straight/elbow routing, and automatic or fixed-side
+  endpoints. Moving or resizing either target updates the connector. Its
+  settings reopen through the command or a double-click on the line. Detach
+  keeps its shape. Deleted targets leave the last shape; Undo restores links.
+  Copying a whole connected diagram creates independent references; copying
+  a connector alone produces a plain drawing.
+
+The portable geometry/binding checks and Windows interaction checks run with
+all earlier regressions, including a separate AddressSanitizer executable.
