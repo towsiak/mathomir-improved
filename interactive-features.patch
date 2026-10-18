@@ -272,7 +272,7 @@
 +}
 --- /dev/null
 +++ b/Mathomir/InteractiveFeatures.inl
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,136 @@
 +// Native view integration: persistent object references, live parameter controls,
 +// step reveals and connectors. Included after the view's existing implementations.
 +namespace {
@@ -329,16 +329,27 @@
 +}
 +
 +class CParameterSlidersDialog:public CFeatureDialog {
-+    CFunctionPlotter *plot;InteractiveObjects::Parameters original,current;bool initializing,changed,pending,wasModified;
-+    void Fields(){initializing=true;for(int i=0;i<3;i++){const auto &p=current.a[i];SetDlgItemText(1511+10*i,Piecewise::Number(p.value).c_str());SetDlgItemText(1512+10*i,Piecewise::Number(p.low).c_str());SetDlgItemText(1513+10*i,Piecewise::Number(p.high).c_str());SetDlgItemText(1514+10*i,Piecewise::Number(p.step).c_str());auto s=(CSliderCtrl*)GetDlgItem(1510+10*i);s->SetRange(0,1000);s->SetPos(p.Position());}initializing=false;}
-+    bool Read(){auto proposed=current;std::string error;for(int i=0;i<3;i++){double *fields[4]={&proposed.a[i].value,&proposed.a[i].low,&proposed.a[i].high,&proposed.a[i].step};for(int j=0;j<4;j++){CString s;GetDlgItemText(1511+10*i+j,s);if(!IntegralArea::Constant((LPCSTR)s,*fields[j],error)){SetDlgItemText(1505,"Enter finite values, minimum, maximum and a positive step.");return false;}}}if(!proposed.Valid()){SetDlgItemText(1505,"Use minimum < maximum, a value in that range, and 0 < step <= range. Bounds: +/- one billion.");return false;}current=proposed;return true;}
-+    bool Apply(){bool different=false;for(int i=0;i<3;i++){auto a=current.a[i],b=plot->parameters.a[i];different=different||a.value!=b.value||a.low!=b.low||a.high!=b.high||a.step!=b.step;}if(!different){pending=false;return true;}if(!plot->StopForZoom()){SetDlgItemText(1505,"The graph is busy; try again after it finishes.");return false;}if(!changed){pMainView->UndoSave("graph sliders");changed=true;}plot->parameters=current;plot->parametric.Bind(current);plot->TheState=0;plot->PlotFunction(1);pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);CString s;s.Format("Live graph: a=%s   b=%s   c=%s",Piecewise::Number(current.a[0].value).c_str(),Piecewise::Number(current.a[1].value).c_str(),Piecewise::Number(current.a[2].value).c_str());SetDlgItemText(1505,s);pending=false;return true;}
++    CFunctionPlotter *plot;InteractiveObjects::Parameters original,current;bool initializing,changed,pending,wasModified;bool compact;CSize expanded;std::map<int,CRect> positions;    void Layout(bool small){CRect window,client,frame;GetWindowRect(&window);GetClientRect(&client);theApp.m_pMainWnd->GetWindowRect(&frame);int extraX=window.Width()-client.Width(),extraY=window.Height()-client.Height();
++        if(positions.empty()){expanded=CSize(window.Width(),window.Height());for(HWND child=::GetWindow(m_hWnd,GW_CHILD);child;child=::GetWindow(child,GW_HWNDNEXT)){int id=::GetDlgCtrlID(child);if(id<0)continue;CRect r;::GetWindowRect(child,&r);ScreenToClient(&r);positions[id]=r;}}
++        compact=small;
++        if(!small){SetDlgItemText(1501,"Apply values / ranges");SetDlgItemText(1502,"Reset defaults");for(auto &item:positions){auto control=GetDlgItem(item.first);control->MoveWindow(item.second);control->ShowWindow(SW_SHOW);}SetDlgItemText(1504,"Compact view");SetWindowPos(NULL,max(frame.left,frame.right-expanded.cx-12),window.top,expanded.cx,expanded.cy,SWP_NOZORDER|SWP_NOACTIVATE);}
++        else{SetDlgItemText(1501,"Apply values");SetDlgItemText(1502,"Reset");
++            for(int id=1544;id<=1547;id++)GetDlgItem(id)->ShowWindow(SW_HIDE);
++            GetDlgItem(1543)->MoveWindow(8,6,398,24);
++            for(int i=0;i<3;i++){GetDlgItem(1540+i)->MoveWindow(8,42+30*i,14,20);GetDlgItem(1510+10*i)->MoveWindow(25,35+30*i,270,28);GetDlgItem(1511+10*i)->MoveWindow(302,37+30*i,104,22);for(int j=2;j<=4;j++)GetDlgItem(1510+10*i+j)->ShowWindow(SW_HIDE);}
++            GetDlgItem(1501)->MoveWindow(8,132,105,24);GetDlgItem(1502)->MoveWindow(119,132,79,24);GetDlgItem(1504)->MoveWindow(204,132,76,24);GetDlgItem(IDOK)->MoveWindow(286,132,54,24);GetDlgItem(IDCANCEL)->MoveWindow(346,132,60,24);GetDlgItem(1505)->MoveWindow(8,166,398,40);SetDlgItemText(1504,"Ranges...");SetWindowPos(NULL,max(frame.left,frame.right-420-extraX-12),window.top,420+extraX,214+extraY,SWP_NOZORDER|SWP_NOACTIVATE);
++        }Invalidate();
++    }
++
++    void Fields(){initializing=true;for(int i=0;i<3;i++){const auto &p=current.a[i];SetDlgItemText(1511+10*i,InteractiveObjects::DisplayNumber(p.value).c_str());SetDlgItemText(1512+10*i,InteractiveObjects::DisplayNumber(p.low).c_str());SetDlgItemText(1513+10*i,InteractiveObjects::DisplayNumber(p.high).c_str());SetDlgItemText(1514+10*i,InteractiveObjects::DisplayNumber(p.step).c_str());auto s=(CSliderCtrl*)GetDlgItem(1510+10*i);s->SetRange(0,1000);s->SetPos(p.Position());}initializing=false;}
++    bool Read(){auto proposed=current;std::string error;for(int i=0;i<3;i++){double *fields[4]={&proposed.a[i].value,&proposed.a[i].low,&proposed.a[i].high,&proposed.a[i].step};for(int j=0;j<4;j++){CString s;GetDlgItemText(1511+10*i+j,s);if(!IntegralArea::Constant((LPCSTR)s,*fields[j],error)){SetDlgItemText(1505,"Enter finite values, minimum, maximum and a positive step.");return false;}}}if(!proposed.Valid()){SetDlgItemText(1505,"Use minimum < maximum, a value in that range, and 0 < step <= range. Bounds: -1e9 to 1e9.");return false;}current=proposed;return true;}
++    bool Apply(){bool different=false;for(int i=0;i<3;i++){auto a=current.a[i],b=plot->parameters.a[i];different=different||a.value!=b.value||a.low!=b.low||a.high!=b.high||a.step!=b.step;}if(!different){pending=false;return true;}if(!plot->StopForZoom()){SetDlgItemText(1505,"The graph is busy; try again after it finishes.");return false;}if(!changed){pMainView->UndoSave("graph sliders");changed=true;}plot->parameters=current;plot->parametric.Bind(current);plot->TheState=0;plot->PlotFunction(1);pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);CString s;s.Format("Live graph: a=%s   b=%s   c=%s",InteractiveObjects::DisplayNumber(current.a[0].value).c_str(),InteractiveObjects::DisplayNumber(current.a[1].value).c_str(),InteractiveObjects::DisplayNumber(current.a[2].value).c_str());SetDlgItemText(1505,s);pending=false;return true;}
 +public:
-+    CParameterSlidersDialog(CFunctionPlotter *p):CFeatureDialog(IDD_PARAMETER_SLIDERS,theApp.m_pMainWnd),plot(p),original(p->parameters),current(p->parameters),initializing(true),changed(false),pending(false),wasModified(pMainView->GetDocument()->IsModified()!=FALSE){}
-+    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();Fields();SetTimer(1,100,NULL);CRect r,frame;GetWindowRect(&r);theApp.m_pMainWnd->GetWindowRect(&frame);SetWindowPos(NULL,max(frame.left,frame.right-r.Width()-12),frame.top+125,0,0,SWP_NOSIZE|SWP_NOZORDER);return TRUE;}
-+    afx_msg void OnHScroll(UINT code,UINT pos,CScrollBar *bar){if(!initializing&&bar){int i=(bar->GetDlgCtrlID()-1510)/10;if(i>=0&&i<3){current.a[i].value=current.a[i].At(((CSliderCtrl*)bar)->GetPos());SetDlgItemText(1511+10*i,Piecewise::Number(current.a[i].value).c_str());pending=true;}}CFeatureDialog::OnHScroll(code,pos,bar);}
++    CParameterSlidersDialog(CFunctionPlotter *p):CFeatureDialog(IDD_PARAMETER_SLIDERS,theApp.m_pMainWnd),plot(p),original(p->parameters),current(p->parameters),initializing(true),changed(false),pending(false),wasModified(pMainView->GetDocument()->IsModified()!=FALSE),compact(true){}
++    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();Fields();Layout(true);SetTimer(1,100,NULL);CRect r,frame;GetWindowRect(&r);theApp.m_pMainWnd->GetWindowRect(&frame);SetWindowPos(NULL,max(frame.left,frame.right-r.Width()-12),frame.top+125,0,0,SWP_NOSIZE|SWP_NOZORDER);return TRUE;}
++    afx_msg void OnHScroll(UINT code,UINT pos,CScrollBar *bar){if(!initializing&&bar){int i=(bar->GetDlgCtrlID()-1510)/10;if(i>=0&&i<3){current.a[i].value=current.a[i].At(((CSliderCtrl*)bar)->GetPos());SetDlgItemText(1511+10*i,InteractiveObjects::DisplayNumber(current.a[i].value).c_str());pending=true;}}CFeatureDialog::OnHScroll(code,pos,bar);}
 +    afx_msg void OnTimer(UINT_PTR id){if(id==1&&pending)Apply();else CFeatureDialog::OnTimer(id);}
-+    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1501){if(Read()){Fields();Apply();}return TRUE;}if(id==1502){current=InteractiveObjects::Parameters();Fields();Apply();return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1504){Layout(!compact);return TRUE;}if(id==1501){if(Read()){Fields();Apply();}return TRUE;}if(id==1502){current=InteractiveObjects::Parameters();Fields();Apply();return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
 +    virtual void OnOK(){if(Read()&&Apply()){KillTimer(1);CFeatureDialog::OnOK();}}
 +    virtual void OnCancel(){KillTimer(1);if(changed){if(!plot->StopForZoom()){SetDlgItemText(1505,"The graph is busy; try Cancel again after it finishes.");return;}plot->parameters=original;plot->parametric.Bind(original);plot->TheState=0;plot->PlotFunction(1);pMainView->RepaintTheView(1);pMainView->GetDocument()->SetModifiedFlag(wasModified);}CFeatureDialog::OnCancel();}
 +    DECLARE_MESSAGE_MAP()
@@ -397,17 +408,19 @@
 +    auto a=FindInteractive(nodes,dialog.link.from),b=FindInteractive(nodes,dialog.link.to);dialog.canDetach=existing!=NULL;if(!a||!b){dialog.missing=true;dialog.fromLabel="An attached object was deleted.";dialog.toLabel="Detach keeps this shape. Undo can restore the missing object.";}else{dialog.fromLabel.Format("A: %s at (%d, %d)",a->type==1?"Text / formula":"Drawing / graph",(int)a->bounds.left,(int)a->bounds.top);dialog.toLabel.Format("B: %s at (%d, %d)",b->type==1?"Text / formula":"Drawing / graph",(int)b->bounds.left,(int)b->bounds.top);}if(dialog.DoModal()!=IDOK)return;UndoSave("attached connector");
 +    if(existing){if(dialog.detach)existing->m_Connector.from=existing->m_Connector.to=0;else existing->m_Connector=dialog.link;}
 +    else if(!dialog.detach){auto d=new CDrawing();d->m_Connector=dialog.link;d->m_Color=0;if(!AddDocumentObject(2,0,0)){delete d;return;}TheDocument[NumDocumentElements-1].Object=(CObject*)d;}
-+    OnChar(27,1,0);SyncInteractiveObjects(&dc);GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();}
++    OnChar(27,1,0);for(int i=0;i<NumDocumentElements;i++){auto d=TheDocument+i;if(d->MovingDotState!=5)d->MovingDotState=0;if(d->Type==1)((CExpression*)d->Object)->DeselectExpression();else if(d->Type==2)((CDrawing*)d->Object)->SelectDrawing(0);}NumSelectedObjects=0;SyncInteractiveObjects(&dc);GetDocument()->SetModifiedFlag();RepaintTheView(1);SetFocus();}
 --- /dev/null
 +++ b/Mathomir/InteractiveObjects.h
-@@ -0,0 +1,48 @@
+@@ -0,0 +1,50 @@
 +#pragma once
 +#include <algorithm>
 +#include <cmath>
 +#include <cstdlib>
++#include <cstdio>
 +#include <string>
 +#include <vector>
 +namespace InteractiveObjects {
++inline std::string DisplayNumber(double value){char text[64]={};for(int precision=1;precision<=17;precision++){std::sprintf(text,"%.*g",precision,value);if(std::strtod(text,NULL)==value)break;}return text;}
 +struct Info {
 +    unsigned int id,steps;int order;
 +    Info():id(0),steps(0),order(0){}
@@ -418,8 +431,8 @@
 +struct Parameter {
 +    double value,low,high,step;
 +    Parameter(double n=1):value(n),low(-5),high(5),step(.1){}
-+    bool Valid()const{return std::isfinite(value)&&std::isfinite(low)&&std::isfinite(high)&&std::isfinite(step)&&low<high&&step>0&&step<=high-low&&value>=low&&value<=high&&std::fabs(low)<=1e9&&std::fabs(high)<=1e9;}
-+    double At(int position)const{double n=low+(high-low)*(std::max)(0,(std::min)(1000,position))/1000.;return (std::max)(low,(std::min)(high,low+std::round((n-low)/step)*step));}
++    bool Valid()const{return std::isfinite(value)&&std::isfinite(low)&&std::isfinite(high)&&std::isfinite(step)&&low<high&&step>0&&step<=high-low&&std::isfinite((high-low)/step)&&value>=low&&value<=high&&std::fabs(low)<=1e9&&std::fabs(high)<=1e9;}
++    double At(int position)const{double n=low+(high-low)*(std::max)(0,(std::min)(1000,position))/1000.;n=low+std::round((n-low)/step)*step;char text[64];std::sprintf(text,"%.15g",n);double tidy=std::strtod(text,NULL);if(std::fabs(tidy-n)<=step*1e-9)n=tidy;return (std::max)(low,(std::min)(high,n));}
 +    int Position()const{return (int)std::round((value-low)*1000/(high-low));}
 +};
 +struct Parameters {Parameter a[3];Parameters(){a[2].value=0;}bool Valid()const{return a[0].Valid()&&a[1].Valid()&&a[2].Valid();}};
@@ -494,7 +507,7 @@
          MENUITEM "Integral area shader...", ID_INTEGRAL_SHADER
          MENUITEM "Logarithm builder...", ID_LOG_BASE_BUILDER
          MENUITEM "Piecewise function grapher...", ID_PIECEWISE_GRAPH
-@@ -1218,3 +1223,88 @@
+@@ -1218,3 +1223,89 @@
      DEFPUSHBUTTON "Place brace",IDOK,225,199,76,17
      PUSHBUTTON "Cancel",IDCANCEL,308,199,52,17
  END
@@ -504,24 +517,24 @@
 +CAPTION "Graph parameter sliders"
 +FONT 9,"Segoe UI"
 +BEGIN
-+ LTEXT "Use a, b and c in the graph's formulas. Drag a slider to update the graph.",-1,8,8,344,20
-+ LTEXT "Value",-1,168,32,40,10
-+ LTEXT "Minimum",-1,214,32,42,10
-+ LTEXT "Maximum",-1,260,32,42,10
-+ LTEXT "Step",-1,306,32,42,10
-+ LTEXT "a",-1,8,51,12,12
++ LTEXT "Use a, b and c in the graph's formulas. Drag a slider to update the graph.",1543,8,8,344,20
++ LTEXT "Value",1544,168,32,40,10
++ LTEXT "Minimum",1545,214,32,42,10
++ LTEXT "Maximum",1546,260,32,42,10
++ LTEXT "Step",1547,306,32,42,10
++ LTEXT "a",1540,8,51,12,12
 + CONTROL "",1510,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,44,139,25
 + EDITTEXT 1511,168,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
 + EDITTEXT 1512,214,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
 + EDITTEXT 1513,260,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
 + EDITTEXT 1514,306,47,45,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ LTEXT "b",-1,8,91,12,12
++ LTEXT "b",1541,8,91,12,12
 + CONTROL "",1520,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,84,139,25
 + EDITTEXT 1521,168,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
 + EDITTEXT 1522,214,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
 + EDITTEXT 1523,260,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
 + EDITTEXT 1524,306,87,45,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ LTEXT "c",-1,8,131,12,12
++ LTEXT "c",1542,8,131,12,12
 + CONTROL "",1530,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,124,139,25
 + EDITTEXT 1531,168,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
 + EDITTEXT 1532,214,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
@@ -529,6 +542,7 @@
 + EDITTEXT 1534,306,127,45,15,ES_AUTOHSCROLL | WS_TABSTOP
 + PUSHBUTTON "Apply values / ranges",1501,8,158,113,18
 + PUSHBUTTON "Reset defaults",1502,129,158,90,18
++ PUSHBUTTON "Compact view",1504,230,158,121,18
 + LTEXT "Drag sliders for live changes. Cancel restores the values you started with.",1505,8,183,344,22
 + DEFPUSHBUTTON "Done",IDOK,236,206,55,17
 + PUSHBUTTON "Cancel",IDCANCEL,298,206,54,17
