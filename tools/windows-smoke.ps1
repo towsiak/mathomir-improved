@@ -563,7 +563,7 @@ try {
   if($autoStrokeFailed){Write-Output ('Automatic stroke diagnostic: '+$autoStroke.OuterXml)}
   [MathomirUiProbe]::OpenFile($main,$derivativeFixture);Start-Sleep -Milliseconds 500
   [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;[xml]$reopenedDerivative=Get-Content $derivativeFixture -Raw
-  if($reopenedDerivative.SelectSingleNode('/mathomir/*[last()]').OuterXml -ne $derivativeXml){throw 'Editable derivative changed after reopening.'}
+  if($reopenedDerivative.SelectSingleNode('/mathomir/*[last()]').OuterXml -ne $derivativeXml){Write-Output ('Expected derivative: '+$derivativeXml);Write-Output ('Reopened derivative: '+$reopenedDerivative.SelectSingleNode('/mathomir/*[last()]').OuterXml);throw 'Editable derivative changed after reopening.'}
   Write-Output 'Symbolic derivative finder passed: actual palette button, simplified polynomial, second derivative, numeric check, invalid input, boundary notes and native placed/reopened math.'
   Write-Output 'Smart freehand smoothing passed: saved-stroke smoothing, fixed endpoints, native identity, exact Undo, and automatically smoothed mouse-drawn curves.'
 

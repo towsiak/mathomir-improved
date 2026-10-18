@@ -272,7 +272,7 @@
 +}
 --- /dev/null
 +++ b/Mathomir/InteractiveFeatures.inl
-@@ -0,0 +1,136 @@
+@@ -0,0 +1,137 @@
 +// Native view integration: persistent object references, live parameter controls,
 +// step reveals and connectors. Included after the view's existing implementations.
 +namespace {
@@ -317,6 +317,7 @@
 +    if(exact)for(int i=0;i<NumDocumentElements;i++){auto d=TheDocument+i;if(!d->Object)continue;short w=0,a=0,b=0;if(d->Type==1)((CExpression*)d->Object)->CalculateSize(dc,ViewZoom,&w,&a,&b);else if(d->Type==2)((CDrawing*)d->Object)->CalculateSize(dc,ViewZoom,&w,&b);d->Length=w*100/ViewZoom;d->Above=a*100/ViewZoom;d->Below=b*100/ViewZoom;}
 +    return changed;
 +}
++void CMathomirView::PrepareInteractiveSave(){auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);}
 +static bool StepPresentationActive(){return InteractiveObjects::Reveal().group!=0;}
 +static bool InteractiveHidden(tDocumentStruct *object){if(!StepPresentationActive()||!object||!object->Object)return false;Info *info=InteractiveInfo(object->Object,object->Type);if(info&&InteractiveObjects::Hidden(*info))return true;
 +    if(object->Type==2&&((CDrawing*)object->Object)->m_Connector.Attached()){auto &c=((CDrawing*)object->Object)->m_Connector;auto nodes=InteractiveNodes(NULL);auto a=FindInteractive(nodes,c.from),b=FindInteractive(nodes,c.to);return a&&InteractiveObjects::Hidden(*a->info)||b&&InteractiveObjects::Hidden(*b->info);}return false;
@@ -972,10 +973,11 @@
 +#include "InteractiveFeatures.inl"
 --- a/Mathomir/MathomirView.h
 +++ b/Mathomir/MathomirView.h
-@@ -145,6 +145,11 @@
+@@ -145,6 +145,12 @@
      void OnIntegralShader();
      void OnRelationGraph();
      void OnBraceLabel();
++    void PrepareInteractiveSave();
 +    void OnParameterSliders();
 +    void OnStepSequence();
 +    void OnStepReveal();
@@ -1053,3 +1055,13 @@
 +#define IDD_STEP_SEQUENCE 198
 +#define IDD_ATTACHED_CONNECTOR 199
 +#define IDD_STEP_CONTROLS 200
+--- a/Mathomir/MathomirDoc.cpp
++++ b/Mathomir/MathomirDoc.cpp
+@@ -605,6 +605,7 @@
+ 
+ 
++    if(pMainView)pMainView->PrepareInteractiveSave();
+ 	//first, calculate briefly the length of the output data
+ 
+ 	if (save_keyboard_clipboard)
+ 		len+=((CExpression*)TheKeyboardClipboard)->XML_output(dummy,1,1);

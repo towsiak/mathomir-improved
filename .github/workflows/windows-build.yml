@@ -34,6 +34,10 @@ jobs:
       - name: Sliders, step reveal and attached connector checks
         shell: pwsh
         run: ./tools/interactive-features-smoke.ps1
+      - name: Windows UI smoke checks
+        id: windows_ui
+        shell: pwsh
+        run: ./tools/windows-smoke.ps1
       - name: Attached brace label box checks
         shell: pwsh
         run: ./tools/brace-label-smoke.ps1
@@ -168,10 +172,6 @@ jobs:
         id: stats_ui
         shell: pwsh
         run: ./tools/statistics-smoke.ps1
-      - name: Windows UI smoke checks
-        id: windows_ui
-        shell: pwsh
-        run: ./tools/windows-smoke.ps1
       - name: Diagnose memory errors after failed UI checks
         if: failure() && (steps.stats_ui.conclusion == 'failure' || steps.windows_ui.conclusion == 'failure')
         shell: pwsh
@@ -303,6 +303,7 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/interactive-features-smoke.ps1
+          ./tools/windows-smoke.ps1
           ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
           ./tools/object-pointer-smoke.ps1
@@ -329,7 +330,6 @@ jobs:
           ./tools/page-toolbar-smoke.ps1
           ./tools/log-base-smoke.ps1
           ./tools/integral-evaluation-smoke.ps1
-          ./tools/windows-smoke.ps1
 
       - name: Upload native memory diagnostics
         if: failure()
