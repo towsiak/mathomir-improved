@@ -389,10 +389,10 @@
 +    void Layout(){
 +        for(int id:{1544,1545,1546,1560,1561,1562})GetDlgItem(id)->ShowWindow(compact?SW_HIDE:SW_SHOW);
 +        for(int i=0;i<3;i++)for(int j=2;j<=4;j++)GetDlgItem(1510+10*i+j)->ShowWindow(compact?SW_HIDE:SW_SHOW);
-+        int y=compact?116:200;
-+        Move(1501,10,y,64,18);Move(1502,80,y,54,18);Move(1504,140,y,94,18);
-+        Move(1505,10,y+26,224,25);SetDlgItemText(1504,compact?"Ranges / step":"Hide ranges");
-+        Anchor();Invalidate(FALSE);
++        int y=116;
++        Move(1501,8,y,62,18);Move(1502,76,y,42,18);Move(1504,124,y,68,18);
++        Move(1505,8,compact?142:232,184,25);SetDlgItemText(1504,compact?"Ranges / step":"Hide ranges");
++        Anchor();RedrawWindow(NULL,NULL,RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN);
 +    }
 +public:
 +    CParameterSliderPanel():CFeatureDialog(IDD_PARAMETER_SLIDERS,pMainView),graphId(0),epoch(0),initializing(false),opened(false),compact(true),fieldsDirty(false),pending(false),gesture(false),gestureUndo(false),ending(false),applying(false){background.CreateSolidBrush(RGB(245,248,252));}
@@ -404,7 +404,7 @@
 +    }
 +    bool Opened()const{return opened;}
 +    void Anchor(){
-+        if(!GetSafeHwnd()||!opened)return;CRect client,desired(0,0,244,compact?170:254),actual;
++        if(!GetSafeHwnd()||!opened)return;CRect client,desired(0,0,200,compact?170:260),actual;
 +        pMainView->GetClientRect(&client);MapDialogRect(&desired);
 +        desired.MoveToXY(max(4,client.right-desired.Width()-12),12);GetWindowRect(&actual);pMainView->ScreenToClient(&actual);
 +        if(actual!=desired)SetWindowPos(NULL,desired.left,desired.top,desired.Width(),desired.Height(),SWP_NOZORDER|SWP_NOACTIVATE);
@@ -497,13 +497,13 @@
  public:
 --- a/Mathomir/Mathomir.rc
 +++ b/Mathomir/Mathomir.rc
-@@ -1224,41 +1224,45 @@
+@@ -1224,40 +1224,43 @@
      PUSHBUTTON "Cancel",IDCANCEL,308,199,52,17
  END
  
 -IDD_PARAMETER_SLIDERS DIALOGEX 0,0,360,229
 -STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-+IDD_PARAMETER_SLIDERS DIALOGEX 0,0,244,254
++IDD_PARAMETER_SLIDERS DIALOGEX 0,0,200,260
 +STYLE DS_CONTROL | WS_CHILD | WS_CLIPCHILDREN | WS_BORDER
 +EXSTYLE WS_EX_CONTROLPARENT
  CAPTION "Graph parameter sliders"
@@ -538,43 +538,40 @@
 - LTEXT "Drag sliders for live changes. Cancel restores the values you started with.",1505,8,183,344,22
 - DEFPUSHBUTTON "Done",IDOK,236,206,55,17
 - PUSHBUTTON "Cancel",IDCANCEL,298,206,54,17
--END
-+ LTEXT "Graph sliders",1548,10,8,175,13
-+ PUSHBUTTON "X",IDCANCEL,214,5,20,17
-+ LTEXT "Select a graph",1543,10,24,224,12
-+ LTEXT "a",1540,10,45,10,12
-+ CONTROL "",1510,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,24,39,147,24
-+ EDITTEXT 1511,177,43,57,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ LTEXT "b",1541,10,69,10,12
-+ CONTROL "",1520,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,24,63,147,24
-+ EDITTEXT 1521,177,67,57,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ LTEXT "c",1542,10,93,10,12
-+ CONTROL "",1530,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,24,87,147,24
-+ EDITTEXT 1531,177,91,57,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ LTEXT "Minimum",1544,27,116,60,12
-+ LTEXT "Maximum",1545,94,116,60,12
-+ LTEXT "Step",1546,161,116,60,12
-+ LTEXT "a",1560,10,133,10,12
-+ EDITTEXT 1512,27,130,60,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ EDITTEXT 1513,94,130,60,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ EDITTEXT 1514,161,130,73,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ LTEXT "b",1561,10,155,10,12
-+ EDITTEXT 1522,27,152,60,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ EDITTEXT 1523,94,152,60,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ EDITTEXT 1524,161,152,73,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ LTEXT "c",1562,10,177,10,12
-+ EDITTEXT 1532,27,174,60,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ EDITTEXT 1533,94,174,60,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ EDITTEXT 1534,161,174,73,15,ES_AUTOHSCROLL | WS_TABSTOP
-+ PUSHBUTTON "Apply values",1501,10,200,64,18
-+ PUSHBUTTON "Reset",1502,80,200,54,18
-+ PUSHBUTTON "Hide ranges",1504,140,200,94,18
-+ LTEXT "Drag to update the graph. Enter applies typed values. Undo restores each change.",1505,10,226,224,25
-+END
-+
++ LTEXT "Graph sliders",1548,8,8,144,13
++ PUSHBUTTON "X",IDCANCEL,170,5,22,17
++ LTEXT "Select a graph",1543,8,24,184,12
++ LTEXT "a",1540,8,45,10,12
++ CONTROL "",1510,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,22,39,123,24
++ EDITTEXT 1511,151,43,41,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "b",1541,8,69,10,12
++ CONTROL "",1520,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,22,63,123,24
++ EDITTEXT 1521,151,67,41,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "c",1542,8,93,10,12
++ CONTROL "",1530,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,22,87,123,24
++ EDITTEXT 1531,151,91,41,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "Minimum",1544,25,148,51,12
++ LTEXT "Maximum",1545,83,148,51,12
++ LTEXT "Step",1546,141,148,51,12
++ LTEXT "a",1560,8,165,10,12
++ EDITTEXT 1512,25,162,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1513,83,162,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1514,141,162,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "b",1561,8,187,10,12
++ EDITTEXT 1522,25,184,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1523,83,184,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1524,141,184,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "c",1562,8,209,10,12
++ EDITTEXT 1532,25,206,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1533,83,206,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1534,141,206,51,15,ES_AUTOHSCROLL | WS_TABSTOP
++ PUSHBUTTON "Apply values",1501,8,116,62,18
++ PUSHBUTTON "Reset",1502,76,116,42,18
++ PUSHBUTTON "Hide ranges",1504,124,116,68,18
++ LTEXT "Drag to update the graph. Enter applies typed values. Undo restores each change.",1505,8,232,184,25
+ END
  
  IDD_STEP_SEQUENCE DIALOGEX 0,0,350,230
- STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -72,6 +72,9 @@
@@ -626,7 +623,7 @@
      std::vector<double> previous(nx+1),next(nx+1);
      for(int x=0;x<=nx;x++){Point a={v.X(double(x)/nx),v.Y(0)};previous[x]=p.Value(a);}
      for(int y=0;y<ny;y++){
-@@ -91,7 +92,7 @@
+@@ -91,11 +92,25 @@
      bool Parse(std::string &error){try{if(!Finite(low)||!Finite(high)||!(low<high)||std::fabs(low)>1e12||std::fabs(high)>1e12)throw std::runtime_error("Use finite t bounds with start < end and magnitude at most one trillion.");SymbolicDerivative::Parser p;x=p.Parse(xtext);y=p.Parse(ytext);if(!Variables(x,true)||!Variables(y,true))throw std::runtime_error("Parametric coordinates use t, for example 3*cos(t) and 2*sin(t).");Bind(InteractiveObjects::Parameters());error.clear();return true;}catch(const std::exception &e){error=e.what();return false;}}
      Point Value(double t)const{Point p={SymbolicDerivative::Value(compiledX,"t",t,radians),SymbolicDerivative::Value(compiledY,"t",t,radians)};return p;}
  };
@@ -635,7 +632,25 @@
      if(--budget<0||cancel())return;double tm=ta+(tb-ta)/2;Point m=v.Pixel(p.Value(tm));
      if(!Finite(a)&&!Finite(b)&&!Finite(m))return;
      bool valid=Finite(a)&&Finite(b)&&Finite(m);double deviation=valid?std::hypot(m.x-(a.x+b.x)/2,m.y-(a.y+b.y)/2):1e30;
-@@ -103,4 +104,30 @@
+     double span=valid?std::hypot(b.x-a.x,b.y-a.y):1e30;
++    if(valid){
++        // Reject geometry safely beyond the viewport, allowing for curvature.
++        double pad=2*deviation+.4;
++        double left=(std::min)(a.x,(std::min)(b.x,m.x)),right=(std::max)(a.x,(std::max)(b.x,m.x));
++        double top=(std::min)(a.y,(std::min)(b.y,m.y)),bottom=(std::max)(a.y,(std::max)(b.y,m.y));
++        if(right < -pad || left > v.width-1+pad || bottom < -pad || top > v.height-1+pad)return;
++        if(deviation<=.4&&span>32){
++            Point q=v.Pixel(p.Value(ta+(tb-ta)*.25)),r=v.Pixel(p.Value(ta+(tb-ta)*.75));
++            double qerror=std::hypot(q.x-(a.x*.75+b.x*.25),q.y-(a.y*.75+b.y*.25));
++            double rerror=std::hypot(r.x-(a.x*.25+b.x*.75),r.y-(a.y*.25+b.y*.75));
++            // Quarter samples reject jumps/S-turns while allowing long straight segments.
++            if(Finite(q)&&Finite(r)&&qerror<=.4&&rerror<=.4){if(Clip(a,b,v.width,v.height))emit(a,b);return;}
++        }
++    }
+     if(deviation>.4||span>32){if(depth<10){ParametricPart(p,v,ta,tm,a,m,depth+1,emit,cancel,budget);ParametricPart(p,v,tm,tb,m,b,depth+1,emit,cancel,budget);}return;}
+     if(valid&&Clip(a,b,v.width,v.height))emit(a,b);
+ }
+@@ -103,4 +118,30 @@
      const int steps=512;int budget=100000;Point a=v.Pixel(p.Value(p.low));
      for(int i=0;i<steps&&!cancel()&&budget>0;i++){double ta=p.low+(p.high-p.low)*i/steps,tb=p.low+(p.high-p.low)*(i+1)/steps;Point b=v.Pixel(p.Value(tb));ParametricPart(p,v,ta,tb,a,b,0,emit,cancel,budget);a=b;}
  }

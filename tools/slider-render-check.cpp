@@ -13,7 +13,11 @@ int main(){
     for(const char *text:{"y=a*sin(x)","a*sin(x)=y","x=a*sin(y)","a*sin(y)=x","x=a","y=a"}){
         Check(p.Parse(text,true,error),"explicit parse");p.Bind(parameters);ExplicitCurve curve;
         Check(Explicit(p,curve),"explicit direction was not recognized");lines.clear();Contour(p,v,emit,shade,cancel);
-        Check(lines.size()>100,"explicit curve absent");for(auto s:lines){Check(std::fabs(p.Value(world(s.a)))<1e-8,"explicit curve changed equation");Check(std::hypot(s.a.x-s.b.x,s.a.y-s.b.y)<33,"adaptive segment too long");}
+        Check(lines.size()>100,"explicit curve absent");for(auto s:lines){Check(std::fabs(p.Value(world(s.a)))<1e-8,"explicit curve changed equation");Check(Finite(s.a)&&Finite(s.b),"invalid explicit pixels");}
+    }
+    for(const char *text:{"y=a*x","y=a*sin(x)","x=a*y"}){
+        Check(p.Parse(text,true,error),"steep parse");auto steep=parameters;steep.a[0].value=1e9;p.Bind(steep);lines.clear();Contour(p,v,emit,shade,cancel);Check(!lines.empty(),"large parameter starved visible geometry");
+        for(auto segment:lines)Check(Finite(segment.a)&&Finite(segment.b),"invalid steep pixels");
     }
     Check(p.Parse("y=a/(x-0.3)",true,error),"pole parse");p.Bind(parameters);lines.clear();Contour(p,v,emit,shade,cancel);
     Check(!lines.empty(),"rational curve absent");for(auto s:lines)Check((world(s.a).x-.3)*(world(s.b).x-.3)>0,"explicit renderer bridged a pole");
