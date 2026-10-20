@@ -668,3 +668,15 @@ Graph sliders, step reveals and attached connectors (18 October 2026)
 - Native Windows tests cover live rendering, validation, Cancel, Undo, saved
   parameters, parametrics, reveal ordering/visibility/navigation/persistence,
   connection tracking, deletion recovery, independent copy and text targets.
+
+CANVAS SLIDER PANEL AND LIVE GRAPH UPDATES (2026-10-19)
+- Graph > Parameter sliders opens an embedded panel on the page. Canvas typing,
+  movement, graph editing, zoom and saving remain available while it is open.
+- Clicking another graph switches the panel. Ranges and step expand inline;
+  Enter applies typed values. Close hides the panel and keeps live changes.
+  Undo restores each drag/change. Deletion disables controls; Undo reconnects
+  them. Opening another document clears the old target.
+- Slider changes are coalesced, workers use parameter snapshots, and completed
+  offscreen frames replace the previous curve without blanking it. Explicit
+  functions use adaptive one-dimensional tracing; implicit previews refine
+  at release. Shared worker serialization and cancellation remain in place.

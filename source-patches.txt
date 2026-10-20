@@ -35,3 +35,4 @@ attached-object-pointers.patch
 relation-parametric-graphs.patch
 brace-label-box.patch
 interactive-features.patch
+canvas-slider-panel.patch

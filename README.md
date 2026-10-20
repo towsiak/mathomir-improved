@@ -167,7 +167,10 @@ use the existing native drawing paths. Background controls color the label box.
 - **Graph > Parameter sliders** controls a, b and c in ordinary equations,
   implicit relations and parametric coordinates. Defaults: a=1, b=1, c=0.
   Each slider has a value, minimum, maximum and positive increment; typed ranges
-  use Apply. Dragging updates the existing graph. Cancel restores starting values.
+  expand inside a panel on the canvas. The page stays editable while the panel
+  is open; click another graph to switch its target. Close hides the panel, and
+  Undo restores each drag or typed change. Curves update while dragging; implicit
+  curves refine after release.
 - Select objects and use **View > Make or edit step sequence**. Each object or
   existing native group becomes a step; reorder the list and start the reveal.
   Back/Next/Show all/Exit appear on the canvas. Space/Right advances, Left goes

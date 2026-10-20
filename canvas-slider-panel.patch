@@ -1,0 +1,667 @@
+--- a/Mathomir/Drawing.h
++++ b/Mathomir/Drawing.h
+@@ -2,6 +2,7 @@
+ #include "expression.h"
+ #include "Piecewise.h"
+ #include <atomic>
++#include <mutex>
+ #include "Statistics.h"
+ #include "IntegralArea.h"
+ #include "RelationGraph.h"
+@@ -133,6 +134,15 @@
+ {
+ public:
+     InteractiveObjects::Parameters parameters;
++    mutable std::mutex ParameterMutex;
++    InteractiveObjects::Parameters ParameterSnapshot() const;
++    void SetParameterValues(const InteractiveObjects::Parameters &value);
++    void RequestParameterPlot(bool preview);
++    bool PublishParameterFrame();
++    // UI owns publication. Worker writes the pending frame before releasing ThreadHandle.
++    HBITMAP ParameterFrame;
++    bool ParameterDirty,ParameterPreviewRequested;
++    std::atomic<bool> InteractiveRender,InteractivePreview;
+     RelationGraph::Parametric parametric;
+     IntegralArea::Settings integral;IntegralArea::Result integralResult;std::string integralError;
+     std::vector<Piecewise::Row> pieces;
+@@ -167,7 +177,7 @@
+ 	int XML_output(char * output, int num_tabs, char only_calculate);
+ 	char *XML_input(char * file);
+ 
+-	int PlotFunction(int reset_plot, CDC *PrintDC=NULL,short zoom=0);
++	int PlotFunction(int reset_plot, CDC *PrintDC=NULL,short zoom=0,bool interactive=false,bool preview=false);
+ 	bool StopForZoom();
+     void EnsureFunctionSlots();
+     int CurveControlStep(int zoom);
+--- a/Mathomir/FeatureHelp.h
++++ b/Mathomir/FeatureHelp.h
+@@ -39,7 +39,14 @@
+     }
+ };
+ inline const char *FeatureControlHelp(int dialog,int id){
+-    if(dialog==IDD_PARAMETER_SLIDERS){if(id>=1510&&id<=1534)return "Use a, b and c in graph formulas. Sliders change the live graph; each row has value, minimum, maximum and step. Apply validates typed ranges. Cancel restores the starting values.";if(id==1501)return "Validate and apply the typed values and ranges to the current graph.";if(id==1502)return "Reset a=1, b=1, c=0 with ranges -5 to 5 and step 0.1.";}
++    if(dialog==IDD_PARAMETER_SLIDERS){
++        if(id>=1510&&id<=1534)return "Use a, b and c in graph formulas. Drag to update the graph live, or type a value and press Enter. Range settings expand inside this panel.";
++        if(id==1501)return "Apply the typed values and ranges. This panel stays open; Undo restores each change.";
++        if(id==1502)return "Reset a=1, b=1, c=0, with ranges -5 to 5 and step 0.1.";
++        if(id==1504)return "Show or hide minimum, maximum and step settings inside this panel.";
++        if(id==IDCANCEL)return "Hide the slider panel. Changes stay in the graph; use Undo to reverse a change.";
++        return "Graph slider controls stay on the page while you edit. Click another graph to switch the panel's target.";
++    }
+     if(dialog==IDD_STEP_SEQUENCE)return "Each listed object or group becomes one step. Use Move up/down to arrange the order. Saving keeps every step; reveal hides only later steps on screen. Existing native groups can contain several objects in one step.";
+     if(dialog==IDD_ATTACHED_CONNECTOR)return "The connector follows the two referenced objects. Choose line or arrow ends, straight or elbow path, and automatic or fixed-side anchors. Swap reverses A and B; Detach keeps the current shape as an ordinary drawing.";
+     if(dialog==IDD_FORMULA_REFERENCE){
+--- a/Mathomir/FunctionPlotter.cpp
++++ b/Mathomir/FunctionPlotter.cpp
+@@ -23,6 +23,7 @@
+ #include "IntegralPaint.h"
+ #include "MathDisplay.h"
+ #include "GraphZoom.h"
++#include <memory>
+ #include "GraphDiscontinuities.h"
+ #include "GraphStepEndpoints.h"
+ #include "NativeSymbolic.h"
+@@ -71,14 +72,14 @@
+ 	//because some bug corrupts memory in multi-threading
+ 	CFunctionPlotter *Plotter=(CFunctionPlotter*)lpParameter;
+ 	int timer=0;
+-	while ((GetKeyState(VK_RBUTTON)&0x8000) ||
++	while (!Plotter->InteractiveRender && ((GetKeyState(VK_RBUTTON)&0x8000) ||
+ 		  (GetKeyState(33)&0x8000) ||
+ 		  (GetKeyState(34)&0x8000) ||
+ 		  (GetKeyState(VK_LEFT)&0x8000) ||
+ 		  (GetKeyState(VK_RIGHT)&0x8000) ||
+ 		  (GetKeyState(VK_UP)&0x8000) ||
+ 		  (GetKeyState(VK_DOWN)&0x8000) ||
+-		  (timer<15)) //we must wait a bit!!!! STRANGE, otherwise function drawing is not ok
++		  (timer<15))) //we must wait a bit!!!! STRANGE, otherwise function drawing is not ok
+ 	{
+ 		if (Plotter->abort_request) goto PlotterThread_exit;
+ 		Sleep(10);
+@@ -113,9 +114,11 @@
+     // A queued or pre-start cancellation never acquired the drawing lock and
+     // must not clear another graph worker's busy state.
+     if(crit_sec){InterlockedDecrement(&DrawingThreadUsed);LeaveCriticalSection(&section);}
++    HWND repaint=pMainView?pMainView->GetSafeHwnd():NULL;
+     HANDLE completedHandle=Plotter->ThreadHandle;
+     Plotter->ThreadHandle=NULL; // No access to Plotter after announcing completion.
+     if(completedHandle)CloseHandle(completedHandle);
++    if(repaint)::InvalidateRect(repaint,NULL,FALSE);
+ 	ExitThread(0);
+ 	return 0;
+ }
+@@ -136,7 +139,7 @@
+ //constructor
+ CFunctionPlotter::CFunctionPlotter(CDrawing *BaseItem)
+ {
+-    FloatingPreview=false;
++    FloatingPreview=false;ParameterFrame=NULL;ParameterDirty=false;ParameterPreviewRequested=false;InteractiveRender=false;InteractivePreview=false;
+ 	Base=BaseItem;
+     pieceRadians=true;statisticsModel=1;scatterResidual=false;
+ 	Plot=NULL;
+@@ -160,13 +163,14 @@
+ 	abort_request=1;
+ 	while (ThreadHandle) Sleep(10);
+ 	if (Plot) delete Plot;
++    if(ParameterFrame)::DeleteObject(ParameterFrame);
+ }
+ 
+ //Copies relevant data from another object of the same type (this is used
+ //when a copy of an existing object is to be made)
+ int CFunctionPlotter::CopyFrom(CDrawing *Original)
+ {
+-    FloatingPreview=false;
++    FloatingPreview=false;ParameterFrame=NULL;ParameterDirty=false;ParameterPreviewRequested=false;InteractiveRender=false;InteractivePreview=false;
+ 	if (Original->IsSpecialDrawing!=51) return 0;
+ 	CFunctionPlotter *org=(CFunctionPlotter*)Original->SpecialData;
+ 	if (!org) return 0;
+@@ -194,6 +198,24 @@
+ 	return 1;
+ }
+ 
++InteractiveObjects::Parameters CFunctionPlotter::ParameterSnapshot() const {
++    std::lock_guard<std::mutex> lock(ParameterMutex);return parameters;
++}
++void CFunctionPlotter::SetParameterValues(const InteractiveObjects::Parameters &value){
++    std::lock_guard<std::mutex> lock(ParameterMutex);parameters=value;
++}
++void CFunctionPlotter::RequestParameterPlot(bool preview){
++    ParameterDirty=true;ParameterPreviewRequested=preview;
++    // Finish an already-running interactive preview; abort slow/stale full renders.
++    if(ThreadHandle&&(!InteractiveRender||!InteractivePreview))abort_request=1;
++    if(pMainView)pMainView->Invalidate(FALSE);
++}
++bool CFunctionPlotter::PublishParameterFrame(){
++    if(ThreadHandle||!ParameterFrame)return false;
++    CBitmap *frame=new CBitmap();frame->Attach(ParameterFrame);ParameterFrame=NULL;
++    CBitmap *old=Plot;Plot=frame;delete old;return true;
++}
++
+ //Paints the object interior (painting starts from X,Y coordinates - upper left corner)
+ int wwwxxx;
+ CRITICAL_SECTION section2;
+@@ -201,7 +223,12 @@
+ {
+     // Axis labels must not inherit opaque text backgrounds from a fresh preview DC.
+     DC->SetBkMode(TRANSPARENT);DC->SetBkColor(RGB(255,255,255));
+-    if(GetCurrentThreadId()!=ThreadID)EnsureFunctionSlots();
++    if(GetCurrentThreadId()!=ThreadID){
++        EnsureFunctionSlots();PublishParameterFrame();
++        if(ParameterDirty&&!ThreadHandle&&!PrintRendering&&!DC->IsPrinting()){
++            bool preview=ParameterPreviewRequested;ParameterDirty=false;PlotFunction(1,NULL,zoom,true,preview);
++        }
++    }
+ 	MX=(PrintRendering?50:max(50,2*ToolboxSize/5+20));
+ 	MY=MX/2;
+ 	const int LeftMargin=MX*zoom/100;
+@@ -1843,7 +1870,7 @@
+     }
+ }
+ static void PaintRelationCurves(CDC &dc,const RelationGraph::Viewport &view,RelationGraph::Program *relations,bool *active,
+-    const RelationGraph::Parametric &parametric,int zoom,std::atomic<unsigned char> &abort)
++    const RelationGraph::Parametric &parametric,int zoom,std::atomic<unsigned char> &abort,bool preview=false)
+ {
+     const int colors[8]={0,2,1,3,5,6,7,4};int saved=dc.SaveDC();dc.IntersectClipRect(0,0,view.width,view.height);
+     auto cancel=[&](){return abort!=0;};
+@@ -1852,12 +1879,12 @@
+         auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));dc.SetPixelV((int)floor(b.x+.5),(int)floor(b.y+.5),color);};
+         auto shade=[&](int x,int y,int right,int bottom){dc.FillSolidRect(x,y,right-x,bottom-y,RGB(230,236,245));};
+         if(parametric.enabled&&k==0)RelationGraph::Trace(parametric,view,emit,cancel);
+-        else RelationGraph::Contour(relations[k],view,emit,shade,cancel);
++        else RelationGraph::Contour(relations[k],view,emit,shade,cancel,preview?64:256);
+         dc.SelectStockObject(BLACK_PEN);
+     }dc.RestoreDC(saved);
+ }
+ 
+-int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom)
++int CFunctionPlotter::PlotFunction(int reset_plot, CDC *PrintDC,short ViewZoom,bool interactive,bool preview)
+ {
+ 	if (ViewZoom==0)
+ 		ViewZoom=::ViewZoom;
+@@ -1882,6 +1909,7 @@
+ 			cnt++;
+ 		}
+ 		abort_request=0;
++        PublishParameterFrame();InteractiveRender=interactive&&PrintDC==NULL;InteractivePreview=preview;ParameterDirty=false;
+         if(integral.enabled){integralError.clear();
+             try{if(Base->NumItems>8){auto expression=(CExpression*)Base->Items[8].pSubdrawing;int first=0;for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='=')first=n+1;integral.formula=NativeSymbolic::Formula(expression,first);}IntegralArea::Calculate(integral,integralResult,integralError);}
+             catch(const std::exception &e){integralResult.ready=false;integralError=e.what();}
+@@ -1911,6 +1939,7 @@
+ 
+ 		//create the new bitmap if already not exists
+ 		CDC *DC=pMainView->GetDC();
++        bool newBitmap=Plot==NULL;
+ 		if (Plot==NULL)
+ 		{
+ 			Plot=new CBitmap();
+@@ -1921,7 +1950,7 @@
+ 		CDC mDC;
+ 		if (PrintDC) mDC.CreateCompatibleDC(PrintDC); else mDC.CreateCompatibleDC(DC);
+ 		CBitmap *prev_bitmap=mDC.SelectObject(Plot);
+-		mDC.FillSolidRect(0,0,Xlen,Ylen,RGB(255,255,255));
++		if(!InteractiveRender||newBitmap)mDC.FillSolidRect(0,0,Xlen,Ylen,RGB(255,255,255));
+ 		mDC.SelectObject(prev_bitmap);
+ 		pMainView->ReleaseDC(DC);
+ 
+@@ -1971,7 +2000,8 @@
+ 
+ 
+ 
+-	    RelationGraph::Parametric boundParametric=parametric;boundParametric.Bind(parameters);
++	    const auto frameParameters=ParameterSnapshot();
++    RelationGraph::Parametric boundParametric=parametric;boundParametric.Bind(frameParameters);
+     RelationGraph::Program relations[8];bool relationActive[8]={false};
+ 	CExpression *Func[8];
+     bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
+@@ -1984,7 +2014,7 @@
+ 	{
+         Func[kk]=NULL;
+         if(parametric.enabled){if(kk==0)any_found=1;continue;}
+-        if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9&&NativeGraphRelation((CExpression*)pItem->pSubdrawing,relations[kk],is_x_pi!=0,parameters)){
++        if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9&&NativeGraphRelation((CExpression*)pItem->pSubdrawing,relations[kk],is_x_pi!=0,frameParameters)){
+             relationActive[kk]=true;any_found=1;continue;
+         }
+ 		if (Base->NumItems>=kk+9)
+@@ -2022,6 +2052,13 @@
+ 	CDC *DC=pMainView->GetDC();
+ 	CDC mDC;
+ 	if (PrintDC) mDC.CreateCompatibleDC(PrintDC); else mDC.CreateCompatibleDC(DC);
++    std::unique_ptr<CBitmap> completed;
++    CBitmap *renderPlot=Plot;
++    if(InteractiveRender){
++        completed.reset(new CBitmap());if(!completed->CreateCompatibleBitmap(DC,Xlen,Ylen)){pMainView->ReleaseDC(DC);return 0;}
++        completed->SetBitmapDimension(Xlen,Ylen);renderPlot=completed.get();
++        auto old=mDC.SelectObject(renderPlot);mDC.FillSolidRect(0,0,Xlen,Ylen,RGB(255,255,255));mDC.SelectObject(old);
++    }
+ 	pMainView->ReleaseDC(DC);
+ 	mDC.SelectObject(GetStockObject(BLACK_PEN));
+ 
+@@ -2091,16 +2128,17 @@
+ 	double f1=(Xmax-Xmin)/(double)(Xlen*density-1);
+ 	double f2=log10(Xmax/Xmin)/(double)(Xlen*density-1);
+ 
+-	for (int i=0;i<Xlen*density;i++)
++    bool nativeSamples=false;for(int k=0;k<8;k++)if(Func[k])nativeSamples=true;
++	for (int i=nativeSamples?0:Xlen*density-1;i<Xlen*density;i++)
+ 	{
+ 		//we will suspend the plotting if creen is scrolling or some other action is being done
+-		while ((GetKeyState(VK_RBUTTON)&0x8000) ||
++		while (!InteractiveRender && ((GetKeyState(VK_RBUTTON)&0x8000) ||
+ 		  (GetKeyState(33)&0x8000) ||
+ 		  (GetKeyState(34)&0x8000) ||
+ 		  (GetKeyState(VK_LEFT)&0x8000) ||
+ 		  (GetKeyState(VK_RIGHT)&0x8000) ||
+ 		  (GetKeyState(VK_UP)&0x8000) ||
+-		  (GetKeyState(VK_DOWN)&0x8000))
++		  (GetKeyState(VK_DOWN)&0x8000)))
+ 		{
+ 			if (abort_request) break;
+ 			Sleep(10);
+@@ -2129,7 +2167,7 @@
+ 		}
+ 
+ 		//from time to type refresh the plotter (we don't do it very often because is slow)
+-		if (((((!analyze) && (i%32==31)) || ((analyze) && (i%64==63))) && (PrintDC==NULL)) || (i==density*Xlen-1))
++		if ((!InteractiveRender&&((((!analyze) && (i%32==31)) || ((analyze) && (i%64==63))) && (PrintDC==NULL)) || (i==density*Xlen-1))
+ 		{
+ 			if (i==density*Xlen-1) show_no_scale=0;
+ 
+@@ -2142,7 +2180,7 @@
+                         if(k>=(int)pieces.size() && !known && GraphDiscontinuities::HoleLimit([&](double x){return Func[k]->PlotterCalculateFunctionValue(x,VarPos[k],is_x_pi!=0);},point.x,Xmax-Xmin,point.y))
+                         {point.hole=true;domainPoints[k].push_back(point);}
+                     }
+-			CBitmap *prev_bitmap=mDC.SelectObject(Plot);
++			CBitmap *prev_bitmap=mDC.SelectObject(renderPlot);
+ 
+ 			//if we need to auto-adjust y scale, we will do this form time to time
+             if (calc_y && !abort_request && i==density*Xlen-1)
+@@ -2408,7 +2446,7 @@
+             if(i==density*Xlen-1&&!abort_request){
+                 RelationGraph::Viewport viewport;viewport.xmin=Xmin;viewport.xmax=Xmax;viewport.ymin=Ymin;viewport.ymax=Ymax;
+                 viewport.width=Xlen;viewport.height=Ylen;viewport.logx=is_x_log!=0;viewport.logy=is_y_log!=0;
+-                PaintRelationCurves(mDC,viewport,relations,relationActive,boundParametric,ViewZoom,abort_request);
++                PaintRelationCurves(mDC,viewport,relations,relationActive,boundParametric,ViewZoom,abort_request,InteractivePreview);
+                 GraphDiagnostic("relation,parametric,width,height",relationActive[0],parametric.enabled,Xlen,Ylen);
+             }
+ 			mDC.SelectObject(prev_bitmap);
+@@ -2420,7 +2458,7 @@
+                     (absY-ViewY)*ViewZoom/100+Ylen+MY*ViewZoom/100+4);
+                 if(detached)pMainView->Invalidate(FALSE);
+                 else pMainView->InvalidateRect(&region,FALSE);
+-                Sleep(10);
++                if(!InteractiveRender)Sleep(10);
+ 			}
+ 		}
+ 	}
+@@ -2436,6 +2474,7 @@
+ 			delete Func[kk];
+ 		}
+ 	mDC.DeleteDC();
++    if(completed&&!abort_request)ParameterFrame=(HBITMAP)completed->Detach();
+ 
+ 	show_no_scale=0;
+ 	calc_y=0;
+--- a/Mathomir/InteractiveFeatures.inl
++++ b/Mathomir/InteractiveFeatures.inl
+@@ -54,39 +54,163 @@
+     for(auto &n:nodes)if(n.root>=TheDocument+first&&n.root<TheDocument+first+count&&n.type==2){auto &c=((CDrawing*)n.object)->m_Connector;if(c.Attached()){if(ids.count(c.from)&&ids.count(c.to)){c.from=ids[c.from];c.to=ids[c.to];}else if(!(cut&&InteractiveCutIds.count(n.info->id)&&(existing.count(c.from)||ids.count(c.from))&&(existing.count(c.to)||ids.count(c.to))))c.from=c.to=0;}}
+ }
+ 
+-class CParameterSlidersDialog:public CFeatureDialog {
+-    CFunctionPlotter *plot;InteractiveObjects::Parameters original,current;bool initializing,changed,pending,wasModified;bool compact;CSize expanded;std::map<int,CRect> positions;    void Layout(bool collapsed){CRect window,client,frame;GetWindowRect(&window);GetClientRect(&client);theApp.m_pMainWnd->GetWindowRect(&frame);int extraX=window.Width()-client.Width(),extraY=window.Height()-client.Height();
+-        if(positions.empty()){expanded=CSize(window.Width(),window.Height());for(HWND child=::GetWindow(m_hWnd,GW_CHILD);child;child=::GetWindow(child,GW_HWNDNEXT)){int id=::GetDlgCtrlID(child);if(id<0)continue;CRect r;::GetWindowRect(child,&r);ScreenToClient(&r);positions[id]=r;}}
+-        compact=collapsed;
+-        if(!collapsed){SetDlgItemText(1501,"Apply values / ranges");SetDlgItemText(1502,"Reset defaults");for(auto &item:positions){auto control=GetDlgItem(item.first);control->MoveWindow(item.second);control->ShowWindow(SW_SHOW);}SetDlgItemText(1504,"Compact view");SetWindowPos(NULL,max(frame.left,frame.right-expanded.cx-12),window.top,expanded.cx,expanded.cy,SWP_NOZORDER|SWP_NOACTIVATE);}
+-        else{SetDlgItemText(1501,"Apply values");SetDlgItemText(1502,"Reset");
+-            for(int id=1544;id<=1547;id++)GetDlgItem(id)->ShowWindow(SW_HIDE);
+-            GetDlgItem(1543)->MoveWindow(8,6,398,24);
+-            for(int i=0;i<3;i++){GetDlgItem(1540+i)->MoveWindow(8,42+30*i,14,20);GetDlgItem(1510+10*i)->MoveWindow(25,35+30*i,270,28);GetDlgItem(1511+10*i)->MoveWindow(302,37+30*i,104,22);for(int j=2;j<=4;j++)GetDlgItem(1510+10*i+j)->ShowWindow(SW_HIDE);}
+-            GetDlgItem(1501)->MoveWindow(8,132,105,24);GetDlgItem(1502)->MoveWindow(119,132,79,24);GetDlgItem(1504)->MoveWindow(204,132,76,24);GetDlgItem(IDOK)->MoveWindow(286,132,54,24);GetDlgItem(IDCANCEL)->MoveWindow(346,132,60,24);GetDlgItem(1505)->MoveWindow(8,166,398,40);SetDlgItemText(1504,"Ranges...");SetWindowPos(NULL,max(frame.left,frame.right-420-extraX-12),window.top,420+extraX,214+extraY,SWP_NOZORDER|SWP_NOACTIVATE);
+-        }Invalidate();
+-    }
+-
+-    void Fields(){initializing=true;for(int i=0;i<3;i++){const auto &p=current.a[i];SetDlgItemText(1511+10*i,InteractiveObjects::DisplayNumber(p.value).c_str());SetDlgItemText(1512+10*i,InteractiveObjects::DisplayNumber(p.low).c_str());SetDlgItemText(1513+10*i,InteractiveObjects::DisplayNumber(p.high).c_str());SetDlgItemText(1514+10*i,InteractiveObjects::DisplayNumber(p.step).c_str());auto s=(CSliderCtrl*)GetDlgItem(1510+10*i);s->SetRange(0,1000);s->SetPos(p.Position());}initializing=false;}
+-    bool Read(){auto proposed=current;std::string error;for(int i=0;i<3;i++){double *fields[4]={&proposed.a[i].value,&proposed.a[i].low,&proposed.a[i].high,&proposed.a[i].step};for(int j=0;j<4;j++){CString s;GetDlgItemText(1511+10*i+j,s);if(!IntegralArea::Constant((LPCSTR)s,*fields[j],error)){SetDlgItemText(1505,"Enter finite values, minimum, maximum and a positive step.");return false;}}}if(!proposed.Valid()){SetDlgItemText(1505,"Use minimum < maximum, a value in that range, and 0 < step <= range. Bounds: -1e9 to 1e9.");return false;}current=proposed;return true;}
+-    bool Apply(){bool different=false;for(int i=0;i<3;i++){auto a=current.a[i],b=plot->parameters.a[i];different=different||a.value!=b.value||a.low!=b.low||a.high!=b.high||a.step!=b.step;}if(!different){pending=false;return true;}if(!plot->StopForZoom()){SetDlgItemText(1505,"The graph is busy; try again after it finishes.");return false;}if(!changed){pMainView->UndoSave("graph sliders");changed=true;}plot->parameters=current;plot->parametric.Bind(current);plot->TheState=0;plot->PlotFunction(1);pMainView->GetDocument()->SetModifiedFlag();pMainView->RepaintTheView(1);CString s;s.Format("Live graph: a=%s   b=%s   c=%s",InteractiveObjects::DisplayNumber(current.a[0].value).c_str(),InteractiveObjects::DisplayNumber(current.a[1].value).c_str(),InteractiveObjects::DisplayNumber(current.a[2].value).c_str());SetDlgItemText(1505,s);pending=false;return true;}
+-public:
+-    CParameterSlidersDialog(CFunctionPlotter *p):CFeatureDialog(IDD_PARAMETER_SLIDERS,theApp.m_pMainWnd),plot(p),original(p->parameters),current(p->parameters),initializing(true),changed(false),pending(false),wasModified(pMainView->GetDocument()->IsModified()!=FALSE),compact(true){}
+-    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();Fields();Layout(true);SetTimer(1,100,NULL);CRect r,frame;GetWindowRect(&r);theApp.m_pMainWnd->GetWindowRect(&frame);SetWindowPos(NULL,max(frame.left,frame.right-r.Width()-12),frame.top+125,0,0,SWP_NOSIZE|SWP_NOZORDER);return TRUE;}
+-    afx_msg void OnHScroll(UINT code,UINT pos,CScrollBar *bar){if(!initializing&&bar){int i=(bar->GetDlgCtrlID()-1510)/10;if(i>=0&&i<3){current.a[i].value=current.a[i].At(((CSliderCtrl*)bar)->GetPos());SetDlgItemText(1511+10*i,InteractiveObjects::DisplayNumber(current.a[i].value).c_str());pending=true;}}CFeatureDialog::OnHScroll(code,pos,bar);}
+-    afx_msg void OnTimer(UINT_PTR id){if(id==1&&pending)Apply();else CFeatureDialog::OnTimer(id);}
+-    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp);if(id==1504){Layout(!compact);return TRUE;}if(id==1501){if(Read()){Fields();Apply();}return TRUE;}if(id==1502){current=InteractiveObjects::Parameters();Fields();Apply();return TRUE;}return CFeatureDialog::OnCommand(wp,lp);}
+-    virtual void OnOK(){if(Read()&&Apply()){KillTimer(1);CFeatureDialog::OnOK();}}
+-    virtual void OnCancel(){KillTimer(1);if(changed){if(!plot->StopForZoom()){SetDlgItemText(1505,"The graph is busy; try Cancel again after it finishes.");return;}plot->parameters=original;plot->parametric.Bind(original);plot->TheState=0;plot->PlotFunction(1);pMainView->RepaintTheView(1);pMainView->GetDocument()->SetModifiedFlag(wasModified);}CFeatureDialog::OnCancel();}
++class CParameterSliderPanel:public CFeatureDialog {
++    unsigned int graphId,epoch;
++    InteractiveObjects::Parameters current;
++    bool initializing,opened,compact,fieldsDirty,pending,gesture,gestureUndo,ending,applying;
++    CBrush background;CFont heading;
++    static bool Same(const InteractiveObjects::Parameters &a,const InteractiveObjects::Parameters &b){
++        for(int i=0;i<3;i++)if(a.a[i].value!=b.a[i].value||a.a[i].low!=b.a[i].low||a.a[i].high!=b.a[i].high||a.a[i].step!=b.a[i].step)return false;
++        return true;
++    }
++    void Move(int id,int x,int y,int w,int h){CRect r(x,y,x+w,y+h);MapDialogRect(&r);GetDlgItem(id)->MoveWindow(r,FALSE);}
++    void EnableFields(bool enabled){
++        for(int i=0;i<3;i++)for(int j=0;j<5;j++)GetDlgItem(1510+10*i+j)->EnableWindow(enabled);
++        GetDlgItem(1501)->EnableWindow(enabled);GetDlgItem(1502)->EnableWindow(enabled);
++    }
++    void Fields(){
++        initializing=true;
++        for(int i=0;i<3;i++){
++            const auto &p=current.a[i];int id=1510+10*i;
++            SetDlgItemText(id+1,InteractiveObjects::DisplayNumber(p.value).c_str());
++            SetDlgItemText(id+2,InteractiveObjects::DisplayNumber(p.low).c_str());
++            SetDlgItemText(id+3,InteractiveObjects::DisplayNumber(p.high).c_str());
++            SetDlgItemText(id+4,InteractiveObjects::DisplayNumber(p.step).c_str());
++            auto slider=(CSliderCtrl*)GetDlgItem(id);slider->SetRange(0,1000);slider->SetPos(p.Position());
++        }
++        initializing=false;fieldsDirty=false;
++    }
++    bool Read(){
++        auto proposed=current;std::string error;
++        for(int i=0;i<3;i++){
++            double *fields[4]={&proposed.a[i].value,&proposed.a[i].low,&proposed.a[i].high,&proposed.a[i].step};
++            for(int j=0;j<4;j++){CString s;GetDlgItemText(1511+10*i+j,s);
++                if(!IntegralArea::Constant((LPCSTR)s,*fields[j],error)){SetDlgItemText(1505,"Enter finite values, minimum, maximum and a positive step.");return false;}
++            }
++        }
++        if(!proposed.Valid()){SetDlgItemText(1505,"Use minimum < maximum, a value in that range, and 0 < step <= range.");return false;}
++        current=proposed;return true;
++    }
++    bool Commit(bool partOfGesture){
++        if(applying)return false;auto plot=Graph();
++        if(!plot||ViewOnlyMode||StepPresentationActive()){pending=false;return false;}
++        auto before=plot->ParameterSnapshot();pending=false;
++        if(Same(current,before))return true;
++        applying=true;
++        if(!partOfGesture||!gestureUndo){pMainView->UndoSave("graph slider");if(partOfGesture)gestureUndo=true;}
++        plot->SetParameterValues(current);plot->RequestParameterPlot(partOfGesture&&!ending);
++        pMainView->GetDocument()->SetModifiedFlag();fieldsDirty=false;
++        SetDlgItemText(1505,"Drag to update the graph. Enter applies typed values. Undo restores each change.");
++        pMainView->Invalidate(FALSE);applying=false;return true;
++    }
++    void FinishGesture(){
++        ending=true;if(pending)Commit(true);
++        if(gesture){auto plot=Graph();if(plot)plot->RequestParameterPlot(false);}
++        gesture=gestureUndo=ending=false;
++    }
++    void Layout(){
++        for(int id:{1544,1545,1546,1560,1561,1562})GetDlgItem(id)->ShowWindow(compact?SW_HIDE:SW_SHOW);
++        for(int i=0;i<3;i++)for(int j=2;j<=4;j++)GetDlgItem(1510+10*i+j)->ShowWindow(compact?SW_HIDE:SW_SHOW);
++        int y=compact?116:200;
++        Move(1501,10,y,64,18);Move(1502,80,y,54,18);Move(1504,140,y,94,18);
++        Move(1505,10,y+26,224,25);SetDlgItemText(1504,compact?"Ranges / step":"Hide ranges");
++        Anchor();Invalidate(FALSE);
++    }
++public:
++    CParameterSliderPanel():CFeatureDialog(IDD_PARAMETER_SLIDERS,pMainView),graphId(0),epoch(0),initializing(false),opened(false),compact(true),fieldsDirty(false),pending(false),gesture(false),gestureUndo(false),ending(false),applying(false){background.CreateSolidBrush(RGB(245,248,252));}
++    CFunctionPlotter *Graph(){
++        if(!graphId||epoch!=InteractiveObjects::DocumentEpoch())return NULL;
++        auto nodes=InteractiveNodes(NULL);auto n=FindInteractive(nodes,graphId);
++        if(!n||n->type!=2)return NULL;auto d=(CDrawing*)n->object;
++        return d->IsSpecialDrawing==51?(CFunctionPlotter*)d->SpecialData:NULL;
++    }
++    bool Opened()const{return opened;}
++    void Anchor(){
++        if(!GetSafeHwnd()||!opened)return;CRect client,desired(0,0,244,compact?170:254),actual;
++        pMainView->GetClientRect(&client);MapDialogRect(&desired);
++        desired.MoveToXY(max(4,client.right-desired.Width()-12),12);GetWindowRect(&actual);pMainView->ScreenToClient(&actual);
++        if(actual!=desired)SetWindowPos(NULL,desired.left,desired.top,desired.Width(),desired.Height(),SWP_NOZORDER|SWP_NOACTIVATE);
++    }
++    void Open(CDrawing *graph){
++        if(epoch!=InteractiveObjects::DocumentEpoch()){graphId=0;epoch=InteractiveObjects::DocumentEpoch();pending=gesture=gestureUndo=false;current=InteractiveObjects::Parameters();Fields();}
++        if(graph){
++            FinishGesture();auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);
++            for(auto &n:nodes)if(n.object==(CObject*)graph){graphId=n.info->id;epoch=InteractiveObjects::DocumentEpoch();break;}
++            auto plot=Graph();if(plot){current=plot->ParameterSnapshot();Fields();}
++        }
++        opened=true;SetTimer(1,16,NULL);Layout();Sync();
++    }
++    void Follow(CDrawing *graph){if(opened&&graph&&(!graphId||graph->m_ObjectInfo.id!=graphId))Open(graph);}
++    void Sync(){
++        if(!GetSafeHwnd()||!opened||applying)return;
++        if(graphId&&epoch!=InteractiveObjects::DocumentEpoch()){opened=false;graphId=0;pending=gesture=gestureUndo=false;KillTimer(1);ShowWindow(SW_HIDE);return;}
++        if(StepPresentationActive()){ShowWindow(SW_HIDE);return;}
++        auto plot=Graph();EnableFields(plot&&!ViewOnlyMode);
++        if(plot){
++            auto actual=plot->ParameterSnapshot();
++            if(!pending&&!fieldsDirty&&!Same(actual,current)){current=actual;gesture=gestureUndo=false;Fields();}
++            auto nodes=InteractiveNodes(NULL);auto node=FindInteractive(nodes,graphId);CString title;
++            title.Format("Graph at (%d, %d)",(int)node->bounds.left,(int)node->bounds.top);SetDlgItemText(1543,title);
++        }else{SetDlgItemText(1543,graphId?"Graph removed":"Select a graph");SetDlgItemText(1505,graphId?"Undo restores the graph and reconnects this panel.":"Click a graph on the page to show its sliders. Use a, b and c in its formulas.");}
++        Anchor();if(!IsWindowVisible())ShowWindow(SW_SHOWNOACTIVATE);
++    }
++    virtual BOOL OnInitDialog(){
++        CFeatureDialog::OnInitDialog();SetDlgCtrlID(ID_PARAMETER_SLIDERS);pMainView->ModifyStyle(0,WS_CLIPCHILDREN);
++        LOGFONT font={};GetFont()->GetLogFont(&font);font.lfWeight=FW_BOLD;heading.CreateFontIndirect(&font);GetDlgItem(1548)->SetFont(&heading);
++        Fields();Layout();return TRUE;
++    }
++    afx_msg HBRUSH OnCtlColor(CDC *dc,CWnd *window,UINT type){
++        if(type==CTLCOLOR_DLG||type==CTLCOLOR_STATIC){dc->SetBkColor(RGB(245,248,252));dc->SetTextColor(RGB(35,48,67));return (HBRUSH)background.GetSafeHandle();}
++        return CFeatureDialog::OnCtlColor(dc,window,type);
++    }
++    afx_msg void OnHScroll(UINT code,UINT pos,CScrollBar *bar){
++        if(initializing||!bar)return;
++        if(code==TB_ENDTRACK){FinishGesture();return;}
++        int i=(bar->GetDlgCtrlID()-1510)/10;if(i<0||i>=3)return;
++        auto plot=Graph();if(!plot)return;
++        int sliderPosition=((CSliderCtrl*)bar)->GetPos();
++        if(!gesture){current=plot->ParameterSnapshot();gesture=true;gestureUndo=false;Fields();}
++        current.a[i].value=current.a[i].At(sliderPosition);
++        initializing=true;SetDlgItemText(1511+10*i,InteractiveObjects::DisplayNumber(current.a[i].value).c_str());initializing=false;pending=true;
++        // Key/page/wheel changes are complete gestures; a thumb drag is coalesced by the timer.
++        if(code!=TB_THUMBTRACK)FinishGesture();
++    }
++    afx_msg void OnTimer(UINT_PTR id){if(id==1){if(pending)Commit(true);Sync();}else CFeatureDialog::OnTimer(id);}
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){
++        int id=LOWORD(wp),notice=HIWORD(wp);
++        if(initializing)return TRUE;
++        if(id>=1511&&id<=1534&&id%10>=1&&id%10<=4){
++            if(notice==EN_CHANGE){fieldsDirty=true;return TRUE;}
++            if(notice==EN_KILLFOCUS&&id%10==1&&fieldsDirty){FinishGesture();if(Read()){Commit(false);Fields();}return TRUE;}
++        }
++        if(id==1504){compact=!compact;Layout();return TRUE;}
++        if(id==1501){FinishGesture();if(Read()){Commit(false);Fields();}return TRUE;}
++        if(id==1502){FinishGesture();current=InteractiveObjects::Parameters();Commit(false);Fields();return TRUE;}
++        return CFeatureDialog::OnCommand(wp,lp);
++    }
++    virtual void OnOK(){FinishGesture();if(Read()){Commit(false);Fields();}pMainView->SetFocus();}
++    virtual void OnCancel(){FinishGesture();opened=false;pending=false;KillTimer(1);ShowWindow(SW_HIDE);pMainView->SetFocus();}
+     DECLARE_MESSAGE_MAP()
+ };
+-BEGIN_MESSAGE_MAP(CParameterSlidersDialog,CFeatureDialog)
++BEGIN_MESSAGE_MAP(CParameterSliderPanel,CFeatureDialog)
+     ON_WM_HSCROLL()
+     ON_WM_TIMER()
++    ON_WM_CTLCOLOR()
+ END_MESSAGE_MAP()
+-void CMathomirView::OnParameterSliders(){if(ViewOnlyMode)return;CDrawing *graph=NULL;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2&&(TheDocument+i==prevTouchedObject||TheDocument[i].MovingDotState==3)){graph=FindRelationGraph((CDrawing*)TheDocument[i].Object);if(graph)break;}
++static CParameterSliderPanel *ParameterPanel=NULL;
++static void UpdateParameterPanel(){if(ParameterPanel)ParameterPanel->Sync();}
++static void DestroyParameterPanel(){if(ParameterPanel){if(ParameterPanel->GetSafeHwnd())ParameterPanel->DestroyWindow();delete ParameterPanel;ParameterPanel=NULL;}}
++static void ParameterGraphClicked(tDocumentStruct *object){
++    if(ParameterPanel&&ParameterPanel->Opened()&&object&&object->Type==2){auto graph=FindRelationGraph((CDrawing*)object->Object);if(graph)ParameterPanel->Follow(graph);}
++}
++void CMathomirView::OnParameterSliders(){
++    if(ViewOnlyMode)return;CDrawing *graph=NULL;
++    for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2&&(TheDocument+i==prevTouchedObject||TheDocument[i].MovingDotState==3)){graph=FindRelationGraph((CDrawing*)TheDocument[i].Object);if(graph)break;}
+     if(!graph){int count=0;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2){auto d=FindRelationGraph((CDrawing*)TheDocument[i].Object);if(d){graph=d;count++;}}if(count!=1)graph=NULL;}
+-    if(!graph){AfxMessageBox("Point at or select an ordinary, implicit or parametric graph, then open Parameter sliders. Use a, b and c in its formulas.");return;}OnChar(27,1,0);auto plot=(CFunctionPlotter*)graph->SpecialData;if(!plot->StopForZoom())return;CParameterSlidersDialog dialog(plot);dialog.DoModal();SetFocus();}
++    if(!ParameterPanel){ParameterPanel=new CParameterSliderPanel();if(!ParameterPanel->Create(IDD_PARAMETER_SLIDERS,this)){delete ParameterPanel;ParameterPanel=NULL;return;}}
++    ParameterPanel->Open(graph);SetFocus();
++}
++
+ 
+ class CStepControls:public CDialog {
+ public:
+--- a/Mathomir/Mathomir.rc
++++ b/Mathomir/Mathomir.rc
+@@ -1224,41 +1224,45 @@
+     PUSHBUTTON "Cancel",IDCANCEL,308,199,52,17
+ END
+ 
+-IDD_PARAMETER_SLIDERS DIALOGEX 0,0,360,229
+-STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
++IDD_PARAMETER_SLIDERS DIALOGEX 0,0,244,254
++STYLE DS_CONTROL | WS_CHILD | WS_CLIPCHILDREN | WS_BORDER
++EXSTYLE WS_EX_CONTROLPARENT
+ CAPTION "Graph parameter sliders"
+ FONT 9,"Segoe UI"
+ BEGIN
+- LTEXT "Use a, b and c in the graph's formulas. Drag a slider to update the graph.",1543,8,8,344,20
+- LTEXT "Value",1544,168,32,40,10
+- LTEXT "Minimum",1545,214,32,42,10
+- LTEXT "Maximum",1546,260,32,42,10
+- LTEXT "Step",1547,306,32,42,10
+- LTEXT "a",1540,8,51,12,12
+- CONTROL "",1510,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,44,139,25
+- EDITTEXT 1511,168,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1512,214,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1513,260,47,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1514,306,47,45,15,ES_AUTOHSCROLL | WS_TABSTOP
+- LTEXT "b",1541,8,91,12,12
+- CONTROL "",1520,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,84,139,25
+- EDITTEXT 1521,168,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1522,214,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1523,260,87,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1524,306,87,45,15,ES_AUTOHSCROLL | WS_TABSTOP
+- LTEXT "c",1542,8,131,12,12
+- CONTROL "",1530,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,23,124,139,25
+- EDITTEXT 1531,168,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1532,214,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1533,260,127,40,15,ES_AUTOHSCROLL | WS_TABSTOP
+- EDITTEXT 1534,306,127,45,15,ES_AUTOHSCROLL | WS_TABSTOP
+- PUSHBUTTON "Apply values / ranges",1501,8,158,113,18
+- PUSHBUTTON "Reset defaults",1502,129,158,90,18
+- PUSHBUTTON "Compact view",1504,230,158,121,18
+- LTEXT "Drag sliders for live changes. Cancel restores the values you started with.",1505,8,183,344,22
+- DEFPUSHBUTTON "Done",IDOK,236,206,55,17
+- PUSHBUTTON "Cancel",IDCANCEL,298,206,54,17
+-END
++ LTEXT "Graph sliders",1548,10,8,175,13
++ PUSHBUTTON "X",IDCANCEL,214,5,20,17
++ LTEXT "Select a graph",1543,10,24,224,12
++ LTEXT "a",1540,10,45,10,12
++ CONTROL "",1510,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,24,39,147,24
++ EDITTEXT 1511,177,43,57,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "b",1541,10,69,10,12
++ CONTROL "",1520,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,24,63,147,24
++ EDITTEXT 1521,177,67,57,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "c",1542,10,93,10,12
++ CONTROL "",1530,"msctls_trackbar32",TBS_HORZ | TBS_NOTICKS | WS_TABSTOP,24,87,147,24
++ EDITTEXT 1531,177,91,57,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "Minimum",1544,27,116,60,12
++ LTEXT "Maximum",1545,94,116,60,12
++ LTEXT "Step",1546,161,116,60,12
++ LTEXT "a",1560,10,133,10,12
++ EDITTEXT 1512,27,130,60,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1513,94,130,60,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1514,161,130,73,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "b",1561,10,155,10,12
++ EDITTEXT 1522,27,152,60,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1523,94,152,60,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1524,161,152,73,15,ES_AUTOHSCROLL | WS_TABSTOP
++ LTEXT "c",1562,10,177,10,12
++ EDITTEXT 1532,27,174,60,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1533,94,174,60,15,ES_AUTOHSCROLL | WS_TABSTOP
++ EDITTEXT 1534,161,174,73,15,ES_AUTOHSCROLL | WS_TABSTOP
++ PUSHBUTTON "Apply values",1501,10,200,64,18
++ PUSHBUTTON "Reset",1502,80,200,54,18
++ PUSHBUTTON "Hide ranges",1504,140,200,94,18
++ LTEXT "Drag to update the graph. Enter applies typed values. Undo restores each change.",1505,10,226,224,25
++END
++
+ 
+ IDD_STEP_SEQUENCE DIALOGEX 0,0,350,230
+ STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -72,6 +72,9 @@
+ static void RememberInteractiveCut();
+ static void UpdateStepControls(CMathomirView *view);
+ static void DestroyStepControls();
++static void UpdateParameterPanel();
++static void DestroyParameterPanel();
++static void ParameterGraphClicked(tDocumentStruct *object);
+ 
+ 
+ 
+@@ -1169,6 +1172,7 @@
+ 
+ CMathomirView::~CMathomirView()
+ {
++    DestroyParameterPanel();
+     DestroyStepControls();
+     if(m_SelectionApproxPanel){if(m_SelectionApproxPanel->GetSafeHwnd())m_SelectionApproxPanel->DestroyWindow();delete m_SelectionApproxPanel;m_SelectionApproxPanel=NULL;}
+ 	if (ClipboardBackground.DC)
+@@ -1351,7 +1355,7 @@
+ 
+ void CMathomirView::OnDraw(CDC* pDC)
+ {
+-    SyncInteractiveObjects(pDC);if(!pDC->IsPrinting())UpdateStepControls(this);
++    SyncInteractiveObjects(pDC);if(!pDC->IsPrinting()){UpdateStepControls(this);UpdateParameterPanel();}
+     if (!pDC->IsPrinting()) { ApplyPageWidthFit(); UpdateQuickActionMode(); }
+ 	tDocumentStruct *ds=TheDocument;
+ 	int SelectedElement;
+@@ -2326,6 +2330,7 @@
+     if(MouseMode==0 && !IsDrawingMode && !TouchMouseMode && !(nFlags&MK_SHIFT))
+         OnMouseMove(nFlags&~MK_LBUTTON,point);
+     tDocumentStruct *clickedContent=FrontContentAtPoint(point);
++    if(!ClipboardExpression&&!ClipboardDrawing&&!IsDrawingMode)ParameterGraphClicked(clickedContent?clickedContent:SpecialDrawingHover);
+     for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object &&
+         TheDocument+i!=clickedContent)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);
+     // A deliberate node-edit session must reach the node before legacy drawing
+--- a/Mathomir/RelationGraph.h
++++ b/Mathomir/RelationGraph.h
+@@ -60,8 +60,9 @@
+     // A sign change across a pole or a jump is not a zero contour.
+     if(best>scale*1e-5)return false;root=candidate;return true;
+ }
+-inline void Contour(const Program &p,const Viewport &v,const Emit &emit,const Shade &shade,const Cancel &cancel){
+-    int nx=(std::max)(16,(std::min)(256,v.width/2)),ny=(std::max)(16,(std::min)(256,v.height/2));
++inline void ImplicitContour(const Program &p,const Viewport &v,const Emit &emit,const Shade &shade,const Cancel &cancel,int resolution=256){
++    int limit=(std::max)(16,(std::min)(256,resolution));
++    int nx=(std::max)(16,(std::min)(limit,v.width/2)),ny=(std::max)(16,(std::min)(limit,v.height/2));
+     std::vector<double> previous(nx+1),next(nx+1);
+     for(int x=0;x<=nx;x++){Point a={v.X(double(x)/nx),v.Y(0)};previous[x]=p.Value(a);}
+     for(int y=0;y<ny;y++){
+@@ -91,7 +92,7 @@
+     bool Parse(std::string &error){try{if(!Finite(low)||!Finite(high)||!(low<high)||std::fabs(low)>1e12||std::fabs(high)>1e12)throw std::runtime_error("Use finite t bounds with start < end and magnitude at most one trillion.");SymbolicDerivative::Parser p;x=p.Parse(xtext);y=p.Parse(ytext);if(!Variables(x,true)||!Variables(y,true))throw std::runtime_error("Parametric coordinates use t, for example 3*cos(t) and 2*sin(t).");Bind(InteractiveObjects::Parameters());error.clear();return true;}catch(const std::exception &e){error=e.what();return false;}}
+     Point Value(double t)const{Point p={SymbolicDerivative::Value(compiledX,"t",t,radians),SymbolicDerivative::Value(compiledY,"t",t,radians)};return p;}
+ };
+-inline void ParametricPart(const Parametric &p,const Viewport &v,double ta,double tb,Point a,Point b,int depth,const Emit &emit,const Cancel &cancel,int &budget){
++template<class Curve> inline void ParametricPart(const Curve &p,const Viewport &v,double ta,double tb,Point a,Point b,int depth,const Emit &emit,const Cancel &cancel,int &budget){
+     if(--budget<0||cancel())return;double tm=ta+(tb-ta)/2;Point m=v.Pixel(p.Value(tm));
+     if(!Finite(a)&&!Finite(b)&&!Finite(m))return;
+     bool valid=Finite(a)&&Finite(b)&&Finite(m);double deviation=valid?std::hypot(m.x-(a.x+b.x)/2,m.y-(a.y+b.y)/2):1e30;
+@@ -103,4 +104,30 @@
+     const int steps=512;int budget=100000;Point a=v.Pixel(p.Value(p.low));
+     for(int i=0;i<steps&&!cancel()&&budget>0;i++){double ta=p.low+(p.high-p.low)*i/steps,tb=p.low+(p.high-p.low)*(i+1)/steps;Point b=v.Pixel(p.Value(tb));ParametricPart(p,v,ta,tb,a,b,0,emit,cancel,budget);a=b;}
+ }
++// Explicit functions take a one-dimensional adaptive path instead of an area scan.
++// The same clipping/domain checks apply in either direction and on logarithmic axes.
++struct ExplicitCurve {
++    Expr formula;bool vertical,radians;
++    Point Value(double t)const {double value=SymbolicDerivative::Value(formula,vertical?"y":"x",t,radians);return vertical?Point{value,t}:Point{t,value};}
++};
++inline bool Explicit(const Program &p,ExplicitCurve &curve){
++    if(p.relation!='=')return false;
++    auto choose=[&](Expr axis,Expr value){
++        if(!axis||axis->op!='v'||(axis->name!="x"&&axis->name!="y")||SymbolicDerivative::Depends(value,axis->name))return false;
++        curve.formula=value;curve.vertical=axis->name=="x";curve.radians=p.radians;return true;
++    };
++    return choose(p.compiledLeft,p.compiledRight)||choose(p.compiledRight,p.compiledLeft);
+ }
++inline void Contour(const Program &p,const Viewport &v,const Emit &emit,const Shade &shade,const Cancel &cancel,int resolution=256){
++    ExplicitCurve curve;
++    if(!Explicit(p,curve)){ImplicitContour(p,v,emit,shade,cancel,resolution);return;}
++    int steps=(std::max)(32,(std::min)(4096,2*(curve.vertical?v.height:v.width))),budget=100000;
++    auto argument=[&](double u){return curve.vertical?v.Y(1-u):v.X(u);};
++    double ta=argument(0);Point a=v.Pixel(curve.Value(ta));
++    for(int i=0;i<steps&&!cancel()&&budget>0;i++){
++        double tb=argument(double(i+1)/steps);Point b=v.Pixel(curve.Value(tb));
++        ParametricPart(curve,v,ta,tb,a,b,0,emit,cancel,budget);ta=tb;a=b;
++    }
++}
++
++}
