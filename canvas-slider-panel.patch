@@ -154,7 +154,19 @@
  	MX=(PrintRendering?50:max(50,2*ToolboxSize/5+20));
  	MY=MX/2;
  	const int LeftMargin=MX*zoom/100;
-@@ -1843,7 +1870,7 @@
+@@ -815,7 +842,10 @@
+ 							tmp->PaintExpression(DC,zoom*3/4*MX/50,X+1,Y+a+1,ClipReg);
+ 							tmp->Delete();
+ 						}
+-						tmp->InsertElement(var->m_pElementList+position,0);
++                        auto axisSymbol=var->m_pElementList+position;
++                        if(parametric.enabled || (axisSymbol->Type==1 && axisSymbol->pElementObject && GraphParameters::Name(axisSymbol->pElementObject->Data1)))
++                            tmp->InsertEmptyElement(0,1,'x');
++                        else tmp->InsertElement(axisSymbol,0);
+ 						short l,a,b;
+ 						tmp->CalculateSize(DC,zoom*3/4*MX/50,&l,&a,&b);
+ 						DC->FillSolidRect(X+Xlen-l-3,Y+Ylen-b-a-2,l,a+b+1,RGB(245,245,245));
+@@ -1843,7 +1873,7 @@
      }
  }
  static void PaintRelationCurves(CDC &dc,const RelationGraph::Viewport &view,RelationGraph::Program *relations,bool *active,
@@ -163,7 +175,7 @@
  {
      const int colors[8]={0,2,1,3,5,6,7,4};int saved=dc.SaveDC();dc.IntersectClipRect(0,0,view.width,view.height);
      auto cancel=[&](){return abort!=0;};
-@@ -1852,12 +1879,12 @@
+@@ -1852,12 +1882,12 @@
          auto emit=[&](RelationGraph::Point a,RelationGraph::Point b){dc.MoveTo((int)floor(a.x+.5),(int)floor(a.y+.5));dc.LineTo((int)floor(b.x+.5),(int)floor(b.y+.5));dc.SetPixelV((int)floor(b.x+.5),(int)floor(b.y+.5),color);};
          auto shade=[&](int x,int y,int right,int bottom){dc.FillSolidRect(x,y,right-x,bottom-y,RGB(230,236,245));};
          if(parametric.enabled&&k==0)RelationGraph::Trace(parametric,view,emit,cancel);
@@ -178,7 +190,7 @@
  {
  	if (ViewZoom==0)
  		ViewZoom=::ViewZoom;
-@@ -1882,6 +1909,7 @@
+@@ -1882,6 +1912,7 @@
  			cnt++;
  		}
  		abort_request=0;
@@ -186,7 +198,7 @@
          if(integral.enabled){integralError.clear();
              try{if(Base->NumItems>8){auto expression=(CExpression*)Base->Items[8].pSubdrawing;int first=0;for(int n=0;n<expression->m_NumElements;n++)if(expression->m_pElementList[n].Type==2&&expression->m_pElementList[n].pElementObject->Data1[0]=='=')first=n+1;integral.formula=NativeSymbolic::Formula(expression,first);}IntegralArea::Calculate(integral,integralResult,integralError);}
              catch(const std::exception &e){integralResult.ready=false;integralError=e.what();}
-@@ -1911,6 +1939,7 @@
+@@ -1911,6 +1942,7 @@
  
  		//create the new bitmap if already not exists
  		CDC *DC=pMainView->GetDC();
@@ -194,7 +206,7 @@
  		if (Plot==NULL)
  		{
  			Plot=new CBitmap();
-@@ -1921,7 +1950,7 @@
+@@ -1921,7 +1953,7 @@
  		CDC mDC;
  		if (PrintDC) mDC.CreateCompatibleDC(PrintDC); else mDC.CreateCompatibleDC(DC);
  		CBitmap *prev_bitmap=mDC.SelectObject(Plot);
@@ -203,7 +215,7 @@
  		mDC.SelectObject(prev_bitmap);
  		pMainView->ReleaseDC(DC);
  
-@@ -1971,7 +2000,8 @@
+@@ -1971,7 +2003,8 @@
  
  
  
@@ -213,7 +225,7 @@
      RelationGraph::Program relations[8];bool relationActive[8]={false};
  	CExpression *Func[8];
      bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
-@@ -1984,7 +2014,7 @@
+@@ -1984,7 +2017,7 @@
  	{
          Func[kk]=NULL;
          if(parametric.enabled){if(kk==0)any_found=1;continue;}
@@ -222,7 +234,7 @@
              relationActive[kk]=true;any_found=1;continue;
          }
  		if (Base->NumItems>=kk+9)
-@@ -2022,6 +2052,13 @@
+@@ -2022,6 +2055,13 @@
  	CDC *DC=pMainView->GetDC();
  	CDC mDC;
  	if (PrintDC) mDC.CreateCompatibleDC(PrintDC); else mDC.CreateCompatibleDC(DC);
@@ -236,7 +248,7 @@
  	pMainView->ReleaseDC(DC);
  	mDC.SelectObject(GetStockObject(BLACK_PEN));
  
-@@ -2091,16 +2128,17 @@
+@@ -2091,16 +2131,17 @@
  	double f1=(Xmax-Xmin)/(double)(Xlen*density-1);
  	double f2=log10(Xmax/Xmin)/(double)(Xlen*density-1);
  
@@ -257,7 +269,7 @@
  		{
  			if (abort_request) break;
  			Sleep(10);
-@@ -2129,7 +2167,8 @@
+@@ -2129,7 +2170,8 @@
  		}
  
  		//from time to type refresh the plotter (we don't do it very often because is slow)
@@ -267,7 +279,7 @@
  		{
  			if (i==density*Xlen-1) show_no_scale=0;
  
-@@ -2142,7 +2181,7 @@
+@@ -2142,7 +2184,7 @@
                          if(k>=(int)pieces.size() && !known && GraphDiscontinuities::HoleLimit([&](double x){return Func[k]->PlotterCalculateFunctionValue(x,VarPos[k],is_x_pi!=0);},point.x,Xmax-Xmin,point.y))
                          {point.hole=true;domainPoints[k].push_back(point);}
                      }
@@ -276,7 +288,7 @@
  
  			//if we need to auto-adjust y scale, we will do this form time to time
              if (calc_y && !abort_request && i==density*Xlen-1)
-@@ -2408,7 +2447,7 @@
+@@ -2408,7 +2450,7 @@
              if(i==density*Xlen-1&&!abort_request){
                  RelationGraph::Viewport viewport;viewport.xmin=Xmin;viewport.xmax=Xmax;viewport.ymin=Ymin;viewport.ymax=Ymax;
                  viewport.width=Xlen;viewport.height=Ylen;viewport.logx=is_x_log!=0;viewport.logy=is_y_log!=0;
@@ -285,7 +297,7 @@
                  GraphDiagnostic("relation,parametric,width,height",relationActive[0],parametric.enabled,Xlen,Ylen);
              }
  			mDC.SelectObject(prev_bitmap);
-@@ -2420,7 +2459,7 @@
+@@ -2420,7 +2462,7 @@
                      (absY-ViewY)*ViewZoom/100+Ylen+MY*ViewZoom/100+4);
                  if(detached)pMainView->Invalidate(FALSE);
                  else pMainView->InvalidateRect(&region,FALSE);
@@ -294,7 +306,7 @@
  			}
  		}
  	}
-@@ -2436,6 +2475,7 @@
+@@ -2436,6 +2478,7 @@
  			delete Func[kk];
  		}
  	mDC.DeleteDC();
