@@ -36,3 +36,4 @@ relation-parametric-graphs.patch
 brace-label-box.patch
 interactive-features.patch
 canvas-slider-panel.patch
+teaching-tools.patch
