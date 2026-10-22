@@ -17,7 +17,7 @@ public static class TeachingUI {
 }
 '@
 $caseFailures=New-Object 'System.Collections.Generic.List[string]'
-function Case($name,[scriptblock]$body){try{& $body}catch{$why=$_.Exception.Message;$caseFailures.Add($name+': '+$why);if($main -ne [IntPtr]::Zero){Capture $main ('teaching-case-'+($name -replace '[^a-zA-Z0-9]','-')+'.png')};Write-Output ('TEACHING CASE FAILED: '+$name+': '+$why)}}
+function Case($name,[scriptblock]$body){try{& $body}catch{$why=$_.Exception.Message;$caseFailures.Add($name+': '+$why);if($main -ne [IntPtr]::Zero){Capture $main ('teaching-case-'+($name -replace '[^a-zA-Z0-9]','-')+'.png')};Write-Output ('TEACHING CASE FAILED: '+$name+': '+$why)}finally{if($main -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowEnabled($main)){try{EscapeView;Command 0xE103}catch{Write-Output ('Scenario cleanup: '+$_.Exception.Message)}}}}
 function Dock($command){Command $command;for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 50;$p=[MathomirUiProbe]::Child($view,33116);if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)){return $p}};throw 'Teaching dock did not appear'}
 function Press($p,$id){[MathomirUiProbe]::Send($p,273,$id)|Out-Null;Start-Sleep -Milliseconds 150}
 function SelectChoice($p,$id,$index){[MathomirUiProbe]::Send([MathomirUiProbe]::Child($p,$id),334,$index)|Out-Null;[MathomirUiProbe]::Send($p,273,((1-shl 16)-bor $id))|Out-Null}
