@@ -701,3 +701,8 @@ TEACHING TOOLS, DATA PLOTS AND GRAPH UNITS (2026-10-22)
   independent editable copies; the saved palette survives app restarts.
 - View > Presentation spotlight / magnifier: pointer-following overlays;
   Escape exits; authored files and print output stay free of the overlay.
+- Live table edits can auto-fit the ranges so new extreme values remain visible;
+  disable Auto-fit axes to retain manually chosen ranges.
+- Shared layer reordering now uses one stable bounded permutation, retaining
+  every object and relocating active document references. Forward/backward,
+  selection ordering and Undo are checked for dropped objects.

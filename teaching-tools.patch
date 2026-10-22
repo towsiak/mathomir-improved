@@ -13,7 +13,7 @@
  		}
  		if(!plot->pieces.empty())ret^=metadata;
          {unsigned int hash=5381;for(int i=0;i<3;i++){const auto &p=plot->parameters.a[i];std::string text=Piecewise::Number(p.value)+"|"+Piecewise::Number(p.low)+"|"+Piecewise::Number(p.high)+"|"+Piecewise::Number(p.step);for(unsigned char c:text)hash=hash*33u+c;}ret^=hash;}
-+        {const auto &e=plot->exploration;std::string text=plot->axes.X()+"|"+plot->axes.Y()+"|"+(e.enabled?"1":"0")+std::to_string(e.slot)+"|"+Piecewise::Number(e.a)+"|"+Piecewise::Number(e.b)+"|"+Piecewise::Number(e.ay)+"|"+Piecewise::Number(e.by)+(e.tangent?"1":"0")+(e.normal?"1":"0")+(e.secant?"1":"0")+plot->tableData.xLabel+plot->tableData.yLabel+std::to_string(plot->tableData.source)+(plot->tableData.connect?"1":"0");unsigned int h=5381;for(unsigned char c:text)h=h*33u+c;for(auto p:plot->tableData.points){for(unsigned char c:Piecewise::Number(p.x)+","+Piecewise::Number(p.y))h=h*33u+c;}ret^=(int)h;}
++        {const auto &e=plot->exploration;std::string text=plot->axes.X()+"|"+plot->axes.Y()+"|"+(e.enabled?"1":"0")+std::to_string(e.slot)+"|"+Piecewise::Number(e.a)+"|"+Piecewise::Number(e.b)+"|"+Piecewise::Number(e.ay)+"|"+Piecewise::Number(e.by)+(e.tangent?"1":"0")+(e.normal?"1":"0")+(e.secant?"1":"0")+plot->tableData.xLabel+plot->tableData.yLabel+std::to_string(plot->tableData.source)+(plot->tableData.connect?"1":"0")+(plot->tableData.autoFit?"1":"0")+std::to_string(plot->tableData.xColumn)+","+std::to_string(plot->tableData.yColumn)+(plot->tableData.rows?"1":"0");unsigned int h=5381;for(unsigned char c:text)h=h*33u+c;for(auto p:plot->tableData.points){for(unsigned char c:Piecewise::Number(p.x)+","+Piecewise::Number(p.y))h=h*33u+c;}ret^=(int)h;}
          if(plot->parametric.enabled){const auto &p=plot->parametric;std::string text=p.xtext+"|"+p.ytext+"|"+Piecewise::Number(p.low)+"|"+Piecewise::Number(p.high)+(p.radians?"1":"0");unsigned int hash=5381;for(unsigned char c:text)hash=hash*33u+c;ret^=(int)hash;}
          if(plot->integral.enabled){
              const auto &s=plot->integral;std::string text=s.formula+"|"+Piecewise::Number(s.a)+"|"+Piecewise::Number(s.b)+"|"+(s.radians?"1":"0")+(s.hatch?"1":"0")+(s.labels?"1":"0");
@@ -100,7 +100,7 @@
      }
 +    if(axes.Custom())text+="<graphaxes xn=\""+TeachingTools::Hex(axes.xName)+"\" yn=\""+TeachingTools::Hex(axes.yName)+"\" xu=\""+TeachingTools::Hex(axes.xUnit)+"\" yu=\""+TeachingTools::Hex(axes.yUnit)+"\" />\r\n";
 +    if(exploration.enabled){const auto &e=exploration;text+="<explore slot=\""+std::to_string(e.slot)+"\" a=\""+Piecewise::Number(e.a)+"\" b=\""+Piecewise::Number(e.b)+"\" ay=\""+Piecewise::Number(e.ay)+"\" by=\""+Piecewise::Number(e.by)+"\" tangent=\""+(e.tangent?"1":"0")+"\" normal=\""+(e.normal?"1":"0")+"\" secant=\""+(e.secant?"1":"0")+"\" />\r\n";}
-+    if(!tableData.points.empty()){text+="<plotdata xl=\""+TeachingTools::Hex(tableData.xLabel)+"\" yl=\""+TeachingTools::Hex(tableData.yLabel)+"\" connect=\""+(tableData.connect?"1":"0")+"\" source=\""+std::to_string(tableData.source)+"\" xc=\""+std::to_string(tableData.xColumn)+"\" yc=\""+std::to_string(tableData.yColumn)+"\" rows=\""+(tableData.rows?"1":"0")+"\" />\r\n";
++    if(!tableData.points.empty()){text+="<plotdata xl=\""+TeachingTools::Hex(tableData.xLabel)+"\" yl=\""+TeachingTools::Hex(tableData.yLabel)+"\" connect=\""+(tableData.connect?"1":"0")+"\" source=\""+std::to_string(tableData.source)+"\" xc=\""+std::to_string(tableData.xColumn)+"\" yc=\""+std::to_string(tableData.yColumn)+"\" rows=\""+(tableData.rows?"1":"0")+"\" fit=\""+(tableData.autoFit?"1":"0")+"\" />\r\n";
 +        for(auto p:tableData.points)text+="<datum x=\""+Piecewise::Number(p.x)+"\" y=\""+Piecewise::Number(p.y)+"\" />\r\n";}
      if(!only_calculate)memcpy(output,text.c_str(),text.size());return (int)text.size();
  }
@@ -114,7 +114,7 @@
 +        }while(attribute[0]);if(e.Valid())exploration=e;return file;}
 +    if(strncmp(file,"plotdata ",9)==0){file+=8;TeachingTools::Data d;char attribute[64],value[512];
 +        do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,512);if(!file)return NULL;
-+            if(!strcmp(attribute,"xl"))d.xLabel=TeachingTools::Unhex(value);if(!strcmp(attribute,"yl"))d.yLabel=TeachingTools::Unhex(value);if(!strcmp(attribute,"connect"))d.connect=atoi(value)!=0;if(!strcmp(attribute,"source"))d.source=(unsigned int)strtoul(value,NULL,10);if(!strcmp(attribute,"xc"))d.xColumn=max(0,min(63,atoi(value)));if(!strcmp(attribute,"yc"))d.yColumn=max(0,min(63,atoi(value)));if(!strcmp(attribute,"rows"))d.rows=atoi(value)!=0;
++            if(!strcmp(attribute,"xl"))d.xLabel=TeachingTools::Unhex(value);if(!strcmp(attribute,"yl"))d.yLabel=TeachingTools::Unhex(value);if(!strcmp(attribute,"connect"))d.connect=atoi(value)!=0;if(!strcmp(attribute,"source"))d.source=(unsigned int)strtoul(value,NULL,10);if(!strcmp(attribute,"xc"))d.xColumn=max(0,min(63,atoi(value)));if(!strcmp(attribute,"yc"))d.yColumn=max(0,min(63,atoi(value)));if(!strcmp(attribute,"rows"))d.rows=atoi(value)!=0;if(!strcmp(attribute,"fit"))d.autoFit=atoi(value)!=0;
 +        }while(attribute[0]);if(d.xLabel.empty())d.xLabel="x";if(d.yLabel.empty())d.yLabel="y";tableData=d;return file;}
 +    if(strncmp(file,"datum ",6)==0){file+=5;char attribute[64],value[128];TeachingTools::Point p={sqrt(-1.),sqrt(-1.)};
 +        do{file=((CMainFrame*)theApp.m_pMainWnd)->XML_read_attribute(attribute,value,file,128);if(!file)return NULL;if(!strcmp(attribute,"x"))p.x=Piecewise::StoredBound(value);if(!strcmp(attribute,"y"))p.y=Piecewise::StoredBound(value);}while(attribute[0]);if(RelationGraph::Finite(p)&&tableData.points.size()<4096)tableData.points.push_back(p);return file;}
@@ -224,11 +224,11 @@
          if(gesture){auto plot=Graph();if(plot)plot->RequestParameterPlot(false);}
          gesture=gestureUndo=ending=false;
      }
-+    void StopAnimation(){if(!animation.playing)return;animation.playing=false;auto plot=Graph();if(plot)plot->RequestParameterPlot(false);SetDlgItemText(1570,"Play");}
++    void StopAnimation(){if(!animation.playing)return;animation.playing=false;auto plot=Graph();if(plot)plot->RequestParameterPlot(false);SetDlgItemText(1570,"Play");SetDlgItemText(1505,"Paused. This value is kept; Play resumes, and Undo restores the run.");}
 +    void ToggleAnimation(){if(animation.playing){StopAnimation();return;}auto plot=Graph();if(!plot||ViewOnlyMode||StepPresentationActive())return;FinishGesture();double seconds=0;std::string error;CString text;GetDlgItemText(1572,text);if(!IntegralArea::Constant((LPCSTR)text,seconds,error)||!std::isfinite(seconds)||seconds<.2||seconds>3600){SetDlgItemText(1505,"Use 0.2 to 3600 seconds for a full slider sweep.");return;}if(fieldsDirty){if(!Read())return;Commit(false);Fields();}
 +        current=plot->ParameterSnapshot();animation.parameter=((CComboBox*)GetDlgItem(1571))->GetCurSel();animation.mode=((CComboBox*)GetDlgItem(1573))->GetCurSel();if(animation.parameter<0||animation.parameter>2)return;auto &p=current.a[animation.parameter];animation.period=seconds;animation.direction=1;animation.phase=(p.value-p.low)/(p.high-p.low);if(animation.phase>=1)animation.phase=0;pMainView->UndoSave("animate graph parameter");animation.playing=true;animationTick=GetTickCount();SetDlgItemText(1570,"Pause");SetDlgItemText(1505,"Playing. Pause keeps this value; Undo restores the whole run.");
 +    }
-+    void Animate(){if(!animation.playing)return;auto plot=Graph();if(!plot||ViewOnlyMode||StepPresentationActive()){StopAnimation();return;}auto actual=plot->ParameterSnapshot();if(!Same(actual,current)){StopAnimation();current=actual;Fields();return;}DWORD now=GetTickCount();double elapsed=min(.25,(now-animationTick)/1000.);animationTick=now;bool wasPlaying=animation.playing;if(animation.Advance(current.a[animation.parameter],elapsed)){plot->SetParameterValues(current);plot->RequestParameterPlot(true);pMainView->GetDocument()->SetModifiedFlag();Fields();}if(wasPlaying&&!animation.playing){plot->RequestParameterPlot(false);SetDlgItemText(1570,"Play");}}
++    void Animate(){if(!animation.playing)return;auto plot=Graph();if(!plot||ViewOnlyMode||StepPresentationActive()){StopAnimation();return;}auto actual=plot->ParameterSnapshot();if(!Same(actual,current)){StopAnimation();current=actual;Fields();return;}DWORD now=GetTickCount();double elapsed=min(.25,(now-animationTick)/1000.);animationTick=now;bool wasPlaying=animation.playing;if(animation.Advance(current.a[animation.parameter],elapsed)){plot->SetParameterValues(current);plot->RequestParameterPlot(true);pMainView->GetDocument()->SetModifiedFlag();Fields();}if(wasPlaying&&!animation.playing){plot->RequestParameterPlot(false);SetDlgItemText(1570,"Play");SetDlgItemText(1505,"Finished. Undo restores the playback run.");}}
      void Layout(){
          for(int id:{1544,1545,1546,1560,1561,1562})GetDlgItem(id)->ShowWindow(compact?SW_HIDE:SW_SHOW);
          for(int i=0;i<3;i++)for(int j=2;j<=4;j++)GetDlgItem(1510+10*i+j)->ShowWindow(compact?SW_HIDE:SW_SHOW);
@@ -426,7 +426,15 @@
 +END
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -75,6 +75,19 @@
+@@ -27,6 +27,7 @@
+ #include "SymbolicDerivative.h"
+ #include "ColorPalette.h"
+ #include "ObjectPointer.h"
++#include "ObjectOrder.h"
+ #include "BraceLabel.h"
+ #include <sstream>
+ #include "ObjectAppearance.h"
+@@ -75,6 +76,19 @@
  static void UpdateParameterPanel();
  static void DestroyParameterPanel();
  static void ParameterGraphClicked(tDocumentStruct *object);
@@ -446,7 +454,7 @@
  
  
  
-@@ -672,7 +685,7 @@
+@@ -672,7 +686,7 @@
      tDocumentStruct *front=NULL;
      for(int i=NumDocumentElements-1;i>=0;i--){
          tDocumentStruct *object=TheDocument+i;
@@ -455,7 +463,7 @@
          double x=point.x-(object->absolute_X-ViewX)*ViewZoom/100;
          double y=point.y-(object->absolute_Y-ViewY)*ViewZoom/100;
          if(x<-3 || x>object->Length*ViewZoom/100+3 || y<-object->Above*ViewZoom/100-3 || y>object->Below*ViewZoom/100+3)continue;
-@@ -707,7 +720,7 @@
+@@ -707,7 +721,7 @@
      tDocumentStruct *front=NULL;
      for(int i=NumDocumentElements-1;i>=0;i--){
          tDocumentStruct *candidate=TheDocument+i;
@@ -464,7 +472,7 @@
              (candidate->Type!=1 && candidate->Type!=2) || !ObjectBoundsContain(candidate,point))continue;
          if(!front || (IsGraphObject(front) && !IsGraphObject(candidate)) || InteractionChild(candidate,front))front=candidate;
      }
-@@ -980,6 +993,11 @@
+@@ -980,6 +994,11 @@
      ON_COMMAND(ID_STATISTICS_REGRESSION,OnStatisticsRegression)
      ON_COMMAND(ID_INTEGRAL_SHADER,OnIntegralShader)
      ON_COMMAND(ID_RELATION_GRAPH,OnRelationGraph)
@@ -476,7 +484,7 @@
      ON_COMMAND(ID_PARAMETER_SLIDERS,OnParameterSliders)
      ON_COMMAND(ID_STEP_SEQUENCE,OnStepSequence)
      ON_COMMAND(ID_STEP_REVEAL,OnStepReveal)
-@@ -1172,6 +1190,7 @@
+@@ -1172,6 +1191,7 @@
  
  CMathomirView::~CMathomirView()
  {
@@ -484,7 +492,7 @@
      DestroyParameterPanel();
      DestroyStepControls();
      if(m_SelectionApproxPanel){if(m_SelectionApproxPanel->GetSafeHwnd())m_SelectionApproxPanel->DestroyWindow();delete m_SelectionApproxPanel;m_SelectionApproxPanel=NULL;}
-@@ -1355,7 +1374,8 @@
+@@ -1355,7 +1375,8 @@
  
  void CMathomirView::OnDraw(CDC* pDC)
  {
@@ -494,7 +502,7 @@
      if (!pDC->IsPrinting()) { ApplyPageWidthFit(); UpdateQuickActionMode(); }
  	tDocumentStruct *ds=TheDocument;
  	int SelectedElement;
-@@ -2182,6 +2202,7 @@
+@@ -2182,6 +2203,7 @@
  			bitmapDC.RestoreDC(drawingToolboxState);
  		}
  		PaintDrawingHotspot(1);
@@ -502,7 +510,7 @@
  		bitmapDC.RestoreDC(bufferState);
  		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
  
-@@ -2265,6 +2286,7 @@
+@@ -2265,6 +2287,7 @@
  
  void CMathomirView::OnLButtonDblClk(UINT nFlags, CPoint point)
  {
@@ -510,7 +518,7 @@
      if(StepPresentationActive())return;
      for(int i=NumDocumentElements-1;i>=0;i--){auto d=TheDocument+i;if(d==FrontContentAtPoint(point)&&d->Type==2&&((CDrawing*)d->Object)->m_Connector.Attached()&&d->MovingDotState!=5){int node=-1;CClientDC dc(this);if(((CDrawing*)d->Object)->SelectObjectAtPoint(&dc,ViewZoom,point.x-(d->absolute_X-ViewX)*ViewZoom/100,point.y-(d->absolute_Y-ViewY)*ViewZoom/100,&node)){RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}for(int k=0;k<NumDocumentElements;k++)if(TheDocument[k].MovingDotState!=5)TheDocument[k].MovingDotState=0;NumSelectedObjects=0;prevTouchedObject=d;OnAttachedConnector();return;}}}
  	if (ViewOnlyMode || Tillens.Show || IsDrawingMode || point.x<=12) return;
-@@ -2318,6 +2340,7 @@
+@@ -2318,6 +2341,7 @@
  static CObject *ExplicitTypingRoot=NULL;
  void CMathomirView::OnLButtonDown(UINT nFlags, CPoint point)
  {
@@ -518,7 +526,7 @@
      if(StepPresentationActive())return;
      ScopedPlacementPreviewPause previewPause;
      RestoreClipboardBackground();
-@@ -2629,6 +2652,7 @@
+@@ -2629,6 +2653,7 @@
          if((ClipboardExpression || ClipboardDrawing) && !(nFlags&MK_SHIFT) && !TouchMouseMode && ds->Type==1 && ds->MovingDotState<2 && IsInsertionPointTouched!=ds &&
              ((CExpression*)ds->Object)->m_MaxNumRows<=1 && ((CExpression*)ds->Object)->m_MaxNumColumns<=1 &&
              !ExpressionContentAtPoint((CExpression*)ds->Object,point.x-(ds->absolute_X-ViewX)*ViewZoom/100,point.y-(ds->absolute_Y-ViewY)*ViewZoom/100))continue;
@@ -526,7 +534,71 @@
  		if ((ds->MovingDotState==5) && (!AccessLockedObjects)) continue; //ignore locked objects
  
  		int is_expression_found=0;		
-@@ -3878,6 +3902,7 @@
+@@ -3255,50 +3280,19 @@
+ 
+ void ChangeZOrderOfSelectedObjects(int newpos)
+ {
+-	tDocumentStruct tmp;
+-	
+-		/*	if (ResizeHandleObject==object->Object) ResizeHandleObject=NULL;
+-            if (RotationHandleObject==object->Object) RotationHandleObject=NULL;
+-			if (ResizeHandleObject==object->Object) ResizeHandleObject=NULL;
+-            if (RotationHandleObject==object->Object) RotationHandleObject=NULL;
+-            if (prevTouchedObject==object) prevTouchedObject=NULL;
+-			if (prevTouchedObject>object) prevTouchedObject--;
+-			if (SelectedDocumentObject==object) SelectedDocumentObject=NULL;
+-			if (SelectedDocumentObject>object) SelectedDocumentObject--;
+-			if (SelectedDocumentObject2==object) SelectedDocumentObject2=NULL;
+-			if (SelectedDocumentObject2>object) SelectedDocumentObject2--;
+-			if (SpecialDrawingHover==object) SpecialDrawingHover=NULL;
+-			if (SpecialDrawingHover>object) SpecialDrawingHover--;
+-			if (prevSpecialDrawingHover==object) prevSpecialDrawingHover=NULL;
+-			if (prevSpecialDrawingHover>object) prevSpecialDrawingHover--;
+-			if (m_PopupMenuObject==object) m_PopupMenuObject=NULL;
+-			if (m_PopupMenuObject>object) m_PopupMenuObject--;
+-			LongClickObject=NULL;*/
+-
+-	for (int i=0;i<NumDocumentElements;i++)
+-		if (TheDocument[i].MovingDotState==3)
+-		{
+-			if (newpos<i)
+-			{
+-				tmp=TheDocument[i];
+-				for (int j=i-1;j>=newpos;j--)
+-					TheDocument[j+1]=TheDocument[j];
+-				TheDocument[newpos]=tmp;
+-				LongClickObject=NULL;
+-				pMainView->m_PopupMenuObject=prevSpecialDrawingHover=SpecialDrawingHover=SelectedDocumentObject=SelectedDocumentObject2=prevTouchedObject=NULL;
+-			}
+-			else if (newpos>i)
+-			{
+-				tmp=TheDocument[i];
+-				for (int j=i;j<newpos;j++)
+-					TheDocument[j]=TheDocument[j+1];
+-				TheDocument[newpos]=tmp;
+-				LongClickObject=NULL;
+-				pMainView->m_PopupMenuObject=prevSpecialDrawingHover=SpecialDrawingHover=SelectedDocumentObject=SelectedDocumentObject2=prevTouchedObject=NULL;
+-
+-			}
+-			newpos++;
+-		}
++    if(NumDocumentElements<1)return;
++    std::vector<tDocumentStruct> previous(TheDocument,TheDocument+NumDocumentElements);
++    std::vector<bool> selected(NumDocumentElements);
++    for(int i=0;i<NumDocumentElements;i++)selected[i]=TheDocument[i].MovingDotState==3;
++    auto order=ObjectOrder::Permutation(selected,newpos);
++    std::vector<std::pair<tDocumentStruct**,CObject*> > references;
++    auto remember=[&](tDocumentStruct *&pointer){if(!pointer)return;for(int i=0;i<NumDocumentElements;i++)if(pointer==TheDocument+i){references.push_back(std::make_pair(&pointer,pointer->Object));return;}pointer=NULL;};
++    remember(KeyboardEntryBaseObject);remember(LastQuickTypeObject);remember(SelectedDocumentObject);remember(SelectedDocumentObject2);remember(prevTouchedObject);remember(SpecialDrawingHover);remember(prevSpecialDrawingHover);remember(LongClickObject);remember(IsInsertionPointTouched);remember(pMainView->m_PopupMenuObject);
++    CObject *copied=RootObjectCopy>=0&&RootObjectCopy<NumDocumentElements?TheDocument[RootObjectCopy].Object:NULL;
++    for(int i=0;i<NumDocumentElements;i++)TheDocument[i]=previous[order[i]];
++    for(auto &reference:references){*reference.first=NULL;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==reference.second){*reference.first=TheDocument+i;break;}}
++    if(copied){RootObjectCopy=-1;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==copied){RootObjectCopy=i;break;}}
++    NewlineAddObject=prevNewlineAddObject=-1;
+ }
+ 
+ void CMathomirView::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
+@@ -3878,6 +3872,7 @@
  
  void CMathomirView::OnMouseMove(UINT nFlags, CPoint point)
  {
@@ -534,7 +606,7 @@
      if(StepPresentationActive()){SetCursor(::LoadCursor(NULL,IDC_ARROW));return;}
      if(IsDrawingMode)RestoreClipboardBackground();
      if(MouseMode==8 && getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *t=fopen("center-move-grip-trace.txt","a");if(t){fprintf(t,"node move %d,%d flags=%u node=%d,%d\n",point.x,point.y,nFlags,tmpDrawing2?tmpDrawing2->NodeX:-999,tmpDrawing2?tmpDrawing2->NodeY:-999);fclose(t);}}
-@@ -4545,6 +4570,7 @@
+@@ -4545,6 +4540,7 @@
  			if ((ds->Type==2) && (ds->MovingDotState!=3) && (IsDrawingMode) && 
  				(!isCTRL) && (((CDrawing*)ds->Object)->IsSpecialDrawing!=50)) continue;
  
@@ -542,7 +614,7 @@
  			if ((ds->MovingDotState!=3) && (ds->MovingDotState!=5)) //not selected nor locked
  				if ((ds->MovingDotState!=4) || (ClipboardDrawing==NULL))
  					ds->MovingDotState=0;
-@@ -5099,6 +5125,7 @@
+@@ -5099,6 +5095,7 @@
  						deltaY=Y-SelectedDocumentObject2->absolute_Y-corry;*/
                          SnapCanvasGridPoint(deltaX,deltaY);
  					}
@@ -550,7 +622,7 @@
  					int i;
  					tDocumentStruct *ds=TheDocument;
  					for (i=NumDocumentElements-1;i>=0;i--,ds++)
-@@ -5123,6 +5150,7 @@
+@@ -5123,6 +5120,7 @@
  						deltaX=X-SelectedDocumentObject->absolute_X;
  						deltaY=Y-SelectedDocumentObject->absolute_Y;
  					}
@@ -558,7 +630,7 @@
  					SelectedDocumentObject->absolute_X=X;
  
  					SelectedDocumentObject->absolute_Y=Y;
-@@ -5686,6 +5714,7 @@
+@@ -5686,6 +5684,7 @@
  #pragma optimize("s",on)
  void CMathomirView::OnKeyDown(UINT nChar, UINT nRepCnt, UINT nFlags)
  {
@@ -566,7 +638,7 @@
      if(StepPresentationActive()&&!(GetKeyState(VK_CONTROL)&0x8000)){if(nChar==VK_ESCAPE)OnStepControl(ID_STEP_EXIT);else if(nChar==VK_SPACE||nChar==VK_RIGHT||nChar==VK_DOWN||nChar==VK_NEXT)OnStepControl(ID_STEP_NEXT);else if(nChar==VK_LEFT||nChar==VK_UP||nChar==VK_PRIOR)OnStepControl(ID_STEP_PREVIOUS);else if(nChar==VK_END)OnStepControl(ID_STEP_ALL);else if(nChar==VK_HOME){InteractiveObjects::Reveal().visible=0;OnStepControl(0);}return;}
      if(nChar==VK_ESCAPE){CenterEditRelease=false;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Type==2 && TheDocument[i].Object)((CDrawing*)TheDocument[i].Object)->SetGripNodeEditing(false);}
      m_SelectionApproxDismissed.clear();HideSelectionApproxPanel();
-@@ -8860,6 +8889,8 @@
+@@ -8860,6 +8859,8 @@
  #pragma optimize("s",on)
  void CMathomirView::OnLButtonUp(UINT nFlags, CPoint point)
  {
@@ -575,7 +647,7 @@
      if(getenv("MATHOMIR_GRAPH_DIAGNOSTICS")){FILE *t=fopen("center-move-grip-trace.txt","a");if(t){fprintf(t,"up %d,%d mode=%d editrelease=%d\n",point.x,point.y,MouseMode,CenterEditRelease);fclose(t);}}
      if(CenterEditRelease){CenterEditRelease=false;return;}
      if(DeleteGripClick){DeleteGripClick=false;return;}
-@@ -11178,6 +11209,12 @@
+@@ -11178,6 +11179,12 @@
      dialog.Add(ID_AI_HELP,"Calculus > AI math help...","AI explain check working OpenAI tutor online graph ideas");
      dialog.Add(ID_LOG_BASE_BUILDER,"Graph > Logarithm builder...","log base logarithm radical sqrt custom argument change of base");
      dialog.Add(ID_PARAMETER_SLIDERS,"Graph > Parameter sliders...","slider parameters a b c animate explore graph coefficients");
@@ -588,7 +660,7 @@
      dialog.Add(ID_STEP_SEQUENCE,"View > Make or edit step sequence...","steps reveal sequence presentation solution order");
      dialog.Add(ID_STEP_REVEAL,"View > Reveal step sequence","steps reveal presentation next back show all");
      dialog.Add(ID_ATTACHED_CONNECTOR,"Draw > Connect selected objects...","connector connected arrow line elbow attach follow endpoints diagram");
-@@ -11533,6 +11570,7 @@
+@@ -11533,6 +11540,7 @@
          int ox=0,oy=0;if(object->Type==2)((CDrawing*)object->Object)->FindRealCorner(&ox,&oy);else ox=3;
          int x=nextX+ox,y=nextY+oy;SnapCanvasGridPoint(x,y);nextX=x-ox;nextY=y-oy;
      }
@@ -596,7 +668,7 @@
      if(nextX==object->absolute_X && nextY==object->absolute_Y)return;
      if(CenterMovePending)CenterPressObject=NULL;
      if(!GripMoveStarted){
-@@ -11547,6 +11585,7 @@
+@@ -11547,6 +11555,7 @@
  {
      tDocumentStruct *object=MoveGripDocument();
      if (cancel && object) { object->absolute_X=MoveStartX; object->absolute_Y=MoveStartY; }
@@ -604,7 +676,7 @@
      MouseMovingActive=false;CenterMovePending=false;GripMoveStarted=false; MouseMode=0; MoveGripObject=NULL;
      if (GetCapture()==this) ReleaseCapture();
      RepaintTheView(1); SetCursor(::LoadCursor(NULL,IDC_ARROW));
-@@ -15376,3 +15415,5 @@
+@@ -15376,3 +15385,5 @@
  void CMathomirView::OnFreeAiHelp(){int p=theApp.GetProfileInt("AI","Provider",1);if(p!=1&&p!=2&&p!=3)theApp.WriteProfileInt("AI","Provider",1);OnAiHelp();}
  
  #include "InteractiveFeatures.inl"
@@ -623,6 +695,27 @@
      void OnStepSequence();
      void OnStepReveal();
      void OnStepControl(UINT command);
+--- /dev/null
++++ b/Mathomir/ObjectOrder.h
+@@ -0,0 +1,18 @@
++#pragma once
++#include <vector>
++#include <algorithm>
++
++// Build a stable permutation once. Moving a selected element while iterating
++// the live document can otherwise visit it twice and write past the active list.
++namespace ObjectOrder {
++inline std::vector<size_t> Permutation(const std::vector<bool> &selected,int position){
++    std::vector<size_t> chosen,others;
++    for(size_t i=0;i<selected.size();i++)(selected[i]?chosen:others).push_back(i);
++    if(chosen.empty())return others;
++    size_t at=(size_t)(std::max)(0,(std::min)(position,(int)others.size()));
++    std::vector<size_t> order;order.reserve(selected.size());
++    order.insert(order.end(),others.begin(),others.begin()+at);
++    order.insert(order.end(),chosen.begin(),chosen.end());
++    order.insert(order.end(),others.begin()+at,others.end());return order;
++}
++}
 --- a/Mathomir/Resource.h
 +++ b/Mathomir/Resource.h
 @@ -345,3 +345,16 @@
@@ -668,8 +761,8 @@
 +inline std::string Hex(const std::string &s){const char *h="0123456789ABCDEF";std::string out;for(unsigned char c:s){out+=h[c>>4];out+=h[c&15];}return out;}
 +inline std::string Unhex(const std::string &s,size_t limit=120){if(s.size()%2||s.size()>2*limit)return "";std::string out;for(size_t i=0;i<s.size();i+=2){auto digit=[](char c){return c>='0'&&c<='9'?c-'0':c>='A'&&c<='F'?c-'A'+10:c>='a'&&c<='f'?c-'a'+10:-1;};int a=digit(s[i]),b=digit(s[i+1]);if(a<0||b<0||!(a||b))return "";out+=(char)(16*a+b);}return out;}
 +struct Data {
-+    std::vector<Point> points;std::string xLabel,yLabel;bool connect;unsigned int source,sourceEpoch;int xColumn,yColumn;bool rows;
-+    Data():xLabel("x"),yLabel("y"),connect(false),source(0),sourceEpoch(0),xColumn(0),yColumn(1),rows(false){}
++    std::vector<Point> points;std::string xLabel,yLabel;bool connect,autoFit;unsigned int source,sourceEpoch;int xColumn,yColumn;bool rows;
++    Data():xLabel("x"),yLabel("y"),connect(false),autoFit(true),source(0),sourceEpoch(0),xColumn(0),yColumn(1),rows(false){}
 +};
 +typedef std::vector<std::vector<std::string> > Grid;
 +inline bool Split(const std::string &text,Grid &grid,std::string &error){
@@ -797,7 +890,7 @@
 +    for(auto &n:nodes){if(n.type==1&&n.info->tableGraph){auto plot=TeachPlot(n.info->tableGraph);if(documentChanged&&plot)n.info->referenceEpoch=InteractiveObjects::DocumentEpoch();if(!plot||KeyboardEntryBaseObject==n.root||KeyboardEntryObject==(CObject*)n.object)continue;unsigned int sig=(unsigned int)plot->Base->CalcChecksum()^n.info->Hash();if(sig==n.info->tableSignature)continue;auto table=TeachLinkedTable(plot,*n.info);if(table){((CExpression*)n.object)->CopyExpression(table,0,1,0);delete table;n.info->tableSignature=sig;}}
 +        if(n.type==2){auto d=(CDrawing*)n.object;if(d->IsSpecialDrawing!=51||!d->SpecialData)continue;auto plot=(CFunctionPlotter*)d->SpecialData;if(!plot->tableData.source||plot->ThreadHandle)continue;auto source=FindInteractive(nodes,plot->tableData.source);if(!source||source->type!=1)continue;if(documentChanged)plot->tableData.sourceEpoch=InteractiveObjects::DocumentEpoch();
 +            unsigned int sig=(unsigned int)((CExpression*)source->object)->CalcChecksum();if(sig==plot->tableSourceHash)continue;TeachingTools::Grid g;TeachingTools::Data data=plot->tableData;std::string error;
-+            if(TeachGrid((CExpression*)source->object,g)&&TeachingTools::Pairs(g,data.xColumn,data.yColumn,data.rows,data,error)){plot->tableData=data;plot->tableSourceHash=sig;plot->RequestParameterPlot(false);}
++            if(TeachGrid((CExpression*)source->object,g)&&TeachingTools::Pairs(g,data.xColumn,data.yColumn,data.rows,data,error)){bool changed=data.points.size()!=plot->tableData.points.size();for(size_t i=0;!changed&&i<data.points.size();i++)changed=data.points[i].x!=plot->tableData.points[i].x||data.points[i].y!=plot->tableData.points[i].y;plot->tableData=data;plot->tableSourceHash=sig;if(changed){if(data.autoFit){auto v=TeachingTools::Bounds(data.points);plot->SetBounds(v.xmin,v.xmax,v.ymin,v.ymax);}plot->RequestParameterPlot(false);}}
 +        }
 +    }TeachSyncing=false;
 +}
@@ -903,7 +996,7 @@
 +    void PlaceLinkedTable(){auto p=TeachPlot(graphId);if(!p){Status(1624,"Choose a graph first.");return;}InteractiveObjects::Info info;info.tableGraph=graphId;info.referenceEpoch=InteractiveObjects::DocumentEpoch();info.tableSlot=Choice(1611);double count=0;if(!TeachingTools::Constant(TeachGet(m_hWnd,1620),info.tableStart)||!TeachingTools::Constant(TeachGet(m_hWnd,1621),info.tableStep)||info.tableStep==0||!TeachingTools::Constant(TeachGet(m_hWnd,1622),count)||count!=std::floor(count)||count<2||count>19){Status(1624,"Use a finite start, a nonzero step, and 2-19 samples.");return;}info.tableCount=(int)count;auto table=TeachLinkedTable(p,info);if(!table){Status(1624,"Select a defined curve before making its table.");return;}OnCancel();TeachPlace(table,NULL);}
 +    bool ReadData(bool showError=true){TeachingTools::Grid grid;TeachingTools::Data data;std::string error;double xcol=0,ycol=0;if(!TeachingTools::Constant(TeachGet(m_hWnd,1631),xcol)||!TeachingTools::Constant(TeachGet(m_hWnd,1632),ycol)||xcol!=floor(xcol)||ycol!=floor(ycol)||xcol<1||xcol>64||ycol<1||ycol>64){Status(1640,"Choose column or row numbers from 1 to 64.");return false;}int xc=(int)xcol-1,yc=(int)ycol-1;
 +        if(!TeachingTools::Split(TeachGet(m_hWnd,1630),grid,error)||!TeachingTools::Pairs(grid,xc,yc,Choice(1633)==1,data,error)){preview.data=TeachingTools::Data();preview.Invalidate(FALSE);if(showError)Status(1640,error);return false;}
-+        auto xl=TeachingTools::Trim(TeachGet(m_hWnd,1634)),yl=TeachingTools::Trim(TeachGet(m_hWnd,1635));if(!xl.empty())data.xLabel=xl;if(!yl.empty())data.yLabel=yl;data.connect=Checked(1636);data.source=sourceId&&Checked(1641)?sourceId:0;data.sourceEpoch=data.source?InteractiveObjects::DocumentEpoch():0;if(editGraphId&&data.source){auto original=TeachPlot(editGraphId);if(original){data.xColumn=original->tableData.xColumn;data.yColumn=original->tableData.yColumn;data.rows=original->tableData.rows;}}preview.data=data;preview.Invalidate(FALSE);Status(1640,std::to_string(data.points.size())+" pairs ready. Order is preserved when connecting points.");return true;}
++        auto xl=TeachingTools::Trim(TeachGet(m_hWnd,1634)),yl=TeachingTools::Trim(TeachGet(m_hWnd,1635));if(!xl.empty())data.xLabel=xl;if(!yl.empty())data.yLabel=yl;data.connect=Checked(1636);data.autoFit=Checked(1645);data.source=sourceId&&Checked(1641)?sourceId:0;data.sourceEpoch=data.source?InteractiveObjects::DocumentEpoch():0;if(editGraphId&&data.source){auto original=TeachPlot(editGraphId);if(original){data.xColumn=original->tableData.xColumn;data.yColumn=original->tableData.yColumn;data.rows=original->tableData.rows;}}preview.data=data;preview.Invalidate(FALSE);Status(1640,std::to_string(data.points.size())+" pairs ready. Order is preserved when connecting points.");return true;}
 +    void SelectedTable(){TeachingTools::Grid grid;unsigned int id=0;if(!TeachSelectedGrid(grid,id)){Status(1640,"Select or touch a native table on the page, then use this button.");return;}loading=true;TeachSet(m_hWnd,1630,TeachGridText(grid));TeachSet(m_hWnd,1634,"");TeachSet(m_hWnd,1635,"");sourceId=id;editGraphId=0;::SendDlgItemMessage(m_hWnd,1641,BM_SETCHECK,BST_CHECKED,0);loading=false;ReadData();}
 +    void PlotData(){if(!ReadData())return;auto data=preview.data;auto xunit=TeachingTools::Trim(TeachGet(m_hWnd,1643)),yunit=TeachingTools::Trim(TeachGet(m_hWnd,1644));if(data.xLabel.size()>80||data.yLabel.size()>80||xunit.size()>80||yunit.size()>80){Status(1640,"Use short axis names and units (80 UTF-8 bytes each).");return;}
 +        auto plot=editGraphId?TeachPlot(editGraphId):NULL;CDrawing *drawing=plot?plot->Base:NULL;bool existing=plot!=NULL;
@@ -943,8 +1036,8 @@
 +        }else if(page==1){Label(L"Pairs: paste columns, or read a table on the page.",8,49);Edit(1630,"t\tv\r\n0\t0\r\n1\t2\r\n2\t5\r\n3\t9",8,64,210,62,ES_MULTILINE|ES_WANTRETURN|WS_VSCROLL|WS_HSCROLL);::SendDlgItemMessage(m_hWnd,1630,EM_SETLIMITTEXT,262144,0);
 +            Combo(1633,8,132,91,{L"Data in columns",L"Data in rows"});Label(L"First",106,135,27);Edit(1631,"1",135,132,29);Label(L"Second",170,135,30);Edit(1632,"2",201,132,17);
 +            Label(L"Horizontal",8,158,53);Edit(1634,"",64,154,65);Edit(1643,"",138,154,80);Label(L"Vertical",8,180,53);Edit(1635,"",64,176,65);Edit(1644,"",138,176,80);Label(L"Variable names at left; units at right.",8,197);
-+            Check(1636,L"Connect in table order",8,214,116,false);Check(1641,L"Keep table linked",128,214,90,true);Button(1637,L"Read selected table",8,234,103);Button(1642,L"Preview",117,234,101);MakePreview(1639,258,40);Button(1638,L"Place / update graph",8,303,210);Add(1640,L"STATIC",L"",8,324,210,20);
-+            sourceId=0;editGraphId=0;auto p=TeachPlot(graphId);if(p&&!p->tableData.points.empty()){editGraphId=graphId;sourceId=p->tableData.source;std::string text=p->tableData.xLabel+"\t"+p->tableData.yLabel+"\r\n";for(auto q:p->tableData.points)text+=TeachingTools::Number(q.x)+"\t"+TeachingTools::Number(q.y)+"\r\n";TeachSet(m_hWnd,1630,text);TeachSet(m_hWnd,1634,p->axes.xName);TeachSet(m_hWnd,1635,p->axes.yName);TeachSet(m_hWnd,1643,p->axes.xUnit);TeachSet(m_hWnd,1644,p->axes.yUnit);::SendDlgItemMessage(m_hWnd,1636,BM_SETCHECK,p->tableData.connect?BST_CHECKED:BST_UNCHECKED,0);}loading=false;TeachingTools::Grid g;unsigned int id=0;if(TeachSelectedGrid(g,id))SelectedTable();else ReadData();
++            Check(1636,L"Connect points",8,214,71,false);Check(1641,L"Live table link",84,214,73,true);Check(1645,L"Auto-fit axes",162,214,56,true);Button(1637,L"Read selected table",8,234,103);Button(1642,L"Preview",117,234,101);MakePreview(1639,258,40);Button(1638,L"Place / update graph",8,303,210);Add(1640,L"STATIC",L"",8,324,210,20);
++            sourceId=0;editGraphId=0;auto p=TeachPlot(graphId);if(p&&!p->tableData.points.empty()){editGraphId=graphId;sourceId=p->tableData.source;std::string text=p->tableData.xLabel+"\t"+p->tableData.yLabel+"\r\n";for(auto q:p->tableData.points)text+=TeachingTools::Number(q.x)+"\t"+TeachingTools::Number(q.y)+"\r\n";TeachSet(m_hWnd,1630,text);TeachSet(m_hWnd,1634,p->axes.xName);TeachSet(m_hWnd,1635,p->axes.yName);TeachSet(m_hWnd,1643,p->axes.xUnit);TeachSet(m_hWnd,1644,p->axes.yUnit);::SendDlgItemMessage(m_hWnd,1636,BM_SETCHECK,p->tableData.connect?BST_CHECKED:BST_UNCHECKED,0);::SendDlgItemMessage(m_hWnd,1645,BM_SETCHECK,p->tableData.autoFit?BST_CHECKED:BST_UNCHECKED,0);}loading=false;TeachingTools::Grid g;unsigned int id=0;if(TeachSelectedGrid(g,id))SelectedTable();else ReadData();
 +        }else if(page==2){Label(L"Front items appear first. Select buried objects here.",8,49);Add(1650,L"LISTBOX",L"",8,65,210,158,LBS_NOTIFY|LBS_NOINTEGRALHEIGHT|WS_VSCROLL|WS_BORDER|WS_TABSTOP);Edit(1651,"",8,230,145);Button(1652,L"Rename",159,229,59);Button(1653,L"Hide",8,254,65);Button(1654,L"Lock",80,254,65);Button(1659,L"Find on page",152,254,66);Button(1655,L"Bring forward",8,278,103);Button(1656,L"Send backward",117,278,101);Button(1657,L"Refresh list",8,302,210);Add(1658,L"STATIC",L"Choose an object to select it on the page.",8,324,210,20);RefreshObjects(true);
 +        }else{Label(L"Save selected objects as your own reusable items.",8,49);Add(1660,L"LISTBOX",L"",8,65,210,103,LBS_NOTIFY|LBS_NOINTEGRALHEIGHT|WS_VSCROLL|WS_BORDER|WS_TABSTOP);MakePreview(1666,175,71);Edit(1661,"",8,254,210);Button(1662,L"Save selection",8,279,103);Button(1663,L"Place copy",117,279,101);Button(1664,L"Remove saved item",8,303,210);Add(1665,L"STATIC",L"Select objects on the page, enter a name and Save.",8,324,210,20);RefreshFavorites();}
 +        loading=false;Anchor();RedrawWindow(NULL,NULL,RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN);
