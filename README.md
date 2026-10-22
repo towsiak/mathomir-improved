@@ -186,3 +186,18 @@ use the existing native drawing paths. Background controls color the label box.
 
 The portable geometry/binding checks and Windows interaction checks run with
 all earlier regressions, including a separate AddressSanitizer executable.
+
+### Teaching tools, table plots and graph units
+
+- **Graph > Graph points, linked table and units** opens an embedded panel. Choose a graph and curve, enable points, and apply. Drag A along the curve; enable Secant + B for a second point. Tangent and normal lines follow A. Points support ordinary, vertical, piecewise, implicit and parametric curves where the curve evaluator has a defined value. For explicit graphs, the A/B input is the independent coordinate; for parametric graphs it is t; implicit curves use coordinate seeds and curve dragging. Undefined points and nonsmooth tangents are reported.
+- The same panel has separate horizontal/vertical variable and unit fields. For example, use t, s, v, m/s². Units are authored labels; changing a label does not convert numerical values or change the grapher's formula variables. Names and Unicode units are saved, copied and printed.
+- **Place linked table** generates 2-19 samples at the chosen start and step. The native table follows formula and slider changes. A missing source leaves the last table intact; restoring the source with Undo reconnects it.
+- **Graph > Plot a table of pairs** accepts pasted tab-separated, comma-separated, semicolon-separated or whitespace-separated data. Choose two columns or two rows, give their axes variable names and optional units, preview, and place. A heading row is optional. Fractions and Unicode π are accepted as constants. Up to 4096 pairs are supported. Connecting points follows the table's order; the tool does not invent a fitted function.
+- Select or touch a table already on the page and choose **Read selected table**. Keep table linked updates its plotted pairs after editing the source. Reopen a table plot to edit its data, names or units. Copying a source table and plot together remaps their references to the independent copies.
+- **Graph > Parameter sliders** includes Play/Pause, a/b/c selection, seconds per sweep, and Once/Loop/Back-forth modes. A run has one Undo entry. Pause retains the current values; changing document or graph stops playback.
+- **View > Objects and layers** lists the page's root objects, including hidden and locked items. Select a buried item, rename it, hide/show it, lock/unlock it, locate it, or change its order. Existing graph/background interaction priorities remain in effect.
+- **Draw > Align and space objects** provides optional smart edge/center guides while moving, edge alignment and equal-gap horizontal/vertical distribution. Hold Alt to bypass smart snapping. Alignment and spacing support Undo.
+- **Draw > My reusable palette** saves selected native objects under a name in your user profile. Preview and place independent editable copies after restarting the app. Connections and links within a saved selection follow the copied objects; links to objects outside that selection are detached.
+- **View > Presentation spotlight / magnifier** follows the pointer without altering authored content. Escape exits. These overlays never print.
+
+Portable numerical/data checks are in `tools/teaching-tools-check.cpp`. Native Windows and memory checks exercise the embedded controls, graph-point dragging, Unicode units, linked tables, table plotting, animation, object controls, saved palette copies, alignment and presentation overlays.

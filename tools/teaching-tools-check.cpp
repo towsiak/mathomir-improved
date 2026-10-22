@@ -10,6 +10,7 @@ int main(){
     assert(Split("t,v\n1,nope\n",grid,error));assert(!Pairs(grid,0,1,false,d,error));
     assert(Split("(1,2)\n(2,3)",grid,error)&&Pairs(grid,0,1,false,d,error));
     assert(Split("\"Time (s)\",\"Velocity (m/s)\"\n0,2",grid,error)&&Pairs(grid,0,1,false,d,error)&&d.xLabel=="Time (s)");
+    double pi;assert(Constant("\xCF\x80/2",pi)&&std::fabs(pi-1.5707963267948966)<1e-12);
     assert(!Pairs(grid,0,0,false,d,error));auto bounds=Bounds({{2,7}});assert(bounds.xmin<2&&bounds.xmax>2&&bounds.ymin<7&&bounds.ymax>7);
     Curve c;InteractiveObjects::Parameters p;p.a[0].value=3;Point q,dir;
     assert(c.Parse("y=a*x^2",true,p,error)&&c.At(2,0,q)&&q.y==12&&c.Direction(2,q,dir));assert(std::fabs(dir.y/dir.x-12)<1e-5);

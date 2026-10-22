@@ -680,3 +680,24 @@ CANVAS SLIDER PANEL AND LIVE GRAPH UPDATES (2026-10-19)
   offscreen frames replace the previous curve without blanking it. Explicit
   functions use adaptive one-dimensional tracing; implicit previews refine
   at release. Shared worker serialization and cancellation remain in place.
+
+TEACHING TOOLS, DATA PLOTS AND GRAPH UNITS (2026-10-22)
+- Graph > Graph points, linked table and units: enable and drag points on curves;
+  tangent, normal and secant controls; linked native value tables.
+- Separate axis variable and unit fields support Unicode units and printing.
+  Units label the data; they do not perform automatic numerical conversions.
+- Graph > Plot a table of pairs: paste pairs or read a selected native table;
+  choose two columns or two rows, optional headings, preview, connect points
+  in table order, and keep the plot linked to the native source table.
+- Up to 4096 pairs; finite constants, fractions and pi accepted. Incomplete rows
+  are rejected. No regression is imposed on the plotted data.
+- Slider panel Play/Pause, a/b/c selector, seconds, Once/Loop/Back-forth.
+  Undo restores each playback run; switching document or target stops playback.
+- View > Objects and layers: select buried root objects, rename, show/hide,
+  lock/unlock, locate and reorder them.
+- Draw > Align and space objects: optional smart edge/center guides, align
+  left/top, and equal-gap horizontal/vertical distribution, with Undo.
+- Draw > My reusable palette: save selected native items, preview and place
+  independent editable copies; the saved palette survives app restarts.
+- View > Presentation spotlight / magnifier: pointer-following overlays;
+  Escape exits; authored files and print output stay free of the overlay.

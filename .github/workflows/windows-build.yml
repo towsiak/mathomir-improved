@@ -31,6 +31,17 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Graph points, table plots, units and teaching tools
+        shell: pwsh
+        run: ./tools/teaching-tools-smoke.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Teaching-Tools-Preview
+          path: |
+            source/build/teaching-*.png
+            source/build/interactive-teaching-*.mom
+          if-no-files-found: warn
       - name: Sliders, step reveal and attached connector checks
         shell: pwsh
         run: ./tools/interactive-features-smoke.ps1
@@ -184,6 +195,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/teaching-tools-smoke.ps1
           ./tools/interactive-features-smoke.ps1
           ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
@@ -277,7 +289,7 @@ jobs:
   memory_check:
     name: Native operations memory checks
     runs-on: windows-2022
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - name: Fetch original source and apply repair
@@ -302,6 +314,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/teaching-tools-smoke.ps1
           ./tools/interactive-features-smoke.ps1
           ./tools/windows-smoke.ps1
           ./tools/brace-label-smoke.ps1

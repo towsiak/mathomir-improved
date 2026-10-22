@@ -228,7 +228,7 @@
 +    void ToggleAnimation(){if(animation.playing){StopAnimation();return;}auto plot=Graph();if(!plot||ViewOnlyMode||StepPresentationActive())return;FinishGesture();double seconds=0;std::string error;CString text;GetDlgItemText(1572,text);if(!IntegralArea::Constant((LPCSTR)text,seconds,error)||!std::isfinite(seconds)||seconds<.2||seconds>3600){SetDlgItemText(1505,"Use 0.2 to 3600 seconds for a full slider sweep.");return;}if(fieldsDirty){if(!Read())return;Commit(false);Fields();}
 +        current=plot->ParameterSnapshot();animation.parameter=((CComboBox*)GetDlgItem(1571))->GetCurSel();animation.mode=((CComboBox*)GetDlgItem(1573))->GetCurSel();if(animation.parameter<0||animation.parameter>2)return;auto &p=current.a[animation.parameter];animation.period=seconds;animation.direction=1;animation.phase=(p.value-p.low)/(p.high-p.low);if(animation.phase>=1)animation.phase=0;pMainView->UndoSave("animate graph parameter");animation.playing=true;animationTick=GetTickCount();SetDlgItemText(1570,"Pause");SetDlgItemText(1505,"Playing. Pause keeps this value; Undo restores the whole run.");
 +    }
-+    void Animate(){if(!animation.playing)return;auto plot=Graph();if(!plot||ViewOnlyMode||StepPresentationActive()){StopAnimation();return;}DWORD now=GetTickCount();double elapsed=min(.25,(now-animationTick)/1000.);animationTick=now;bool wasPlaying=animation.playing;if(animation.Advance(current.a[animation.parameter],elapsed)){plot->SetParameterValues(current);plot->RequestParameterPlot(true);pMainView->GetDocument()->SetModifiedFlag();Fields();}if(wasPlaying&&!animation.playing){plot->RequestParameterPlot(false);SetDlgItemText(1570,"Play");}}
++    void Animate(){if(!animation.playing)return;auto plot=Graph();if(!plot||ViewOnlyMode||StepPresentationActive()){StopAnimation();return;}auto actual=plot->ParameterSnapshot();if(!Same(actual,current)){StopAnimation();current=actual;Fields();return;}DWORD now=GetTickCount();double elapsed=min(.25,(now-animationTick)/1000.);animationTick=now;bool wasPlaying=animation.playing;if(animation.Advance(current.a[animation.parameter],elapsed)){plot->SetParameterValues(current);plot->RequestParameterPlot(true);pMainView->GetDocument()->SetModifiedFlag();Fields();}if(wasPlaying&&!animation.playing){plot->RequestParameterPlot(false);SetDlgItemText(1570,"Play");}}
      void Layout(){
          for(int id:{1544,1545,1546,1560,1561,1562})GetDlgItem(id)->ShowWindow(compact?SW_HIDE:SW_SHOW);
          for(int i=0;i<3;i++)for(int j=2;j<=4;j++)GetDlgItem(1510+10*i+j)->ShowWindow(compact?SW_HIDE:SW_SHOW);
@@ -554,7 +554,7 @@
  						deltaX=X-SelectedDocumentObject->absolute_X;
  						deltaY=Y-SelectedDocumentObject->absolute_Y;
  					}
-+                    SnapTeachingAlignment(SelectedDocumentObject,X,Y);
++                    SnapTeachingAlignment(SelectedDocumentObject,X,Y);deltaX=X-SelectedDocumentObject->absolute_X;deltaY=Y-SelectedDocumentObject->absolute_Y;
  					SelectedDocumentObject->absolute_X=X;
  
  					SelectedDocumentObject->absolute_Y=Y;
@@ -747,7 +747,7 @@
 +    bool playing;int parameter,mode,direction;double period,phase;
 +    Animation():playing(false),parameter(0),mode(1),direction(1),period(4),phase(0){}
 +    bool Advance(InteractiveObjects::Parameter &p,double elapsed){if(!playing||!p.Valid()||!std::isfinite(elapsed)||elapsed<0||!std::isfinite(period)||period<.2||period>3600)return false;double previous=p.value;phase+=elapsed/period*direction;
-+        if(mode==2){while(phase>1||phase<0){if(phase>1){phase=2-phase;direction=-1;}else{phase=-phase;direction=1;}}}
++        if(mode==2){double start=phase-elapsed/period*direction,unfolded=(direction>0?start:2-start)+elapsed/period,wrapped=std::fmod(unfolded,2.);if(wrapped<0)wrapped+=2;phase=wrapped<=1?wrapped:2-wrapped;direction=wrapped<1?1:-1;}
 +        else if(mode==1){phase-=std::floor(phase);}else if(phase>=1){phase=1;playing=false;}else if(phase<0){phase=0;playing=false;}
 +        p.value=p.At((int)std::round(phase*1000));return p.value!=previous;
 +    }
@@ -761,10 +761,9 @@
 +}
 --- /dev/null
 +++ b/Mathomir/TeachingTools.inl
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,226 @@
 +#include <shlobj.h>
 +#pragma comment(lib,"Msimg32.lib")
-+namespace {
 +static std::wstring TeachWide(const std::string &s){int n=MultiByteToWideChar(CP_UTF8,0,s.data(),(int)s.size(),NULL,0);std::wstring w(n,L' ');if(n)MultiByteToWideChar(CP_UTF8,0,s.data(),(int)s.size(),&w[0],n);return w;}
 +static std::string TeachUtf8(const std::wstring &w){int n=WideCharToMultiByte(CP_UTF8,0,w.data(),(int)w.size(),NULL,0,NULL,NULL);std::string s(n,' ');if(n)WideCharToMultiByte(CP_UTF8,0,w.data(),(int)w.size(),&s[0],n,NULL,NULL);return s;}
 +static std::string TeachGet(HWND p,int id){HWND h=::GetDlgItem(p,id);int n=::GetWindowTextLengthW(h);std::vector<wchar_t> text(n+1);::GetWindowTextW(h,text.data(),n+1);return TeachUtf8(std::wstring(text.data()));}
@@ -779,7 +778,7 @@
 +    if(rows>1||columns>1){if(rows>4097||columns>64)return false;grid.assign(rows,std::vector<std::string>(columns));for(int r=0;r<rows;r++)for(int c=0;c<columns;c++){int first=e->FindMatrixElement(r,c,0);if(first<0)return false;int end=first;while(end<e->m_NumElements&&e->m_pElementList[end].Type!=11&&e->m_pElementList[end].Type!=12)end++;grid[r][c]=TeachCell(e,first,end);}return true;}
 +    for(int i=0;i<e->m_NumElements;i++){auto a=e->m_pElementList[i].pElementObject;if(a&&TeachGrid((CExpression*)a->Expression1,grid,depth+1))return true;}return false;
 +}
-+static bool TeachSelectedGrid(TeachingTools::Grid &grid,unsigned int &id){auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);for(auto &n:nodes)if(n.type==1&&(n.root->MovingDotState==3||n.root==prevTouchedObject||n.root->Object==(CObject*)KeyboardEntryBaseObject||n.object==(CObject*)KeyboardEntryObject))if(TeachGrid((CExpression*)n.object,grid)){id=n.info->id;return true;}return false;}
++static bool TeachSelectedGrid(TeachingTools::Grid &grid,unsigned int &id){auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);for(auto &n:nodes)if(n.type==1&&(n.root->MovingDotState==3||n.root==prevTouchedObject||n.root==KeyboardEntryBaseObject||n.object==(CObject*)KeyboardEntryObject))if(TeachGrid((CExpression*)n.object,grid)){id=n.info->id;return true;}return false;}
 +static std::string TeachGridText(const TeachingTools::Grid &grid){std::string text;for(auto &row:grid){for(size_t i=0;i<row.size();i++){if(i)text+='\t';text+=row[i];}text+="\r\n";}return text;}
 +static void TeachNativeText(CExpression *e,int at,const std::string &text){auto w=TeachWide(text);int n=WideCharToMultiByte(CP_ACP,0,w.data(),(int)w.size(),NULL,0,NULL,NULL);std::string ansi(n,' ');if(n)WideCharToMultiByte(CP_ACP,0,w.data(),(int)w.size(),&ansi[0],n,NULL,NULL);for(size_t i=0;i<ansi.size();i+=16){e->InsertEmptyElement(at,1,'x');auto a=e->m_pElementList[at].pElementObject;std::string part=ansi.substr(i,16);strcpy(a->Data1,part.c_str());at++;}}
 +static CExpression *TeachLinkedTable(CFunctionPlotter *plot,const InteractiveObjects::Info &info){
@@ -795,7 +794,7 @@
 +    if(TeachSyncing||InteractivePasteInProgress||!pMainView)return;TeachSyncing=true;
 +    if(TeachEpoch!=InteractiveObjects::DocumentEpoch()){TeachEpoch=InteractiveObjects::DocumentEpoch();TeachDragId=0;TeachPresentation=0;TeachGuide=TeachingTools::Alignment();}
 +    auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);
-+    for(auto &n:nodes){if(n.type==1&&n.info->tableGraph){auto plot=TeachPlot(n.info->tableGraph);if(!plot||KeyboardEntryBaseObject==(CObject*)n.object||KeyboardEntryObject==(CObject*)n.object)continue;unsigned int sig=(unsigned int)plot->Base->CalcChecksum()^n.info->Hash();if(sig==n.info->tableSignature)continue;auto table=TeachLinkedTable(plot,*n.info);if(table){((CExpression*)n.object)->CopyExpression(table,0,1,0);delete table;n.info->tableSignature=sig;}}
++    for(auto &n:nodes){if(n.type==1&&n.info->tableGraph){auto plot=TeachPlot(n.info->tableGraph);if(!plot||KeyboardEntryBaseObject==n.root||KeyboardEntryObject==(CObject*)n.object)continue;unsigned int sig=(unsigned int)plot->Base->CalcChecksum()^n.info->Hash();if(sig==n.info->tableSignature)continue;auto table=TeachLinkedTable(plot,*n.info);if(table){((CExpression*)n.object)->CopyExpression(table,0,1,0);delete table;n.info->tableSignature=sig;}}
 +        if(n.type==2){auto d=(CDrawing*)n.object;if(d->IsSpecialDrawing!=51||!d->SpecialData)continue;auto plot=(CFunctionPlotter*)d->SpecialData;if(!plot->tableData.source||plot->ThreadHandle)continue;auto source=FindInteractive(nodes,plot->tableData.source);if(!source||source->type!=1)continue;
 +            unsigned int sig=(unsigned int)((CExpression*)source->object)->CalcChecksum();if(sig==plot->tableSourceHash)continue;TeachingTools::Grid g;TeachingTools::Data data=plot->tableData;std::string error;
 +            if(TeachGrid((CExpression*)source->object,g)&&TeachingTools::Pairs(g,data.xColumn,data.yColumn,data.rows,data,error)){plot->tableData=data;plot->tableSourceHash=sig;plot->RequestParameterPlot(false);}
@@ -822,15 +821,15 @@
 +}
 +static bool TeachingMouseMove(UINT flags,CPoint point){
 +    if(TeachPresentation){TeachPointer=point;pMainView->Invalidate(FALSE);::SetCursor(::LoadCursor(NULL,IDC_CROSS));return true;}
-+    if(!TeachDragId)return false;if(TeachDragEpoch!=InteractiveObjects::DocumentEpoch()||pMainView->GetCapture()!=pMainView){TeachDragId=0;return false;}InteractiveNode n;auto plot=TeachPlot(TeachDragId,&n);if(!plot){TeachDragId=0;if(pMainView->GetCapture()==pMainView)pMainView->ReleaseCapture();return true;}
++    if(!TeachDragId)return false;if(TeachDragEpoch!=InteractiveObjects::DocumentEpoch()||pMainView->GetCapture()!=pMainView){TeachDragId=0;return false;}InteractiveNode n;auto plot=TeachPlot(TeachDragId,&n);if(!plot){TeachDragId=0;if(pMainView->GetCapture()==pMainView)::ReleaseCapture();return true;}
 +    RelationGraph::Viewport v;CRect r;TeachingTools::Curve curve;std::string error;if(TeachViewport(n,plot,v,r)&&plot->TeachingCurve(plot->exploration.slot,curve,error)){
 +        TeachingTools::Point m={double(max(0,min(v.width-1,point.x-r.left))),double(max(0,min(v.height-1,point.y-r.top)))},p;double u=0,sy=0;bool valid=false;
 +        if(!curve.isExplicit&&!curve.isParametric){u=v.X(m.x/(v.width-1));sy=v.Y(m.y/(v.height-1));valid=curve.At(u,sy,p);if(valid){u=p.x;sy=p.y;}}
 +        else valid=curve.Nearest(v,m,u,sy,p);if(valid){auto &e=plot->exploration;if(TeachDragPoint==1){e.a=u;e.ay=sy;}else{e.b=u;e.by=sy;e.secant=true;}pMainView->GetDocument()->SetModifiedFlag();pMainView->Invalidate(FALSE);}
-+    }if(!(flags&MK_LBUTTON)){TeachDragId=0;pMainView->ReleaseCapture();}::SetCursor(::LoadCursor(NULL,IDC_CROSS));return true;
++    }if(!(flags&MK_LBUTTON)){TeachDragId=0;::ReleaseCapture();}::SetCursor(::LoadCursor(NULL,IDC_CROSS));return true;
 +}
-+static bool TeachingMouseUp(CPoint point){if(TeachPresentation)return true;if(!TeachDragId)return false;TeachingMouseMove(MK_LBUTTON,point);TeachDragId=0;if(pMainView->GetCapture()==pMainView)pMainView->ReleaseCapture();pMainView->Invalidate(FALSE);return true;}
-+static bool TeachingKey(UINT key){if(key!=VK_ESCAPE)return false;if(TeachPresentation){TeachPresentation=0;pMainView->Invalidate(FALSE);return true;}if(TeachDragId){auto plot=TeachPlot(TeachDragId);if(plot)plot->exploration=TeachDragBefore;TeachDragId=0;if(pMainView->GetCapture()==pMainView)pMainView->ReleaseCapture();pMainView->Invalidate(FALSE);return true;}return false;}
++static bool TeachingMouseUp(CPoint point){if(TeachPresentation)return true;if(!TeachDragId)return false;TeachingMouseMove(MK_LBUTTON,point);TeachDragId=0;if(pMainView->GetCapture()==pMainView)::ReleaseCapture();pMainView->Invalidate(FALSE);return true;}
++static bool TeachingKey(UINT key){if(key!=VK_ESCAPE)return false;if(TeachPresentation){TeachPresentation=0;pMainView->Invalidate(FALSE);return true;}if(TeachDragId){auto plot=TeachPlot(TeachDragId);if(plot)plot->exploration=TeachDragBefore;TeachDragId=0;if(pMainView->GetCapture()==pMainView)::ReleaseCapture();pMainView->Invalidate(FALSE);return true;}return false;}
 +static void ClearTeachingAlignment(){TeachGuide=TeachingTools::Alignment();}
 +static void SnapTeachingAlignment(tDocumentStruct *object,int &x,int &y){
 +    ClearTeachingAlignment();if(!TeachSmartAlign||GetKeyState(VK_MENU)&0x8000||!object)return;std::vector<InteractiveObjects::Rect> others;
@@ -839,13 +838,13 @@
 +}
 +static void PaintTeachingOverlay(CDC *dc){
 +    int saved=dc->SaveDC();if(TeachGuide.vertical||TeachGuide.horizontal){CPen pen(PS_DOT,1,RGB(180,70,155));dc->SelectObject(&pen);if(TeachGuide.vertical){int x=(int)((TeachGuide.x-ViewX)*ViewZoom/100);dc->MoveTo(x,0);dc->LineTo(x,TheClientRect.bottom);}if(TeachGuide.horizontal){int y=(int)((TeachGuide.y-ViewY)*ViewZoom/100);dc->MoveTo(0,y);dc->LineTo(TheClientRect.right,y);}}
-+    if(TeachPresentation){int cx=TheClientRect.right,cy=TheClientRect.bottom;CPoint p(max(0,min(cx-1,TeachPointer.x)),max(0,min(cy-1,TeachPointer.y)));
++    if(TeachPresentation){int cx=TheClientRect.right,cy=TheClientRect.bottom;if(cx<40||cy<40){dc->RestoreDC(saved);return;}CPoint p(max(0,min(cx-1,TeachPointer.x)),max(0,min(cy-1,TeachPointer.y)));
 +        if(TeachPresentation==1){CRgn all,hole;all.CreateRectRgn(0,0,cx,cy);hole.CreateEllipticRgn(p.x-100,p.y-100,p.x+100,p.y+100);all.CombineRgn(&all,&hole,RGN_DIFF);dc->SelectClipRgn(&all);CDC tint;CBitmap pixel;tint.CreateCompatibleDC(dc);pixel.CreateCompatibleBitmap(dc,1,1);auto old=tint.SelectObject(&pixel);tint.FillSolidRect(0,0,1,1,RGB(235,238,242));BLENDFUNCTION blend={AC_SRC_OVER,0,190,0};::AlphaBlend(dc->GetSafeHdc(),0,0,cx,cy,tint.GetSafeHdc(),0,0,1,1,blend);tint.SelectObject(old);dc->SelectClipRgn(NULL);CPen pen(PS_SOLID,2,RGB(55,85,120));dc->SelectObject(&pen);dc->SelectStockObject(NULL_BRUSH);dc->Ellipse(p.x-100,p.y-100,p.x+100,p.y+100);}
 +        else{int size=min(180,min(cx,cy)-20),source=max(1,size/2),sx=max(0,min(cx-source,p.x-source/2)),sy=max(0,min(cy-source,p.y-source/2));int tx=max(6,min(cx-size-6,p.x+28)),ty=max(6,min(cy-size-6,p.y+24));CDC image;CBitmap copy;image.CreateCompatibleDC(dc);copy.CreateCompatibleBitmap(dc,source,source);auto old=image.SelectObject(&copy);image.BitBlt(0,0,source,source,dc,sx,sy,SRCCOPY);dc->SetStretchBltMode(HALFTONE);dc->StretchBlt(tx,ty,size,size,&image,0,0,source,source,SRCCOPY);dc->Draw3dRect(tx-2,ty-2,size+4,size+4,RGB(35,60,95),RGB(35,60,95));image.SelectObject(old);}
 +        dc->SetBkColor(RGB(255,255,255));dc->SetBkMode(OPAQUE);dc->SetTextColor(RGB(25,35,50));dc->SelectObject(GetStockObject(DEFAULT_GUI_FONT));TeachDraw(dc,12,max(5,cy-28),TeachPresentation==1?L"Spotlight  \u00b7  Esc to exit":L"Magnifier  \u00b7  Esc to exit");
 +    }dc->RestoreDC(saved);
 +}
-+static void TeachPlace(CExpression *expression,CDrawing *drawing){pMainView->OnChar(27,1,0);CancelFloatingPlacement();RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardExpression=expression;ClipboardDrawing=drawing;RootObjectCopy=-1;RootObjectFontSize=100;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;pMainView->SetFocus();pMainView->RepaintTheView();::SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));}
++static void TeachPlace(CExpression *expression,CDrawing *drawing){pMainView->OnChar(27,1,0);pMainView->CancelFloatingPlacement();pMainView->RestoreClipboardBackground();if(ClipboardExpression){delete ClipboardExpression;ClipboardExpression=NULL;}if(ClipboardDrawing){delete ClipboardDrawing;ClipboardDrawing=NULL;}ClipboardExpression=expression;ClipboardDrawing=drawing;RootObjectCopy=-1;RootObjectFontSize=100;IsDrawingMode=MouseMode=0;MovingStartX=MovingStartY=0;pMainView->SetFocus();pMainView->RepaintTheView();::SetCursor(theApp.LoadCursor(IDC_POINTER_COPY));}
 +static std::wstring TeachFavoriteFolder(){wchar_t folder[MAX_PATH]={};if(FAILED(SHGetFolderPathW(NULL,CSIDL_LOCAL_APPDATA|CSIDL_FLAG_CREATE,NULL,SHGFP_TYPE_CURRENT,folder)))return L"";std::wstring path=std::wstring(folder)+L"\\Mathomir";CreateDirectoryW(path.c_str(),NULL);path+=L"\\MyPalette";CreateDirectoryW(path.c_str(),NULL);return path;}
 +static bool TeachWriteFile(const std::wstring &path,const std::string &data){HANDLE file=CreateFileW((path+L".tmp").c_str(),GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);if(file==INVALID_HANDLE_VALUE)return false;DWORD written=0;bool ok=WriteFile(file,data.data(),(DWORD)data.size(),&written,NULL)&&written==data.size();CloseHandle(file);if(ok)ok=MoveFileExW((path+L".tmp").c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=FALSE;if(!ok)DeleteFileW((path+L".tmp").c_str());return ok;}
 +static bool TeachReadFile(const std::wstring &path,std::string &data){HANDLE f=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);if(f==INVALID_HANDLE_VALUE)return false;DWORD n=GetFileSize(f,NULL),got=0;bool ok=n>0&&n<=8*1024*1024;if(ok){data.resize(n);ok=ReadFile(f,&data[0],n,&got,NULL)&&got==n;}CloseHandle(f);return ok;}
@@ -871,7 +870,6 @@
 +BEGIN_MESSAGE_MAP(CTeachingPreview,CWnd)
 +    ON_WM_PAINT()
 +END_MESSAGE_MAP()
-+}
 +
 +class CTeachingDock:public CFeatureDialog {
 +    std::vector<HWND> controls;CTeachingPreview preview;std::vector<unsigned int> graphs,objects;std::vector<std::wstring> favorites;
@@ -903,10 +901,10 @@
 +        TeachSet(m_hWnd,1623,text);
 +    }
 +    void PlaceLinkedTable(){auto p=TeachPlot(graphId);if(!p){Status(1624,"Choose a graph first.");return;}InteractiveObjects::Info info;info.tableGraph=graphId;info.tableSlot=Choice(1611);double count=0;if(!TeachingTools::Constant(TeachGet(m_hWnd,1620),info.tableStart)||!TeachingTools::Constant(TeachGet(m_hWnd,1621),info.tableStep)||info.tableStep==0||!TeachingTools::Constant(TeachGet(m_hWnd,1622),count)||count!=std::floor(count)||count<2||count>19){Status(1624,"Use a finite start, a nonzero step, and 2-19 samples.");return;}info.tableCount=(int)count;auto table=TeachLinkedTable(p,info);if(!table){Status(1624,"Select a defined curve before making its table.");return;}OnCancel();TeachPlace(table,NULL);}
-+    bool ReadData(bool showError=true){TeachingTools::Grid grid;TeachingTools::Data data;std::string error;int xc=atoi(TeachGet(m_hWnd,1631).c_str())-1,yc=atoi(TeachGet(m_hWnd,1632).c_str())-1;
++    bool ReadData(bool showError=true){TeachingTools::Grid grid;TeachingTools::Data data;std::string error;double xcol=0,ycol=0;if(!TeachingTools::Constant(TeachGet(m_hWnd,1631),xcol)||!TeachingTools::Constant(TeachGet(m_hWnd,1632),ycol)||xcol!=floor(xcol)||ycol!=floor(ycol)||xcol<1||xcol>64||ycol<1||ycol>64){Status(1640,"Choose column or row numbers from 1 to 64.");return false;}int xc=(int)xcol-1,yc=(int)ycol-1;
 +        if(!TeachingTools::Split(TeachGet(m_hWnd,1630),grid,error)||!TeachingTools::Pairs(grid,xc,yc,Choice(1633)==1,data,error)){preview.data=TeachingTools::Data();preview.Invalidate(FALSE);if(showError)Status(1640,error);return false;}
-+        auto xl=TeachingTools::Trim(TeachGet(m_hWnd,1634)),yl=TeachingTools::Trim(TeachGet(m_hWnd,1635));if(!xl.empty())data.xLabel=xl;if(!yl.empty())data.yLabel=yl;data.connect=Checked(1636);data.source=sourceId&&Checked(1641)?sourceId:0;preview.data=data;preview.Invalidate(FALSE);Status(1640,std::to_string(data.points.size())+" pairs ready. Order is preserved when connecting points.");return true;}
-+    void SelectedTable(){TeachingTools::Grid grid;unsigned int id=0;if(!TeachSelectedGrid(grid,id)){Status(1640,"Select or touch a native table on the page, then use this button.");return;}loading=true;TeachSet(m_hWnd,1630,TeachGridText(grid));TeachSet(m_hWnd,1634,"");TeachSet(m_hWnd,1635,"");sourceId=id;::SendDlgItemMessage(m_hWnd,1641,BM_SETCHECK,BST_CHECKED,0);loading=false;ReadData();}
++        auto xl=TeachingTools::Trim(TeachGet(m_hWnd,1634)),yl=TeachingTools::Trim(TeachGet(m_hWnd,1635));if(!xl.empty())data.xLabel=xl;if(!yl.empty())data.yLabel=yl;data.connect=Checked(1636);data.source=sourceId&&Checked(1641)?sourceId:0;if(editGraphId&&data.source){auto original=TeachPlot(editGraphId);if(original){data.xColumn=original->tableData.xColumn;data.yColumn=original->tableData.yColumn;data.rows=original->tableData.rows;}}preview.data=data;preview.Invalidate(FALSE);Status(1640,std::to_string(data.points.size())+" pairs ready. Order is preserved when connecting points.");return true;}
++    void SelectedTable(){TeachingTools::Grid grid;unsigned int id=0;if(!TeachSelectedGrid(grid,id)){Status(1640,"Select or touch a native table on the page, then use this button.");return;}loading=true;TeachSet(m_hWnd,1630,TeachGridText(grid));TeachSet(m_hWnd,1634,"");TeachSet(m_hWnd,1635,"");sourceId=id;editGraphId=0;::SendDlgItemMessage(m_hWnd,1641,BM_SETCHECK,BST_CHECKED,0);loading=false;ReadData();}
 +    void PlotData(){if(!ReadData())return;auto data=preview.data;auto xunit=TeachingTools::Trim(TeachGet(m_hWnd,1643)),yunit=TeachingTools::Trim(TeachGet(m_hWnd,1644));if(data.xLabel.size()>80||data.yLabel.size()>80||xunit.size()>80||yunit.size()>80){Status(1640,"Use short axis names and units (80 UTF-8 bytes each).");return;}
 +        auto plot=editGraphId?TeachPlot(editGraphId):NULL;CDrawing *drawing=plot?plot->Base:NULL;bool existing=plot!=NULL;
 +        if(!drawing){drawing=new CDrawing();int x,y;drawing->StartCreatingItem(51);drawing->UpdateCreatingItem(4000,3200,0,0);drawing->EndCreatingItem(&x,&y);plot=(CFunctionPlotter*)drawing->SpecialData;}
@@ -955,7 +953,7 @@
 +    CTeachingDock():CFeatureDialog(IDD_TEACHING_DOCK,pMainView),epoch(0),graphId(0),objectId(0),sourceId(0),editGraphId(0),page(0),labelId(1800),opened(false),loading(false){}
 +    bool Opened()const{return opened;}
 +    virtual BOOL OnInitDialog(){CFeatureDialog::OnInitDialog();SetDlgCtrlID(ID_GRAPH_EXPLORER);pMainView->ModifyStyle(0,WS_CLIPCHILDREN);for(const wchar_t *s:{L"Graph points, table and units",L"Plot a table of pairs",L"Objects and layers",L"My reusable palette"})::SendDlgItemMessageW(m_hWnd,1600,CB_ADDSTRING,0,(LPARAM)s);return TRUE;}
-+    void Open(int next){if(epoch!=InteractiveObjects::DocumentEpoch()){graphId=objectId=sourceId=editGraphId=0;epoch=InteractiveObjects::DocumentEpoch();}page=next;opened=true;::SendDlgItemMessage(m_hWnd,1600,CB_SETCURSEL,page,0);Build();SetTimer(1,250,NULL);ShowWindow(SW_SHOWNOACTIVATE);}
++    void Open(int next){if(epoch!=InteractiveObjects::DocumentEpoch()){graphId=objectId=sourceId=editGraphId=0;epoch=InteractiveObjects::DocumentEpoch();}auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);for(auto &n:nodes)if(n.type==2&&((CDrawing*)n.object)->IsSpecialDrawing==51&&(n.root==prevTouchedObject||n.root==SpecialDrawingHover||n.root->MovingDotState==3)){graphId=n.info->id;break;}if(!graphId){unsigned int only=0;int count=0;for(auto &n:nodes)if(n.type==2&&((CDrawing*)n.object)->IsSpecialDrawing==51){only=n.info->id;count++;}if(count==1)graphId=only;}page=next;opened=true;::SendDlgItemMessage(m_hWnd,1600,CB_SETCURSEL,page,0);Build();SetTimer(1,250,NULL);ShowWindow(SW_SHOWNOACTIVATE);}
 +    void Anchor(){if(!opened)return;CRect client,desired(0,0,226,302),actual;pMainView->GetClientRect(client);MapDialogRect(&desired);desired.MoveToXY(max(4,client.right-desired.Width()-8),8);GetWindowRect(actual);pMainView->ScreenToClient(actual);if(actual!=desired)SetWindowPos(NULL,desired.left,desired.top,desired.Width(),desired.Height(),SWP_NOZORDER|SWP_NOACTIVATE);}
 +    void Follow(tDocumentStruct *object){if(!opened||page!=0||!object||object->Type!=2)return;auto graph=TeachFindPlot((CDrawing*)object->Object);if(!graph||graph->m_ObjectInfo.id==graphId)return;graphId=graph->m_ObjectInfo.id;PopulateGraphs();GraphFields();}
 +    void Sync(){if(!opened)return;if(epoch!=InteractiveObjects::DocumentEpoch()){OnCancel();graphId=objectId=sourceId=editGraphId=0;return;}Anchor();if(StepPresentationActive())ShowWindow(SW_HIDE);else if(!IsWindowVisible())ShowWindow(SW_SHOWNOACTIVATE);}
