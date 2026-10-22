@@ -589,7 +589,7 @@
 +    auto order=ObjectOrder::Permutation(selected,newpos);
 +    std::vector<std::pair<tDocumentStruct**,CObject*> > references;
 +    auto remember=[&](tDocumentStruct *&pointer){if(!pointer)return;for(int i=0;i<NumDocumentElements;i++)if(pointer==TheDocument+i){references.push_back(std::make_pair(&pointer,pointer->Object));return;}pointer=NULL;};
-+    remember(KeyboardEntryBaseObject);remember(LastQuickTypeObject);remember(SelectedDocumentObject);remember(SelectedDocumentObject2);remember(prevTouchedObject);remember(SpecialDrawingHover);remember(prevSpecialDrawingHover);remember(LongClickObject);remember(IsInsertionPointTouched);remember(pMainView->m_PopupMenuObject);
++    remember(KeyboardEntryBaseObject);remember(LastQuickTypeObject);remember(SelectedDocumentObject);remember(SelectedDocumentObject2);remember(prevTouchedObject);remember(SpecialDrawingHover);remember(prevSpecialDrawingHover);remember(IsInsertionPointTouched);remember(pMainView->m_PopupMenuObject);
 +    CObject *copied=RootObjectCopy>=0&&RootObjectCopy<NumDocumentElements?TheDocument[RootObjectCopy].Object:NULL;
 +    for(int i=0;i<NumDocumentElements;i++)TheDocument[i]=previous[order[i]];
 +    for(auto &reference:references){*reference.first=NULL;for(int i=0;i<NumDocumentElements;i++)if(TheDocument[i].Object==reference.second){*reference.first=TheDocument+i;break;}}
