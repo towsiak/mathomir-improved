@@ -737,7 +737,7 @@
 +#define IDD_TEACHING_DOCK 201
 --- /dev/null
 +++ b/Mathomir/TeachingTools.h
-@@ -0,0 +1,114 @@
+@@ -0,0 +1,115 @@
 +#pragma once
 +#include "RelationGraph.h"
 +#include "IntegralArea.h"
@@ -758,6 +758,7 @@
 +inline std::string Number(double n){return InteractiveObjects::DisplayNumber(n);}
 +inline std::string Trim(std::string s){size_t a=s.find_first_not_of(" \t\r\n"),b=s.find_last_not_of(" \t\r\n");return a==std::string::npos?"":s.substr(a,b-a+1);}
 +inline bool Constant(const std::string &s,double &n){std::string text=Trim(s);const char *from[]={"\xCF\x80","\xE2\x88\x92","\xC2\xB7","\xC3\x97","\xC2\xB2","\xC2\xB3"};const char *to[]={"pi","-","*","*","^2","^3"};for(int i=0;i<6;i++){size_t at=0;while((at=text.find(from[i],at))!=std::string::npos){text.replace(at,std::strlen(from[i]),to[i]);at+=std::strlen(to[i]);}}std::string error;return !text.empty()&&IntegralArea::Constant(text,n,error)&&std::isfinite(n);}
++inline std::string WindowsLines(const std::string &text){std::string out;for(size_t i=0;i<text.size();i++){if(text[i]=='\r'){out+="\r\n";if(i+1<text.size()&&text[i+1]=='\n')i++;}else if(text[i]=='\n')out+="\r\n";else out+=text[i];}return out;}
 +inline std::string Hex(const std::string &s){const char *h="0123456789ABCDEF";std::string out;for(unsigned char c:s){out+=h[c>>4];out+=h[c&15];}return out;}
 +inline std::string Unhex(const std::string &s,size_t limit=120){if(s.size()%2||s.size()>2*limit)return "";std::string out;for(size_t i=0;i<s.size();i+=2){auto digit=[](char c){return c>='0'&&c<='9'?c-'0':c>='A'&&c<='F'?c-'A'+10:c>='a'&&c<='f'?c-'a'+10:-1;};int a=digit(s[i]),b=digit(s[i+1]);if(a<0||b<0||!(a||b))return "";out+=(char)(16*a+b);}return out;}
 +struct Data {
@@ -767,7 +768,7 @@
 +typedef std::vector<std::vector<std::string> > Grid;
 +inline bool Split(const std::string &text,Grid &grid,std::string &error){
 +    grid.clear();if(text.size()>262144){error="Use at most 256 KB of table data.";return false;}
-+    std::istringstream input(text);std::string line;size_t columns=0;
++    std::istringstream input(WindowsLines(text));std::string line;size_t columns=0;
 +    while(std::getline(input,line)){line=Trim(line);if(line.empty())continue;std::vector<std::string> cells;
 +        if(line.front()=='('&&line.back()==')')line=line.substr(1,line.size()-2);
 +        char delimiter=line.find('\t')!=std::string::npos?'\t':line.find(',')!=std::string::npos?',':line.find(';')!=std::string::npos?';':0;
@@ -995,7 +996,7 @@
 +    }
 +    void PlaceLinkedTable(){auto p=TeachPlot(graphId);if(!p){Status(1624,"Choose a graph first.");return;}InteractiveObjects::Info info;info.tableGraph=graphId;info.referenceEpoch=InteractiveObjects::DocumentEpoch();info.tableSlot=Choice(1611);double count=0;if(!TeachingTools::Constant(TeachGet(m_hWnd,1620),info.tableStart)||!TeachingTools::Constant(TeachGet(m_hWnd,1621),info.tableStep)||info.tableStep==0||!TeachingTools::Constant(TeachGet(m_hWnd,1622),count)||count!=std::floor(count)||count<2||count>19){Status(1624,"Use a finite start, a nonzero step, and 2-19 samples.");return;}info.tableCount=(int)count;auto table=TeachLinkedTable(p,info);if(!table){Status(1624,"Select a defined curve before making its table.");return;}OnCancel();TeachPlace(table,NULL);}
 +    bool ReadData(bool showError=true){TeachingTools::Grid grid;TeachingTools::Data data;std::string error;double xcol=0,ycol=0;if(!TeachingTools::Constant(TeachGet(m_hWnd,1631),xcol)||!TeachingTools::Constant(TeachGet(m_hWnd,1632),ycol)||xcol!=floor(xcol)||ycol!=floor(ycol)||xcol<1||xcol>64||ycol<1||ycol>64){Status(1640,"Choose column or row numbers from 1 to 64.");return false;}int xc=(int)xcol-1,yc=(int)ycol-1;
-+        if(!TeachingTools::Split(TeachGet(m_hWnd,1630),grid,error)||!TeachingTools::Pairs(grid,xc,yc,Choice(1633)==1,data,error)){preview.data=TeachingTools::Data();preview.Invalidate(FALSE);if(showError)Status(1640,error);return false;}
++        auto raw=TeachGet(m_hWnd,1630),display=TeachingTools::WindowsLines(raw);if(raw!=display){loading=true;TeachSet(m_hWnd,1630,display);loading=false;}if(!TeachingTools::Split(raw,grid,error)||!TeachingTools::Pairs(grid,xc,yc,Choice(1633)==1,data,error)){preview.data=TeachingTools::Data();preview.Invalidate(FALSE);if(showError)Status(1640,error);return false;}
 +        auto xl=TeachingTools::Trim(TeachGet(m_hWnd,1634)),yl=TeachingTools::Trim(TeachGet(m_hWnd,1635));if(!xl.empty())data.xLabel=xl;if(!yl.empty())data.yLabel=yl;data.connect=Checked(1636);data.autoFit=Checked(1645);data.source=sourceId&&Checked(1641)?sourceId:0;data.sourceEpoch=data.source?InteractiveObjects::DocumentEpoch():0;if(editGraphId&&data.source){auto original=TeachPlot(editGraphId);if(original){data.xColumn=original->tableData.xColumn;data.yColumn=original->tableData.yColumn;data.rows=original->tableData.rows;}}preview.data=data;preview.Invalidate(FALSE);Status(1640,std::to_string(data.points.size())+" pairs ready. Order is preserved when connecting points.");return true;}
 +    void SelectedTable(){TeachingTools::Grid grid;unsigned int id=0;if(!TeachSelectedGrid(grid,id)){Status(1640,"Select or touch a native table on the page, then use this button.");return;}loading=true;TeachSet(m_hWnd,1630,TeachGridText(grid));TeachSet(m_hWnd,1634,"");TeachSet(m_hWnd,1635,"");sourceId=id;editGraphId=0;::SendDlgItemMessage(m_hWnd,1641,BM_SETCHECK,BST_CHECKED,0);loading=false;ReadData();}
 +    void PlotData(){if(!ReadData())return;auto data=preview.data;auto xunit=TeachingTools::Trim(TeachGet(m_hWnd,1643)),yunit=TeachingTools::Trim(TeachGet(m_hWnd,1644));if(data.xLabel.size()>80||data.yLabel.size()>80||xunit.size()>80||yunit.size()>80){Status(1640,"Use short axis names and units (80 UTF-8 bytes each).");return;}
@@ -1056,7 +1057,7 @@
 +    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){int id=LOWORD(wp),notice=HIWORD(wp);if(loading)return TRUE;if((id==1612||id==1613)&&notice==EN_CHANGE){pointFieldsDirty=true;return TRUE;}if(id==1600&&notice==CBN_SELCHANGE){page=Choice(1600);Build();return TRUE;}if(id==1610&&notice==CBN_SELCHANGE){int i=Choice(1610);if(i>=0&&i<(int)graphs.size()){graphId=graphs[i];GraphFields();}return TRUE;}if(id==1611&&notice==CBN_SELCHANGE){Readout();return TRUE;}
 +        if(ViewOnlyMode&&(id==1618||id==1619||id==1674||id==1638||(id>=1652&&id<=1656)||id==1662||id==1663))return TRUE;
 +        if(id==1618){ApplyGraph(false);return TRUE;}if(id==1674){ApplyGraph(true);return TRUE;}if(id==1619){PlaceLinkedTable();return TRUE;}if(id==1628){OnCancel();pMainView->OnParameterSliders();return TRUE;}
-+        if(id==1637){SelectedTable();return TRUE;}if(id==1642){ReadData();return TRUE;}if(id==1638){PlotData();return TRUE;}if(id==1630&&notice==EN_CHANGE){sourceId=0;auto text=TeachGet(m_hWnd,1630);std::string normalized;for(size_t i=0;i<text.size();i++){if(text[i]=='\n'&&(i==0||text[i-1]!='\r'))normalized+='\r';normalized+=text[i];}if(normalized!=text){loading=true;TeachSet(m_hWnd,1630,normalized);loading=false;}Status(1640,"Press Preview or Place after editing the pairs.");return TRUE;}
++        if(id==1637){SelectedTable();return TRUE;}if(id==1642){ReadData();return TRUE;}if(id==1638){PlotData();return TRUE;}if(id==1630&&notice==EN_CHANGE){sourceId=0;auto text=TeachGet(m_hWnd,1630);auto normalized=TeachingTools::WindowsLines(text);if(normalized!=text){loading=true;TeachSet(m_hWnd,1630,normalized);loading=false;}Status(1640,"Press Preview or Place after editing the pairs.");return TRUE;}
 +        if(id==1650&&notice==LBN_SELCHANGE){int i=(int)::SendDlgItemMessage(m_hWnd,1650,LB_GETCURSEL,0,0);if(i>=0&&i<(int)objects.size()){objectId=objects[i];SelectObjectOnPage(false);}return TRUE;}if(id>=1652&&id<=1656||id==1659){ObjectAction(id);return TRUE;}if(id==1657){RefreshObjects(true);return TRUE;}
 +        if(id==1660&&notice==LBN_SELCHANGE){FavoriteChanged();return TRUE;}if(id==1662){SaveFavorite();return TRUE;}if(id==1663){int i=FavoriteSelection();auto d=i>=0?TeachLoadFavorite(favorites[i]):NULL;if(!d){Status(1665,"Choose a saved item that can be loaded.");return TRUE;}OnCancel();TeachPlace(NULL,d);return TRUE;}if(id==1664){int i=FavoriteSelection();if(i>=0&&MoveFileExW(favorites[i].c_str(),(favorites[i]+L".removed").c_str(),MOVEFILE_REPLACE_EXISTING)){preview.Reset();preview.Invalidate(FALSE);RefreshFavorites();Status(1665,"Removed from the palette.");}return TRUE;}
 +        return CFeatureDialog::OnCommand(wp,lp);

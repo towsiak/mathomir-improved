@@ -4,6 +4,7 @@
 using namespace TeachingTools;
 int main(){
     Grid grid;Data d;std::string error;
+    assert(WindowsLines("a\nb\r\nc\rd")=="a\r\nb\r\nc\r\nd");
     assert(Split("t,v\n0,1\n1/2,3\npi,4\n",grid,error));assert(Pairs(grid,0,1,false,d,error));assert(d.points.size()==3&&d.xLabel=="t"&&d.yLabel=="v"&&d.points[1].x==.5);
     assert(Split("t\t0\t1\t2\nv\t3\t5\t8",grid,error));assert(Pairs(grid,0,1,true,d,error)&&d.points.size()==3&&d.points[2].y==8);
     assert(Split("0,1\n1,\n2,4",grid,error));assert(!Pairs(grid,0,1,false,d,error));
