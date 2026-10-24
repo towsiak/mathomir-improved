@@ -62,7 +62,7 @@ function SelectList($p,$id,$index){[MathomirUiProbe]::Send([MathomirUiProbe]::Ch
 function Mark($p,$id,$value){[MathomirUiProbe]::Send([MathomirUiProbe]::Child($p,$id),241,[int]$value)|Out-Null}
 function Decode($hex){if(!$hex){return ''};$bytes=for($i=0;$i -lt $hex.Length;$i+=2){[Convert]::ToByte($hex.Substring($i,2),16)};return [Text.Encoding]::UTF8.GetString([byte[]]$bytes)}
 function EscapeView {[MathomirUiProbe]::Send($view,256,27)|Out-Null;[MathomirUiProbe]::Send($view,258,27)|Out-Null;Start-Sleep -Milliseconds 100}
-function NewRelation {Load 'teaching-curve' '<?xml version="1.0"?><mathomir></mathomir>';$d=Dialog 33106 'Relations and parametric curves';SetField $d 1423 'y=a*x^2';[MathomirUiProbe]::Send($d,273,1439)|Out-Null;CloseDialog $d;Place 100 100}
+function NewRelation($name='teaching-curve') {Load $name '<?xml version="1.0"?><mathomir></mathomir>';$d=Dialog 33106 'Relations and parametric curves';SetField $d 1423 'y=a*x^2';[MathomirUiProbe]::Send($d,273,1439)|Out-Null;CloseDialog $d;Place 100 100}
 function NativeTable($rows){$xml='<?xml version="1.0"?><mathomir><obj type="1" X="100" Y="180"><ex><elm tp="5" E1=""><ex shp=" ">';foreach($row in $rows){$xml+='<var t="'+$row[0]+'" f="00"/><col_sep/><var t="'+$row[1]+'" f="00"/><row_sep/>'};return $xml+'</ex></elm></ex></obj></mathomir>'}
 $exe=(Resolve-Path source/build/Mathomir.exe).Path;$folder=Split-Path $exe
 $env:MATHOMIR_POPUP_COLOR_DIAGNOSTICS='1';$env:MATHOMIR_PLACEMENT_DIAGNOSTICS='1';$env:MATHOMIR_DIAGNOSTIC_STARTUP='1'
@@ -70,7 +70,7 @@ $app=Start-Process $exe -WorkingDirectory $folder -PassThru
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;Check ($main -ne [IntPtr]::Zero) 'App did not start';[InteractiveUI]::ShowWindow($main,3)|Out-Null;$view=[MathomirUiProbe]::Child($main,0xE900)
  Case 'visible top toolbar' {
- NewRelation;$wide=CheckFeatureLayout;$tops=@($wide|ForEach-Object {$_.Top}|Sort-Object -Unique);Check ($tops.Count -eq 1) 'Wide feature toolbar wraps unnecessarily';Capture $main 'teaching-top-toolbar-wide.png'
+ NewRelation 'teaching-toolbar-curve';$wide=CheckFeatureLayout;$tops=@($wide|ForEach-Object {$_.Top}|Sort-Object -Unique);Check ($tops.Count -eq 1) 'Wide feature toolbar wraps unnecessarily';Capture $main 'teaching-top-toolbar-wide.png'
  [InteractiveUI]::ShowWindow($main,9)|Out-Null;[InteractiveUI]::MoveWindow($main,20,20,500,760,$true)|Out-Null;Start-Sleep -Milliseconds 200;$small=CheckFeatureLayout;Check (@($small|ForEach-Object {$_.Top}|Sort-Object -Unique).Count -ge 2) 'Narrow window did not wrap its shortcuts';Capture $main 'teaching-top-toolbar-narrow.png';[InteractiveUI]::ShowWindow($main,3)|Out-Null;Start-Sleep -Milliseconds 200;CheckFeatureLayout|Out-Null
  FeatureClick 1120;$dock=[MathomirUiProbe]::Child($view,33116);Check ([MathomirUiProbe]::IsWindowVisible([MathomirUiProbe]::Child($dock,1690))) 'Plot points shortcut did not open the simple grid';ClosePanel $dock
  FeatureClick 1121;$panel=[MathomirUiProbe]::Child($view,33108);Check ([MathomirUiProbe]::IsWindowVisible($panel)) 'Sliders shortcut failed';ClosePanel $panel
