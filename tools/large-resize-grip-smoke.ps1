@@ -17,7 +17,7 @@ public static class LargeGripProbe {
  [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
  static bool Blue(byte[] p,int w,int x,int y){int i=(y*w+x)*4;return p[i]==155&&p[i+1]==95&&p[i+2]==45;}
  public static int[] Find(IntPtr h,int width,int height){return FindInternal(h,width,height,false);}
- public static int[] FindInk(IntPtr h,int width,int height){return FindInternal(h,width,height,true);}
+ public static int[] FindInk(IntPtr h,int width,int height){for(int attempt=0;;attempt++){try{return FindInternal(h,width,height,true);}catch(Exception){if(attempt>=19)throw;System.Threading.Thread.Sleep(25);}}}
  static int[] FindInternal(IntPtr h,int width,int height,bool ink){IntPtr dc=GetDC(h),mem=CreateCompatibleDC(dc),bmp=CreateCompatibleBitmap(dc,width,height),old=SelectObject(mem,bmp);try{
   BitBlt(mem,0,0,width,height,dc,0,0,0x00cc0020);SelectObject(mem,old);old=IntPtr.Zero;
   byte[] pixels=new byte[width*height*4];BitmapInfo info=new BitmapInfo{Size=40,Width=width,Height=-height,Planes=1,BitCount=32};
