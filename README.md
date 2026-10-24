@@ -189,6 +189,8 @@ all earlier regressions, including a separate AddressSanitizer executable.
 
 ### Teaching tools, table plots and graph units
 
+The blue toolbar across the top now keeps **Plot points**, **Sliders**, **Graph tools**, **Objects**, **My palette**, **Align**, and **Present** visible. Buttons wrap when the window narrows. Graph tools opens points/tangents, linked value tables and units. Align opens guides, edge alignment and equal spacing; Present opens Spotlight, Magnifier and step-by-step tools. Each button has an explanatory tooltip.
+
 - **Graph > Graph points, linked table and units** opens an embedded panel. Choose a graph and curve, enable points, and apply. Drag A along the curve; enable Secant + B for a second point. Tangent and normal lines follow A. Points support ordinary, vertical, piecewise, implicit and parametric curves where the curve evaluator has a defined value. For explicit graphs, the A/B input is the independent coordinate; for parametric graphs it is t; implicit curves use coordinate seeds and curve dragging. Undefined points and nonsmooth tangents are reported.
 - The same panel has separate horizontal/vertical variable and unit fields. For example, use t, s, v, m/s². Units are authored labels; changing a label does not convert numerical values or change the grapher's formula variables. Names and Unicode units are saved, copied and printed.
 - **Place linked table** generates 2-19 samples at the chosen start and step. The native table follows formula and slider changes. A missing source leaves the last table intact; restoring the source with Undo reconnects it.

@@ -38,3 +38,4 @@ interactive-features.patch
 canvas-slider-panel.patch
 teaching-tools.patch
 simple-table-plot.patch
+top-toolbar-shortcuts.patch

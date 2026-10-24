@@ -1,0 +1,185 @@
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -36,6 +36,7 @@
+ #include "MathDisplay.h"
+ #include "Mathomir.h"
+ #include "FeatureHelp.h"
++#include "QuickToolbar.h"
+ #include "AiConnection.h"
+ #include "AiPresentation.h"
+ #include "FormulaReference.h"
+@@ -865,6 +866,7 @@
+ 
+ 
+ static void PositionQuickActionBar(CMathomirView *view);
++static int QuickActionHeight(int width);
+ static bool FocusQuickActionSearch();
+ static void HideQuickActionSearch();
+ static void UpdateQuickActionMode();
+@@ -3250,16 +3252,13 @@
+ 
+ void CMathomirView::AdjustPosition(void)
+ {
+-	RECT cr;
+-	if (theApp.m_pMainWnd==NULL)
+-	{
+-		GetWindowRect(&cr);
+-		SetWindowPos(NULL,ToolboxSize,(((UseToolbar)?ToolboxSize/2:0)+(ViewOnlyMode ? 0 : 32)),cr.right-ToolboxSize,cr.bottom-(((UseToolbar)?ToolboxSize/2:0)+(ViewOnlyMode ? 0 : 32)),SWP_NOZORDER | SWP_NOACTIVATE);
+-		return;
+-	}
+-	theApp.m_pMainWnd->GetClientRect(&cr);
+-	SetWindowPos(NULL,ToolboxSize,(((UseToolbar)?ToolboxSize/2:0)+(ViewOnlyMode ? 0 : 32)),cr.right-ToolboxSize,cr.bottom-(((UseToolbar)?ToolboxSize/2:0)+(ViewOnlyMode ? 0 : 32)),SWP_NOZORDER | SWP_NOACTIVATE);
+-	GetClientRect(&TheClientRect);
++    RECT cr;
++    if(theApp.m_pMainWnd)theApp.m_pMainWnd->GetClientRect(&cr);else GetWindowRect(&cr);
++    int width=max(0,cr.right-ToolboxSize);
++    int top=(UseToolbar?ToolboxSize/2:0)+QuickActionHeight(width);
++    SetWindowPos(NULL,ToolboxSize,top,width,max(0,cr.bottom-top),SWP_NOZORDER|SWP_NOACTIVATE);
++    if(!theApp.m_pMainWnd)return;
++    GetClientRect(&TheClientRect);
+     PositionQuickActionBar(this);
+ }
+ 
+@@ -11263,6 +11262,32 @@
+ }
+ 
+ 
++struct QuickFeature {const char *label;UINT command;const wchar_t *help;bool menu;};
++static const QuickFeature QuickFeatures[]={
++    {"Plot points",ID_TABLE_PLOTTER,L"Enter points in a two-column table, preview them and place a graph. A selected table is read automatically.",false},
++    {"Sliders",ID_PARAMETER_SLIDERS,L"Change graph parameters a, b and c. Play or pause an animation, set its speed, and choose looping or back-and-forth motion.",false},
++    {"Graph tools",ID_GRAPH_EXPLORER,L"Drag graph points; add tangent, normal and secant lines; create a linked value table; set axis names and units.",false},
++    {"Objects",ID_OBJECT_PANEL,L"Find buried objects, rename, hide, lock and reorder them in the Objects and layers panel.",false},
++    {"My palette",ID_MY_PALETTE,L"Save selected native objects as reusable items, preview them and place independent editable copies.",false},
++    {"Align",0,L"Smart alignment guides, align left or top, and space selected objects evenly.",true},
++    {"Present",0,L"Spotlight, magnifier and step-by-step presentation tools. Escape exits an overlay.",true}
++};
++static QuickToolbar::Layout FeatureToolbarLayout(int width){
++    std::vector<int> widths;CWnd *frame=theApp.m_pMainWnd;
++    if(frame&&frame->GetSafeHwnd()){CClientDC dc(frame);int saved=dc.SaveDC();dc.SelectStockObject(DEFAULT_GUI_FONT);for(auto &f:QuickFeatures)widths.push_back(max(58,dc.GetTextExtent(f.label).cx+24+(f.menu?10:0)));dc.RestoreDC(saved);}
++    else for(auto &f:QuickFeatures)widths.push_back((int)strlen(f.label)*7+24+(f.menu?10:0));
++    return QuickToolbar::Arrange(width,widths);
++}
++static int QuickActionHeight(int width){return ViewOnlyMode?0:32+FeatureToolbarLayout(width).height;}
++class CQuickFeatureButton:public CButton {
++public:bool menu;CQuickFeatureButton():menu(false){}
++    virtual void DrawItem(LPDRAWITEMSTRUCT item){CDC dc;dc.Attach(item->hDC);int saved=dc.SaveDC();CRect r=item->rcItem;bool down=(item->itemState&ODS_SELECTED)!=0;
++        dc.FillSolidRect(r,down?RGB(193,215,247):RGB(232,241,255));dc.Draw3dRect(r,RGB(134,165,207),RGB(134,165,207));
++        dc.SelectStockObject(DEFAULT_GUI_FONT);dc.SetBkMode(TRANSPARENT);dc.SetTextColor(RGB(24,65,121));CString label;GetWindowText(label);CRect text=r;if(menu)text.right-=12;if(down)text.OffsetRect(1,1);dc.DrawText(label,text,DT_CENTER|DT_VCENTER|DT_SINGLELINE|DT_NOPREFIX);
++        if(menu){int x=r.right-12,y=r.CenterPoint().y;CPen pen(PS_SOLID,1,RGB(24,65,121));CBrush brush(RGB(24,65,121));auto oldPen=dc.SelectObject(&pen);auto oldBrush=dc.SelectObject(&brush);CPoint triangle[3]={{x-3,y-1},{x+3,y-1},{x,y+2}};dc.Polygon(triangle,3);dc.SelectObject(oldBrush);dc.SelectObject(oldPen);}
++        if(item->itemState&ODS_FOCUS){r.DeflateRect(4,4);dc.DrawFocusRect(r);}dc.RestoreDC(saved);dc.Detach();
++    }
++};
+ class CQuickActionBar;
+ class CQuickSearchEdit : public CEdit
+ {
+@@ -11281,8 +11306,8 @@
+     CQuickSearchEdit search;
+     CStatic label;
+     CButton fontButton, rotateButton, modeButton,colorButton,fitButton,selectButton,backgroundButton;
+-    CFeatureSearchDialog dropdown;
+-    CQuickActionBar() : view(NULL) {}
++    CFeatureSearchDialog dropdown;CQuickFeatureButton features[_countof(QuickFeatures)];int featureHeight;
++    CQuickActionBar() : view(NULL),featureHeight(0) {}
+     void Position(CMathomirView *newView)
+     {
+         view=newView;
+@@ -11290,7 +11315,7 @@
+         if (!frame || !frame->GetSafeHwnd()) return;
+         if (!GetSafeHwnd())
+         {
+-            CString klass=AfxRegisterWndClass(0,::LoadCursor(NULL,IDC_ARROW),(HBRUSH)(COLOR_BTNFACE+1),NULL);
++            CString klass=AfxRegisterWndClass(CS_HREDRAW|CS_VREDRAW,::LoadCursor(NULL,IDC_ARROW),(HBRUSH)(COLOR_BTNFACE+1),NULL);
+             if (!CreateEx(0,klass,"Quick tools",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,CRect(0,0,1,32),frame,1110)) return;
+             label.Create("Search:",WS_CHILD|WS_VISIBLE|SS_CENTERIMAGE,CRect(0,0,1,1),this,1111);
+             search.bar=this;
+@@ -11315,24 +11340,27 @@
+             tips.Add(backgroundButton.m_hWnd,L"Choose a background colour behind typed math or text, or clear the background.");
+             tips.Add(modeButton.m_hWnd,L"Switch numerical trigonometric calculations between radians and degrees. The graph's separate \u03c0 button switches x-axis labels to multiples of \u03c0.");
+             CFont *font=CFont::FromHandle((HFONT)GetStockObject(DEFAULT_GUI_FONT));
++            for(int i=0;i<_countof(QuickFeatures);i++){features[i].menu=QuickFeatures[i].menu;features[i].Create(QuickFeatures[i].label,WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_OWNERDRAW,CRect(0,0,1,1),this,1120+i);features[i].SetFont(font);tips.Add(features[i].m_hWnd,QuickFeatures[i].help);}
+             label.SetFont(font); search.SetFont(font); fontButton.SetFont(font); rotateButton.SetFont(font); modeButton.SetFont(font); colorButton.SetFont(font); fitButton.SetFont(font); selectButton.SetFont(font);backgroundButton.SetFont(font);
+         }
+         CRect area; frame->GetClientRect(&area);
+         int top=UseToolbar ? ToolboxSize/2 : 0;
+         int width=max(0,area.Width()-ToolboxSize);
+-        SetWindowPos(&wndTop,ToolboxSize,top,width,32,SWP_NOACTIVATE);
++        auto layout=FeatureToolbarLayout(width);featureHeight=layout.height;
++        SetWindowPos(&wndTop,ToolboxSize,top,width,32+featureHeight,SWP_NOACTIVATE);
++        for(size_t i=0;i<layout.buttons.size();i++){auto r=layout.buttons[i];features[i].MoveWindow(r.left,r.top,r.width,r.height);features[i].ShowWindow(SW_SHOWNOACTIVATE);}
+         ShowWindow(ViewOnlyMode ? SW_HIDE : SW_SHOWNOACTIVATE);
+         int reserved=width>=710 ? 540 : width>=610 ? 448 : width>=500 ? 380 : width>=410 ? 300 : 160;
+         int field=max(50,min(320,width-58-reserved));
+-        label.MoveWindow(6,4,45,24); search.MoveWindow(52,3,field,26);
++        label.MoveWindow(6,featureHeight+4,45,24); search.MoveWindow(52,featureHeight+3,field,26);
+         int x=field+60;
+-        fitButton.MoveWindow(x,3,74,26);
+-        selectButton.MoveWindow(x+80,3,76,26);
+-        fontButton.MoveWindow(x+162,3,76,26); rotateButton.MoveWindow(x+244,3,64,26);
++        fitButton.MoveWindow(x,featureHeight+3,74,26);
++        selectButton.MoveWindow(x+80,featureHeight+3,76,26);
++        fontButton.MoveWindow(x+162,featureHeight+3,76,26); rotateButton.MoveWindow(x+244,featureHeight+3,64,26);
+         fontButton.ShowWindow(width>=410 ? SW_SHOWNOACTIVATE : SW_HIDE); rotateButton.ShowWindow(width>=500 ? SW_SHOWNOACTIVATE : SW_HIDE);
+-        modeButton.MoveWindow(x+(width>=500 ? 314 : 244),3,52,26); modeButton.ShowWindow(width>=410 ? SW_SHOWNOACTIVATE : SW_HIDE);
+-        backgroundButton.MoveWindow(x+446,3,86,26);backgroundButton.ShowWindow(width>=710?SW_SHOWNOACTIVATE:SW_HIDE);
+-        colorButton.MoveWindow(x+372,3,68,26); colorButton.ShowWindow(width>=610?SW_SHOWNOACTIVATE:SW_HIDE);
++        modeButton.MoveWindow(x+(width>=500 ? 314 : 244),featureHeight+3,52,26); modeButton.ShowWindow(width>=410 ? SW_SHOWNOACTIVATE : SW_HIDE);
++        backgroundButton.MoveWindow(x+446,featureHeight+3,86,26);backgroundButton.ShowWindow(width>=710?SW_SHOWNOACTIVATE:SW_HIDE);
++        colorButton.MoveWindow(x+372,featureHeight+3,68,26); colorButton.ShowWindow(width>=610?SW_SHOWNOACTIVATE:SW_HIDE);
+         modeButton.SetWindowText(TrigDegrees ? "DEG" : "RAD");
+         if (dropdown.GetSafeHwnd() && dropdown.IsWindowVisible()) ShowResults();
+     }
+@@ -11351,6 +11379,22 @@
+         CRect client; dropdown.GetClientRect(&client); dropdown.ArrangeInline(client.Width(),client.Height());
+         dropdown.ShowWindow(SW_SHOWNOACTIVATE);
+     }
++    afx_msg void OnPaint(){CPaintDC dc(this);CRect r;GetClientRect(r);dc.FillSolidRect(r,::GetSysColor(COLOR_BTNFACE));if(featureHeight){dc.FillSolidRect(0,0,r.Width(),featureHeight,RGB(224,234,252));dc.FillSolidRect(0,featureHeight-1,r.Width(),1,RGB(169,189,221));}}
++    afx_msg void Feature(UINT id){int i=(int)id-1120;if(!view||i<0||i>=_countof(QuickFeatures))return;HideResults();
++        if(QuickFeatures[i].command){view->RunFeatureCommand(QuickFeatures[i].command,-1);return;}
++        CMenu menu;menu.CreatePopupMenu();
++        if(i==5){
++            int selected=0;for(int j=0;j<NumDocumentElements;j++)if(TheDocument[j].MovingDotState==3&&!InteractiveHidden(TheDocument+j))selected++;
++            menu.AppendMenu(MF_STRING,ID_SMART_ALIGN,"Smart alignment guides");menu.CheckMenuItem(ID_SMART_ALIGN,MF_BYCOMMAND|(theApp.GetProfileInt("Teaching","SmartAlign",0)?MF_CHECKED:MF_UNCHECKED));
++            menu.AppendMenu(MF_SEPARATOR);menu.AppendMenu(MF_STRING|(selected<2?MF_GRAYED:0),ID_ALIGN_LEFT,"Align left edges");menu.AppendMenu(MF_STRING|(selected<2?MF_GRAYED:0),ID_ALIGN_TOP,"Align top edges");
++            menu.AppendMenu(MF_STRING|(selected<3?MF_GRAYED:0),ID_DISTRIBUTE_H,"Space evenly horizontally");menu.AppendMenu(MF_STRING|(selected<3?MF_GRAYED:0),ID_DISTRIBUTE_V,"Space evenly vertically");
++        }else{
++            menu.AppendMenu(MF_STRING,ID_SPOTLIGHT,"Spotlight");menu.AppendMenu(MF_STRING,ID_MAGNIFIER,"Magnifier");menu.AppendMenu(MF_SEPARATOR);
++            menu.AppendMenu(MF_STRING,ID_STEP_SEQUENCE,"Step-by-step setup...");menu.AppendMenu(MF_STRING,ID_STEP_REVEAL,"Start step reveal");menu.AppendMenu(MF_STRING,ID_STEP_EXIT,"Exit step reveal");
++        }
++        CRect anchor;features[i].GetWindowRect(anchor);::ReleaseCapture();UINT command=menu.TrackPopupMenu(TPM_LEFTALIGN|TPM_TOPALIGN|TPM_RETURNCMD|TPM_NONOTIFY,anchor.left,anchor.bottom,theApp.m_pMainWnd);
++        if(command)view->RunFeatureCommand(command,-1);
++    }
+     afx_msg void Changed() { if (GetFocus()==&search) ShowResults(); }
+     afx_msg void SelectAll() {HideResults();if(view)view->RunFeatureCommand(ID_EDIT_SELECT_ALL,-1);}
+     afx_msg void FitWidth() {HideResults();if(view)view->RunFeatureCommand(ID_FIT_PAGE_WIDTH,-1);}
+@@ -11362,6 +11406,8 @@
+     DECLARE_MESSAGE_MAP()
+ };
+ BEGIN_MESSAGE_MAP(CQuickActionBar,CWnd)
++    ON_WM_PAINT()
++    ON_CONTROL_RANGE(BN_CLICKED,1120,1126,Feature)
+     ON_EN_CHANGE(1112,Changed)
+     ON_BN_CLICKED(1113,Font)
+     ON_BN_CLICKED(1114,Rotate)
+--- a/Mathomir/QuickToolbar.h
++++ b/Mathomir/QuickToolbar.h
+@@ -0,0 +1,19 @@
++#pragma once
++#include <vector>
++#include <algorithm>
++namespace QuickToolbar {
++struct Rect {int left,top,width,height;};
++struct Layout {std::vector<Rect> buttons;int height;Layout():height(0){}};
++// Keep every labeled shortcut visible. Measured button widths wrap in order;
++// the same height reserves the toolbar's space above the document.
++inline Layout Arrange(int width,const std::vector<int>& widths){
++    Layout result;if(width<=0||widths.empty())return result;
++    const int margin=width>=12?6:0,usable=(std::max)(1,width-2*margin);
++    int x=margin,y=4;
++    for(int wanted:widths){int w=(std::min)(usable,(std::max)(1,wanted));
++        if(x>margin&&x+w>width-margin){x=margin;y+=30;}
++        result.buttons.push_back({x,y,w,26});x+=w+6;
++    }
++    result.height=y+30;return result;
++}
++}

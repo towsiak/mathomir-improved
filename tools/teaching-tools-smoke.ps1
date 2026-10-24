@@ -43,8 +43,18 @@ public static class PairGridUI {
 '@
 function GridCell($panel,$row,$column){$g=[MathomirUiProbe]::Child($panel,1690);$p=[PairGridUI]::Cell($g,$row,$column);[InteractiveUI]::Drag($main,$g,$p[0],$p[1],$p[0],$p[1]);return $g}
 function GridKey($grid,$key){$cell=[MathomirUiProbe]::Child($grid,1694);[MathomirUiProbe]::PostMessage($cell,256,[IntPtr]$key,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 100}
+# Reuse the same native popup-menu inspection and real click helpers as Page setup.
+$menuSource=Get-Content (Join-Path $PSScriptRoot 'page-toolbar-smoke.ps1') -Raw
+$menuStart=$menuSource.IndexOf("Add-Type @'");$menuEnd=$menuSource.IndexOf("'@",$menuStart)+2
+Invoke-Expression $menuSource.Substring($menuStart,$menuEnd-$menuStart)
+function FeatureClick($id){$b=[MathomirUiProbe]::Child($main,$id);Check ($b -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($b)) "Toolbar shortcut $id is missing";[MathomirUiProbe]::Send($b,245,0)|Out-Null;Start-Sleep -Milliseconds 150}
+function FeatureMenu($id){$b=[MathomirUiProbe]::Child($main,$id);[MathomirUiProbe]::PostMessage($b,245,[IntPtr]::Zero,[IntPtr]::Zero)|Out-Null;for($i=0;$i -lt 30;$i++){Start-Sleep -Milliseconds 50;$popup=[PageMenuUI]::Popup($app.Id);if($popup -ne [IntPtr]::Zero){return [PageMenuUI]::Menu($popup)}};throw 'Toolbar menu did not open'}
+function CheckFeatureLayout {
+ $bar=[MathomirUiProbe]::Child($main,1110);$br=[MathomirUiProbe]::WindowRect($bar);$vr=[MathomirUiProbe]::WindowRect($view);Check ($vr.Top -ge $br.Bottom) 'Toolbar overlaps the editable page';$rects=@()
+ foreach($id in 1120..1126){$b=[MathomirUiProbe]::Child($bar,$id);Check ([MathomirUiProbe]::IsWindowVisible($b)) "Feature $id was hidden on resize";$r=[MathomirUiProbe]::WindowRect($b);Check ($r.Left -ge $br.Left -and $r.Right -le $br.Right -and $r.Top -ge $br.Top -and $r.Bottom -le $br.Bottom) "Feature $id is clipped";foreach($other in $rects){Check ($r.Left -ge $other.Right -or $r.Right -le $other.Left -or $r.Top -ge $other.Bottom -or $r.Bottom -le $other.Top) 'Toolbar feature buttons overlap'};$rects+=$r};return $rects
+}
 $caseFailures=New-Object 'System.Collections.Generic.List[string]'
-function Case($name,[scriptblock]$body){try{& $body}catch{$why=$_.Exception.Message;$caseFailures.Add($name+': '+$why);if($main -ne [IntPtr]::Zero){Capture $main ('teaching-case-'+($name -replace '[^a-zA-Z0-9]','-')+'.png')};Write-Output ('TEACHING CASE FAILED: '+$name+': '+$why)}finally{if($main -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowEnabled($main)){try{EscapeView;Command 0xE103}catch{Write-Output ('Scenario cleanup: '+$_.Exception.Message)}}}}
+function Case($name,[scriptblock]$body){try{& $body}catch{$why=$_.Exception.Message;$caseFailures.Add($name+': '+$why);if($main -ne [IntPtr]::Zero){Capture $main ('teaching-case-'+($name -replace '[^a-zA-Z0-9]','-')+'.png')};Write-Output ('TEACHING CASE FAILED: '+$name+': '+$why)}finally{if([PageMenuUI]::Popup($app.Id) -ne [IntPtr]::Zero){[PageMenuUI]::Key(27);Start-Sleep -Milliseconds 100};if($main -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowEnabled($main)){try{EscapeView;Command 0xE103}catch{Write-Output ('Scenario cleanup: '+$_.Exception.Message)}}}}
 function Dock($command){Command $command;for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 50;$p=[MathomirUiProbe]::Child($view,33116);if($p -ne [IntPtr]::Zero -and [MathomirUiProbe]::IsWindowVisible($p)){return $p}};throw 'Teaching dock did not appear'}
 function Press($p,$id){[MathomirUiProbe]::Send($p,273,$id)|Out-Null;Start-Sleep -Milliseconds 150}
 function SelectChoice($p,$id,$index){[MathomirUiProbe]::Send([MathomirUiProbe]::Child($p,$id),334,$index)|Out-Null;[MathomirUiProbe]::Send($p,273,((1-shl 16)-bor $id))|Out-Null}
@@ -59,6 +69,16 @@ $env:MATHOMIR_POPUP_COLOR_DIAGNOSTICS='1';$env:MATHOMIR_PLACEMENT_DIAGNOSTICS='1
 $app=Start-Process $exe -WorkingDirectory $folder -PassThru
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;Check ($main -ne [IntPtr]::Zero) 'App did not start';[InteractiveUI]::ShowWindow($main,3)|Out-Null;$view=[MathomirUiProbe]::Child($main,0xE900)
+ Case 'visible top toolbar' {
+ NewRelation;$wide=CheckFeatureLayout;$tops=@($wide|ForEach-Object {$_.Top}|Sort-Object -Unique);Check ($tops.Count -eq 1) 'Wide feature toolbar wraps unnecessarily';Capture $main 'teaching-top-toolbar-wide.png'
+ [InteractiveUI]::ShowWindow($main,9)|Out-Null;[InteractiveUI]::MoveWindow($main,20,20,500,760,$true)|Out-Null;Start-Sleep -Milliseconds 200;$small=CheckFeatureLayout;Check (@($small|ForEach-Object {$_.Top}|Sort-Object -Unique).Count -ge 2) 'Narrow window did not wrap its shortcuts';Capture $main 'teaching-top-toolbar-narrow.png';[InteractiveUI]::ShowWindow($main,3)|Out-Null;Start-Sleep -Milliseconds 200;CheckFeatureLayout|Out-Null
+ FeatureClick 1120;$dock=[MathomirUiProbe]::Child($view,33116);Check ([MathomirUiProbe]::IsWindowVisible([MathomirUiProbe]::Child($dock,1690))) 'Plot points shortcut did not open the simple grid';ClosePanel $dock
+ FeatureClick 1121;$panel=[MathomirUiProbe]::Child($view,33108);Check ([MathomirUiProbe]::IsWindowVisible($panel)) 'Sliders shortcut failed';ClosePanel $panel
+ foreach($pair in @(@(1122,1674),@(1123,1650),@(1124,1660))){FeatureClick $pair[0];$dock=[MathomirUiProbe]::Child($view,33116);Check ([MathomirUiProbe]::IsWindowVisible([MathomirUiProbe]::Child($dock,$pair[1]))) "Toolbar feature $($pair[0]) opened the wrong panel";ClosePanel $dock}
+ $before=(SaveDoc).OuterXml;$menu=FeatureMenu 1126;Check ([PageMenuUI]::GetMenuItemID($menu,0) -eq 33121 -and [PageMenuUI]::GetMenuItemID($menu,1) -eq 33122 -and [PageMenuUI]::GetMenuItemID($menu,3) -eq 33109) 'Present menu is missing overlays or steps';Capture $main 'teaching-top-toolbar-present.png';[PageMenuUI]::Choose($main,$menu,0);Start-Sleep -Milliseconds 100;EscapeView;Check ((SaveDoc).OuterXml -eq $before) 'Toolbar presentation changed authored content'
+ $menu=FeatureMenu 1125;Check ([PageMenuUI]::GetMenuItemID($menu,0) -eq 33120 -and [PageMenuUI]::GetMenuItemID($menu,2) -eq 33123 -and [PageMenuUI]::GetMenuItemID($menu,5) -eq 33126) 'Align menu is incomplete';$checked=([PageMenuUI]::GetMenuState($menu,33120,0)-band 8)-ne 0;Capture $main 'teaching-top-toolbar-align.png';[PageMenuUI]::Choose($main,$menu,0);Start-Sleep -Milliseconds 100;$menu=FeatureMenu 1125;Check ((([PageMenuUI]::GetMenuState($menu,33120,0)-band 8)-ne 0) -ne $checked) 'Toolbar smart-guides action did not toggle';[PageMenuUI]::Choose($main,$menu,0);Start-Sleep -Milliseconds 100
+ Write-Output 'Visible top toolbar passed: all seven labels, wide/narrow wrapping, unclipped buttons, reserved canvas space, actual button dispatch, presentation menu, alignment menu and guide state.'
+ }
  Case 'graph points and links' {
  NewRelation;$d=Dock 33116;Check ([InteractiveUI]::GetParent($d) -eq $view -and ([InteractiveUI]::Style($d,-16)-band 0x40000000)) 'Teaching controls are not embedded in the canvas';Check ([MathomirUiProbe]::IsWindowEnabled($main)) 'Teaching controls disabled the page'
  SetField $d 1670 't';SetField $d 1671 's';SetField $d 1672 'v';SetField $d 1673 ('m/s'+[char]0x00B2);Press $d 1674;$s=SaveDoc;$axis=$s.SelectSingleNode('//graphaxes');Check ((Decode $axis.xn) -eq 't' -and (Decode $axis.yu) -eq ('m/s'+[char]0x00B2)) 'Graph units were lost'
