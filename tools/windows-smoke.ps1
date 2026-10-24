@@ -114,6 +114,8 @@ public static class MathomirUiProbe {
   public static string MenuText(IntPtr hwnd,uint id) {var text=new StringBuilder(256);GetMenuString(GetMenu(hwnd),id,text,256,0);return text.ToString();}
   public static void SetText(IntPtr hwnd,string text) { UIntPtr result; if(SendTextTimeout(hwnd,12,IntPtr.Zero,text,2,3000,out result)==IntPtr.Zero) throw new Exception("Search text did not respond"); }
   public static Rect ClientRect(IntPtr hwnd){Rect rect;GetClientRect(hwnd,out rect);return rect;}
+  public static void EnsureCanvas(IntPtr main,IntPtr view,int minimumWidth,int minimumHeight){Rect window=WindowRect(main),canvas=ClientRect(view);int width=Math.Min(GetSystemMetrics(0),window.Right-window.Left+Math.Max(0,minimumWidth-canvas.Right)),height=Math.Min(GetSystemMetrics(1),window.Bottom-window.Top+Math.Max(0,minimumHeight-canvas.Bottom));int left=Math.Max(0,Math.Min(window.Left,GetSystemMetrics(0)-width)),top=Math.Max(0,Math.Min(window.Top,GetSystemMetrics(1)-height));if(!MoveWindow(main,left,top,width,height,true))throw new Exception("Could not reserve the visible canvas for fixed-coordinate UI fixtures");}
+
   public static IntPtr CaptionChild(IntPtr parent,string caption){IntPtr found=IntPtr.Zero;EnumChildWindows(parent,(hwnd,p)=>{if(Text(hwnd)==caption){found=hwnd;return false;}return true;},IntPtr.Zero);return found;}
   public static IntPtr Child(IntPtr parent,int id) { IntPtr found=IntPtr.Zero; EnumChildWindows(parent,(hwnd,p)=>{if(GetDlgCtrlID(hwnd)==id){found=hwnd;return false;} return true;},IntPtr.Zero); return found; }
   public static IntPtr Window(int process,string caption) { IntPtr found=IntPtr.Zero; EnumWindows((hwnd,p)=>{uint pid; GetWindowThreadProcessId(hwnd,out pid); if(pid==process && IsWindowVisible(hwnd) && Text(hwnd)==caption){found=hwnd;return false;}return true;},IntPtr.Zero); return found; }
@@ -449,6 +451,13 @@ try {
   [MathomirUiProbe]::Send($startupView,276,3)|Out-Null
   Start-Sleep -Milliseconds 100
   if([MathomirUiProbe]::HorizontalTravel($startupView) -or ![MathomirUiProbe]::WhiteWidth($startupView)){throw 'A bottom scrollbar action displaced the fitted page.'}
+  # Width responsiveness was checked above. The following interaction fixtures
+  # use fixed document coordinates, so reserve visible canvas space independently
+  # of how many labeled toolbar rows the current window needs.
+  [MathomirUiProbe]::EnsureCanvas($main,$startupView,560,500)
+  Start-Sleep -Milliseconds 200
+  $canvas=[MathomirUiProbe]::ClientRect($startupView)
+  if($canvas.Right -lt 560 -or $canvas.Bottom -lt 500){throw 'The visible canvas is too small for the fixed-coordinate UI fixtures.'}
   $edgeFixture=Join-Path (Split-Path $exe) 'page-edges-smoke.mom'
   @'
 <?xml version="1.0"?>
