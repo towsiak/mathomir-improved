@@ -706,3 +706,13 @@ TEACHING TOOLS, DATA PLOTS AND GRAPH UNITS (2026-10-22)
 - Shared layer reordering now uses one stable bounded permutation, retaining
   every object and relocating active document references. Forward/backward,
   selection ordering and Undo are checked for dropped objects.
+
+SIMPLER TABLE-TO-GRAPH WORKFLOW (2026-10-24)
+- Fill a native table, right-click it and choose Plot points, then click the page.
+  First two columns, optional headings, ranges and live updates are automatic.
+- Graph > Plot points from a table opens an editable two-column grid with a live
+  preview. Tab moves across; Enter moves down; Paste table accepts spreadsheet
+  cells. Plot points is the single placement action. New tables have two columns.
+- Units and other settings stay under More options, collapsed by default.
+- Incomplete rows clear the preview and disable placement. Showing or hiding
+  options preserves data. The explicitly selected table wins over stale hover.

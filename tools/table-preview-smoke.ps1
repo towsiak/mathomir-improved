@@ -53,6 +53,7 @@ try{
  [MathomirUiProbe]::Send($main,273,0xE103)|Out-Null;$baseline=(Get-Content $fixture -Raw)
  OpenTable;$preview=[MathomirUiProbe]::Child($dialog,1126)
  Check ($preview -ne [IntPtr]::Zero) 'Table layout preview missing from the same dialog.'
+ Check ([MathomirUiProbe]::Text([MathomirUiProbe]::Child($dialog,1122)) -eq '2') 'New tables should default to two columns for point pairs.'
  $initial=Signature $preview;Check ($initial.Ink -gt 20) 'Default native table preview is blank.'
  SetValue 1121 3;$rows=Signature $preview;Check ($rows.Hash -ne $initial.Hash) 'Rows do not update preview.'
  SetValue 1122 5;$columns=Signature $preview;Check ($columns.Hash -ne $rows.Hash) 'Columns do not update preview.'

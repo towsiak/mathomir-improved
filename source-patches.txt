@@ -37,3 +37,4 @@ brace-label-box.patch
 interactive-features.patch
 canvas-slider-panel.patch
 teaching-tools.patch
+simple-table-plot.patch
