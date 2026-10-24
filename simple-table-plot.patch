@@ -49,14 +49,14 @@
  int PopupMenu::ShowPopupMenu(CExpression* expression, CWnd*owner, int OwnerType,int UserParam,int no_reposition)
  {
  	PopupMenuSecondPassChoosing=0;
-@@ -1116,6 +1117,7 @@
- 		free(list);
- 	}
+@@ -971,6 +972,7 @@
  
+ 	m_NumOptions=0;
+ 	memset((void*)&Options,0,sizeof(Options));
 +	if(m_Expression){CExpression *root=m_Expression;while(root->m_pPaternalExpression)root=root->m_pPaternalExpression;if(PopupContainsTable(root)){PopupOption_Y+=TSize/5;AddMenuOption(0,5*TSize,"Plot points",942,1);}}
- 	if ((m_Expression) && (m_Expression->m_IsMatrixElementSelected))
+ 	if ((m_HaveCutDel) || ((m_OwnerType==3) && (UserParam)))
  	{
- 		PopupOption_Y+=TSize/5; //separator
+ 
 @@ -2086,6 +2088,7 @@
  		//}
  
