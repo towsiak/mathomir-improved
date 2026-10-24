@@ -8,6 +8,8 @@ function Points($doc){$prev=$null;foreach($p in (ShaderPoints $doc.mathomir.Firs
 function MaxTurn($points){[double]$max=0;for($i=1;$i -lt $points.Count-1;$i++){$ax=$points[$i].x-$points[$i-1].x;$ay=$points[$i].y-$points[$i-1].y;$bx=$points[$i+1].x-$points[$i].x;$by=$points[$i+1].y-$points[$i].y;$den=[Math]::Sqrt(($ax*$ax+$ay*$ay)*($bx*$bx+$by*$by));if($den -gt .00001){$cos=[Math]::Max(-1.0,[Math]::Min(1.0,($ax*$bx+$ay*$by)/$den));$max=[Math]::Max($max,[Math]::Acos($cos))}};return $max}
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,0xE900)
+ # Geometry fixtures need their ink and controls inside the visible canvas.
+ [MathomirUiProbe]::EnsureCanvas($main,$view,560,500);Start-Sleep -Milliseconds 150
  $fixture=Join-Path (Split-Path $exe) 'sparse-rounded-freehand.mom'
  # Follow the broad shape and sparse bends of the reported screenshot.
  $xy=@(@(92,478),@(334,401),@(362,373),@(380,329),@(373,295),@(346,271),@(314,261),@(262,267),@(177,284),@(103,291),@(67,263),@(81,203),@(175,156),@(262,148),@(348,172),@(398,198),@(499,227),@(514,224),@(550,199),@(579,143),@(578,103),@(573,74))

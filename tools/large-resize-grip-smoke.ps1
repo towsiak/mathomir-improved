@@ -41,6 +41,8 @@ function Drag($g,$dx,$dy,$release=$true){
 }
 try {
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,0xE900)
+ # Geometry fixtures need their ink and controls inside the visible canvas.
+ [MathomirUiProbe]::EnsureCanvas($main,$view,560,500);Start-Sleep -Milliseconds 150
  foreach($font in @(600,800,1200,2400)){foreach($power in @($false,$true)){foreach($zoom in @(60,100,200)){
   $script:fixture=Join-Path (Split-Path $exe) "large-resize-grip-$font-$power-$zoom.mom"
   $formula=if($power){'<elm tp="3" E1="" E2=""><ex fh="'+$font+'"><var t="e" f="00" /></ex><ex fh="'+[int]($font*.7)+'"><var t="2" f="00" /><var t="x" f="00" /></ex></elm>'}else{'<var t="e" f="00" />'}

@@ -11,6 +11,8 @@ try{
   for($attempt=0;$attempt -lt 40;$attempt++){Start-Sleep -Milliseconds 250;$appProcess.Refresh();if($appProcess.HasExited){throw 'Application exited during overlap startup.'};if($appProcess.MainWindowHandle -ne 0){$main=$appProcess.MainWindowHandle;break}}
   if($main -eq [IntPtr]::Zero){throw 'No main window for overlap checks.'}
   $view=[MathomirUiProbe]::Child($main,0xE900)
+ # Geometry fixtures need their ink and controls inside the visible canvas.
+ [MathomirUiProbe]::EnsureCanvas($main,$view,560,500);Start-Sleep -Milliseconds 150
   $start=$all.IndexOf('  # Interaction tests, not just static visibility:')
   $end=$all.IndexOf("  Write-Output 'Overlap interaction checks passed:",$start)
   if($start -lt 0 -or $end -lt 0){throw 'Could not locate shared overlap checks.'}

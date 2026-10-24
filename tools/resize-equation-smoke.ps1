@@ -19,6 +19,8 @@ function Drag([int[]]$g,[int]$dx,[int]$dy,[bool]$release=$true){
 function Shape($doc){$copy=$doc.Clone();foreach($e in $copy.SelectNodes('//ex | //expr')){$e.RemoveAttribute('fh');$e.RemoveAttribute('fnt_h')};$copy.mathomir.FirstChild.RemoveAttribute('X');$copy.mathomir.FirstChild.RemoveAttribute('Y');return $copy.OuterXml}
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;$view=[MathomirUiProbe]::Child($main,0xE900)
+ # Geometry fixtures need their ink and controls inside the visible canvas.
+ [MathomirUiProbe]::EnsureCanvas($main,$view,560,500);Start-Sleep -Milliseconds 150
  $radical='<elm tp="8" E1=""><ex fh="90"><var t="x" f="00" /></ex></elm>'
  $power='<elm tp="3" E1="" E2=""><ex fh="100"><var t="x" f="00" /></ex><ex fh="70"><fra E1="n" E2="d"><ex fh="63"><var t="1" f="00" /></ex><ex fh="63"><var t="2" f="00" /></ex></fra></ex></elm>'
  $left='<elm tp="5" E1=""><ex fh="100" br="1" shp="("><var t="2" f="00" />'+$radical+'</ex></elm><opr s="\27" />'
