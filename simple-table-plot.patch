@@ -46,7 +46,7 @@
  
  #pragma optimize("s",on)
 +static bool PopupContainsTable(CExpression *e,int depth=0){if(!e||depth>24)return false;int rows=1,cols=1;e->GetMatrixSize(&rows,&cols);if(cols>=2)return true;for(int i=0;i<e->m_NumElements;i++){auto a=e->m_pElementList[i].pElementObject;if(a&&PopupContainsTable((CExpression*)a->Expression1,depth+1))return true;}return false;}
-+static CExpression *PopupTableTarget(PopupMenu *popup){CExpression *root=popup->m_Expression;for(int depth=0;root&&root->m_pPaternalExpression&&depth<128;depth++)root=root->m_pPaternalExpression;CExpression *only=NULL;int count=0;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type!=1||!object->Object||std::find(popup->m_AppearanceTargets.begin(),popup->m_AppearanceTargets.end(),object->Object)==popup->m_AppearanceTargets.end())continue;auto e=(CExpression*)object->Object;if(!PopupContainsTable(e))continue;if(e==root||object==prevTouchedObject)return e;only=e;count++;}return count==1?only:NULL;}
++static CExpression *PopupTableTarget(PopupMenu *popup){CExpression *root=popup->m_Expression;for(int depth=0;root&&root->m_pPaternalExpression&&depth<128;depth++)root=root->m_pPaternalExpression;CExpression *only=NULL;int count=0;for(int i=0;i<NumDocumentElements;i++){auto object=TheDocument+i;if(object->Type!=1||!object->Object||std::find(popup->m_AppearanceTargets.begin(),popup->m_AppearanceTargets.end(),object->Object)==popup->m_AppearanceTargets.end())continue;auto e=(CExpression*)object->Object;if(!PopupContainsTable(e))continue;if(e==root)return e;only=e;count++;}return count==1?only:NULL;}
  int PopupMenu::ShowPopupMenu(CExpression* expression, CWnd*owner, int OwnerType,int UserParam,int no_reposition)
  {
  	PopupMenuSecondPassChoosing=0;
