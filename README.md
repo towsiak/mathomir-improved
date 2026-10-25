@@ -204,3 +204,12 @@ The blue toolbar across the top now keeps **Plot points**, **Sliders**, **Graph 
 - **View > Presentation spotlight / magnifier** follows the pointer without altering authored content. Escape exits. These overlays never print.
 
 Portable numerical/data checks are in `tools/teaching-tools-check.cpp`. Native Windows and memory checks exercise the embedded controls, graph-point dragging, Unicode units, linked tables, table plotting, animation, object controls, saved palette copies, alignment and presentation overlays.
+
+BASIC GRAPHER: POINT LISTS AND INLINE UNITS (2026-10-25)
+- Click any colored f1-f8 entry in a basic graph and type (1,2) or
+  (1,2),(3,4),(5,6). Finish editing to plot filled, color-matched points.
+- Points and ordinary curves can occupy different entries of the same graph.
+  Point-only graphs fit their data automatically; points are never joined.
+- Click Axes / units inside the graph to change horizontal/vertical names and
+  optional units in place. Unicode units, native point expressions, copying,
+  save/reopen and Undo are preserved. Cancel leaves the labels unchanged.

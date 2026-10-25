@@ -39,3 +39,4 @@ canvas-slider-panel.patch
 teaching-tools.patch
 simple-table-plot.patch
 top-toolbar-shortcuts.patch
+basic-grapher-input.patch

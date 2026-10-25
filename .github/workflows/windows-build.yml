@@ -33,12 +33,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Graph points, table plots, units and teaching tools
         shell: pwsh
-        run: ./tools/teaching-tools-smoke.ps1
+        run: |
+          ./tools/basic-grapher-smoke.ps1
+          ./tools/teaching-tools-smoke.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Teaching-Tools-Preview
           path: |
+            source/build/basic-grapher-*.png
+            source/build/basic-grapher-*.mom
             source/build/teaching-*.png
             source/build/interactive-teaching-*.mom
           if-no-files-found: warn
@@ -195,6 +199,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/basic-grapher-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
           ./tools/interactive-features-smoke.ps1
           ./tools/brace-label-smoke.ps1
@@ -314,6 +319,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/basic-grapher-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
           ./tools/interactive-features-smoke.ps1
           ./tools/windows-smoke.ps1

@@ -1,0 +1,315 @@
+--- a/Mathomir/BasicGraphEditor.inl
++++ b/Mathomir/BasicGraphEditor.inl
+@@ -0,0 +1,76 @@
++// A child of the page, positioned inside its graph. Targets are resolved by
++// document epoch and stable object ID on every action; never retain a plot pointer.
++class CBasicGraphEditor;
++static CBasicGraphEditor *BasicGraphEditor=NULL;
++class CBasicGraphEditor:public CWnd {
++    unsigned int target,epoch;CBrush background;
++    CFunctionPlotter *Target(InteractiveNode *node=NULL){return epoch==InteractiveObjects::DocumentEpoch()?TeachPlot(target,node):NULL;}
++    void Control(const wchar_t *kind,const wchar_t *text,int id,int x,int y,int w,int h,DWORD style=0){
++        HWND control=::CreateWindowExW(!wcscmp(kind,L"EDIT")?WS_EX_CLIENTEDGE:0,kind,text,WS_CHILD|WS_VISIBLE|style,x,y,w,h,m_hWnd,(HMENU)(INT_PTR)id,AfxGetInstanceHandle(),NULL);
++        ::SendMessage(control,WM_SETFONT,(WPARAM)::GetStockObject(DEFAULT_GUI_FONT),FALSE);
++        if(!wcscmp(kind,L"EDIT"))::SendMessage(control,EM_SETLIMITTEXT,80,0);
++    }
++    void Close(){DestroyWindow();if(pMainView&&::IsWindow(pMainView->m_hWnd)){pMainView->SetFocus();pMainView->Invalidate(FALSE);}}
++    void Apply(){
++        auto plot=Target();if(!plot){Close();return;}TeachingTools::Axes value;
++        value.xName=TeachingTools::Trim(TeachGet(m_hWnd,1711));value.xUnit=TeachingTools::Trim(TeachGet(m_hWnd,1712));
++        value.yName=TeachingTools::Trim(TeachGet(m_hWnd,1713));value.yUnit=TeachingTools::Trim(TeachGet(m_hWnd,1714));
++        if(value.xName.empty()||value.yName.empty()||value.xName.size()>80||value.yName.size()>80||value.xUnit.size()>80||value.yUnit.size()>80){::SetDlgItemTextW(m_hWnd,1717,L"Use short names and optional units (80 bytes).");return;}
++        if(!plot->StopForZoom())return;
++        if(plot->axes.xName!=value.xName||plot->axes.yName!=value.yName||plot->axes.xUnit!=value.xUnit||plot->axes.yUnit!=value.yUnit){pMainView->UndoSave("graph axis names and units");plot->axes=value;pMainView->GetDocument()->SetModifiedFlag();}
++        Close();
++    }
++public:
++    CBasicGraphEditor(unsigned int id):target(id),epoch(InteractiveObjects::DocumentEpoch()),background(RGB(246,250,254)){}
++    bool Open(){
++        CString cls=AfxRegisterWndClass(CS_HREDRAW|CS_VREDRAW,::LoadCursor(NULL,IDC_ARROW),(HBRUSH)background.GetSafeHandle());
++        if(!CreateEx(0,cls,"Graph axis names and units",WS_CHILD|WS_VISIBLE|WS_BORDER|WS_CLIPCHILDREN,CRect(0,0,300,140),pMainView,1710))return false;
++        Control(L"STATIC",L"Axis names and units",-1,9,7,218,16);
++        Control(L"STATIC",L"Axis",-1,9,28,36,16);Control(L"STATIC",L"Name",-1,49,28,60,16);Control(L"STATIC",L"Units (optional)",-1,123,28,140,16);
++        Control(L"STATIC",L"Horiz.",-1,9,51,38,18);Control(L"EDIT",L"",1711,49,47,63,22,ES_AUTOHSCROLL|WS_TABSTOP);Control(L"EDIT",L"",1712,123,47,152,22,ES_AUTOHSCROLL|WS_TABSTOP);
++        Control(L"STATIC",L"Vert.",-1,9,78,38,18);Control(L"EDIT",L"",1713,49,74,63,22,ES_AUTOHSCROLL|WS_TABSTOP);Control(L"EDIT",L"",1714,123,74,152,22,ES_AUTOHSCROLL|WS_TABSTOP);
++        Control(L"BUTTON",L"Apply",1715,49,103,66,23,BS_DEFPUSHBUTTON|WS_TABSTOP);Control(L"BUTTON",L"Cancel",1716,123,103,66,23,WS_TABSTOP);
++        Control(L"STATIC",L"",1717,9,131,270,18);
++        auto plot=Target();if(!plot){Close();return false;}
++        TeachSet(m_hWnd,1711,plot->axes.xName);TeachSet(m_hWnd,1712,plot->axes.xUnit);TeachSet(m_hWnd,1713,plot->axes.yName);TeachSet(m_hWnd,1714,plot->axes.yUnit);
++        SetTimer(1,120,NULL);if(!Position())return false;::SetFocus(::GetDlgItem(m_hWnd,1712));return true;
++    }
++    bool Position(){
++        InteractiveNode node;auto plot=Target(&node);if(!plot||ViewOnlyMode||InteractiveHidden(node.root)){Close();return false;}
++        RelationGraph::Viewport viewport;CRect graph,client,visible;
++        if(!TeachViewport(node,plot,viewport,graph)){Close();return false;}pMainView->GetClientRect(client);visible.IntersectRect(graph,client);
++        int width=min(300,visible.Width()-12),height=154;
++        if(width<215||visible.Height()<height+8){Close();return false;}
++        int x=visible.left+6,y=min(visible.bottom-height-4,visible.top+42);
++        CRect current;GetWindowRect(current);pMainView->ScreenToClient(current);CRect desired(x,y,x+width,y+height);
++        if(current!=desired)SetWindowPos(&wndTop,x,y,width,height,SWP_NOACTIVATE);
++        int unitWidth=max(55,width-139);
++        for(int id:{1712,1714})GetDlgItem(id)->SetWindowPos(NULL,123,id==1712?47:74,unitWidth,22,SWP_NOZORDER|SWP_NOACTIVATE);
++        GetDlgItem(1717)->SetWindowPos(NULL,9,131,width-18,18,SWP_NOZORDER|SWP_NOACTIVATE);
++        return true;
++    }
++    virtual BOOL PreTranslateMessage(MSG *message){
++        if(message->message==WM_KEYDOWN){if(message->wParam==VK_ESCAPE){Close();return TRUE;}if(message->wParam==VK_RETURN){Apply();return TRUE;}
++            if(message->wParam==VK_TAB){HWND next=::GetNextDlgTabItem(m_hWnd,::GetFocus(),::GetKeyState(VK_SHIFT)<0);if(next)::SetFocus(next);return TRUE;}}
++        return CWnd::PreTranslateMessage(message);
++    }
++    virtual BOOL OnCommand(WPARAM wp,LPARAM lp){if(HIWORD(wp)==BN_CLICKED){if(LOWORD(wp)==1715){Apply();return TRUE;}if(LOWORD(wp)==1716){Close();return TRUE;}}return CWnd::OnCommand(wp,lp);}
++    virtual void PostNcDestroy(){if(BasicGraphEditor==this)BasicGraphEditor=NULL;delete this;}
++    afx_msg void OnTimer(UINT_PTR id){Position();}
++    afx_msg HBRUSH OnCtlColor(CDC *dc,CWnd *,UINT){dc->SetTextColor(RGB(25,35,45));dc->SetBkColor(RGB(246,250,254));return (HBRUSH)background.GetSafeHandle();}
++    DECLARE_MESSAGE_MAP()
++};
++BEGIN_MESSAGE_MAP(CBasicGraphEditor,CWnd)
++    ON_WM_TIMER()
++    ON_WM_CTLCOLOR()
++END_MESSAGE_MAP()
++static void UpdateBasicGraphEditor(){if(BasicGraphEditor&&::IsWindow(BasicGraphEditor->m_hWnd))BasicGraphEditor->Position();}
++void OpenBasicGraphAxes(CFunctionPlotter *plot){
++    auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);unsigned int target=0;
++    for(auto &node:nodes)if(node.type==2&&node.object==(CObject*)plot->Base){target=node.info->id;break;}
++    if(!target||ViewOnlyMode)return;
++    if(BasicGraphEditor)BasicGraphEditor->DestroyWindow();
++    if(KeyboardEntryObject)pMainView->SendMessage(WM_CHAR,VK_ESCAPE,0);
++    auto editor=new CBasicGraphEditor(target);BasicGraphEditor=editor;
++    if(!editor->Open()&&BasicGraphEditor==editor){BasicGraphEditor=NULL;delete editor;}
++}
+--- a/Mathomir/FunctionPlotter.cpp
++++ b/Mathomir/FunctionPlotter.cpp
+@@ -27,6 +27,7 @@
+ #include "GraphDiscontinuities.h"
+ #include "GraphStepEndpoints.h"
+ #include "NativeSymbolic.h"
++#include "GraphPointLists.h"
+ #include "ColorPalette.h"
+ #include ".\drawing.h"
+ #include "Mathomir.h"
+@@ -39,6 +40,8 @@
+ #include "math.h"
+ #include "float.h"
+ #include "toolbox.h"
++extern void OpenBasicGraphAxes(CFunctionPlotter *plot);
++extern CDrawing *ClipboardDrawing;
+ 
+ static void GraphDiagnostic(const char *event,double a,double b,double c,double d)
+ {
+@@ -958,7 +961,8 @@
+     // expressions rather than the variable-replaced worker copies.
+     // Keep an always-reserved top control row and a separate legend row below it.
+     // Leave the right-hand function button column clear even when labels wrap.
+-    const int legendTop=max(ToolboxSize*30/100,ToolboxSize/6+2*((ToolboxSize+28)/18))+8;
++    auto axesButton=GraphPointLists::AxesButton(Xlen,LeftMargin,ToolboxSize,zoom);
++    const int legendTop=max(max(ToolboxSize*30/100,ToolboxSize/6+2*((ToolboxSize+28)/18))+8,axesButton.bottom+5);
+     const int legendRight=ToolboxSize/6+2*((ToolboxSize+28)/18)+8;
+     if(zoom>=40 && Xlen>LeftMargin+legendRight+65 && Ylen>legendTop+BottomMargin+20)
+     {
+@@ -973,6 +977,8 @@
+             if(item->Type!=2 || !item->pSubdrawing)continue;
+             CExpression *original=(CExpression*)item->pSubdrawing;
+             if(original->m_NumElements==1 && original->m_pElementList[0].Type==0)continue;
++            std::vector<RelationGraph::Point> list;std::string pointError;auto pointKind=GraphPointLists::NotPoints;
++            if(!parametric.enabled&&pieces.empty()&&!integral.enabled)try{pointKind=GraphPointLists::Parse(NativeSymbolic::Formula(original),list,pointError);}catch(...){}
+             CExpression label(NULL,NULL,100);label.CopyExpression(original,0);label.SetColor(colors[k]);
+             std::wstring interval;if(k<(int)pieces.size())interval=L"  x \u2208 "+pieces[k].DisplayInterval();
+             int smallZoom=max(20,zoom*65/100);short length,above,below;
+@@ -981,6 +987,7 @@
+             SIZE intervalSize={0,0};if(!interval.empty())::GetTextExtentPoint32W(DC->GetSafeHdc(),interval.c_str(),(int)interval.size(),&intervalSize);
+             int intervalWidth=intervalSize.cx;
+             int prefix=max(20,22*zoom/100),width=min((int)length+prefix+intervalWidth+8,limit-origin),height=max(14*zoom/100,above+below+6);
++            if(pointKind==GraphPointLists::Invalid)height+=18;
+             if(lx+width>limit && lx>origin){lx=origin;ly+=rowHeight+4;rowHeight=0;}
+             if(ly+height>Y+Ylen-BottomMargin-2)break;
+             if(k==0)GraphDiagnostic("legend x,y,width,height",lx,ly,width,height);
+@@ -988,11 +995,12 @@
+             DC->SetBkMode(TRANSPARENT);DC->SetTextColor(ImprovedColor(colors[k]));
+             DC->SelectObject(GetFontFromPool(4,0,0,max(8,10*zoom/100)));
+             DC->SetTextAlign(TA_LEFT|TA_TOP);
+-            CString name;name.Format("f%d:",k+1);DC->TextOut(lx+2,ly+2,name);
++            CString name;name.Format(pointKind==GraphPointLists::Ready?"P%d:":"f%d:",k+1);DC->TextOut(lx+2,ly+2,name);
+             int clip=DC->SaveDC();DC->IntersectClipRect(lx+prefix,ly,lx+width-2,ly+height);
+             label.PaintExpression(DC,smallZoom,lx+prefix,ly+above+3);
+             if(!interval.empty()){DC->SetTextAlign(TA_LEFT|TA_TOP);DC->SetTextColor(ImprovedColor(colors[k]));DC->SelectObject(GetFontFromPool(4,0,0,max(8,10*zoom/100)));::TextOutW(DC->GetSafeHdc(),lx+prefix+length+3,ly+2,interval.c_str(),(int)interval.size());}
+             DC->RestoreDC(clip);
++            if(pointKind==GraphPointLists::Invalid){DC->SetTextAlign(TA_LEFT|TA_TOP);DC->SetTextColor(RGB(160,35,30));DC->SelectObject(GetFontFromPool(4,0,0,max(9,10*zoom/100)));CRect warning(lx+2,ly+height-17,limit,ly+height);DC->DrawText(pointError.c_str(),warning,DT_SINGLELINE|DT_END_ELLIPSIS);}
+             lx+=width+8;rowHeight=max(rowHeight,height);
+         }
+         if(integral.enabled && integral.labels){
+@@ -1010,6 +1018,12 @@
+         DC->RestoreDC(saved);
+     }
+     PaintTeaching(DC,zoom,X+LeftMargin,Y,Xlen-LeftMargin,Ylen-BottomMargin);
++    if(!PrintRendering&&!DC->IsPrinting()&&!ViewOnlyMode&&axesButton.right>axesButton.left){
++        int saved=DC->SaveDC();CRect r(X+axesButton.left,Y+axesButton.top,X+axesButton.right,Y+axesButton.bottom);
++        DC->SetROP2(R2_COPYPEN);DC->FillSolidRect(r,TheState==18?RGB(210,229,247):RGB(239,246,252));DC->Draw3dRect(r,RGB(130,170,200),RGB(130,170,200));
++        DC->SetTextColor(RGB(25,55,80));DC->SetBkMode(TRANSPARENT);DC->SetTextAlign(TA_LEFT|TA_TOP);DC->SelectObject(GetStockObject(DEFAULT_GUI_FONT));
++        DC->DrawText("Axes / units",r,DT_CENTER|DT_VCENTER|DT_SINGLELINE);DC->RestoreDC(saved);
++    }
+ 	LeaveCriticalSection(&section2);
+ 	return 1;
+ }
+@@ -1018,6 +1032,10 @@
+ int CFunctionPlotter::MouseClick(int X, int Y)
+ {
+     EnsureFunctionSlots();
++    if(X!=0x7FFFFFFF&&!ClipboardExpression&&!ClipboardDrawing&&!ViewOnlyMode){
++        auto r=GraphPointLists::AxesButton(abs(Base->Items[0].X2-Base->Items[0].X1)/DRWZOOM*ViewZoom/100,MX*ViewZoom/100,ToolboxSize,ViewZoom);
++        if(r.Contains(-X*ViewZoom/100,-Y*ViewZoom/100)){OpenBasicGraphAxes(this);TheState=0;return 1;}
++    }
+     if(!tableData.points.empty()&&TheState>=108&&TheState<=115&&X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_TABLE_PLOTTER,0);return 1;}
+     if(parametric.enabled && TheState>=108&&TheState<=115&&X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_RELATION_GRAPH,0);return 1;}
+     if(integral.enabled && TheState==108 && X!=0x7FFFFFFF){pMainView->PostMessage(WM_COMMAND,ID_INTEGRAL_SHADER,0);return 1;}
+@@ -1388,7 +1406,8 @@
+         if(state==1)help="Zoom out around the current graph window.";
+         else if(state==2||state==100)help="Zoom in. Click for a gentle zoom, or drag a rectangle to choose the visible region.";
+         else if(state>=4&&state<=7)help="Click to edit this graph-window limit. Press Enter to apply; Escape cancels. Limits retain full precision.";
+-        else if(state>=8&&state<=15)help="Click to edit this curve's expression. Type y=f(x), x=constant, or a relation such as x^2+y^2=25. Graph > Relations and parametric curves opens the preview editor; parametric f1/f2 are x(t) and y(t).";
++        else if(state==18)help="Edit axis names and units here, inside this graph.";
++        else if(state>=8&&state<=15)help="Click to edit this curve's expression. Points: (1,2), (3,4). Type y=f(x), x=constant, or a relation such as x^2+y^2=25. Graph > Relations and parametric curves opens the preview editor; parametric f1/f2 are x(t) and y(t).";
+         else if(state==17)help="Switch horizontal-axis labels between decimal numbers and multiples of pi. This changes labels, independently of RAD/DEG calculation mode.";
+         else if(state==16)help="Toggle graph analysis: inspect numerical values and other analysis controls.";
+         else if(state==99)help="Automatically choose a vertical range that fits the plotted curves.";
+@@ -1415,7 +1434,11 @@
+ 	mx=(SpecialDrawingHover->absolute_X-ViewX)*ViewZoom/100;
+ 	my=(SpecialDrawingHover->absolute_Y-ViewY)*ViewZoom/100;
+ 
+-    if (DrawingThreadUsed)
++    if(!ClipboardExpression&&!ClipboardDrawing&&!ViewOnlyMode){
++        auto r=GraphPointLists::AxesButton(abs(Base->Items[0].X2-Base->Items[0].X1)/DRWZOOM*ViewZoom/100,MX*ViewZoom/100,ToolboxSize,ViewZoom);
++        if(r.Contains(X*ViewZoom/100,Y*ViewZoom/100)){if(TheState!=18){TheState=18;return 1;}return 0;}
++    }
++	if (DrawingThreadUsed)
+     {
+         if (!KeyboardEntryObject && !ClipboardExpression && SpecialDrawingHover->Length*ViewZoom/100>3*ToolboxSize &&
+             Y>=0 && Y<ToolboxSize*30/ViewZoom && X>MX+ToolboxSize*133/ViewZoom && X<MX+ToolboxSize*200/ViewZoom)
+@@ -2026,6 +2049,7 @@
+ 	    const auto frameParameters=ParameterSnapshot();
+     RelationGraph::Parametric boundParametric=parametric;boundParametric.Bind(frameParameters);
+     RelationGraph::Program relations[8];bool relationActive[8]={false};
++    std::vector<RelationGraph::Point> pointLists[8];
+ 	CExpression *Func[8];
+     bool hasSteps[8]={false};GraphStepEndpoints::Program stepPrograms[8];bool stepReady[8]={false};
+     bool vertical[8]={false};double verticalX[8]={0};
+@@ -2037,6 +2061,11 @@
+ 	{
+         Func[kk]=NULL;
+         if(parametric.enabled){if(kk==0)any_found=1;continue;}
++        if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9){
++            std::string error;auto kind=GraphPointLists::NotPoints;
++            try{kind=GraphPointLists::Parse(NativeSymbolic::Formula((CExpression*)pItem->pSubdrawing),pointLists[kk],error);}catch(...){}
++            if(kind!=GraphPointLists::NotPoints){any_found=1;GraphDiagnostic("point list slot,count,valid,bound",kk,(double)pointLists[kk].size(),kind==GraphPointLists::Ready,0);continue;}
++        }
+         if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9&&NativeGraphRelation((CExpression*)pItem->pSubdrawing,relations[kk],is_x_pi!=0,frameParameters)){
+             relationActive[kk]=true;any_found=1;continue;
+         }
+@@ -2118,6 +2147,11 @@
+ 	}
+ 	double Xmax,Xmin,Ymax,Ymin;
+ 	PlotFunctionGetBondaries(&Xmin,&Xmax,&Ymin,&Ymax);
++    if(calc_y&&!parametric.enabled&&tableData.points.empty()&&scatterPoints.empty()){
++        bool onlyPoints=true;std::vector<double> xs,ys;
++        for(int k=0;k<8;k++){if(Func[k]||relationActive[k]||vertical[k])onlyPoints=false;for(auto p:pointLists[k])if((!is_x_log||p.x>0)&&(!is_y_log||p.y>0)){xs.push_back(p.x);ys.push_back(p.y);}}
++        double left,right,bottom,top;if(onlyPoints&&!xs.empty()&&GraphZoom::Fit(xs.data(),(int)xs.size(),is_x_log!=0,left,right)&&GraphZoom::Fit(ys.data(),(int)ys.size(),is_y_log!=0,bottom,top)){Xmin=left;Xmax=right;Ymin=bottom;Ymax=top;SetBounds(Xmin,Xmax,Ymin,Ymax);}
++    }
+     for(int k=0;k<8 && !abort_request;k++)if(Func[k])
+     {
+         double low=Xmin,high=Xmax;
+@@ -2221,6 +2255,7 @@
+                     GraphDomainPoint point=domainPoints[k][n];if(!point.hole || !Piecewise::Finite(point.y) || (is_y_log && point.y<=0))continue;
+                     double a,b,values[1]={point.y};if(GraphZoom::Fit(values,1,is_y_log,a,b)){if(!found){low=a;high=b;}else {low=min(low,a);high=max(high,b);}found=true;}
+                 }
++                for(int k=0;k<8;k++)for(auto point:pointLists[k])if(point.x>=Xmin&&point.x<=Xmax&&(!is_x_log||point.x>0)){double a,b,values[1]={point.y};if(GraphZoom::Fit(values,1,is_y_log,a,b)){if(!found){low=a;high=b;}else{low=min(low,a);high=max(high,b);}found=true;}}
+                 for(const Statistics::Point &point:scatterPoints)if(point.x>=Xmin&&point.x<=Xmax){double a,b,values[1]={point.y};if(GraphZoom::Fit(values,1,is_y_log,a,b)){if(!found){low=a;high=b;}else{low=min(low,a);high=max(high,b);}found=true;}}
+                 if (found) {Ymin=low;Ymax=high;SetBounds(Xmin,Xmax,Ymin,Ymax);mDC.FillSolidRect(0,0,Xlen,Ylen,RGB(255,255,255));start_drawing_point=0;for(int k=0;k<8;k++)prevy[k]=sqrt(-1.0);}
+             }
+@@ -2460,6 +2495,16 @@
+                 if(tableData.connect)for(size_t n=1;n<tableData.points.size();n++){auto a=v.Pixel(tableData.points[n-1]),b=v.Pixel(tableData.points[n]);if(RelationGraph::Clip(a,b,Xlen,Ylen)){mDC.MoveTo((int)a.x,(int)a.y);mDC.LineTo((int)b.x,(int)b.y);}}
+                 for(auto p:tableData.points){auto q=v.Pixel(p);if(RelationGraph::Finite(q)&&q.x>=0&&q.x<Xlen&&q.y>=0&&q.y<Ylen)mDC.Ellipse((int)q.x-radius,(int)q.y-radius,(int)q.x+radius+1,(int)q.y+radius+1);}mDC.SelectObject(oldBrush);mDC.SelectObject(oldPen);
+             }
++            if(i==density*Xlen-1&&!abort_request){
++                RelationGraph::Viewport v;v.xmin=Xmin;v.xmax=Xmax;v.ymin=Ymin;v.ymax=Ymax;v.width=Xlen;v.height=Ylen;v.logx=is_x_log!=0;v.logy=is_y_log!=0;
++                int radius=max(4,min(8,ViewZoom/25));
++                GraphDiagnostic("point viewport left,top,width,height",MX*ViewZoom/100,0,Xlen,Ylen);
++                for(int k=0;k<8;k++)if(!pointLists[k].empty()){
++                    CBrush dot(ImprovedColor(curveColors[k]));auto oldPen=mDC.SelectObject(&curvePens[k]);auto oldBrush=mDC.SelectObject(&dot);
++                    for(auto p:pointLists[k]){auto q=v.Pixel(p);if(RelationGraph::Finite(q)&&q.x>=0&&q.x<Xlen&&q.y>=0&&q.y<Ylen){mDC.Ellipse((int)q.x-radius,(int)q.y-radius,(int)q.x+radius+1,(int)q.y+radius+1);GraphDiagnostic("typed point pixel x,y,slot,radius",q.x,q.y,k,radius);}}
++                    mDC.SelectObject(oldBrush);mDC.SelectObject(oldPen);
++                }
++            }
+             // Paint open circles last so the interpolated curve cannot fill their centers.
+             if(i==density*Xlen-1 && !abort_request)
+                 for(int filled=0;filled<2;filled++)for(int k=0;k<8;k++)for(size_t n=0;n<domainPoints[k].size();n++)
+--- a/Mathomir/GraphPointLists.h
++++ b/Mathomir/GraphPointLists.h
+@@ -0,0 +1,46 @@
++#pragma once
++#include "TeachingTools.h"
++
++// Ordered pairs belong to a curve slot, so ordinary native editing, copying,
++// save/reopen and Undo all use the expression that the user actually typed.
++namespace GraphPointLists {
++enum Result { NotPoints, Invalid, Ready };
++inline Result Parse(const std::string &raw,std::vector<RelationGraph::Point> &points,std::string &error){
++    points.clear();error.clear();std::string s=TeachingTools::Trim(raw);
++    if(s.empty()||s[0]!='(')return NotPoints;
++    int depth=0;bool candidate=false;
++    for(char c:s){if(c=='(')++depth;else if(c==')'){if(--depth<=0)break;}else if(c==','&&depth==1){candidate=true;break;}}
++    if(!candidate)return NotPoints;
++    auto invalid=[&](const char *why){points.clear();error=why;return Invalid;};
++    if(s.size()>8192)return invalid("Point list is too long; use up to 8192 characters.");
++    size_t at=0;std::vector<RelationGraph::Point> parsed;
++    while(at<s.size()){
++        while(at<s.size()&&std::isspace((unsigned char)s[at]))++at;
++        if(at==s.size()||s[at]!='(')return invalid("Enter points as (1,2), (3,4). Each point needs parentheses.");
++        size_t start=++at,comma=std::string::npos;depth=1;
++        for(;at<s.size()&&depth;at++){
++            char c=s[at];if(c=='(')++depth;else if(c==')')--depth;
++            else if(c==','&&depth==1){if(comma!=std::string::npos)return invalid("Each point needs exactly two coordinates.");comma=at;}
++        }
++        if(depth||comma==std::string::npos)return invalid("Finish each point with two coordinates and a closing parenthesis.");
++        RelationGraph::Point p;
++        if(!TeachingTools::Constant(s.substr(start,comma-start),p.x)||!TeachingTools::Constant(s.substr(comma+1,at-comma-2),p.y))return invalid("Point coordinates must be finite numbers or constant expressions.");
++        if(std::fabs(p.x)>1e12||std::fabs(p.y)>1e12)return invalid("Point coordinates must have magnitude at most one trillion.");
++        parsed.push_back(p);if(parsed.size()>4096)return invalid("Use at most 4096 points in one entry.");
++        while(at<s.size()&&std::isspace((unsigned char)s[at]))++at;
++        if(at==s.size())break;
++        if(s[at++]!=',')return invalid("Separate points with a comma: (1,2), (3,4).");
++        if(TeachingTools::Trim(s.substr(at)).empty())return invalid("Add another point after the comma, or remove the comma.");
++    }
++    points.swap(parsed);return Ready;
++}
++struct Rect {int left,top,right,bottom;bool Contains(int x,int y)const{return x>=left&&x<right&&y>=top&&y<bottom;}};
++inline Rect AxesButton(int width,int leftMargin,int toolbox,int zoom){
++    int w=86,h=22,y=2,x=leftMargin+2*toolbox+8;
++    int edge=width-toolbox/3-6;
++    if(x+w>edge){x=leftMargin+7;y=(std::max)(toolbox*30/100,toolbox/6+2*((toolbox+28)/18))+3;}
++    w=(std::max)(0,(std::min)(w,edge-x));
++    if(zoom<40||w<60)return {0,0,0,0};
++    return {x,y,x+w,y+h};
++}
++}
+--- a/Mathomir/MathomirView.cpp
++++ b/Mathomir/MathomirView.cpp
+@@ -86,6 +86,7 @@
+ static bool TeachingMouseUp(CPoint point);
+ static bool TeachingKey(UINT key);
+ static void PaintTeachingOverlay(CDC *dc);
++static void UpdateBasicGraphEditor();
+ static void SnapTeachingAlignment(tDocumentStruct *object,int &x,int &y);
+ static void ClearTeachingAlignment();
+ static void HideTeachingDock();
+@@ -2206,6 +2207,7 @@
+ 		}
+ 		PaintDrawingHotspot(1);
+         PaintTeachingOverlay(&bitmapDC);
++        UpdateBasicGraphEditor();
+ 		bitmapDC.RestoreDC(bufferState);
+ 		pDC->BitBlt(0,0,TheClientRect.right,TheClientRect.bottom,&bitmapDC,0,0,SRCCOPY);
+ 
+@@ -15433,3 +15435,4 @@
+ #include "InteractiveFeatures.inl"
+ 
+ #include "TeachingTools.inl"
++#include "BasicGraphEditor.inl"
