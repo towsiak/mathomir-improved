@@ -1,7 +1,7 @@
 $ErrorActionPreference='Stop'
 $base=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
-Invoke-Expression $base.Substring(0,$base.IndexOf('$exe ='))
 $helpers=Get-Content (Join-Path $PSScriptRoot 'basic-grapher-smoke.ps1') -Raw
+Invoke-Expression $base.Substring(0,$base.IndexOf('$exe ='))
 $start=$helpers.IndexOf('Add-Type -AssemblyName');$end=$helpers.IndexOf('$exe=')
 Invoke-Expression $helpers.Substring($start,$end-$start)
 Add-Type @'
