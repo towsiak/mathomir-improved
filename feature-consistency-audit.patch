@@ -95,16 +95,17 @@
  //Paints the object interior (painting starts from X,Y coordinates - upper left corner)
  int wwwxxx;
  CRITICAL_SECTION section2;
-@@ -391,7 +395,7 @@
+@@ -391,7 +395,8 @@
  
  
  	//painting control buttons (ony when mouse pointer howers above the graph window)
 -	if ((SpecialDrawingHover) && (SpecialDrawingHover->Object==(CObject*)Base) && (!PrintRendering))
-+	if ((SpecialDrawingHover) && (SpecialDrawingHover->Object==(CObject*)Base) && !PrintRendering && !DC->IsPrinting() && !FloatingPreview && !ViewOnlyMode)
++	const bool showEditControls=SpecialDrawingHover && SpecialDrawingHover->Object==(CObject*)Base && !PrintRendering && !DC->IsPrinting() && !FloatingPreview && !ViewOnlyMode;
++	if(showEditControls)
  	{
  		const int tt=(ToolboxSize+28)/16;
  		const int hh=(ToolboxSize+28)/53;
-@@ -977,8 +981,8 @@
+@@ -977,8 +982,8 @@
              if(item->Type!=2 || !item->pSubdrawing)continue;
              CExpression *original=(CExpression*)item->pSubdrawing;
              if(original->m_NumElements==1 && original->m_pElementList[0].Type==0)continue;
@@ -115,16 +116,16 @@
              CExpression label(NULL,NULL,100);label.CopyExpression(original,0);label.SetColor(colors[k]);
              std::wstring interval;if(k<(int)pieces.size())interval=L"  x \u2208 "+pieces[k].DisplayInterval();
              int smallZoom=max(20,zoom*65/100);short length,above,below;
-@@ -1018,7 +1022,7 @@
+@@ -1018,7 +1023,7 @@
          DC->RestoreDC(saved);
      }
      PaintTeaching(DC,zoom,X+LeftMargin,Y,Xlen-LeftMargin,Ylen-BottomMargin);
 -    if(!PrintRendering&&!DC->IsPrinting()&&!ViewOnlyMode&&axesButton.right>axesButton.left){
-+    if(!PrintRendering&&!DC->IsPrinting()&&!FloatingPreview&&!ViewOnlyMode&&axesButton.right>axesButton.left){
++    if(showEditControls&&axesButton.right>axesButton.left){
          int saved=DC->SaveDC();CRect r(X+axesButton.left,Y+axesButton.top,X+axesButton.right,Y+axesButton.bottom);
          DC->SetROP2(R2_COPYPEN);DC->FillSolidRect(r,TheState==18?RGB(210,229,247):RGB(239,246,252));DC->Draw3dRect(r,RGB(130,170,200),RGB(130,170,200));
          DC->SetTextColor(RGB(25,55,80));DC->SetBkMode(TRANSPARENT);DC->SetTextAlign(TA_LEFT|TA_TOP);DC->SelectObject(GetStockObject(DEFAULT_GUI_FONT));
-@@ -2062,8 +2066,7 @@
+@@ -2062,8 +2067,7 @@
          Func[kk]=NULL;
          if(parametric.enabled){if(kk==0)any_found=1;continue;}
          if(pieces.empty()&&!integral.enabled&&Base->NumItems>=kk+9){

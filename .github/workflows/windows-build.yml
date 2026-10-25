@@ -31,6 +31,9 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Placement preview pixel and lifecycle checks
+        shell: pwsh
+        run: ./tools/placement-preview-smoke.ps1
       - name: Graph points, table plots, units and teaching tools
         shell: pwsh
         run: |
@@ -83,9 +86,6 @@ jobs:
       - name: Center move grips and double-click editing checks
         shell: pwsh
         run: ./tools/center-move-grip-smoke.ps1
-      - name: Placement preview pixel and lifecycle checks
-        shell: pwsh
-        run: ./tools/placement-preview-smoke.ps1
       - name: Equations with equals and nested math resize checks
         shell: pwsh
         run: ./tools/resize-equation-smoke.ps1
@@ -204,6 +204,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/placement-preview-smoke.ps1
           ./tools/basic-grapher-smoke.ps1
           ./tools/feature-audit-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
@@ -217,7 +218,6 @@ jobs:
           ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
-          ./tools/placement-preview-smoke.ps1
           ./tools/resize-equation-smoke.ps1
           ./tools/sticky-exponent-smoke.ps1
           ./tools/formula-reference-smoke.ps1 -OnlineFixture
@@ -329,6 +329,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/placement-preview-smoke.ps1
           ./tools/basic-grapher-smoke.ps1
           ./tools/feature-audit-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
@@ -343,7 +344,6 @@ jobs:
           ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1
           ./tools/center-move-grip-smoke.ps1
-          ./tools/placement-preview-smoke.ps1
           ./tools/resize-equation-smoke.ps1
           ./tools/sticky-exponent-smoke.ps1
           ./tools/formula-reference-model-test.ps1

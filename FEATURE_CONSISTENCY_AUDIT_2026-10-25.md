@@ -20,7 +20,7 @@ has been proved correct or that every interaction now uses one state machine.
 | The inline unit editor repeated unchanged child-window layout and registered a window class with an instance-owned brush. Its parent did not explicitly clip child controls during repaint. | Child controls are laid out only after a geometry change. A shared stock class brush has a valid lifetime; instance painting supplies the background. The canvas clips its children. Lifetime/identity checks continue. |
 | Alignment-guide and Spotlight pens left scope before being deselected from the drawing context. A later DC restore occurred after their attempted destruction. | Each pen is restored before its local owner is destroyed. Native validation checks graphics-handle growth during repeated Spotlight redraws. |
 | Updating a table plot whose target had been deleted fell through to the new-graph constructor. | A missing update target reports its removal and preserves the page. Creating a new graph remains an explicit new-plot action. |
-| Graph editing controls could appear in prepared-object previews. | Native graph controls and the inline units button are suppressed for carried previews and printing; read-only views hide editing controls. |
+| Graph editing controls could appear in prepared-object previews. | Native graph controls and the inline units button share hover visibility. Inactive graphs, carried previews, printing and read-only views exclude editing controls. Strict preview/placement pixel comparison remains enabled. |
 
 ## Evidence and verification
 
