@@ -38,6 +38,7 @@ has been proved correct or that every interaction now uses one state machine.
   synchronization pass. Native controls exercise simultaneous edits in both
   axis editors, table-option updates, deleted-target behavior, unchanged
   window layout, slider cadence, and graphics resources over 120 redraws.
+- Popup checks wait for the complete native option list, and text-color checks hit a letter body rather than a cursor insertion boundary. Their original option, color, geometry and Undo assertions remain active.
 - The normal basic-grapher, teaching, slider/animation, connector, step-reveal,
   preview, editing, printing, and native memory suites remain required.
 - All source overlays are replayed from the pinned upstream source and compared

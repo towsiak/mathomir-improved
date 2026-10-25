@@ -42,8 +42,13 @@ function Grip($x,$y){
  MovePointer $g[0] $g[1];return $g
 }
 function PopupOption($data){
- # Read one row without PowerShell flattening the parsed columns.
- foreach($row in Get-Content (Join-Path $folder 'popup-colors-menu.txt')){$v=$row -split ' ',5;if([int]$v[0] -eq $data){return @([int]$v[1],[int]$v[2])}}
+ # Popup creation precedes its first paint. Wait for the requested native
+ # option instead of consuming a partial diagnostic file while it is written.
+ $path=Join-Path $folder 'popup-colors-menu.txt'
+ for($wait=0;$wait -lt 40;$wait++){
+  if(Test-Path $path){foreach($row in Get-Content $path){$v=$row -split ' ',5;if($v.Count -ge 4 -and [int]$v[0] -eq $data){return @([int]$v[1],[int]$v[2])}}}
+  Start-Sleep -Milliseconds 25
+ }
  throw "Rotation popup option $data missing"
 }
 $exe=(Resolve-Path source/build/Mathomir.exe).Path;$folder=Split-Path $exe
@@ -79,6 +84,7 @@ try{
  Write-Output 'Checking popup and legacy selection rotation pivots.'
  Scene 'selection' ($shape+$second);$baseline=(SaveDoc).OuterXml
  [MathomirUiProbe]::Send($view,273,0xE12A)|Out-Null
+ Remove-Item (Join-Path $folder 'popup-colors-menu.txt') -ErrorAction SilentlyContinue
  MovePointer 210 180;[MathomirUiProbe]::Mouse($view,516,2,210,180);[MathomirUiProbe]::Mouse($view,517,0,210,180)
  $popup=[MathomirUiProbe]::Window($app.Id,'PopupMenu');Check ($popup -ne [IntPtr]::Zero) 'Selection popup missing';[RotationPivotProbe]::MovePopup($popup)
  $option=PopupOption 541;[MathomirUiProbe]::Mouse($popup,512,0,$option[0],$option[1]);Marker 321 251

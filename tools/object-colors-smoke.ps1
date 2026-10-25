@@ -19,9 +19,10 @@ function Background($doc){
 }
 function OpenPopup {
  Remove-Item (Join-Path $folder 'popup-colors-menu.txt') -ErrorAction SilentlyContinue
- $x=if($kind -in @('shape','group')){150}elseif($kind -eq 'text'){225}else{160};$y=if($kind -in @('shape','group')){155}else{175}
+ $x=if($kind -in @('shape','group')){150}else{160};$y=if($kind -in @('shape','group')){155}else{175}
  [MathomirUiProbe]::Mouse($view,512,0,$x,$y);[MathomirUiProbe]::Mouse($view,516,2,$x,$y);[MathomirUiProbe]::Mouse($view,517,0,$x,$y)
- # Click the word body rather than its insertion edge, then wait for the actual
+ # Hit the first letter body; the middle of this word can be an insertion boundary.
+ # Wait for the actual
  # native popup. Slow instrumented redraws must not turn this into a 100 ms race.
  $script:popup=[IntPtr]::Zero
  for($wait=0;$wait -lt 20;$wait++){$script:popup=[MathomirUiProbe]::Window($app.Id,'PopupMenu');if($popup -ne [IntPtr]::Zero){break};Start-Sleep -Milliseconds 50}
