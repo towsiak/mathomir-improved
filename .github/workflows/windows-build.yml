@@ -41,6 +41,7 @@ jobs:
         with:
           name: Teaching-Tools-Preview
           path: |
+            source/build/graph-diagnostics.txt
             source/build/basic-grapher-*.png
             source/build/basic-grapher-*.mom
             source/build/teaching-*.png
@@ -124,6 +125,7 @@ jobs:
             source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
+            source/build/basic-grapher-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -265,6 +267,7 @@ jobs:
             source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
+            source/build/basic-grapher-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -383,6 +386,7 @@ jobs:
             source/build/brace-label-*
             source/build/relation-*
             source/build/object-pointer-*
+            source/build/basic-grapher-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt

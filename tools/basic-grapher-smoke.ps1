@@ -37,13 +37,13 @@ $env:MATHOMIR_GRAPH_DIAGNOSTICS='1';$app=Start-Process $exe -WorkingDirectory $f
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;Check ($main -ne [IntPtr]::Zero) 'App did not start';[BasicGraphProbe]::ShowWindow($main,3)|Out-Null;$view=[MathomirUiProbe]::Child($main,0xE900)
  $single=Join-Path $folder 'basic-grapher-single.mom';$graph|Set-Content $single -Encoding ascii
- [MathomirUiProbe]::OpenFile($main,$single);Start-Sleep -Milliseconds 600;[MathomirUiProbe]::Send($main,273,32775)|Out-Null
+ [MathomirUiProbe]::OpenFile($main,$single);Start-Sleep -Milliseconds 600;[MathomirUiProbe]::Send($main,273,32775)|Out-Null;[MathomirUiProbe]::Send($view,276,0)|Out-Null
  [MathomirUiProbe]::Mouse($view,512,0,400,220);Start-Sleep -Milliseconds 200;$one=[BasicGraphProbe]::Dot($view,0x0000CC00);Click $one[0] $one[1];TypeMath '(1,2)';EscapeView
- Check (@(Get-Content (Join-Path $folder 'graph-diagnostics.txt')|Where-Object{$_ -match '^point list slot,count,valid,bound: 1 1 1 '}).Count -gt 0) 'A single typed pair did not plot'
- [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 600;[MathomirUiProbe]::Send($main,273,32775)|Out-Null
+ Check (@(Get-Content (Join-Path $folder 'graph-diagnostics.txt')|Where-Object{$_ -match '^point list slot,count,valid,bound: 1 1 1 '}).Count -gt 0) 'A single typed pair did not plot';[MathomirUiProbe]::Send($main,273,0xE103)|Out-Null
+ [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 600;[MathomirUiProbe]::Send($main,273,32775)|Out-Null;[MathomirUiProbe]::Send($view,276,0)|Out-Null
  [MathomirUiProbe]::Mouse($view,512,0,400,220);Start-Sleep -Milliseconds 200
  $dot=[BasicGraphProbe]::Dot($view,0x0000CC00);Click $dot[0] $dot[1];TypeMath '(1,2),(3,4),(5,6)';EscapeView;$s=SaveDoc
- $slots=$s.SelectNodes('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[position()>4]/*[self::ex or self::expr]');Check ($slots.Count -eq 8) 'Basic graph did not retain all native input slots'
+ $slots=$s.SelectNodes('/mathomir/*[*[self::dw or self::draw][@spec="51"]]/subexp[position()>4]');Check ($slots.Count -eq 8) 'Basic graph did not retain all native input slots'
  $text=($slots[1].SelectNodes('.//var | .//elm[@tp="1"]')|ForEach-Object{if($_.HasAttribute('t')){$_.t}else{$_.tx}})-join '';Check ($text -eq '123456') ('Point entry was changed: '+$slots[1].OuterXml)
  $log=Get-Content (Join-Path $folder 'graph-diagnostics.txt');Check (@($log|Where-Object{$_ -match '^point list slot,count,valid,bound: 1 3 1 '}).Count -gt 0) 'Literally typed list did not parse as three points'
  $viewport=@($log|Where-Object{$_ -match '^point viewport left,top,width,height:'})[-1] -split ': ',2;$left=[double]($viewport[1] -split ' ')[0]
