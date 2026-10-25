@@ -734,3 +734,18 @@ BASIC GRAPHER: POINT LISTS AND INLINE UNITS (2026-10-25)
 - Click Axes / units inside the graph to change horizontal/vertical names and
   optional units in place. Unicode units, native point expressions, copying,
   save/reopen and Undo are preserved. Cancel leaves the labels unchanged.
+
+FEATURE CONSISTENCY / PERFORMANCE AUDIT (2026-10-25)
+- Shared per-pass object inventory and indexed references remove repeated
+  document scans; linked tables share each graph checksum within the pass.
+- Sliders poll at 125 ms while idle and retain 16 ms updates during playback
+  and dragging. Animation leaves unchanged range and step controls alone.
+- Inline units, Graph tools and table options share axis validation and merge
+  only edited fields, preserving newer labels/units from other controls.
+- Point-list parsing uses immutable per-slot results shared with the worker.
+- Unchanged inline editor geometry no longer triggers child-window layout.
+- Alignment and Spotlight release temporary Windows drawing pens correctly.
+- Deleted table-plot update targets show a status instead of creating a graph.
+- Graph editing controls stay out of carried previews and printed output.
+- FEATURE_CONSISTENCY_AUDIT_2026-10-25.md records findings, checks and remaining
+  legacy save/load, allocation and interaction-state limitations.

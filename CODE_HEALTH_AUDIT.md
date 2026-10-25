@@ -47,3 +47,7 @@ The table dialog now has a live layout preview. Row count, column count, font, b
 - This is a targeted static/dynamic audit, not an exhaustive proof of correctness. In particular, atomic saves, transactional loading, all allocation-failure paths, and a unified interaction engine remain open.
 
 Recommended order: atomic save plus serialization failure handling; transactional loader; shared interaction targeting/state; worker ownership; performance measurements. Avoid a wholesale refactor without retaining the current native regression coverage.
+
+## Follow-up — 25 October 2026
+
+See `FEATURE_CONSISTENCY_AUDIT_2026-10-25.md` for the native feature integration and performance follow-up. The legacy I/O weaknesses above remain open.

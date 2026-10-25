@@ -35,6 +35,7 @@ jobs:
         shell: pwsh
         run: |
           ./tools/basic-grapher-smoke.ps1
+          ./tools/feature-audit-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
       - uses: actions/upload-artifact@v4
         if: always()
@@ -42,6 +43,7 @@ jobs:
           name: Teaching-Tools-Preview
           path: |
             source/build/graph-diagnostics.txt
+            source/build/feature-audit-*
             source/build/basic-grapher-*.png
             source/build/basic-grapher-*.mom
             source/build/teaching-*.png
@@ -126,6 +128,7 @@ jobs:
             source/build/relation-*
             source/build/object-pointer-*
             source/build/basic-grapher-*
+            source/build/feature-audit-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -202,6 +205,7 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/basic-grapher-smoke.ps1
+          ./tools/feature-audit-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
           ./tools/interactive-features-smoke.ps1
           ./tools/brace-label-smoke.ps1
@@ -227,6 +231,7 @@ jobs:
           path: |
             source/build/overlap-ui.png
             source/build/graph-diagnostics.txt
+            source/build/feature-audit-*
             source/build/*integral*.mom
             source/build/integral-ui.png
             source/build/selection-approx-ui.png
@@ -268,6 +273,7 @@ jobs:
             source/build/relation-*
             source/build/object-pointer-*
             source/build/basic-grapher-*
+            source/build/feature-audit-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -288,6 +294,7 @@ jobs:
           Copy-Item source/build/MathomirMath package/MathomirMath -Recurse
           Copy-Item source/ReadMe.txt package/LICENSE.txt
           Copy-Item REPAIR_NOTES.txt package/
+          Copy-Item FEATURE_CONSISTENCY_AUDIT_2026-10-25.md package/
           Copy-Item source/Mathomir/res/MathomirHandyHelp.chm package/
       - uses: actions/upload-artifact@v4
         with:
@@ -323,6 +330,7 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/basic-grapher-smoke.ps1
+          ./tools/feature-audit-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
           ./tools/interactive-features-smoke.ps1
           ./tools/windows-smoke.ps1
@@ -387,6 +395,7 @@ jobs:
             source/build/relation-*
             source/build/object-pointer-*
             source/build/basic-grapher-*
+            source/build/feature-audit-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
