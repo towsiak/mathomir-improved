@@ -7,6 +7,8 @@ using System;
 using System.Runtime.InteropServices;
 public static class BasicGraphProbe {
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int mode);
+ [DllImport("user32.dll",EntryPoint="GetWindowLongW")] static extern int GetWindowLong(IntPtr h,int index);
+ public static bool ClipsChildren(IntPtr h){return (GetWindowLong(h,-16)&0x02000000)!=0;}
  [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr h);
@@ -53,7 +55,7 @@ try{
  # A regular curve uses another slot on the same graph.
  [MathomirUiProbe]::Mouse($view,512,0,400,220);Start-Sleep -Milliseconds 180;$red=[BasicGraphProbe]::Dot($view,0x000000CC);Click $red[0] $red[1];TypeMath 'x';EscapeView;$mixed=SaveDoc
  Check ($mixed.mathomir.ChildNodes.Count -eq 1) 'Mixing points and a curve duplicated the graph';Check ([MathomirUiProbe]::CountColor($view,175,180,370,250,0x000000CC) -gt 50) 'Regular curve disappeared beside points'
- $d=OpenAxes;Check ([BasicGraphProbe]::GetParent($d) -eq $view -and [MathomirUiProbe]::IsWindowEnabled($main)) 'Axis editor is external or modal'
+ $d=OpenAxes;Check ([BasicGraphProbe]::GetParent($d) -eq $view -and [MathomirUiProbe]::IsWindowEnabled($main)) 'Axis editor is external or modal';Check ([BasicGraphProbe]::ClipsChildren($view)) 'Canvas repaint can cover the inline axis controls'
  $dr=[MathomirUiProbe]::WindowRect($d);$vr=[MathomirUiProbe]::WindowRect($view);Check ($dr.Left -ge $vr.Left+100 -and $dr.Right -le $vr.Left+601 -and $dr.Top -ge $vr.Top+100 -and $dr.Bottom -le $vr.Top+461) 'Axis controls are outside their graph'
  [MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1711),'t');[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1712),'s');[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1713),'v');[MathomirUiProbe]::SetText([MathomirUiProbe]::Child($d,1714),('m/s'+[char]0x00B2));Capture 'basic-grapher-inline-units.png';[MathomirUiProbe]::Send($d,273,1715)|Out-Null
  $withUnits=SaveDoc;$axis=$withUnits.SelectSingleNode('//graphaxes');Check ($axis.xn -eq '74' -and $axis.xu -eq '73' -and $axis.yn -eq '76' -and $axis.yu -eq '6D2F73C2B2') 'Inline units did not persist as Unicode'

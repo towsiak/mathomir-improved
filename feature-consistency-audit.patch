@@ -9,7 +9,7 @@
      CFunctionPlotter *Target(InteractiveNode *node=NULL){return epoch==InteractiveObjects::DocumentEpoch()?TeachPlot(target,node):NULL;}
      void Control(const wchar_t *kind,const wchar_t *text,int id,int x,int y,int w,int h,DWORD style=0){
          HWND control=::CreateWindowExW(!wcscmp(kind,L"EDIT")?WS_EX_CLIENTEDGE:0,kind,text,WS_CHILD|WS_VISIBLE|style,x,y,w,h,m_hWnd,(HMENU)(INT_PTR)id,AfxGetInstanceHandle(),NULL);
-@@ -15,9 +15,10 @@
+@@ -15,15 +15,17 @@
          auto plot=Target();if(!plot){Close();return;}TeachingTools::Axes value;
          value.xName=TeachingTools::Trim(TeachGet(m_hWnd,1711));value.xUnit=TeachingTools::Trim(TeachGet(m_hWnd,1712));
          value.yName=TeachingTools::Trim(TeachGet(m_hWnd,1713));value.yUnit=TeachingTools::Trim(TeachGet(m_hWnd,1714));
@@ -22,7 +22,15 @@
          Close();
      }
  public:
-@@ -32,7 +33,7 @@
+     CBasicGraphEditor(unsigned int id):target(id),epoch(InteractiveObjects::DocumentEpoch()),background(RGB(246,250,254)){}
+     bool Open(){
+-        CString cls=AfxRegisterWndClass(CS_HREDRAW|CS_VREDRAW,::LoadCursor(NULL,IDC_ARROW),(HBRUSH)background.GetSafeHandle());
++        pMainView->ModifyStyle(0,WS_CLIPCHILDREN);
++        CString cls=AfxRegisterWndClass(CS_HREDRAW|CS_VREDRAW,::LoadCursor(NULL,IDC_ARROW),(HBRUSH)::GetStockObject(WHITE_BRUSH));
+         if(!CreateEx(0,cls,"Graph axis names and units",WS_CHILD|WS_VISIBLE|WS_BORDER|WS_CLIPCHILDREN,CRect(0,0,300,140),pMainView,1710))return false;
+         Control(L"STATIC",L"Axis names and units",-1,9,7,218,16);
+         Control(L"STATIC",L"Axis",-1,9,28,36,16);Control(L"STATIC",L"Name",-1,49,28,60,16);Control(L"STATIC",L"Units (optional)",-1,123,28,140,16);
+@@ -32,7 +34,7 @@
          Control(L"BUTTON",L"Apply",1715,49,103,66,23,BS_DEFPUSHBUTTON|WS_TABSTOP);Control(L"BUTTON",L"Cancel",1716,123,103,66,23,WS_TABSTOP);
          Control(L"STATIC",L"",1717,9,131,270,18);
          auto plot=Target();if(!plot){Close();return false;}
@@ -31,7 +39,7 @@
          SetTimer(1,120,NULL);if(!Position())return false;::SetFocus(::GetDlgItem(m_hWnd,1712));return true;
      }
      bool Position(){
-@@ -43,7 +44,8 @@
+@@ -43,7 +45,8 @@
          if(width<215||visible.Height()<height+8){Close();return false;}
          int x=visible.left+6,y=min(visible.bottom-height-4,visible.top+42);
          CRect current;GetWindowRect(current);pMainView->ScreenToClient(current);CRect desired(x,y,x+width,y+height);
@@ -41,6 +49,20 @@
          int unitWidth=max(55,width-139);
          for(int id:{1712,1714})GetDlgItem(id)->SetWindowPos(NULL,123,id==1712?47:74,unitWidth,22,SWP_NOZORDER|SWP_NOACTIVATE);
          GetDlgItem(1717)->SetWindowPos(NULL,9,131,width-18,18,SWP_NOZORDER|SWP_NOACTIVATE);
+@@ -57,11 +60,13 @@
+     virtual BOOL OnCommand(WPARAM wp,LPARAM lp){if(HIWORD(wp)==BN_CLICKED){if(LOWORD(wp)==1715){Apply();return TRUE;}if(LOWORD(wp)==1716){Close();return TRUE;}}return CWnd::OnCommand(wp,lp);}
+     virtual void PostNcDestroy(){if(BasicGraphEditor==this)BasicGraphEditor=NULL;delete this;}
+     afx_msg void OnTimer(UINT_PTR id){Position();}
++    afx_msg BOOL OnEraseBkgnd(CDC *dc){CRect r;GetClientRect(r);dc->FillSolidRect(r,RGB(246,250,254));return TRUE;}
+     afx_msg HBRUSH OnCtlColor(CDC *dc,CWnd *,UINT){dc->SetTextColor(RGB(25,35,45));dc->SetBkColor(RGB(246,250,254));return (HBRUSH)background.GetSafeHandle();}
+     DECLARE_MESSAGE_MAP()
+ };
+ BEGIN_MESSAGE_MAP(CBasicGraphEditor,CWnd)
+     ON_WM_TIMER()
++    ON_WM_ERASEBKGND()
+     ON_WM_CTLCOLOR()
+ END_MESSAGE_MAP()
+ static void UpdateBasicGraphEditor(){if(BasicGraphEditor&&::IsWindow(BasicGraphEditor->m_hWnd))BasicGraphEditor->Position();}
 --- a/Mathomir/Drawing.h
 +++ b/Mathomir/Drawing.h
 @@ -7,6 +7,7 @@
