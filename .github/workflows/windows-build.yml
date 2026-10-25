@@ -34,6 +34,12 @@ jobs:
       - name: Placement preview pixel and lifecycle checks
         shell: pwsh
         run: ./tools/placement-preview-smoke.ps1
+      - name: Rotation center overlay UI checks
+        shell: pwsh
+        run: ./tools/rotation-center-smoke.ps1
+      - name: Shared object colors and backgrounds UI checks
+        shell: pwsh
+        run: ./tools/object-colors-smoke.ps1
       - name: Graph points, table plots, units and teaching tools
         shell: pwsh
         run: |
@@ -68,12 +74,6 @@ jobs:
       - name: Attached object pointer chooser checks
         shell: pwsh
         run: ./tools/object-pointer-smoke.ps1
-      - name: Rotation center overlay UI checks
-        shell: pwsh
-        run: ./tools/rotation-center-smoke.ps1
-      - name: Shared object colors and backgrounds UI checks
-        shell: pwsh
-        run: ./tools/object-colors-smoke.ps1
       - name: Actual palette pickup and in-transit preview checks
         shell: pwsh
         run: ./tools/palette-carry-smoke.ps1
@@ -205,6 +205,8 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/placement-preview-smoke.ps1
+          ./tools/rotation-center-smoke.ps1
+          ./tools/object-colors-smoke.ps1
           ./tools/basic-grapher-smoke.ps1
           ./tools/feature-audit-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
@@ -212,8 +214,6 @@ jobs:
           ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
           ./tools/object-pointer-smoke.ps1
-          ./tools/rotation-center-smoke.ps1
-          ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
           ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1
@@ -330,6 +330,8 @@ jobs:
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
           ./tools/placement-preview-smoke.ps1
+          ./tools/rotation-center-smoke.ps1
+          ./tools/object-colors-smoke.ps1
           ./tools/basic-grapher-smoke.ps1
           ./tools/feature-audit-smoke.ps1
           ./tools/teaching-tools-smoke.ps1
@@ -338,8 +340,6 @@ jobs:
           ./tools/brace-label-smoke.ps1
           ./tools/relation-graph-smoke.ps1
           ./tools/object-pointer-smoke.ps1
-          ./tools/rotation-center-smoke.ps1
-          ./tools/object-colors-smoke.ps1
           ./tools/palette-carry-smoke.ps1
           ./tools/table-preview-smoke.ps1
           ./tools/canvas-grid-smoke.ps1

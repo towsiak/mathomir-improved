@@ -1,4 +1,5 @@
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'popup-menu-test-helpers.ps1')
 $helpers=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
 Invoke-Expression $helpers.Substring(0,$helpers.IndexOf('$exe ='))
 Add-Type -AssemblyName System.Drawing
@@ -42,15 +43,10 @@ function Grip($x,$y){
  MovePointer $g[0] $g[1];return $g
 }
 function PopupOption($data){
- # Popup creation precedes its first paint. Wait for the requested native
- # option instead of consuming a partial diagnostic file while it is written.
- $path=Join-Path $folder 'popup-colors-menu.txt'
- for($wait=0;$wait -lt 40;$wait++){
-  if(Test-Path $path){foreach($row in Get-Content $path){$v=$row -split ' ',5;if($v.Count -ge 4 -and [int]$v[0] -eq $data){return @([int]$v[1],[int]$v[2])}}}
-  Start-Sleep -Milliseconds 25
- }
- throw "Rotation popup option $data missing"
+ $rows=@(Wait-MathomirPopupOptions (Join-Path $folder 'popup-colors-menu.txt') @($data))
+ $option=@($rows|Where-Object Data -eq $data)[0];return @([int]$option.X,[int]$option.Y)
 }
+
 $exe=(Resolve-Path source/build/Mathomir.exe).Path;$folder=Split-Path $exe
 $env:MATHOMIR_ROTATION_DIAGNOSTICS='1';$env:MATHOMIR_POPUP_COLOR_DIAGNOSTICS='1';$env:MATHOMIR_DIAGNOSTIC_STARTUP='1'
 $app=Start-Process $exe -WorkingDirectory $folder -PassThru

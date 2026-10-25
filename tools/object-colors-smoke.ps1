@@ -1,4 +1,5 @@
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'popup-menu-test-helpers.ps1')
 $helpers=Get-Content (Join-Path $PSScriptRoot 'windows-smoke.ps1') -Raw
 Invoke-Expression $helpers.Substring(0,$helpers.IndexOf('$exe ='))
 Add-Type -AssemblyName System.Drawing
@@ -18,20 +19,23 @@ function Background($doc){
  if($node -and $node.HasAttribute('bg')){return [int]$node.GetAttribute('bg')};return -1
 }
 function OpenPopup {
- Remove-Item (Join-Path $folder 'popup-colors-menu.txt') -ErrorAction SilentlyContinue
- $x=if($kind -in @('shape','group')){150}else{160};$y=if($kind -in @('shape','group')){155}else{175}
- [MathomirUiProbe]::Mouse($view,512,0,$x,$y);[MathomirUiProbe]::Mouse($view,516,2,$x,$y);[MathomirUiProbe]::Mouse($view,517,0,$x,$y)
- # Hit the first letter body; the middle of this word can be an insertion boundary.
- # Wait for the actual
- # native popup. Slow instrumented redraws must not turn this into a 100 ms race.
- $script:popup=[IntPtr]::Zero
- for($wait=0;$wait -lt 20;$wait++){$script:popup=[MathomirUiProbe]::Window($app.Id,'PopupMenu');if($popup -ne [IntPtr]::Zero){break};Start-Sleep -Milliseconds 50}
+ $path=Join-Path $folder 'popup-colors-menu.txt';Remove-Item $path -ErrorAction SilentlyContinue
+ # Text has deliberate right-click insertion targets between letters. Choose
+ # an actual body point; if it enters editing, dismiss that caret and try another
+ # interior point on this same word. All color/target/Undo assertions stay strict.
+ $points=if($kind -in @('shape','group')){[pscustomobject]@{X=150;Y=155}}elseif($kind -eq 'text'){@([pscustomobject]@{X=156;Y=170},[pscustomobject]@{X=175;Y=168},[pscustomobject]@{X=190;Y=172},[pscustomobject]@{X=205;Y=168},[pscustomobject]@{X=240;Y=172})}else{[pscustomobject]@{X=160;Y=175}}
+ $script:popup=[IntPtr]::Zero;$attempt=0
+ foreach($point in $points){
+  if($attempt -gt 0){[MathomirUiProbe]::Send($view,258,27)|Out-Null};$attempt++
+  $x=$point.X;$y=$point.Y;[MathomirUiProbe]::Mouse($view,512,0,$x,$y);[MathomirUiProbe]::Mouse($view,516,2,$x,$y);[MathomirUiProbe]::Mouse($view,517,0,$x,$y)
+  for($wait=0;$wait -lt 20;$wait++){$script:popup=[MathomirUiProbe]::Window($app.Id,'PopupMenu');if($popup -ne [IntPtr]::Zero){break};Start-Sleep -Milliseconds 50}
+  if($popup -ne [IntPtr]::Zero){break}
+ }
  Check ($popup -ne [IntPtr]::Zero) "No object popup for $kind"
- $script:options=@(Get-Content (Join-Path $folder 'popup-colors-menu.txt')|ForEach-Object{
-  $parts=$_ -split ' ',5;[pscustomobject]@{Data=[int]$parts[0];X=[int]$parts[1];Y=[int]$parts[2];Enabled=[int]$parts[3]}
- })
+ $script:options=@(Wait-MathomirPopupOptions $path (920..929))
  foreach($data in @(920,921,922,923,924,925,926,927,928,929)){Check (@($options|Where-Object Data -eq $data).Count -eq 1) "Missing background option $data for $kind"}
 }
+
 function Choose($data,[switch]$Async){
  $option=@($options|Where-Object Data -eq $data);Check ($option.Count -eq 1 -and $option[0].Enabled) "Missing/enabled color option $data for $kind"
  $option=$option[0]
