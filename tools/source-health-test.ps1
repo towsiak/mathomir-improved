@@ -7,3 +7,9 @@ if(!$vs){throw 'Visual C++ compiler was not found.'}
 $command='"'+$vs+'\Common7\Tools\VsDevCmd.bat" -no_logo -arch=x86 && cl /nologo /EHsc /W4 source\build\source-health-test.cpp /Fe:source\build\source-health-test.exe /Fo:source\build\source-health-test.obj && source\build\source-health-test.exe'
 & cmd /d /s /c $command
 if($LASTEXITCODE -ne 0){throw 'Native source health regression failed.'}
+
+python ./tools/feature-identity-source-test.py --emit source/build/feature-identity-source.cpp
+if($LASTEXITCODE -ne 0){throw 'Could not extract native feature identity functions.'}
+$command='"'+$vs+'\Common7\Tools\VsDevCmd.bat" -no_logo -arch=x86 && cl /nologo /EHsc /W4 /I source\Mathomir source\build\feature-identity-source.cpp /Fe:source\build\feature-identity-source.exe /Fo:source\build\feature-identity-source.obj && source\build\feature-identity-source.exe'
+& cmd /d /s /c $command
+if($LASTEXITCODE -ne 0){throw 'Native feature identity regression failed.'}

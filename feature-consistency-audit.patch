@@ -170,7 +170,7 @@
      int w=86,h=22,y=2,x=leftMargin+2*toolbox+8;
 --- a/Mathomir/InteractiveFeatures.inl
 +++ b/Mathomir/InteractiveFeatures.inl
-@@ -14,7 +14,11 @@
+@@ -14,14 +14,31 @@
      Rect bounds={x,y,x+max(1,(int)w),y+max(1,(int)a+b)};InteractiveNode n={object,type,info,bounds,root,parent,slot,depth,px,py};nodes.push_back(n);
      if(type==2){CDrawing *d=(CDrawing*)object;if(d->IsSpecialDrawing)return;for(int i=0;i<d->NumItems;i++){auto &item=d->Items[i];if((item.Type==0||item.Type==2)&&item.pSubdrawing)CollectInteractive((CObject*)item.pSubdrawing,item.Type==2?1:2,x+double(item.X1)/DRWZOOM,y+double(item.Y1)/DRWZOOM,root,d,i,x,y,depth+1,dc,nodes);}}
  }
@@ -180,10 +180,18 @@
 +    if(enabled){FILE *file=fopen("feature-audit-diagnostics.txt","a");if(file){fprintf(file,"%s %u\n",event,value);fclose(file);}}
 +}
 +static std::vector<InteractiveNode> InteractiveNodes(CDC *dc){FeatureAuditTrace("document walk");std::vector<InteractiveNode> nodes;for(int i=0;i<NumDocumentElements;i++){auto d=TheDocument+i;if(d->Object)CollectInteractive(d->Object,d->Type,d->absolute_X,d->absolute_Y-(d->Type==1?d->Above:0),d,NULL,-1,0,0,0,dc,nodes);}return nodes;}
++static void ReserveInteractiveIds(std::vector<InteractiveNode> &nodes,std::set<unsigned int> &used){
++    for(auto &n:nodes){const InteractiveObjects::Connector *connector=NULL;unsigned int source=0;
++        if(n.type==2){auto d=(CDrawing*)n.object;connector=&d->m_Connector;if(d->IsSpecialDrawing==51&&d->SpecialData)source=((CFunctionPlotter*)d->SpecialData)->tableData.source;}
++        InteractiveObjects::ReserveIds(used,*n.info,connector,source);
++    }
++}
  static unsigned int NextInteractiveId=1;
- static unsigned int NewInteractiveId(std::set<unsigned int> &used){while(!NextInteractiveId||used.count(NextInteractiveId)){NextInteractiveId++;if(NextInteractiveId>=0x7fffffffu)NextInteractiveId=1;}unsigned int id=NextInteractiveId++;used.insert(id);return id;}
+-static unsigned int NewInteractiveId(std::set<unsigned int> &used){while(!NextInteractiveId||used.count(NextInteractiveId)){NextInteractiveId++;if(NextInteractiveId>=0x7fffffffu)NextInteractiveId=1;}unsigned int id=NextInteractiveId++;used.insert(id);return id;}
++static unsigned int NewInteractiveId(std::set<unsigned int> &used){return InteractiveObjects::AllocateId(NextInteractiveId,used);}
  static void EnsureInteractiveIds(std::vector<InteractiveNode> &nodes){std::set<unsigned int> used,seen;
-@@ -22,6 +26,13 @@
+-    for(auto &n:nodes){if(n.info->id)used.insert(n.info->id);if(n.info->steps)used.insert(n.info->steps);if(n.type==2){auto &c=((CDrawing*)n.object)->m_Connector;if(c.from)used.insert(c.from);if(c.to)used.insert(c.to);}}
++    ReserveInteractiveIds(nodes,used);
      for(auto &n:nodes){if(!n.info->id)n.info->id=NewInteractiveId(used);else if(!seen.insert(n.info->id).second){n.info->id=NewInteractiveId(used);n.info->steps=0;n.info->order=0;}}
  }
  static InteractiveNode *FindInteractive(std::vector<InteractiveNode> &nodes,unsigned int id){for(auto &n:nodes)if(n.info->id==id)return &n;return NULL;}
@@ -197,7 +205,7 @@
  static bool WriteConnector(InteractiveNode &node,const std::vector<InteractiveObjects::Segment> &segments){
      if(segments.empty())return false;auto d=(CDrawing*)node.object;bool same=d->NumItems==segments.size();double x=node.bounds.left,y=node.bounds.top;
      for(size_t i=0;same&&i<segments.size();i++){auto &l=d->Items[i];auto &s=segments[i];same=l.Type==1&&std::fabs(x+double(l.X1)/DRWZOOM-s.a.x)<.04&&std::fabs(y+double(l.Y1)/DRWZOOM-s.a.y)<.04&&std::fabs(x+double(l.X2)/DRWZOOM-s.b.x)<.04&&std::fabs(y+double(l.Y2)/DRWZOOM-s.b.y)<.04;}if(same)return false;
-@@ -34,14 +45,15 @@
+@@ -34,14 +51,15 @@
  }
  static bool NormalizeInteractive(CDrawing *d,int &dx,int &dy,int depth=0){dx=dy=0;if(!d||d->IsSpecialDrawing||depth>32)return false;bool has=false;for(int i=0;i<d->NumItems;i++)if(d->Items[i].Type==0){auto child=(CDrawing*)d->Items[i].pSubdrawing;int x=0,y=0;bool nested=NormalizeInteractive(child,x,y,depth+1);if(nested){d->Items[i].X1+=x*DRWZOOM;d->Items[i].Y1+=y*DRWZOOM;has=true;}if(child&&child->m_Connector.Attached())has=true;}if(has){int w,h;d->AdjustCoordinates(&dx,&dy,&w,&h);}return has;}
  }
@@ -216,7 +224,16 @@
  void CMathomirView::PrepareInteractiveSave(){auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);}
  static bool StepPresentationActive(){return InteractiveObjects::Reveal().group!=0;}
  static bool InteractiveHidden(tDocumentStruct *object){if(!object||!object->Object)return false;Info *info=InteractiveInfo(object->Object,object->Type);if(info&&info->hidden)return true;if(!StepPresentationActive())return false;if(info&&InteractiveObjects::Hidden(*info))return true;
-@@ -60,7 +72,8 @@
+@@ -49,7 +67,7 @@
+ }
+ static void RememberInteractiveCut(){InteractiveCutIds.clear();InteractiveCutEpoch=InteractiveObjects::DocumentEpoch();if(KeyboardEntryObject)return;auto nodes=InteractiveNodes(NULL);EnsureInteractiveIds(nodes);for(auto &n:nodes)if(n.root->MovingDotState==3)InteractiveCutIds.insert(n.info->id);}
+ static void RemapPastedObjects(int first,int count,bool cut){auto nodes=InteractiveNodes(NULL);std::set<unsigned int> used,existing;std::map<unsigned int,unsigned int> ids,groups;
+-    for(auto &n:nodes){if(n.info->id)used.insert(n.info->id);if(n.root<TheDocument+first&&n.info->id)existing.insert(n.info->id);if(n.info->steps)used.insert(n.info->steps);}
++    ReserveInteractiveIds(nodes,used);for(auto &n:nodes)if(n.root<TheDocument+first&&n.info->id)existing.insert(n.info->id);
+     for(auto &n:nodes)if(n.root>=TheDocument+first&&n.root<TheDocument+first+count){unsigned int old=n.info->id;bool keep=cut&&InteractiveCutIds.count(old)&&!existing.count(old);unsigned int id=keep?old:NewInteractiveId(used);if(old)ids[old]=id;n.info->id=id;if(n.info->steps&&!keep){auto oldGroup=n.info->steps;if(!groups.count(oldGroup))groups[oldGroup]=NewInteractiveId(used);n.info->steps=groups[oldGroup];}}
+     for(auto &n:nodes)if(n.root>=TheDocument+first&&n.root<TheDocument+first+count){if(n.info->tableGraph){auto original=n.info->tableGraph;bool sameDocument=n.info->referenceEpoch==InteractiveObjects::DocumentEpoch()&&existing.count(original);n.info->tableGraph=ids.count(original)?ids[original]:sameDocument?original:0;if(n.info->tableGraph)n.info->referenceEpoch=InteractiveObjects::DocumentEpoch();}if(n.type==2){auto d=(CDrawing*)n.object;if(d->IsSpecialDrawing==51&&d->SpecialData){auto p=(CFunctionPlotter*)d->SpecialData;auto original=p->tableData.source;bool sameDocument=p->tableData.sourceEpoch==InteractiveObjects::DocumentEpoch()&&existing.count(original);p->tableData.source=ids.count(original)?ids[original]:sameDocument?original:0;if(p->tableData.source)p->tableData.sourceEpoch=InteractiveObjects::DocumentEpoch();p->tableSourceHash=0;}}}
+     for(auto &n:nodes)if(n.root>=TheDocument+first&&n.root<TheDocument+first+count&&n.type==2){auto &c=((CDrawing*)n.object)->m_Connector;if(c.Attached()){if(ids.count(c.from)&&ids.count(c.to)){c.from=ids[c.from];c.to=ids[c.to];}else if(!(cut&&InteractiveCutIds.count(n.info->id)&&(existing.count(c.from)||ids.count(c.from))&&(existing.count(c.to)||ids.count(c.to))))c.from=c.to=0;}}
+@@ -60,7 +78,8 @@
      InteractiveObjects::Parameters current;
      bool initializing,opened,compact,fieldsDirty,pending,gesture,gestureUndo,ending,applying;
      TeachingTools::Animation animation;DWORD animationTick=0;
@@ -226,7 +243,7 @@
      static bool Same(const InteractiveObjects::Parameters &a,const InteractiveObjects::Parameters &b){
          for(int i=0;i<3;i++)if(a.a[i].value!=b.a[i].value||a.a[i].low!=b.a[i].low||a.a[i].high!=b.a[i].high||a.a[i].step!=b.a[i].step)return false;
          return true;
-@@ -70,15 +83,17 @@
+@@ -70,15 +89,17 @@
          for(int i=0;i<3;i++)for(int j=0;j<5;j++)GetDlgItem(1510+10*i+j)->EnableWindow(enabled);
          GetDlgItem(1501)->EnableWindow(enabled);GetDlgItem(1502)->EnableWindow(enabled);
      }
@@ -247,7 +264,7 @@
          }
          initializing=false;fieldsDirty=false;
      }
-@@ -108,13 +123,13 @@
+@@ -108,13 +129,13 @@
      void FinishGesture(){
          ending=true;if(pending)Commit(true);
          if(gesture){auto plot=Graph();if(plot)plot->RequestParameterPlot(false);}
@@ -267,7 +284,7 @@
      void Layout(){
          for(int id:{1544,1545,1546,1560,1561,1562})GetDlgItem(id)->ShowWindow(compact?SW_HIDE:SW_SHOW);
          for(int i=0;i<3;i++)for(int j=2;j<=4;j++)GetDlgItem(1510+10*i+j)->ShowWindow(compact?SW_HIDE:SW_SHOW);
-@@ -127,10 +142,10 @@
+@@ -127,10 +148,10 @@
      }
  public:
      CParameterSliderPanel():CFeatureDialog(IDD_PARAMETER_SLIDERS,pMainView),graphId(0),epoch(0),initializing(false),opened(false),compact(true),fieldsDirty(false),pending(false),gesture(false),gestureUndo(false),ending(false),applying(false){background.CreateSolidBrush(RGB(245,248,252));}
@@ -280,7 +297,7 @@
          return d->IsSpecialDrawing==51?(CFunctionPlotter*)d->SpecialData:NULL;
      }
      bool Opened()const{return opened;}
-@@ -147,19 +162,18 @@
+@@ -147,19 +168,18 @@
              for(auto &n:nodes)if(n.object==(CObject*)graph){graphId=n.info->id;epoch=InteractiveObjects::DocumentEpoch();break;}
              auto plot=Graph();if(plot){current=plot->ParameterSnapshot();Fields();}
          }
@@ -303,7 +320,7 @@
          }else{SetDlgItemText(1543,graphId?"Graph removed":"Select a graph");SetDlgItemText(1505,graphId?"Undo restores the graph and reconnects this panel.":"Click a graph on the page to show its sliders. Use a, b and c in its formulas.");}
          Anchor();if(!IsWindowVisible())ShowWindow(SW_SHOWNOACTIVATE);
      }
-@@ -182,11 +196,11 @@
+@@ -182,11 +202,11 @@
          int sliderPosition=((CSliderCtrl*)bar)->GetPos();
          if(!gesture){current=plot->ParameterSnapshot();gesture=true;gestureUndo=false;Fields();}
          current.a[i].value=current.a[i].At(sliderPosition);
@@ -317,6 +334,34 @@
      virtual BOOL OnCommand(WPARAM wp,LPARAM lp){
          int id=LOWORD(wp),notice=HIWORD(wp);
          if(initializing)return TRUE;
+--- a/Mathomir/InteractiveObjects.h
++++ b/Mathomir/InteractiveObjects.h
+@@ -5,6 +5,7 @@
+ #include <cstdio>
+ #include <string>
+ #include <vector>
++#include <set>
+ namespace InteractiveObjects {
+ inline std::string DisplayNumber(double value){char text[64]={};for(int precision=1;precision<=17;precision++){std::sprintf(text,"%.*g",precision,value);if(std::strtod(text,NULL)==value)break;}return text;}
+ struct Info {
+@@ -36,6 +37,17 @@
+     Connector():from(0),to(0),style(1),route(0),fromPort(0),toPort(0){}
+     bool Attached()const{return from&&to&&from!=to;}
+ };
++// Missing targets still own their IDs while a live reference exists. Otherwise
++// adding or pasting an unrelated object can silently reconnect that reference.
++inline void ReserveIds(std::set<unsigned int> &used,const Info &info,const Connector *connector=NULL,unsigned int tableSource=0){
++    for(unsigned int id:{info.id,info.steps,info.tableGraph,tableSource})if(id)used.insert(id);
++    if(connector){if(connector->from)used.insert(connector->from);if(connector->to)used.insert(connector->to);}
++}
++inline unsigned int AllocateId(unsigned int &next,std::set<unsigned int> &used){
++    if(!next||next>=0x7fffffffu)next=1;
++    while(used.count(next)){if(++next>=0x7fffffffu)next=1;}
++    unsigned int id=next++;if(next>=0x7fffffffu)next=1;used.insert(id);return id;
++}
+ inline Point Port(Rect r,Point other,int port){Point c=r.Center();if(port==1){c.y=r.top;return c;}if(port==2){c.x=r.right;return c;}if(port==3){c.y=r.bottom;return c;}if(port==4){c.x=r.left;return c;}
+     double dx=other.x-c.x,dy=other.y-c.y;if(std::fabs(dx)+std::fabs(dy)<1e-9)dx=1;
+     double t=1e30;if(std::fabs(dx)>1e-9)t=(r.right-r.left)/2/std::fabs(dx);if(std::fabs(dy)>1e-9)t=(std::min)(t,(r.bottom-r.top)/2/std::fabs(dy));Point p={c.x+t*dx,c.y+t*dy};return p;}
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
 @@ -68,6 +68,7 @@
@@ -454,6 +499,15 @@
          else{int size=min(180,min(cx,cy)-20),source=max(1,size/2),sx=max(0,min(cx-source,p.x-source/2)),sy=max(0,min(cy-source,p.y-source/2));int tx=max(6,min(cx-size-6,p.x+28)),ty=max(6,min(cy-size-6,p.y+24));CDC image;CBitmap copy;image.CreateCompatibleDC(dc);copy.CreateCompatibleBitmap(dc,source,source);auto old=image.SelectObject(&copy);image.BitBlt(0,0,source,source,dc,sx,sy,SRCCOPY);dc->SetStretchBltMode(HALFTONE);dc->StretchBlt(tx,ty,size,size,&image,0,0,source,source,SRCCOPY);dc->Draw3dRect(tx-2,ty-2,size+4,size+4,RGB(35,60,95),RGB(35,60,95));image.SelectObject(old);}
          dc->SetBkColor(RGB(255,255,255));dc->SetBkMode(OPAQUE);dc->SetTextColor(RGB(25,35,50));dc->SelectObject(GetStockObject(DEFAULT_GUI_FONT));TeachDraw(dc,12,max(5,cy-28),TeachPresentation==1?L"Spotlight  \u00b7  Esc to exit":L"Magnifier  \u00b7  Esc to exit");
      }dc->RestoreDC(saved);
+@@ -85,7 +114,7 @@
+ static bool TeachWriteFile(const std::wstring &path,const std::string &data){HANDLE file=CreateFileW((path+L".tmp").c_str(),GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);if(file==INVALID_HANDLE_VALUE)return false;DWORD written=0;bool ok=WriteFile(file,data.data(),(DWORD)data.size(),&written,NULL)&&written==data.size();CloseHandle(file);if(ok)ok=MoveFileExW((path+L".tmp").c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=FALSE;if(!ok)DeleteFileW((path+L".tmp").c_str());return ok;}
+ static bool TeachReadFile(const std::wstring &path,std::string &data){HANDLE f=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);if(f==INVALID_HANDLE_VALUE)return false;DWORD n=GetFileSize(f,NULL),got=0;bool ok=n>0&&n<=8*1024*1024;if(ok){data.resize(n);ok=ReadFile(f,&data[0],n,&got,NULL)&&got==n;}CloseHandle(f);return ok;}
+ static void TeachFreshIds(CDrawing *drawing){
+-    tDocumentStruct dummy={};dummy.Object=(CObject*)drawing;dummy.Type=2;dummy.Length=dummy.Below=1;std::vector<InteractiveNode> copied;CollectInteractive((CObject*)drawing,2,0,0,&dummy,NULL,-1,0,0,0,NULL,copied);auto existing=InteractiveNodes(NULL);std::set<unsigned int> used;for(auto &n:existing)if(n.info->id)used.insert(n.info->id);std::map<unsigned int,unsigned int> ids,groups;
++    tDocumentStruct dummy={};dummy.Object=(CObject*)drawing;dummy.Type=2;dummy.Length=dummy.Below=1;std::vector<InteractiveNode> copied;CollectInteractive((CObject*)drawing,2,0,0,&dummy,NULL,-1,0,0,0,NULL,copied);auto existing=InteractiveNodes(NULL);std::set<unsigned int> used;ReserveInteractiveIds(existing,used);std::map<unsigned int,unsigned int> ids,groups;
+     for(auto &n:copied){auto old=n.info->id;n.info->id=NewInteractiveId(used);if(old)ids[old]=n.info->id;if(n.info->steps){auto group=n.info->steps;if(!groups.count(group))groups[group]=NewInteractiveId(used);n.info->steps=groups[group];}}
+     for(auto &n:copied){if(n.info->tableGraph)n.info->tableGraph=ids.count(n.info->tableGraph)?ids[n.info->tableGraph]:0;if(n.type==2){auto d=(CDrawing*)n.object;auto &c=d->m_Connector;if(c.Attached()){if(ids.count(c.from)&&ids.count(c.to)){c.from=ids[c.from];c.to=ids[c.to];}else c.from=c.to=0;}if(d->IsSpecialDrawing==51&&d->SpecialData){auto p=(CFunctionPlotter*)d->SpecialData;p->tableData.source=ids.count(p->tableData.source)?ids[p->tableData.source]:0;p->FloatingPreview=true;}}}
+ }
 @@ -111,6 +140,7 @@
  
  class CTeachingDock:public CFeatureDialog {

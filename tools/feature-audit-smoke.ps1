@@ -25,7 +25,23 @@ foreach($n in @('-10','10','-10','10')){$graph+='<subexp d="0,0;0,0"><ex fh="100
 $graph+='<subexp d="0,0;0,0"><ex fh="100"><var t="a" f="00"/><opr s="*"/><var t="x" f="00"/></ex></subexp></o>'
 for($i=0;$i -lt 12;$i++){$graph+='<o t="1" X="'+(20+($i%6)*85)+'" Y="'+(540+[int][Math]::Floor($i/6)*100)+'"><ex fh="80" oid="'+($i+2)+'" tgraph="1" tstart="0" tstep="1" tcount="2" tslot="0"/></o>'}
 $graph+='</mathomir>';$graph|Set-Content $file -Encoding ascii
-$env:MATHOMIR_FEATURE_DIAGNOSTICS='1';$env:MATHOMIR_GRAPH_DIAGNOSTICS='1';$app=Start-Process $exe -WorkingDirectory $folder -PassThru
+$env:MATHOMIR_FEATURE_DIAGNOSTICS='1';$env:MATHOMIR_GRAPH_DIAGNOSTICS='1'
+# Start with a fresh allocator. ID 2 is missing but referenced by a linked table;
+# creating a new native graph must reserve that ID rather than reusing it.
+$mainFixture=$file;$file=Join-Path $folder 'feature-audit-reserved-reference.mom'
+'<?xml version="1.0"?><mathomir><o t="1" X="40" Y="60"><ex fh="100" oid="1" tgraph="2" tcount="2"><var t="KEEP" f="00"/></ex></o></mathomir>'|Set-Content $file -Encoding ascii
+$app=Start-Process $exe -WorkingDirectory $folder -PassThru
+try{
+ Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;[BasicGraphProbe]::ShowWindow($main,3)|Out-Null;$view=[MathomirUiProbe]::Child($main,0xE900)
+ [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 400;[MathomirUiProbe]::Send($main,273,32775)|Out-Null;[MathomirUiProbe]::Send($view,276,0)|Out-Null
+ [MathomirUiProbe]::PostMessage($main,273,[IntPtr]33106,[IntPtr]::Zero)|Out-Null;$dialog=[IntPtr]::Zero
+ for($i=0;$i -lt 40;$i++){Start-Sleep -Milliseconds 50;$dialog=[MathomirUiProbe]::Window($app.Id,'Relations and parametric curves');if($dialog -ne [IntPtr]::Zero){break}}
+ Check ($dialog -ne [IntPtr]::Zero) 'Could not create the reference-ID test graph';[MathomirUiProbe]::PostMessage($dialog,273,[IntPtr]1,[IntPtr]::Zero)|Out-Null;Start-Sleep -Milliseconds 250;Click 150 150;EscapeView;$s=SaveDoc
+ Check ($s.SelectNodes('//*[@oid="2"]').Count -eq 0) 'A new native object reused a still-referenced missing ID'
+ Check ($s.mathomir.ChildNodes.Count -eq 2 -and $s.OuterXml.Contains('KEEP')) 'A missing graph reference silently attached to the new graph';Capture 'feature-audit-reserved-reference.png'
+ Write-Output 'Native identity audit passed: a new graph does not reuse a missing target ID or alter the orphaned linked table.'
+}catch{if($main){Capture 'feature-audit-identity-failure.png'};throw}finally{if($app -and !$app.HasExited){Stop-Process -Id $app.Id -Force;$app.WaitForExit()}}
+$file=$mainFixture;$app=Start-Process $exe -WorkingDirectory $folder -PassThru
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;[BasicGraphProbe]::ShowWindow($main,3)|Out-Null;$view=[MathomirUiProbe]::Child($main,0xE900)
  [MathomirUiProbe]::OpenFile($main,$file);Start-Sleep -Milliseconds 600;[MathomirUiProbe]::Send($main,273,32775)|Out-Null;[MathomirUiProbe]::Send($view,276,0)|Out-Null;Start-Sleep -Milliseconds 200

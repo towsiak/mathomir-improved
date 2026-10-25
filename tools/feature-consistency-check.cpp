@@ -20,6 +20,12 @@ int main(){
     assert(TeachingTools::MergeAxes(afterInline,afterInline,draft)==merged);
     assert(TeachingTools::SliderPollInterval(false,false,false)==125);
     for(int mask=1;mask<8;mask++)assert(TeachingTools::SliderPollInterval(mask&1,mask&2,mask&4)==16);
+    InteractiveObjects::Info linked;linked.id=1;linked.tableGraph=2;linked.steps=9;
+    InteractiveObjects::Connector connection;connection.from=5;connection.to=6;
+    std::set<unsigned int> reserved;InteractiveObjects::ReserveIds(reserved,linked,&connection,7);
+    assert(reserved==std::set<unsigned int>({1,2,5,6,7,9}));
+    unsigned int next=1;assert(InteractiveObjects::AllocateId(next,reserved)==3);assert(InteractiveObjects::AllocateId(next,reserved)==4);assert(InteractiveObjects::AllocateId(next,reserved)==8);
+    reserved.clear();next=0x7ffffffeu;assert(InteractiveObjects::AllocateId(next,reserved)==0x7ffffffeu);assert(next==1);assert(InteractiveObjects::AllocateId(next,reserved)==1);
     GraphPointLists::Cache cache;auto first=cache.Resolve("(1,2),(3,4),(5,6)");assert(first->kind==GraphPointLists::Ready&&first->points.size()==3);
     for(int i=0;i<10000;i++)assert(cache.Resolve(first->source).get()==first.get());
     auto changed=cache.Resolve("(1,2),(3,4),(5,7)");assert(changed.get()!=first.get()&&changed->points[2].y==7&&first->points[2].y==6);

@@ -228,3 +228,6 @@ FEATURE CONSISTENCY / PERFORMANCE AUDIT (2026-10-25)
 - Graph editing controls stay out of carried previews and printed output.
 - FEATURE_CONSISTENCY_AUDIT_2026-10-25.md records findings, checks and remaining
   legacy save/load, allocation and interaction-state limitations.
+
+The feature audit also centralizes ID reservation for ordinary, pasted and
+reusable objects, including dangling graph/table references and safe wraparound.

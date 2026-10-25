@@ -13,6 +13,7 @@ has been proved correct or that every interaction now uses one state machine.
 
 | Finding | Result |
 | --- | --- |
+| The native allocator reserved object/step/connector IDs but omitted missing graph/table targets; paste and reusable-item paths built different partial reservation sets. The actual extracted allocator reused ID 2 while a linked table still referenced missing graph 2. | One reservation policy serves ordinary allocation, paste and reusable items. It includes object IDs, step groups, both connector endpoints, linked graph IDs and source-table IDs. New allocation also wraps before the invalid upper bound. The extracted native regression and a fresh-process graph-creation check cover the missing-target case. |
 | Feature synchronization built separate document inventories, and each linked table could trigger another whole-document search and repeat the same graph checksum. | One fresh inventory is shared by teaching and interactive synchronization. An ID index resolves references within that pass, and each referenced graph is checksummed once per pass. Connector geometry still receives exact measurements when required. No object-pointer cache survives a frame or document transition. |
 | An open slider panel used a 16 ms timer even while idle; animation rewrote range/step controls that had not changed. | Idle polling is 125 ms. Playback and thumb dragging retain 16 ms updates. Animation updates values and positions; full range/step refreshes remain for actual settings changes. The panel reuses the graph lookup already needed for synchronization. |
 | Inline axis edits, graph-tool fields, and table-plot options could apply stale copies of names/units over newer edits made elsewhere. | All use the same axis validation and fieldwise merge. A field unchanged since the editor's baseline preserves the current graph value. An explicitly edited or cleared field is applied. The graph-tool fields refresh without discarding pending edits. |
@@ -24,7 +25,8 @@ has been proved correct or that every interaction now uses one state machine.
 
 ## Evidence and verification
 
-- `feature-consistency-check.cpp` checks stale axis forms, independent edits,
+- `feature-identity-source-test.py` runs the actual native reservation and allocation bodies with controlled object stubs; the pre-fix missing-ID reuse was reproduced.
+- `feature-consistency-check.cpp` checks reference reservation and wraparound, stale axis forms, independent edits,
   clearing and conflicting changes, shared limits, idle/active cadence, cache
   invalidation, invalid input, and concurrent immutable point snapshots.
 - A local parsing microbenchmark with 100 constant-expression points and 1,000
