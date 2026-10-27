@@ -8,6 +8,7 @@ using System;
 using System.Text;
 using System.Runtime.InteropServices;
 public static class SearchClickUI {
+ public static bool RequireListHit=true;
  [StructLayout(LayoutKind.Sequential)] public struct Rect {public int Left,Top,Right,Bottom;}
  [StructLayout(LayoutKind.Sequential)] struct Point {public int X,Y;}
  [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="SendMessageTimeoutW")] static extern IntPtr Read(IntPtr h,uint m,IntPtr w,StringBuilder text,uint f,uint ms,out UIntPtr r);
@@ -16,11 +17,13 @@ public static class SearchClickUI {
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] static extern IntPtr WindowFromPoint(Point p);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h,StringBuilder text,int size);
+ [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr h);
  [DllImport("user32.dll")] static extern void mouse_event(uint flags,uint x,uint y,uint data,UIntPtr extra);
  [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h,int x,int y,int w,int height,bool paint);
  public static string Label(IntPtr list,int row){var text=new StringBuilder(2048);UIntPtr r;if(Read(list,0x189,(IntPtr)row,text,2,3000,out r)==IntPtr.Zero)throw new Exception("Cannot read result");return text.ToString();}
  public static Rect Row(IntPtr list,int row){Rect rect;UIntPtr r;if(Bounds(list,0x198,(IntPtr)row,out rect,2,3000,out r)==IntPtr.Zero||r.ToUInt64()==UInt64.MaxValue)throw new Exception("Cannot locate result");return rect;}
- public static void Pointer(IntPtr frame,IntPtr list,int row){Rect rect=Row(list,row);Point p=new Point{X=rect.Left+20,Y=(rect.Top+rect.Bottom)/2};ClientToScreen(list,ref p);SetForegroundWindow(frame);SetCursorPos(p.X,p.Y);System.Threading.Thread.Sleep(120);if(WindowFromPoint(p)!=list)throw new Exception("Result is covered by a different native window");}
+ public static void Pointer(IntPtr frame,IntPtr list,int row){Rect rect=Row(list,row);Point p=new Point{X=rect.Left+20,Y=(rect.Top+rect.Bottom)/2};ClientToScreen(list,ref p);SetForegroundWindow(frame);SetCursorPos(p.X,p.Y);System.Threading.Thread.Sleep(120);IntPtr hit=WindowFromPoint(p);var name=new StringBuilder(100);GetClassName(hit,name,100);Console.WriteLine("Search hit: row="+row+", x="+p.X+", y="+p.Y+", class="+name+", control="+GetDlgCtrlID(hit)+", list="+(hit==list));if(RequireListHit&&hit!=list)throw new Exception("Result is covered by native "+name+" control "+GetDlgCtrlID(hit));}
  public static void Down(){mouse_event(2,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(90);}
  public static void Up(){mouse_event(4,0,0,0,UIntPtr.Zero);System.Threading.Thread.Sleep(120);}
  public static void Click(IntPtr frame,IntPtr list,int row){Pointer(frame,list,row);Down();Up();}
@@ -60,6 +63,7 @@ $env:MATHOMIR_DIAGNOSTIC_STARTUP='1'
 $app=Start-Process $exe -WorkingDirectory $folder -PassThru
 try{
  Start-Sleep -Seconds 2;$app.Refresh();$main=$app.MainWindowHandle;Check ($main -ne [IntPtr]::Zero) 'App did not start'
+ [SearchClickUI]::RequireListHit=(!$BaselineProbe)
  [SearchClickUI]::MoveWindow($main,15,15,1050,760,$true)|Out-Null
  $view=[MathomirUiProbe]::Child($main,0xE900);$search=[MathomirUiProbe]::Child($main,1112)
  $fixture=Join-Path $folder 'search-click-steps.mom'
@@ -74,6 +78,9 @@ try{
  if($BaselineProbe){
   $r=@{real_mouse_opened_step_dialog=($d -ne [IntPtr]::Zero);selected_row=[MathomirUiProbe]::Send($list,0x188,0);intended_row=$step}
   if($d -ne [IntPtr]::Zero){CloseDialog $d}
+  Query 'Make or edit step sequence';[SearchClickUI]::Click($main,$list,0);$first=WaitDialog 'Step-by-step sequence'
+  $r['uncovered_first_row_opened_step_dialog']=($first -ne [IntPtr]::Zero)
+  if($first -ne [IntPtr]::Zero){CloseDialog $first}
   Query 'ste';for($i=0;$i -lt $step;$i++){[MathomirUiProbe]::PostMessage($search,256,[IntPtr]40,[IntPtr]::Zero)|Out-Null};Start-Sleep -Milliseconds 100
   $r['selection_before_resize']=[MathomirUiProbe]::Send($list,0x188,0)
   [SearchClickUI]::MoveWindow($main,15,15,1060,760,$true)|Out-Null;Start-Sleep -Milliseconds 150

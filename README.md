@@ -234,9 +234,9 @@ reusable objects, including dangling graph/table references and safe wraparound.
 
 
 SEARCH RESULT CLICKS (2026-10-27)
-Feature-search results now handle a complete real mouse press/release gesture,
-including an already-selected first row and lower rows. Dragging outside cancels.
+The inline feature-search list now hides its original modal-dialog prompt,
+which overlapped lower result rows and intercepted actual mouse clicks.
 Resizing the toolbar repositions the open list without resetting its selection.
-Step setup and reveal retain the selected page objects. Native regression checks
-use actual mouse input on the ambiguous "ste" results, plus arrows/Enter, resize,
-first-row choices, and a different dialog in the same results list.
+Native regression checks use real mouse input on the ambiguous "ste" results:
+step setup/save/reveal, first and lower rows, a different dialog in the same list,
+retained page selection, drag-out cancellation, resize and arrows/Enter.

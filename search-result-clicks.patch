@@ -1,68 +1,16 @@
 --- a/Mathomir/MathomirView.cpp
 +++ b/Mathomir/MathomirView.cpp
-@@ -10950,26 +10950,54 @@
-     CString label,keywords;
- };
- 
--// One mouse click runs a result, including the initially selected first row.
-+// Handle the complete mouse gesture ourselves. The native list box tracks
-+// real clicks inside its button-down handler, so an up-only subclass misses
-+// releases consumed by that tracking loop. Keyboard navigation stays native.
- class CFeatureResultList : public CListBox
- {
-+    int pressedRow;
-+    DWORD_PTR pressedEntry;
-+    int RowAt(CPoint point)
-+    {
-+        BOOL outside=FALSE;
-+        UINT row=ItemFromPoint(point,outside);
-+        CRect rectangle;
-+        return !outside && row<(UINT)GetCount() && GetItemRect(row,&rectangle)!=LB_ERR &&
-+            rectangle.PtInRect(point) ? (int)row : -1;
-+    }
-+public:
-+    CFeatureResultList() : pressedRow(-1),pressedEntry(0) {}
- protected:
-+    afx_msg void OnLButtonDown(UINT flags,CPoint point)
-+    {
-+        pressedRow=-1;
-+        int row=RowAt(point);
-+        if (row<0) return;
-+        SetFocus(); SetCurSel(row);
-+        pressedRow=row; pressedEntry=GetItemData(row);
-+        SetCapture();
-+    }
-     afx_msg void OnLButtonUp(UINT flags,CPoint point)
+@@ -11045,6 +11045,9 @@
+     void ArrangeInline(int width,int height)
      {
--        CListBox::OnLButtonUp(flags,point);
--        BOOL outside=FALSE;
--        UINT item=ItemFromPoint(point,outside);
--        CRect rectangle;
--        if (!outside && item<(UINT)GetCount() && GetItemRect(item,&rectangle)!=LB_ERR && rectangle.PtInRect(point))
-+        int row=RowAt(point);
-+        bool run=GetCapture()==this && row>=0 && row==pressedRow && GetItemData(row)==pressedEntry;
-+        pressedRow=-1;
-+        if (GetCapture()==this) ReleaseCapture();
-+        if (run)
-         {
--            SetCurSel(item);
-+            SetCurSel(row);
-             GetParent()->PostMessage(WM_COMMAND,MAKEWPARAM(IDC_FEATURE_RESULTS,LBN_DBLCLK),(LPARAM)m_hWnd);
-         }
-     }
-+    afx_msg void OnLButtonDblClk(UINT flags,CPoint point) { OnLButtonDown(flags,point); }
-+    afx_msg void OnCaptureChanged(CWnd *window) { pressedRow=-1; CListBox::OnCaptureChanged(window); }
-     DECLARE_MESSAGE_MAP()
- };
- BEGIN_MESSAGE_MAP(CFeatureResultList,CListBox)
-+    ON_WM_LBUTTONDOWN()
-     ON_WM_LBUTTONUP()
-+    ON_WM_LBUTTONDBLCLK()
-+    ON_WM_CAPTURECHANGED()
- END_MESSAGE_MAP()
- 
- class CFeatureSearchDialog : public CFeatureDialog
-@@ -11115,10 +11143,10 @@
+         ModifyStyle(WS_CAPTION|WS_SYSMENU,0,SWP_FRAMECHANGED);
++        // The modal search prompt overlaps the second result row in this layout.
++        // Hide every modal-only control, including this static text hit target.
++        CWnd *prompt=GetDlgItem(IDC_STATIC); if (prompt) prompt->ShowWindow(SW_HIDE);
+         GetDlgItem(IDC_FEATURE_QUERY)->ShowWindow(SW_HIDE);
+         GetDlgItem(IDOK)->ShowWindow(SW_HIDE); GetDlgItem(IDCANCEL)->ShowWindow(SW_HIDE);
+         results.MoveWindow(4,4,width-8,height-28);
+@@ -11115,10 +11118,10 @@
          DWORD_PTR index=results.GetItemData(row);
          if (index>=entries.size()) return;
          command=entries[index].command; drawingMode=entries[index].drawingMode;
@@ -75,7 +23,7 @@
      DECLARE_MESSAGE_MAP()
  };
  BEGIN_MESSAGE_MAP(CFeatureSearchDialog,CDialog)
-@@ -11364,7 +11392,7 @@
+@@ -11364,7 +11367,7 @@
          backgroundButton.MoveWindow(x+446,featureHeight+3,86,26);backgroundButton.ShowWindow(width>=710?SW_SHOWNOACTIVATE:SW_HIDE);
          colorButton.MoveWindow(x+372,featureHeight+3,68,26); colorButton.ShowWindow(width>=610?SW_SHOWNOACTIVATE:SW_HIDE);
          modeButton.SetWindowText(TrigDegrees ? "DEG" : "RAD");
@@ -84,7 +32,7 @@
      }
      void HideResults() { if (dropdown.GetSafeHwnd()) dropdown.ShowWindow(SW_HIDE); }
      void ShowResults()
-@@ -11373,13 +11401,19 @@
+@@ -11373,13 +11376,19 @@
          if (!dropdown.GetSafeHwnd()) { dropdown.inlineView=view; if (!dropdown.Create(IDD_FEATURE_SEARCH,this)) return; dropdown.ModifyStyle(WS_CAPTION|WS_SYSMENU,0,SWP_FRAMECHANGED); }
          BuildFeatureCatalog(dropdown);
          CString query; search.GetWindowText(query); dropdown.SetQuery(query);
