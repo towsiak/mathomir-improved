@@ -41,3 +41,4 @@ simple-table-plot.patch
 top-toolbar-shortcuts.patch
 basic-grapher-input.patch
 feature-consistency-audit.patch
+search-result-clicks.patch

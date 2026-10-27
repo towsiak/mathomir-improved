@@ -231,3 +231,12 @@ FEATURE CONSISTENCY / PERFORMANCE AUDIT (2026-10-25)
 
 The feature audit also centralizes ID reservation for ordinary, pasted and
 reusable objects, including dangling graph/table references and safe wraparound.
+
+
+SEARCH RESULT CLICKS (2026-10-27)
+Feature-search results now handle a complete real mouse press/release gesture,
+including an already-selected first row and lower rows. Dragging outside cancels.
+Resizing the toolbar repositions the open list without resetting its selection.
+Step setup and reveal retain the selected page objects. Native regression checks
+use actual mouse input on the ambiguous "ste" results, plus arrows/Enter, resize,
+first-row choices, and a different dialog in the same results list.

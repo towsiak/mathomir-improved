@@ -31,6 +31,15 @@ jobs:
         run: |
           & $env:MSBUILD source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Real mouse and keyboard feature-search checks
+        shell: pwsh
+        run: ./tools/feature-search-smoke.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Search-Clicks-Preview
+          path: source/build/search-click-*
+          if-no-files-found: warn
       - name: Placement preview pixel and lifecycle checks
         shell: pwsh
         run: ./tools/placement-preview-smoke.ps1
@@ -53,6 +62,7 @@ jobs:
           path: |
             source/build/graph-diagnostics.txt
             source/build/feature-audit-*
+            source/build/search-click-*
             source/build/basic-grapher-*.png
             source/build/basic-grapher-*.mom
             source/build/teaching-*.png
@@ -129,6 +139,7 @@ jobs:
             source/build/object-pointer-*
             source/build/basic-grapher-*
             source/build/feature-audit-*
+            source/build/search-click-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -204,6 +215,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/feature-search-smoke.ps1
           ./tools/placement-preview-smoke.ps1
           ./tools/rotation-center-smoke.ps1
           ./tools/object-colors-smoke.ps1
@@ -232,6 +244,7 @@ jobs:
             source/build/overlap-ui.png
             source/build/graph-diagnostics.txt
             source/build/feature-audit-*
+            source/build/search-click-*
             source/build/*integral*.mom
             source/build/integral-ui.png
             source/build/selection-approx-ui.png
@@ -274,6 +287,7 @@ jobs:
             source/build/object-pointer-*
             source/build/basic-grapher-*
             source/build/feature-audit-*
+            source/build/search-click-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -329,6 +343,7 @@ jobs:
           $env:PATH = "$($compiler.FullName)\bin\Hostx64\x86;$env:PATH"
           $env:ASAN_OPTIONS = "log_path=asan"
           $env:MATHOMIR_DIAGNOSTIC_STARTUP = '1'
+          ./tools/feature-search-smoke.ps1
           ./tools/placement-preview-smoke.ps1
           ./tools/rotation-center-smoke.ps1
           ./tools/object-colors-smoke.ps1
@@ -396,6 +411,7 @@ jobs:
             source/build/object-pointer-*
             source/build/basic-grapher-*
             source/build/feature-audit-*
+            source/build/search-click-*
             source/build/rotation-center-*
             source/build/object-colors-*
             source/build/popup-colors-menu.txt
@@ -421,3 +437,35 @@ jobs:
           name: AI-Math-Reader-Preview
           path: source/build/ai-math-reader-ui.png
           if-no-files-found: ignore
+
+  search_click_baseline:
+    # One diagnostic comparison with the previous shipped click handler.
+    if: contains(github.event.head_commit.message, '[search-click-repro]')
+    name: Previous search mouse-handler comparison
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble previous search behavior
+        shell: pwsh
+        run: |
+          ./tools/prepare-source.ps1
+          git -C source apply --reverse --ignore-space-change ../search-result-clicks.patch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build previous search behavior
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.ATLMFC -property installationPath
+          if (!$vs) { throw 'Visual Studio with MFC is required.' }
+          & "$vs\MSBuild\Current\Bin\MSBuild.exe" source/Mathomir/Mathomir.vcxproj /m /p:Configuration=Release /p:Platform=Win32 /v:minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Record actual previous real-mouse result
+        shell: pwsh
+        run: ./tools/feature-search-smoke.ps1 -BaselineProbe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Search-Clicks-Previous-Behavior
+          path: source/build/search-click-*
+          if-no-files-found: warn
